@@ -378,6 +378,21 @@
       color: #ffffff;
     }
 
+    .pattern-btn.export:hover {
+      background: #0066ff;
+      color: #ffffff;
+    }
+
+    .pattern-btn.import:hover {
+      background: #ff6600;
+      color: #ffffff;
+    }
+
+    .pattern-btn.apply:hover {
+      background: #00ff66;
+      color: #000000;
+    }
+
     .code-editor {
       width: 100%;
       height: 300px;
@@ -1499,9 +1514,10 @@
             <div class="editor-header">
               <h3>CODE EDITOR</h3>
               <div class="editor-controls">
-                <button id="runPatternBtn" class="pattern-btn run">▶️ RUN</button>
-                <button id="stopPatternBtn" class="pattern-btn stop">⏹️ STOP</button>
-                <button id="exportPatternBtn" class="pattern-btn export">💾 EXPORT</button>
+                        <button id="runPatternBtn" class="pattern-btn run">▶️ RUN</button>
+        <button id="stopPatternBtn" class="pattern-btn stop">⏹️ STOP</button>
+        <button id="exportPatternBtn" class="pattern-btn export">💾 EXPORT</button>
+        <button id="applyToLayersBtn" class="pattern-btn apply">🎭 APPLY TO LAYERS</button>
               </div>
             </div>
             <textarea id="patternCodeEditor" class="code-editor" placeholder="// Write your P5.js pattern code here...
@@ -1983,21 +1999,163 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
       }
       
       function updatePreview() {
-        // Preview 2 shows Palette A (topmost visible layer)
-        const visibleLayersA = layersA.filter(l => l.visible);
-        const topLayerA = visibleLayersA.length > 0 ? 
-          visibleLayersA.reduce((top, layer) => {
-            return layer.id > top.id ? layer : top; // Get highest ID (most recent)
-          }) : null;
-        updatePreviewRow(preview2, topLayerA);
+        // Preview 2 shows Palette A composition (all visible layers combined)
+        updatePaletteComposition(preview2, layersA, 'PALETTE A');
         
-        // Preview 3 shows Palette B (topmost visible layer)
-        const visibleLayersB = layersB.filter(l => l.visible);
-        const topLayerB = visibleLayersB.length > 0 ? 
-          visibleLayersB.reduce((top, layer) => {
-            return layer.id > top.id ? layer : top; // Get highest ID (most recent)
-          }) : null;
-        updatePreviewRow(preview3, topLayerB);
+        // Preview 3 shows Palette B composition (all visible layers combined)
+        updatePaletteComposition(preview3, layersB, 'PALETTE B');
+      }
+
+      function updatePaletteComposition(previewRow, layers, paletteName) {
+        const label = previewRow.querySelector('.preview-row-label');
+        
+        // Clear previous content but keep the label
+        previewRow.innerHTML = '';
+        previewRow.appendChild(label);
+        
+        // Get visible layers sorted by layer order (bottom to top)
+        const visibleLayers = layers.filter(l => l.visible).sort((a, b) => a.id - b.id);
+        
+        if (visibleLayers.length === 0) {
+          const placeholder = document.createElement('div');
+          placeholder.className = 'preview-placeholder';
+          placeholder.textContent = `${paletteName} - NO VISIBLE LAYERS`;
+          previewRow.appendChild(placeholder);
+          return;
+        }
+        
+        // Create composition container
+        const compositionContainer = document.createElement('div');
+        compositionContainer.className = 'composition-container';
+        compositionContainer.style.cssText = `
+          position: relative;
+          width: 100%;
+          height: 100%;
+          max-width: 160px;
+          max-height: 90px;
+          background: #000;
+          overflow: hidden;
+          border-radius: 2px;
+        `;
+        
+        // Add each visible layer to the composition
+        visibleLayers.forEach((layer, index) => {
+          if (layer.imageSrc || layer.type === 'pattern') {
+            const layerElement = createLayerElement(layer, index);
+            if (layerElement) {
+              compositionContainer.appendChild(layerElement);
+            }
+          }
+        });
+        
+        // Add composition info overlay
+        const infoOverlay = document.createElement('div');
+        infoOverlay.className = 'composition-info';
+        infoOverlay.style.cssText = `
+          position: absolute;
+          bottom: 2px;
+          left: 2px;
+          background: rgba(0, 0, 0, 0.7);
+          color: #00ff00;
+          font-size: 8px;
+          padding: 1px 3px;
+          font-family: 'Courier New', monospace;
+          border-radius: 1px;
+          z-index: 1000;
+        `;
+        infoOverlay.textContent = `${visibleLayers.length} LAYERS`;
+        compositionContainer.appendChild(infoOverlay);
+        
+        previewRow.appendChild(compositionContainer);
+      }
+
+      function createLayerElement(layer, zIndex) {
+        let element = null;
+        
+        if (layer.type === 'pattern') {
+          // Handle P5.js pattern layers
+          element = document.createElement('canvas');
+          element.width = 160;
+          element.height = 90;
+          element.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: ${zIndex + 1};
+            opacity: ${(layer.opacity || 100) / 100};
+            mix-blend-mode: ${layer.blendMode || 'normal'};
+          `;
+          
+          // Apply inverse filter if enabled
+          if (layer.inverse) {
+            element.style.filter = 'invert(1)';
+          }
+          
+          // Create a mini P5 instance for preview
+          if (layer.patternCode) {
+            try {
+              const ctx = element.getContext('2d');
+              // Simple pattern preview (could be enhanced with actual P5 rendering)
+              ctx.fillStyle = '#00ff00';
+              ctx.fillRect(0, 0, element.width, element.height);
+              ctx.fillStyle = '#000';
+              ctx.font = '10px Courier New';
+              ctx.fillText('P5.JS', 5, 15);
+              ctx.fillText('PATTERN', 5, 30);
+            } catch (e) {
+              console.warn('Pattern preview error:', e);
+            }
+          }
+          
+        } else if (layer.imageSrc) {
+          // Determine if it's a video or image
+          const isVideo = layer.imageSrc && (
+            layer.imageSrc.includes('.mp4') || 
+            layer.imageSrc.includes('.mov') || 
+            layer.imageSrc.includes('.avi') || 
+            layer.imageSrc.includes('.webm') || 
+            layer.imageSrc.includes('.mkv')
+          );
+          
+          if (isVideo) {
+            element = document.createElement('video');
+            element.src = layer.imageSrc;
+            element.autoplay = true;
+            element.loop = true;
+            element.muted = true;
+            element.playsInline = true;
+            
+            // Ensure video starts playing
+            element.addEventListener('loadeddata', () => {
+              element.play().catch(e => console.log('Composition preview video autoplay prevented:', e));
+            });
+          } else {
+            element = document.createElement('img');
+            element.src = layer.imageSrc;
+          }
+          
+          element.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            z-index: ${zIndex + 1};
+            opacity: ${(layer.opacity || 100) / 100};
+            transform: scale(${layer.scale || 1});
+            mix-blend-mode: ${layer.blendMode || 'normal'};
+          `;
+          
+          // Apply inverse filter if enabled
+          if (layer.inverse) {
+            element.style.filter = (element.style.filter || '') + ' invert(1)';
+          }
+        }
+        
+        return element;
       }
       
       function updatePalettePreview(data) {
@@ -2314,17 +2472,59 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
         const result = await dialog.showOpenDialog({
           properties: ['openFile', 'openDirectory', 'multiSelections'],
           filters: [
-            { name: 'Media Files', extensions: ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov', 'avi', 'webm', 'mkv'] },
+            { name: 'All Media', extensions: ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov', 'avi', 'webm', 'mkv', 'comp'] },
             { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif'] },
             { name: 'Videos', extensions: ['mp4', 'mov', 'avi', 'webm', 'mkv'] },
+            { name: 'V3XV0ID Compositions', extensions: ['comp'] },
             { name: 'All Files', extensions: ['*'] }
           ]
         });
         
         if (!result.canceled && result.filePaths.length > 0) {
-          sendToOutput('load-images', { layerId, filePaths: result.filePaths });
+          // Check if any .comp files are selected
+          const compFiles = result.filePaths.filter(path => path.endsWith('.comp'));
+          const mediaFiles = result.filePaths.filter(path => !path.endsWith('.comp'));
+          
+          // Load regular media files
+          if (mediaFiles.length > 0) {
+            sendToOutput('load-images', { layerId, filePaths: mediaFiles });
+          }
+          
+          // Load .comp files as pattern layers
+          for (const compFile of compFiles) {
+            await loadCompositionToLayer(layerId, compFile);
+          }
         }
       };
+
+      async function loadCompositionToLayer(layerId, compFilePath) {
+        try {
+          const fs = require('fs');
+          const compData = JSON.parse(fs.readFileSync(compFilePath, 'utf8'));
+          
+          if (compData.type === 'v3xv0id-composition' && compData.metadata?.patternType === 'p5js') {
+            // Send composition data to output window to create pattern layer
+            sendToOutput('load-composition', { 
+              layerId, 
+              composition: {
+                name: compData.name,
+                code: compData.code,
+                metadata: compData.metadata,
+                type: 'pattern',
+                filePath: compFilePath
+              }
+            });
+            
+            console.log('✅ Composition loaded to layer:', compData.name);
+          } else {
+            console.error('Invalid composition format:', compFilePath);
+            alert(`Invalid .comp file: ${compFilePath}`);
+          }
+        } catch (error) {
+          console.error('Error loading composition to layer:', error);
+          alert(`Error loading composition: ${error.message}`);
+        }
+      }
       
       window.duplicateLayer = function(layerId) {
         sendToOutput('duplicate-layer', { layerId });
@@ -3050,6 +3250,7 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
       const runPatternBtn = document.getElementById('runPatternBtn');
       const stopPatternBtn = document.getElementById('stopPatternBtn');
       const exportPatternBtn = document.getElementById('exportPatternBtn');
+      const applyToLayersBtn = document.getElementById('applyToLayersBtn');
       const patternStatus = document.getElementById('patternStatus');
       const patternFPSDisplay = document.getElementById('patternFPS');
       const patternPresets = document.getElementById('patternPresets');
@@ -3143,6 +3344,10 @@ function draw() {
         updateTargetLayers();
       }
 
+      // Pattern Control Event Listeners
+      runPatternBtn.addEventListener('click', runPattern);
+      stopPatternBtn.addEventListener('click', stopPattern);
+
       function runPattern() {
         if (patternRunning) return;
         
@@ -3220,6 +3425,159 @@ function draw() {
         const checkedBoxes = targetLayersList.querySelectorAll('input:checked');
         activeTargetsCount.textContent = checkedBoxes.length;
       }
+
+      // Pattern Export/Import Functionality
+      exportPatternBtn.addEventListener('click', () => {
+        const code = patternCodeEditor.value.trim();
+        if (!code) {
+          alert('No pattern code to export!');
+          return;
+        }
+        
+        // Get pattern name from current preset or create default
+        let patternName = 'Custom Pattern';
+        const activePreset = document.querySelector('.preset-btn.active');
+        if (activePreset) {
+          patternName = activePreset.textContent;
+        }
+        
+        const patternData = {
+          type: 'v3xv0id-composition',
+          version: '1.0',
+          name: patternName,
+          code: code,
+          timestamp: Date.now(),
+          author: 'V3XV0ID',
+          description: `P5.js pattern composition: ${patternName}`,
+          metadata: {
+            fps: 60,
+            resolution: { width: 400, height: 400 },
+            blendMode: 'normal',
+            opacity: 100,
+            patternType: 'p5js'
+          }
+        };
+        
+        // Create downloadable .comp file
+        const blob = new Blob([JSON.stringify(patternData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${patternName.replace(/\s+/g, '_')}.comp`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        console.log('✅ Pattern exported as .comp file:', patternName);
+        
+        // Show success message
+        patternStatus.textContent = '✅ EXPORTED AS .COMP';
+        setTimeout(() => {
+          patternStatus.textContent = patternRunning ? 'RUNNING' : 'STOPPED';
+        }, 2000);
+      });
+
+      // Add Import .comp file functionality
+      function importCompositionFile() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.comp,.json';
+        input.addEventListener('change', async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          
+          try {
+            const text = await file.text();
+            const compData = JSON.parse(text);
+            
+            if (compData.type === 'v3xv0id-composition' && compData.metadata?.patternType === 'p5js') {
+              // Load the pattern code
+              patternCodeEditor.value = compData.code;
+              
+              // Show success message
+              patternStatus.textContent = '✅ COMPOSITION LOADED';
+              setTimeout(() => {
+                patternStatus.textContent = patternRunning ? 'RUNNING' : 'STOPPED';
+              }, 2000);
+              
+              console.log('✅ Composition loaded:', compData.name);
+            } else {
+              alert('Invalid .comp file format!');
+            }
+          } catch (error) {
+            console.error('Error loading composition:', error);
+            alert('Error loading composition file!');
+          }
+        });
+        input.click();
+      }
+
+      // Add import button to patterns tab
+      const importPatternBtn = document.createElement('button');
+      importPatternBtn.className = 'pattern-btn import';
+      importPatternBtn.innerHTML = '📁 IMPORT .COMP';
+      importPatternBtn.addEventListener('click', importCompositionFile);
+      
+      // Insert import button after export button
+      if (exportPatternBtn && exportPatternBtn.parentNode) {
+        exportPatternBtn.parentNode.insertBefore(importPatternBtn, exportPatternBtn.nextSibling);
+      }
+
+      // Apply Pattern to Selected Layers
+      applyToLayersBtn.addEventListener('click', () => {
+        const code = patternCodeEditor.value.trim();
+        if (!code) {
+          alert('No pattern code to apply!');
+          return;
+        }
+        
+        // Get selected target layers
+        const checkedBoxes = targetLayersList.querySelectorAll('input:checked');
+        if (checkedBoxes.length === 0) {
+          alert('Please select at least one target layer!');
+          return;
+        }
+        
+        // Get pattern name
+        let patternName = 'Custom Pattern';
+        const activePreset = document.querySelector('.preset-btn.active');
+        if (activePreset) {
+          patternName = activePreset.textContent;
+        }
+        
+        // Apply pattern to each selected layer
+        checkedBoxes.forEach(checkbox => {
+          const layerId = parseInt(checkbox.dataset.layerId);
+          
+          const compositionData = {
+            name: `${patternName} (PATTERN)`,
+            code: code,
+            metadata: {
+              fps: 60,
+              resolution: { width: 400, height: 400 },
+              blendMode: 'normal',
+              opacity: 100,
+              patternType: 'p5js'
+            },
+            type: 'pattern'
+          };
+          
+          // Send to output window
+          sendToOutput('apply-pattern-to-layer', { 
+            layerId, 
+            composition: compositionData
+          });
+        });
+        
+        console.log(`✅ Pattern applied to ${checkedBoxes.length} layers`);
+        
+        // Show success message
+        patternStatus.textContent = `✅ APPLIED TO ${checkedBoxes.length} LAYERS`;
+        setTimeout(() => {
+          patternStatus.textContent = patternRunning ? 'RUNNING' : 'STOPPED';
+        }, 2000);
+      });
 
       // Music Tab Functionality
       let musicLibraryTracks = [];
