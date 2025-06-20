@@ -1,0 +1,1788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=800, initial-scale=1.0">
+  <title>V3XV0ID Image Animator - Output</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap');
+    
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background: #000000;
+      color: #ffffff;
+      font-family: 'Courier New', 'Courier Prime', monospace;
+      font-size: 12px;
+      line-height: 1.0;
+      font-weight: normal;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: center;
+      cursor: crosshair;
+      position: relative;
+    }
+    
+    /* Scan lines effect */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(255, 255, 255, 0.01) 2px,
+        rgba(255, 255, 255, 0.01) 4px
+      );
+      pointer-events: none;
+      z-index: 1000;
+    }
+    
+    /* V3XV0ID branding in corner */
+    .v3xv0id-brand {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 999;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      font-size: 14px;
+      color: #ffffff;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      text-shadow: 0 0 3px rgba(255, 255, 255, 0.8);
+      opacity: 0.7;
+      user-select: none;
+      pointer-events: none;
+    }
+    
+    .cyber-text {
+      color: #ffffff;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+    }
+    
+    #animator {
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      width: 100vw;
+      z-index: 1;
+      position: relative;
+    }
+    #placeholder {
+      color: #888;
+      font-size: 18px;
+      font-family: 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-top: 60px;
+      text-align: center;
+      text-shadow: 0 0 2px rgba(136, 136, 136, 0.5);
+    }
+    #defaultBackground {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+    }
+    #defaultBackgroundImage {
+      max-width: 90vw;
+      max-height: 90vh;
+      object-fit: contain;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      box-shadow: 0 0 20px rgba(0,0,0,0.8);
+      transition: opacity 0.3s ease;
+      filter: grayscale(0.3) contrast(1.2);
+    }
+    img#animatedImage {
+      display: block;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 0 20px rgba(0,0,0,0.8);
+      margin: 0 auto;
+      background: #000;
+      filter: contrast(1.1);
+    }
+    
+    #thumbnails-bar {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.95);
+      border-top: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 10px 0 6px 0;
+      z-index: 30;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 0 -2px 12px rgba(0,0,0,0.8);
+    }
+    #thumbnails {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      max-width: 90vw;
+      margin-bottom: 6px;
+    }
+    .thumbnail {
+      width: 60px;
+      height: 40px;
+      object-fit: cover;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      cursor: crosshair;
+      transition: border 0.2s;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.8);
+      filter: grayscale(0.2) contrast(1.2);
+    }
+    .thumbnail:hover {
+      border: 1px solid #ffffff;
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+    }
+
+    .layer-canvas {
+      position: absolute;
+      width: 100vw;
+      height: 100vh;
+      border: 2px solid transparent;
+      z-index: 100;
+      user-select: none;
+      overflow: hidden;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .layer-canvas.draggable {
+      cursor: crosshair;
+    }
+    .layer-canvas.main-layer {
+      position: absolute;
+      left: 0;
+      top: 0;
+      cursor: crosshair;
+    }
+    .layer-image, .layer-video {
+      display: block;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 0 20px rgba(0,0,0,0.8);
+      max-width: none;
+      max-height: none;
+      filter: contrast(1.1);
+    }
+    
+    .layer-video {
+      object-fit: contain;
+    }
+    .layer-canvas:hover {
+      /* Clean hover state */
+    }
+    .layer-canvas.selected {
+      border: 2px solid transparent !important;
+      box-shadow: none !important;
+    }
+    
+    .layer-canvas[style*="cursor: grab"],
+    .layer-canvas[style*="cursor: grabbing"] {
+      border: 2px solid transparent;
+      cursor: crosshair !important;
+    }
+    .frame-controls {
+      position: absolute;
+      top: -30px;
+      right: 0;
+      display: none;
+      gap: 3px;
+    }
+    .layer-canvas:hover .frame-controls,
+    .layer-canvas.selected .frame-controls {
+      display: flex;
+    }
+    .frame-controls button {
+      padding: 4px 8px;
+      font-size: 10px;
+      font-family: 'Courier New', monospace;
+      background: rgba(0,0,0,0.9);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      cursor: crosshair;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      transition: all 0.2s;
+    }
+    .frame-controls button:hover {
+      background: #ffffff;
+      color: #000000;
+      border-color: #ffffff;
+    }
+  </style>
+</head>
+<body>
+  <!-- V3XV0ID Branding -->
+  <div class="v3xv0id-brand">V3XV0ID</div>
+  
+  <!-- Clean output window - controls moved to separate window -->
+  <div id="animator">
+    <div id="mainLayerCanvas" class="layer-canvas main-layer draggable" style="display:none;">
+      <img id="animatedImage" class="layer-image" src="" alt="Image Animation" />
+      <div class="frame-controls">
+        <button onclick="toggleLayerVisibility(0)">👁</button>
+      </div>
+    </div>
+    <div id="defaultBackground" style="display:none;">
+      <img id="defaultBackgroundImage" src="../vexvoid.png" alt="Default Background" />
+    </div>
+    <div id="placeholder" style="display:none;">No folders loaded.<br>Add a folder to begin.</div>
+  </div>
+  <div id="thumbnails-bar">
+    <div id="thumbnails"></div>
+  </div>
+  <script>
+    window.addEventListener('DOMContentLoaded', function() {
+      const { ipcRenderer } = require('electron');
+      const fs = require('fs');
+      const path = require('path');
+      const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif'];
+      const videoExtensions = ['.mp4', '.mov', '.avi', '.webm', '.mkv'];
+      
+      // State variables
+      let imageFiles = [];
+      let current = 0;
+      let interval = null;
+      let isPlaying = true;
+      let jitterEnabled = false;
+      let jitterInterval = null;
+      let layers = [];
+      let selectedLayer = null;
+      let layerCounter = 0;
+      let mainLayer = null;
+      let globalPaused = false;
+      let loopStart = 0;
+      let loopEnd = 0;
+      let totalImages = 0;
+      let activePalette = 'A'; // Track which palette is active for new layers
+      
+      // DOM elements
+      const img = document.getElementById('animatedImage');
+      const mainLayerCanvas = document.getElementById('mainLayerCanvas');
+      const placeholder = document.getElementById('placeholder');
+      const defaultBackground = document.getElementById('defaultBackground');
+      const defaultBackgroundImage = document.getElementById('defaultBackgroundImage');
+      const thumbnailsDiv = document.getElementById('thumbnails');
+      const thumbnailsBar = document.getElementById('thumbnails-bar');
+      
+      // Send updates to control window
+      function sendToControl(command, data = {}) {
+        ipcRenderer.send('output-to-control', { command, data });
+      }
+      
+      // Send preview updates to control window
+      function sendPreviewUpdate() {
+        const previewData = {
+          imageSrc: null,
+          opacity: 1,
+          scale: 1,
+          inverse: false,
+          hasDefaultBackground: false,
+          defaultBackgroundInverse: false,
+          layers: [] // Send all layer data for live preview
+        };
+        
+        // Check if default background is showing
+        if (defaultBackground.style.display !== 'none') {
+          previewData.hasDefaultBackground = true;
+          previewData.defaultBackgroundInverse = defaultBackgroundImage.style.filter.includes('invert(1)');
+        } else {
+          // Find the topmost visible layer for main preview
+          const visibleLayers = layers.filter(l => l.visible);
+          if (visibleLayers.length > 0) {
+            // Get the layer with highest z-index
+            const topLayer = visibleLayers.reduce((top, layer) => {
+              const topZ = parseInt(top.element?.style.zIndex || 0);
+              const layerZ = parseInt(layer.element?.style.zIndex || 0);
+              return layerZ > topZ ? layer : top;
+            });
+            
+            if (topLayer.imageElement && topLayer.imageElement.src) {
+              previewData.imageSrc = topLayer.imageElement.src;
+              previewData.opacity = (topLayer.opacity || 100) / 100;
+              previewData.scale = (topLayer.size || 100) / 100;
+              previewData.inverse = topLayer.inverse || false;
+            }
+          }
+        }
+        
+        // Send data for all layers for individual preview rows
+        previewData.layers = layers.map(layer => ({
+          id: layer.id,
+          name: layer.name,
+          visible: layer.visible,
+          imageSrc: layer.imageElement ? layer.imageElement.src : null,
+          opacity: (layer.opacity || 100) / 100,
+          scale: (layer.size || 100) / 100,
+          inverse: layer.inverse || false,
+          imageIndex: layer.imageIndex,
+          totalImages: layer.imageFiles ? layer.imageFiles.length : 0,
+          palette: layer.palette || 'A'
+        }));
+        
+        // Send palette-specific preview data
+        const paletteALayers = layers.filter(l => (l.palette || 'A') === 'A' && l.visible);
+        const paletteBLayers = layers.filter(l => (l.palette || 'A') === 'B' && l.visible);
+        
+        previewData.paletteA = paletteALayers.length > 0 ? {
+          imageSrc: paletteALayers[paletteALayers.length - 1].imageElement?.src || null,
+          opacity: (paletteALayers[paletteALayers.length - 1].opacity || 100) / 100,
+          scale: (paletteALayers[paletteALayers.length - 1].size || 100) / 100,
+          inverse: paletteALayers[paletteALayers.length - 1].inverse || false
+        } : null;
+        
+        previewData.paletteB = paletteBLayers.length > 0 ? {
+          imageSrc: paletteBLayers[paletteBLayers.length - 1].imageElement?.src || null,
+          opacity: (paletteBLayers[paletteBLayers.length - 1].opacity || 100) / 100,
+          scale: (paletteBLayers[paletteBLayers.length - 1].size || 100) / 100,
+          inverse: paletteBLayers[paletteBLayers.length - 1].inverse || false
+        } : null;
+        
+        sendToControl('preview-update', previewData);
+      }
+      
+      // Start continuous preview updates
+      function startPreviewUpdates() {
+        setInterval(() => {
+          if (!globalPaused) {
+            sendPreviewUpdate();
+          }
+        }, 50); // Update preview 20 times per second for smooth animation
+      }
+      
+      // Handle commands from control window
+      ipcRenderer.on('control-command', (event, message) => {
+        const { command, data } = message;
+        
+        switch (command) {
+          case 'add-layer':
+            createLayer(data.palette || activePalette);
+            break;
+          case 'remove-layer':
+            removeLayer(data.layerId);
+            break;
+          case 'duplicate-layer':
+            duplicateLayer(data.layerId);
+            break;
+          case 'select-layer':
+            const layer = layers.find(l => l.id === data.layerId);
+            if (layer) selectLayer(layer);
+            break;
+          case 'toggle-visibility':
+            toggleLayerVisibility(data.layerId);
+            break;
+          case 'load-images':
+            loadImagesFromPaths(data.layerId, data.filePaths);
+            break;
+          case 'update-layer-property':
+            updateLayerProperty(data.layerId, data.property, data.value);
+            break;
+          case 'toggle-global-pause':
+            toggleGlobalPause();
+            break;
+          case 'toggle-inverse':
+            toggleLayerInverse(data.layerId);
+            break;
+          case 'set-default-background':
+            setDefaultBackground(data.imagePath);
+            break;
+          case 'reorder-layers':
+            reorderLayersInOutput(data.layers);
+            break;
+          case 'request-initial-state':
+            sendInitialState();
+            break;
+          case 'crossfader-update':
+            handleCrossfaderUpdate(data);
+            break;
+        }
+      });
+      
+      function sendInitialState() {
+        const layerData = layers.map(layer => ({
+          id: layer.id,
+          name: layer.name,
+          imageIndex: layer.imageIndex,
+          visible: layer.visible,
+          isMainLayer: layer.isMainLayer,
+          speed: layer.speed,
+          size: layer.size,
+          jitterAmount: layer.jitterAmount,
+          opacity: layer.opacity,
+          strobe: layer.strobe,
+          impact: layer.impact,
+          inverse: layer.inverse || false,
+          palette: layer.palette || 'A' // Include palette information
+        }));
+        
+        sendToControl('layers-updated', { layers: layerData });
+        if (selectedLayer) {
+          sendToControl('layer-selected', { layer: layerData.find(l => l.id === selectedLayer.id) });
+        }
+        sendToControl('global-pause-changed', { globalPaused });
+        sendPreviewUpdate();
+      }
+      
+      function handleCrossfaderUpdate(data) {
+        const { aOpacity, bOpacity, crossfaderValue } = data;
+        
+        // Apply crossfader opacity to all layers based on their actual palette assignment
+        layers.forEach(layer => {
+          if (!layer.element) return;
+          
+          // Use the layer's actual palette assignment
+          const isALayer = (layer.palette || 'A') === 'A';
+          const targetOpacity = isALayer ? aOpacity : bOpacity;
+          
+          // Apply crossfader opacity on top of layer's own opacity
+          const finalOpacity = (layer.opacity / 100) * targetOpacity;
+          layer.element.style.opacity = finalOpacity;
+        });
+      }
+      
+      function loadImagesFromPaths(layerId, filePaths) {
+        let layerImages = [];
+        let layerName = '';
+        
+        for (const filePath of filePaths) {
+          const stat = fs.statSync(filePath);
+          
+          if (stat.isDirectory()) {
+            // Use folder name for layer name
+            if (!layerName) {
+              layerName = path.basename(filePath);
+            }
+            const dirImages = fs.readdirSync(filePath)
+              .filter(file => {
+                const ext = path.extname(file).toLowerCase();
+                return imageExtensions.includes(ext) || videoExtensions.includes(ext);
+              })
+              .map(file => path.join(filePath, file));
+            layerImages = layerImages.concat(dirImages);
+          } else {
+            // Use file name (without extension) for layer name
+            if (!layerName) {
+              layerName = path.basename(filePath, path.extname(filePath));
+            }
+            layerImages.push(filePath);
+          }
+        }
+        
+        // If multiple files/folders, create a descriptive name
+        if (filePaths.length > 1) {
+          const firstPath = path.basename(filePaths[0]);
+          layerName = `${firstPath} +${filePaths.length - 1} more`;
+        }
+        
+        if (layerImages.length > 0) {
+          const layer = layers.find(l => l.id === layerId);
+          if (layer) {
+            // Update layer name to include layer number and content name
+            if (layerName) {
+              layer.name = `Layer ${layer.id}: ${layerName}`;
+            } else {
+              layer.name = `Layer ${layer.id}`;
+            }
+            layer.imageFiles = layerImages;
+            layer.imageIndex = 0;
+            
+            const mediaElement = layer.imageElement || layer.element.querySelector('.layer-image, .layer-video');
+            if (mediaElement) {
+              const firstFile = layerImages[0];
+              const ext = path.extname(firstFile).toLowerCase();
+              
+              if (videoExtensions.includes(ext)) {
+                // Replace image with video element if needed
+                if (mediaElement.tagName === 'IMG') {
+                  const videoElement = document.createElement('video');
+                  videoElement.className = 'layer-video';
+                  videoElement.autoplay = true;
+                  videoElement.loop = true;
+                  videoElement.muted = true;
+                  videoElement.style.cssText = mediaElement.style.cssText;
+                  mediaElement.parentNode.replaceChild(videoElement, mediaElement);
+                  layer.imageElement = videoElement;
+                }
+                layer.imageElement.src = 'file://' + encodeURI(firstFile);
+                layer.isVideo = true;
+              } else {
+                // Replace video with image element if needed
+                if (mediaElement.tagName === 'VIDEO') {
+                  const imageElement = document.createElement('img');
+                  imageElement.className = 'layer-image';
+                  imageElement.style.cssText = mediaElement.style.cssText;
+                  mediaElement.parentNode.replaceChild(imageElement, mediaElement);
+                  layer.imageElement = imageElement;
+                }
+                layer.imageElement.src = 'file://' + encodeURI(firstFile);
+                layer.isVideo = false;
+              }
+              
+              // Apply inverse filter if layer has inverse enabled
+              if (layer.inverse) {
+                layer.imageElement.style.filter = 'invert(1)';
+              }
+            }
+            
+            startLayerAnimation(layer);
+            updatePlaceholderVisibility();
+            
+            const newTotalImages = calculateTotalImages();
+            if (newTotalImages > totalImages || (loopStart === 0 && loopEnd === 0)) {
+              loopStart = 0;
+              loopEnd = Math.max(newTotalImages - 1, 0);
+            }
+            
+            sendLayersUpdate();
+          }
+        }
+      }
+      
+      function updateLayerProperty(layerId, property, value) {
+        const layer = layers.find(l => l.id === layerId);
+        if (!layer) return;
+        
+        layer[property] = value;
+        
+        switch (property) {
+          case 'speed':
+            if (layer.isPlaying) startLayerAnimation(layer);
+            break;
+          case 'size':
+            const scale = layer.size / 100;
+            if (!layer.jitterEnabled) {
+              layer.element.style.transform = `scale(${scale}) translate(${layer.x}px, ${layer.y}px)`;
+            }
+            break;
+          case 'jitterAmount':
+            const shouldJitter = layer.jitterAmount > 0;
+            if (shouldJitter && !layer.jitterEnabled) {
+              layer.jitterEnabled = true;
+              startLayerJitter(layer);
+            } else if (!shouldJitter && layer.jitterEnabled) {
+              layer.jitterEnabled = false;
+              stopLayerJitter(layer);
+            }
+            break;
+          case 'opacity':
+            layer.element.style.opacity = layer.opacity / 100;
+            break;
+          case 'strobe':
+            if (layer.strobeInterval) {
+              clearInterval(layer.strobeInterval);
+              layer.strobeInterval = null;
+            }
+            if (layer.strobe > 0) {
+              startLayerStrobe(layer);
+            } else {
+              layer.element.style.opacity = layer.opacity / 100;
+            }
+            break;
+          case 'impact':
+            if (layer.impactInterval) {
+              clearInterval(layer.impactInterval);
+              layer.impactInterval = null;
+            }
+            if (layer.impact > 0) {
+              startLayerImpact(layer);
+            } else {
+              const scale = layer.size / 100;
+              if (!layer.jitterEnabled) {
+                layer.element.style.transform = `scale(${scale}) translate(${layer.x}px, ${layer.y}px)`;
+              }
+            }
+            break;
+        }
+        
+        sendLayersUpdate();
+      }
+      
+      function toggleGlobalPause() {
+        if (globalPaused) {
+          globalResume();
+        } else {
+          globalPause();
+        }
+        sendToControl('global-pause-changed', { globalPaused });
+      }
+      
+      function toggleLayerInverse(layerId) {
+        const layer = layers.find(l => l.id === layerId);
+        if (!layer) return;
+        
+        layer.inverse = !layer.inverse;
+        
+        // Apply CSS filter for inverse colors
+        const imageElement = layer.imageElement || layer.element.querySelector('.layer-image');
+        if (imageElement) {
+          if (layer.inverse) {
+            imageElement.style.filter = 'invert(1)';
+          } else {
+            imageElement.style.filter = 'none';
+          }
+        }
+        
+        sendLayersUpdate();
+      }
+      
+      function sendLayersUpdate() {
+        const layerData = layers.map(layer => ({
+          id: layer.id,
+          name: layer.name,
+          imageIndex: layer.imageIndex,
+          visible: layer.visible,
+          isMainLayer: layer.isMainLayer,
+          speed: layer.speed,
+          size: layer.size,
+          jitterAmount: layer.jitterAmount,
+          opacity: layer.opacity,
+          strobe: layer.strobe,
+          impact: layer.impact,
+          inverse: layer.inverse || false,
+          palette: layer.palette || 'A' // Include palette information
+        }));
+        
+        sendToControl('layers-updated', { layers: layerData });
+      }
+      
+      // Helper function to update main layer name when global images are loaded
+      function updateMainLayerName(filePaths) {
+        if (!mainLayer || !filePaths || filePaths.length === 0) return;
+        
+        let layerName = '';
+        const firstPath = filePaths[0];
+        
+        try {
+          const stat = fs.statSync(firstPath);
+          if (stat.isDirectory()) {
+            layerName = path.basename(firstPath);
+          } else {
+            layerName = path.basename(firstPath, path.extname(firstPath));
+          }
+          
+          if (filePaths.length > 1) {
+            layerName = `${path.basename(firstPath)} +${filePaths.length - 1} more`;
+          }
+          
+          if (layerName) {
+            mainLayer.name = `Main Layer: ${layerName}`;
+          } else {
+            mainLayer.name = 'Main Layer';
+          }
+          sendLayersUpdate();
+        } catch (error) {
+          console.error('Error updating main layer name:', error);
+        }
+      }
+      
+      function renderThumbnails() {
+        thumbnailsDiv.innerHTML = '';
+        imageFiles.forEach((file, idx) => {
+          const thumb = document.createElement('img');
+          thumb.src = 'file://' + encodeURI(file);
+          thumb.className = 'thumbnail';
+          thumb.title = `Frame ${idx+1}`;
+          thumb.style.border = idx === current ? '2px solid #fff' : '2px solid transparent';
+          thumb.addEventListener('click', () => {
+            current = idx;
+            showNextImage();
+            renderThumbnails();
+          });
+          thumbnailsDiv.appendChild(thumb);
+        });
+      }
+
+
+      function showNextImage() {
+        if (imageFiles.length === 0) {
+          mainLayerCanvas.style.display = 'none';
+          img.src = '';
+          renderThumbnails();
+          // Use new placeholder visibility logic
+          updatePlaceholderVisibility();
+          return;
+        }
+        mainLayerCanvas.style.display = 'block';
+        // Use new placeholder visibility logic
+        updatePlaceholderVisibility();
+        
+        // Respect loop range
+        if (current < loopStart || current > loopEnd) current = loopStart;
+        if (current >= imageFiles.length) current = Math.min(loopEnd, imageFiles.length - 1);
+        
+        img.src = 'file://' + encodeURI(imageFiles[current]);
+        if (mainLayer) {
+          mainLayer.imageIndex = current;
+          // Apply inverse filter if main layer has inverse enabled
+          if (mainLayer.inverse) {
+            img.style.filter = 'invert(1)';
+          } else {
+            img.style.filter = 'none';
+          }
+        }
+        renderThumbnails();
+        sendPreviewUpdate(); // Update preview when main image changes
+        current++;
+        
+        // Loop back to start when reaching end of loop range
+        if (current > loopEnd || current >= imageFiles.length) {
+          current = loopStart;
+        }
+      }
+      function startAnimation() {
+        if (interval) clearInterval(interval);
+        interval = setInterval(showNextImage, 250); // Default speed
+        isPlaying = true;
+        // Removed updatePlayButtons call
+      }
+      function stopAnimation() {
+        if (interval) clearInterval(interval);
+        interval = null;
+        isPlaying = false;
+        // Removed updatePlayButtons call
+      }
+      function startJitter() {
+        if (jitterInterval) clearInterval(jitterInterval);
+        jitterInterval = setInterval(() => {
+          if (jitterEnabled && img.style.display !== 'none') {
+            const maxJitter = 0; // No jitter since controls removed
+            const randomX = (Math.random() - 0.5) * 2 * maxJitter;
+            const randomY = (Math.random() - 0.5) * 2 * maxJitter;
+            img.style.transform = `translate(${randomX}px, ${randomY}px)`;
+          }
+        }, 50); // Update jitter every 50ms for smooth crazy movement
+      }
+      function stopJitter() {
+        if (jitterInterval) clearInterval(jitterInterval);
+        jitterInterval = null;
+        img.style.transform = 'translate(0px, 0px)';
+      }
+      function initializeMainLayer() {
+        if (imageFiles.length === 0) return;
+        mainLayer = {
+          id: 0,
+          name: 'Main Layer',
+          imageIndex: current,
+          x: 0,
+          y: 0,
+          size: 100, // Default size
+          visible: true,
+          element: mainLayerCanvas,
+          imageElement: img,
+          speed: 20, // Default speed (100ms)
+          jitterEnabled: false, // Start with no jitter
+          jitterAmount: 0, // Default to 0
+          opacity: 100, // Default to 100% opacity
+          strobe: 0, // Default to no strobe
+          strobeInterval: null,
+          impact: 0, // Default to no impact
+          impactInterval: null,
+          animationInterval: null,
+          jitterInterval: jitterInterval,
+          isPlaying: true,
+          isMainLayer: true,
+          inverse: false, // Default to no inverse
+          palette: 'A' // Main layer defaults to palette A
+        };
+        
+        // Set the main layer scale and opacity
+        mainLayerCanvas.style.transform = `scale(${mainLayer.size / 100})`;
+        mainLayerCanvas.style.opacity = mainLayer.opacity / 100;
+        
+        layers = [mainLayer];
+        makeDraggable(mainLayerCanvas, mainLayer);
+        startLayerAnimation(mainLayer);
+        selectLayer(mainLayer); // This will set up dragging properly
+        sendLayersUpdate();
+      }
+      function createLayer(palette = 'A') {
+        // Allow layer creation even without folders loaded
+        // if (imageFiles.length === 0) return;
+        layerCounter++;
+        const layer = {
+          id: layerCounter,
+          name: `Layer ${layerCounter}`,
+          imageIndex: 0, // Always start at index 0
+          x: 0,
+          y: 0,
+          size: 100, // 100% scale
+          visible: true,
+          element: null,
+          speed: 20, // Default speed (100ms)
+          jitterEnabled: false, // Start with no jitter
+          jitterAmount: 0, // Default to 0
+          opacity: 100, // Default to 100% opacity
+          strobe: 0, // Default to no strobe
+          strobeInterval: null,
+          impact: 0, // Default to no impact
+          impactInterval: null,
+          animationInterval: null,
+          jitterInterval: null,
+          isPlaying: true,
+          isMainLayer: false,
+          imageFiles: null, // Layer-specific images
+          inverse: false, // Default to no inverse
+          palette: palette // Track which palette this layer belongs to
+        };
+        const canvasElement = document.createElement('div');
+        canvasElement.className = 'layer-canvas draggable';
+        canvasElement.style.transform = `scale(${layer.size / 100}) translate(${layer.x}px, ${layer.y}px)`;
+        canvasElement.style.opacity = layer.opacity / 100;
+        
+        const imageElement = document.createElement('img');
+        if (imageFiles.length > 0) {
+          imageElement.src = 'file://' + encodeURI(imageFiles[layer.imageIndex]);
+        } else {
+          // Show placeholder when no images are loaded
+          imageElement.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMzMzIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzg4OCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlczwvdGV4dD48L3N2Zz4=';
+        }
+        imageElement.className = 'layer-image';
+        imageElement.draggable = false;
+        
+        canvasElement.appendChild(imageElement);
+        const controls = document.createElement('div');
+        controls.className = 'frame-controls';
+        controls.innerHTML = `
+          <button onclick="event.stopPropagation(); removeLayer(${layer.id})">✕</button>
+          <button onclick="event.stopPropagation(); duplicateLayer(${layer.id})">⧉</button>
+        `;
+        canvasElement.appendChild(controls);
+        layer.element = canvasElement;
+        layer.imageElement = imageElement;
+        document.getElementById('animator').appendChild(canvasElement);
+        layers.push(layer);
+        makeDraggable(canvasElement, layer);
+        startLayerAnimation(layer);
+        updatePlaceholderVisibility();
+        selectLayer(layer); // This will set the proper cursor and selection
+        sendLayersUpdate();
+      }
+      function makeDraggable(element, layer) {
+        // Store dragging state on the layer object
+        layer.isDragging = false;
+        layer.dragStartX = 0;
+        layer.dragStartY = 0;
+        layer.dragInitialX = 0;
+        layer.dragInitialY = 0;
+        
+        element.addEventListener('mousedown', (e) => {
+          if (e.target.tagName === 'BUTTON') return;
+          
+          // Only allow dragging if this layer is selected
+          if (!selectedLayer || selectedLayer.id !== layer.id) {
+            return;
+          }
+          
+          layer.isDragging = true;
+          layer.dragStartX = e.clientX;
+          layer.dragStartY = e.clientY;
+          layer.dragInitialX = layer.x;
+          layer.dragInitialY = layer.y;
+          
+          // Add visual feedback for dragging
+          element.style.cursor = 'grabbing';
+          
+          e.preventDefault();
+        });
+      }
+      
+      // Global mouse move handler for dragging
+      document.addEventListener('mousemove', (e) => {
+        if (!selectedLayer || !selectedLayer.isDragging) return;
+        
+        const deltaX = e.clientX - selectedLayer.dragStartX;
+        const deltaY = e.clientY - selectedLayer.dragStartY;
+        selectedLayer.x = selectedLayer.dragInitialX + deltaX;
+        selectedLayer.y = selectedLayer.dragInitialY + deltaY;
+        
+        // Update position using transform
+        const scale = selectedLayer.size / 100;
+        if (selectedLayer.jitterEnabled) {
+          // If jitter is enabled, let the jitter function handle the transform
+          // Just update the base position values
+        } else {
+          // Apply scale and translate transforms together
+          selectedLayer.element.style.transform = `scale(${scale}) translate(${selectedLayer.x}px, ${selectedLayer.y}px)`;
+        }
+      });
+      
+      // Global mouse up handler for dragging
+      document.addEventListener('mouseup', () => {
+        if (selectedLayer && selectedLayer.isDragging) {
+          selectedLayer.isDragging = false;
+          selectedLayer.element.style.cursor = 'grab';
+        }
+      });
+      function selectLayer(layer) {
+        // Remove selection styling and draggable cursor from all layers
+        layers.forEach(l => {
+          if (!l.isMainLayer) {
+            l.element.classList.remove('selected');
+            l.element.style.cursor = 'default';
+          }
+        });
+        
+        // Add selection styling and draggable cursor to selected layer
+        if (!layer.isMainLayer) {
+          layer.element.classList.add('selected');
+          layer.element.style.cursor = 'grab';
+        } else {
+          // Main layer is always draggable when selected
+          layer.element.style.cursor = 'grab';
+        }
+        
+        selectedLayer = layer;
+        
+        // Send layer selection to control window
+        const layerData = {
+          id: layer.id,
+          name: layer.name,
+          imageIndex: layer.imageIndex,
+          visible: layer.visible,
+          isMainLayer: layer.isMainLayer,
+          speed: layer.speed,
+          size: layer.size,
+          jitterAmount: layer.jitterAmount,
+          opacity: layer.opacity,
+          strobe: layer.strobe,
+          impact: layer.impact
+        };
+        sendToControl('layer-selected', { layer: layerData });
+      }
+      function updateSidebarControls() {
+        if (!selectedLayer) {
+          selectedLayerInfo.textContent = 'No layer selected';
+          speedControl.disabled = true;
+          sizeControl.disabled = true;
+          jitterControl.disabled = true;
+          opacityControl.disabled = true;
+          strobeControl.disabled = true;
+          impactControl.disabled = true;
+          // playPauseBtn.disabled = true; // Keep enabled since it's global
+  
+          return;
+        }
+        
+        selectedLayerInfo.textContent = `Controlling: ${selectedLayer.name}`;
+        speedControl.disabled = false;
+        sizeControl.disabled = false;
+        jitterControl.disabled = false;
+        opacityControl.disabled = false;
+        strobeControl.disabled = false;
+        impactControl.disabled = false;
+        // playPauseBtn.disabled = false; // Always enabled since it's global
+
+        
+        // Update control values to match selected layer
+        speedControl.value = selectedLayer.speed;
+        sizeControl.value = selectedLayer.size;
+        jitterControl.value = selectedLayer.jitterAmount;
+        opacityControl.value = selectedLayer.opacity;
+        strobeControl.value = selectedLayer.strobe;
+        impactControl.value = selectedLayer.impact;
+        
+        // Update display values
+        speedValue.textContent = sliderToMs(selectedLayer.speed);
+        sizeValue.textContent = selectedLayer.size;
+        jitterValue.textContent = selectedLayer.jitterAmount;
+        opacityValue.textContent = selectedLayer.opacity;
+        strobeValue.textContent = selectedLayer.strobe;
+        impactValue.textContent = selectedLayer.impact;
+        
+        // Play/pause button is now global - don't update text here
+      }
+      function startLayerAnimation(layer) {
+        if (layer.animationInterval) clearInterval(layer.animationInterval);
+        if (!layer.isPlaying) return;
+        
+        // Use layer-specific images if available, otherwise fall back to global imageFiles
+        const layerImageFiles = layer.imageFiles || imageFiles;
+        if (layerImageFiles.length === 0) return;
+        
+        // If this is a single video file, don't animate through files
+        if (layerImageFiles.length === 1) {
+          const ext = path.extname(layerImageFiles[0]).toLowerCase();
+          if (videoExtensions.includes(ext)) {
+            // Single video - just ensure it's playing
+            const videoElement = layer.imageElement;
+            if (videoElement && videoElement.tagName === 'VIDEO') {
+              videoElement.play();
+            }
+            return;
+          }
+        }
+        
+        layer.animationInterval = setInterval(() => {
+          // Respect loop range for layer animations
+          const maxIndex = Math.min(loopEnd, layerImageFiles.length - 1);
+          const minIndex = Math.min(loopStart, layerImageFiles.length - 1);
+          
+          if (layer.imageIndex < minIndex || layer.imageIndex > maxIndex) {
+            layer.imageIndex = minIndex;
+          } else {
+            layer.imageIndex++;
+            if (layer.imageIndex > maxIndex) {
+              layer.imageIndex = minIndex;
+            }
+          }
+          
+          const currentFile = layerImageFiles[layer.imageIndex];
+          const ext = path.extname(currentFile).toLowerCase();
+          const mediaElement = layer.imageElement || layer.element.querySelector('.layer-image, .layer-video');
+          
+          if (mediaElement) {
+            if (videoExtensions.includes(ext)) {
+              // Switch to video if needed
+              if (mediaElement.tagName === 'IMG') {
+                const videoElement = document.createElement('video');
+                videoElement.className = 'layer-video';
+                videoElement.autoplay = true;
+                videoElement.loop = true;
+                videoElement.muted = true;
+                videoElement.style.cssText = mediaElement.style.cssText;
+                mediaElement.parentNode.replaceChild(videoElement, mediaElement);
+                layer.imageElement = videoElement;
+              }
+              layer.imageElement.src = 'file://' + encodeURI(currentFile);
+              layer.imageElement.play();
+            } else {
+              // Switch to image if needed
+              if (mediaElement.tagName === 'VIDEO') {
+                const imageElement = document.createElement('img');
+                imageElement.className = 'layer-image';
+                imageElement.style.cssText = mediaElement.style.cssText;
+                mediaElement.parentNode.replaceChild(imageElement, mediaElement);
+                layer.imageElement = imageElement;
+              }
+              layer.imageElement.src = 'file://' + encodeURI(currentFile);
+            }
+            
+            // Preserve inverse filter during animation
+            if (layer.inverse) {
+              layer.imageElement.style.filter = 'invert(1)';
+            }
+          }
+          updateLayersList();
+        }, sliderToMs(layer.speed));
+      }
+      function stopLayerAnimation(layer) {
+        if (layer.animationInterval) clearInterval(layer.animationInterval);
+        layer.animationInterval = null;
+      }
+      function startLayerJitter(layer) {
+        if (layer.jitterInterval) clearInterval(layer.jitterInterval);
+        layer.jitterInterval = setInterval(() => {
+          if (layer.jitterEnabled && layer.visible) {
+            const randomX = (Math.random() - 0.5) * 2 * layer.jitterAmount;
+            const randomY = (Math.random() - 0.5) * 2 * layer.jitterAmount;
+            
+            // Get current scale - check if impact is active
+            let currentScale = layer.size / 100;
+            if (layer.impactInterval) {
+              // If impact is active, we need to get the current impact scale
+              // This is a bit tricky since impact alternates, so we'll let impact handle the transform
+              return;
+            }
+            
+            // Apply scale, base position, and jitter offset together
+            layer.element.style.transform = `scale(${currentScale}) translate(${layer.x + randomX}px, ${layer.y + randomY}px)`;
+          }
+        }, 50);
+      }
+      function stopLayerJitter(layer) {
+        if (layer.jitterInterval) clearInterval(layer.jitterInterval);
+        layer.jitterInterval = null;
+        const scale = layer.size / 100;
+        // Reset to base position without jitter offset
+        layer.element.style.transform = `scale(${scale}) translate(${layer.x}px, ${layer.y}px)`;
+      }
+      
+      function startLayerStrobe(layer) {
+        if (layer.strobeInterval) clearInterval(layer.strobeInterval);
+        const strobeFrequency = 1000 / layer.strobe; // Convert Hz to milliseconds
+        let strobeState = true;
+        
+        layer.strobeInterval = setInterval(() => {
+          if (layer.visible) {
+            strobeState = !strobeState;
+            const opacity = strobeState ? (layer.opacity / 100) : 0;
+            layer.element.style.opacity = opacity;
+          }
+        }, strobeFrequency);
+      }
+      
+      function stopLayerStrobe(layer) {
+        if (layer.strobeInterval) clearInterval(layer.strobeInterval);
+        layer.strobeInterval = null;
+        // Reset to normal opacity
+        layer.element.style.opacity = layer.opacity / 100;
+      }
+      
+      function startLayerImpact(layer) {
+        if (layer.impactInterval) clearInterval(layer.impactInterval);
+        const impactFrequency = 1000 / layer.impact; // Convert Hz to milliseconds
+        let impactState = true;
+        
+        layer.impactInterval = setInterval(() => {
+          if (layer.visible) {
+            impactState = !impactState;
+            // Alternate between normal size and 150% size for dramatic effect
+            const impactScale = impactState ? (layer.size / 100) : (layer.size / 100 * 1.5);
+            
+            // Apply impact scale with position and jitter if active
+            if (layer.jitterEnabled && layer.jitterInterval) {
+              // Apply jitter with impact scale
+              const randomX = (Math.random() - 0.5) * 2 * layer.jitterAmount;
+              const randomY = (Math.random() - 0.5) * 2 * layer.jitterAmount;
+              layer.element.style.transform = `scale(${impactScale}) translate(${layer.x + randomX}px, ${layer.y + randomY}px)`;
+            } else {
+              layer.element.style.transform = `scale(${impactScale}) translate(${layer.x}px, ${layer.y}px)`;
+            }
+          }
+        }, impactFrequency);
+      }
+      
+      function stopLayerImpact(layer) {
+        if (layer.impactInterval) clearInterval(layer.impactInterval);
+        layer.impactInterval = null;
+        // Reset to normal scale
+        const scale = layer.size / 100;
+        if (!layer.jitterEnabled) {
+          layer.element.style.transform = `scale(${scale}) translate(${layer.x}px, ${layer.y}px)`;
+        }
+      }
+      
+      // Global pause/resume functions
+      function globalPause() {
+        globalPaused = true;
+        layers.forEach(layer => {
+          // Stop all animations but preserve the isPlaying state
+          if (layer.animationInterval) {
+            clearInterval(layer.animationInterval);
+            layer.animationInterval = null;
+          }
+          // Stop all jitter effects
+          if (layer.jitterInterval) {
+            clearInterval(layer.jitterInterval);
+            layer.jitterInterval = null;
+            // Reset to base position without jitter
+            const scale = layer.size / 100;
+            layer.element.style.transform = `scale(${scale}) translate(${layer.x}px, ${layer.y}px)`;
+          }
+          // Stop all strobe effects
+          if (layer.strobeInterval) {
+            clearInterval(layer.strobeInterval);
+            layer.strobeInterval = null;
+            // Reset to normal opacity
+            layer.element.style.opacity = layer.opacity / 100;
+          }
+          // Stop all impact effects
+          if (layer.impactInterval) {
+            clearInterval(layer.impactInterval);
+            layer.impactInterval = null;
+            // Reset to normal scale
+            const scale = layer.size / 100;
+            if (!layer.jitterEnabled) {
+              layer.element.style.transform = `scale(${scale}) translate(${layer.x}px, ${layer.y}px)`;
+            }
+          }
+        });
+        // Also stop the main animation if it exists
+        if (interval) {
+          clearInterval(interval);
+          interval = null;
+        }
+        // Stop main jitter if it exists
+        if (jitterInterval) {
+          clearInterval(jitterInterval);
+          jitterInterval = null;
+        }
+      }
+      
+      function globalResume() {
+        globalPaused = false;
+        layers.forEach(layer => {
+          // Restart animations for layers that were playing
+          if (layer.isPlaying) {
+            startLayerAnimation(layer);
+          }
+          // Restart jitter for layers that had it enabled
+          if (layer.jitterEnabled) {
+            startLayerJitter(layer);
+          }
+          // Restart strobe for layers that had it enabled
+          if (layer.strobe > 0) {
+            startLayerStrobe(layer);
+          }
+          // Restart impact for layers that had it enabled
+          if (layer.impact > 0) {
+            startLayerImpact(layer);
+          }
+        });
+        // Restart main animation if it was playing
+        if (isPlaying && imageFiles.length > 0) {
+          startAnimation();
+        }
+        // Restart main jitter if it was enabled
+        if (jitterEnabled) {
+          startJitter();
+        }
+      }
+      
+      function stepBackward() {
+        if (!globalPaused) return; // Only work when paused
+        
+        // Step backward for main layer/global images
+        if (imageFiles.length > 0) {
+          current--;
+          const minIndex = Math.min(loopStart, imageFiles.length - 1);
+          const maxIndex = Math.min(loopEnd, imageFiles.length - 1);
+          if (current < minIndex) current = maxIndex;
+          img.src = 'file://' + encodeURI(imageFiles[current]);
+          if (mainLayer) {
+            mainLayer.imageIndex = current;
+          }
+          renderThumbnails();
+        }
+        
+        // Step backward for all layers with their own images
+        layers.forEach(layer => {
+          if (layer.imageFiles && layer.imageFiles.length > 0) {
+            layer.imageIndex--;
+            const minIndex = Math.min(loopStart, layer.imageFiles.length - 1);
+            const maxIndex = Math.min(loopEnd, layer.imageFiles.length - 1);
+            if (layer.imageIndex < minIndex) layer.imageIndex = maxIndex;
+            const imageElement = layer.imageElement || layer.element.querySelector('.layer-image');
+            if (imageElement) {
+              imageElement.src = 'file://' + encodeURI(layer.imageFiles[layer.imageIndex]);
+            }
+          }
+        });
+        
+        updateLayersList();
+      }
+      
+      function stepForward() {
+        if (!globalPaused) return; // Only work when paused
+        
+        // Step forward for main layer/global images
+        if (imageFiles.length > 0) {
+          current++;
+          const minIndex = Math.min(loopStart, imageFiles.length - 1);
+          const maxIndex = Math.min(loopEnd, imageFiles.length - 1);
+          if (current > maxIndex) current = minIndex;
+          img.src = 'file://' + encodeURI(imageFiles[current]);
+          if (mainLayer) {
+            mainLayer.imageIndex = current;
+          }
+          renderThumbnails();
+        }
+        
+        // Step forward for all layers with their own images
+        layers.forEach(layer => {
+          if (layer.imageFiles && layer.imageFiles.length > 0) {
+            layer.imageIndex++;
+            const minIndex = Math.min(loopStart, layer.imageFiles.length - 1);
+            const maxIndex = Math.min(loopEnd, layer.imageFiles.length - 1);
+            if (layer.imageIndex > maxIndex) layer.imageIndex = minIndex;
+            const imageElement = layer.imageElement || layer.element.querySelector('.layer-image');
+            if (imageElement) {
+              imageElement.src = 'file://' + encodeURI(layer.imageFiles[layer.imageIndex]);
+            }
+          }
+        });
+        
+        updateLayersList();
+      }
+      
+      function calculateTotalImages() {
+        // Calculate total images across all layers and global images
+        let total = imageFiles.length;
+        layers.forEach(layer => {
+          if (layer.imageFiles && layer.imageFiles.length > 0) {
+            total = Math.max(total, layer.imageFiles.length);
+          }
+        });
+        return Math.max(total, 1); // Minimum 1 for slider
+      }
+      
+      function updateLoopSlider() {
+        totalImages = calculateTotalImages();
+        
+        // Update loop end if it's beyond total images
+        if (loopEnd >= totalImages) loopEnd = totalImages - 1;
+        if (loopStart >= totalImages) loopStart = totalImages - 1;
+        if (loopStart > loopEnd) loopStart = loopEnd;
+        
+        // Ensure minimum valid range
+        if (loopEnd < 0) loopEnd = 0;
+        if (loopStart < 0) loopStart = 0;
+        
+        // Update slider positions
+        const containerWidth = loopSliderContainer.offsetWidth;
+        const startPercent = (loopStart / Math.max(totalImages - 1, 1)) * 100;
+        const endPercent = (loopEnd / Math.max(totalImages - 1, 1)) * 100;
+        
+        loopStartHandle.style.left = startPercent + '%';
+        loopEndHandle.style.left = endPercent + '%';
+        
+        // Update range bar
+        loopSliderRange.style.left = startPercent + '%';
+        loopSliderRange.style.width = (endPercent - startPercent) + '%';
+        
+        // Update display text
+        loopRangeValue.textContent = `${loopStart + 1} - ${loopEnd + 1}`;
+      }
+      function removeLayer(layerId) {
+        const layerIndex = layers.findIndex(l => l.id === layerId);
+        if (layerIndex !== -1) {
+          const layer = layers[layerIndex];
+          stopLayerAnimation(layer);
+          stopLayerJitter(layer);
+          stopLayerStrobe(layer);
+          stopLayerImpact(layer);
+          layer.element.remove();
+          layers.splice(layerIndex, 1);
+          if (selectedLayer && selectedLayer.id === layerId) {
+            selectedLayer = null;
+            sendToControl('layer-selected', { layer: null });
+          }
+          updatePlaceholderVisibility();
+          sendLayersUpdate();
+        }
+      }
+      function duplicateLayer(layerId) {
+        const originalLayer = layers.find(l => l.id === layerId);
+        if (!originalLayer) return;
+        layerCounter++;
+        const newLayer = {
+          id: layerCounter,
+          name: `Layer ${layerCounter}: ${originalLayer.name.replace(/^(Layer \d+: |Main Layer: )/, '')} Copy`,
+          imageIndex: originalLayer.imageIndex,
+          x: originalLayer.x + 20,
+          y: originalLayer.y + 20,
+          size: originalLayer.size,
+          visible: true,
+          element: null,
+          speed: originalLayer.speed,
+          jitterEnabled: originalLayer.jitterEnabled,
+          jitterAmount: originalLayer.jitterAmount,
+          opacity: originalLayer.opacity, // Copy opacity from original
+          strobe: originalLayer.strobe, // Copy strobe from original
+          strobeInterval: null,
+          impact: originalLayer.impact, // Copy impact from original
+          impactInterval: null,
+          animationInterval: null,
+          jitterInterval: null,
+          isPlaying: originalLayer.isPlaying,
+          imageFiles: originalLayer.imageFiles, // Copy layer-specific images
+          inverse: originalLayer.inverse || false, // Copy inverse from original
+          palette: originalLayer.palette || 'A' // Copy palette assignment
+        };
+        const canvasElement = document.createElement('div');
+        canvasElement.className = 'layer-canvas draggable';
+        canvasElement.style.transform = `scale(${newLayer.size / 100}) translate(${newLayer.x}px, ${newLayer.y}px)`;
+        canvasElement.style.opacity = newLayer.opacity / 100;
+        
+        const imageElement = document.createElement('img');
+        const originalImageElement = originalLayer.imageElement || originalLayer.element.querySelector('.layer-image');
+        imageElement.src = originalImageElement ? originalImageElement.src : '';
+        imageElement.className = 'layer-image';
+        imageElement.draggable = false;
+        
+        // Apply inverse filter if needed
+        if (newLayer.inverse) {
+          imageElement.style.filter = 'invert(1)';
+        }
+        
+        canvasElement.appendChild(imageElement);
+        const controls = document.createElement('div');
+        controls.className = 'frame-controls';
+        controls.innerHTML = `
+          <button onclick="event.stopPropagation(); removeLayer(${newLayer.id})">✕</button>
+          <button onclick="event.stopPropagation(); duplicateLayer(${newLayer.id})">⧉</button>
+        `;
+        canvasElement.appendChild(controls);
+        newLayer.element = canvasElement;
+        newLayer.imageElement = imageElement;
+        document.getElementById('animator').appendChild(canvasElement);
+        layers.push(newLayer);
+        makeDraggable(canvasElement, newLayer);
+        startLayerAnimation(newLayer);
+        if (newLayer.jitterEnabled) startLayerJitter(newLayer);
+        if (newLayer.strobe > 0) startLayerStrobe(newLayer);
+        if (newLayer.impact > 0) startLayerImpact(newLayer);
+        selectLayer(newLayer);
+        sendLayersUpdate();
+      }
+      // Layer list management moved to control window
+      function toggleLayerVisibility(layerId) {
+        const layer = layers.find(l => l.id === layerId);
+        if (layer) {
+          layer.visible = !layer.visible;
+          layer.element.style.display = layer.visible ? 'block' : 'none';
+          updatePlaceholderVisibility();
+          sendLayersUpdate();
+        }
+      }
+
+      // Function to load images into a specific layer
+      async function loadImagesIntoLayer(layer) {
+        const { dialog } = require('@electron/remote');
+        const result = await dialog.showOpenDialog({
+          properties: ['openFile', 'openDirectory', 'multiSelections'],
+          filters: [
+            { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif'] },
+            { name: 'All Files', extensions: ['*'] }
+          ]
+        });
+        
+        if (!result.canceled && result.filePaths.length > 0) {
+          let layerImages = [];
+          
+          for (const filePath of result.filePaths) {
+            const fs = require('fs');
+            const path = require('path');
+            const stat = fs.statSync(filePath);
+            
+            if (stat.isDirectory()) {
+              // If it's a directory, get all image files from it
+              const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif'];
+              const dirImages = fs.readdirSync(filePath)
+                .filter(file => imageExtensions.includes(path.extname(file).toLowerCase()))
+                .map(file => path.join(filePath, file));
+              layerImages = layerImages.concat(dirImages);
+            } else {
+              // If it's a file, add it directly
+              layerImages.push(filePath);
+            }
+          }
+          
+          if (layerImages.length > 0) {
+            // Store images specific to this layer
+            layer.imageFiles = layerImages;
+            layer.imageIndex = 0;
+            
+            // Update the layer's image
+            const imageElement = layer.imageElement || layer.element.querySelector('.layer-image');
+            if (imageElement) {
+              imageElement.src = 'file://' + encodeURI(layerImages[0]);
+            }
+            
+            // Start animation for this layer
+            startLayerAnimation(layer);
+            updateLayersList();
+            updatePlaceholderVisibility();
+            
+            // Update loop range to include all images when new images are loaded
+            const newTotalImages = calculateTotalImages();
+            if (newTotalImages > totalImages || (loopStart === 0 && loopEnd === 0)) {
+              // Reset loop range to include all images
+              loopStart = 0;
+              loopEnd = Math.max(newTotalImages - 1, 0);
+            }
+            updateLoopSlider();
+          }
+        }
+      }
+
+      // Make functions global for onclick handlers
+      window.removeLayer = removeLayer;
+      window.duplicateLayer = duplicateLayer;
+      window.toggleLayerVisibility = toggleLayerVisibility;
+      window.loadImagesIntoLayer = loadImagesIntoLayer;
+      window.selectLayer = selectLayer;
+      window.layers = layers;
+      // Removed control functions
+      function sliderToMs(x) {
+        x = Number(x);
+        if (x <= 50) {
+          return Math.round((x / 50) * 250);
+        } else {
+          return Math.round(250 + Math.pow((x - 50) / 50, 2) * (20000 - 250));
+        }
+      }
+      // Removed updateSpeedFromSlider function
+      // Removed sidebar control event listeners
+      // Removed initialization code for sidebar controls
+      
+      // Open sidebar by default for easy access to buttons
+      sidebar.classList.add('open');
+      // Layer control event listeners
+      speedControl.addEventListener('input', () => {
+        if (selectedLayer) {
+          selectedLayer.speed = parseInt(speedControl.value);
+          speedValue.textContent = sliderToMs(selectedLayer.speed);
+          if (selectedLayer.isPlaying) {
+            startLayerAnimation(selectedLayer);
+          }
+        }
+      });
+      
+      sizeControl.addEventListener('input', () => {
+        if (selectedLayer) {
+          selectedLayer.size = parseInt(sizeControl.value);
+          sizeValue.textContent = selectedLayer.size;
+          
+          const scale = selectedLayer.size / 100;
+          if (!selectedLayer.jitterEnabled) {
+            selectedLayer.element.style.transform = `scale(${scale}) translate(${selectedLayer.x}px, ${selectedLayer.y}px)`;
+          }
+        }
+      });
+      
+      jitterControl.addEventListener('input', () => {
+        if (selectedLayer) {
+          selectedLayer.jitterAmount = parseInt(jitterControl.value);
+          jitterValue.textContent = selectedLayer.jitterAmount;
+          
+          const shouldJitter = selectedLayer.jitterAmount > 0;
+          
+          if (shouldJitter && !selectedLayer.jitterEnabled) {
+            selectedLayer.jitterEnabled = true;
+            startLayerJitter(selectedLayer);
+          } else if (!shouldJitter && selectedLayer.jitterEnabled) {
+            selectedLayer.jitterEnabled = false;
+            stopLayerJitter(selectedLayer);
+          }
+        }
+      });
+      
+      opacityControl.addEventListener('input', () => {
+        if (selectedLayer) {
+          selectedLayer.opacity = parseInt(opacityControl.value);
+          opacityValue.textContent = selectedLayer.opacity;
+          
+          const opacity = selectedLayer.opacity / 100;
+          selectedLayer.element.style.opacity = opacity;
+        }
+      });
+      
+      strobeControl.addEventListener('input', () => {
+        if (selectedLayer) {
+          selectedLayer.strobe = parseInt(strobeControl.value);
+          strobeValue.textContent = selectedLayer.strobe;
+          
+          // Stop existing strobe if any
+          if (selectedLayer.strobeInterval) {
+            clearInterval(selectedLayer.strobeInterval);
+            selectedLayer.strobeInterval = null;
+          }
+          
+          // Start new strobe if value > 0
+          if (selectedLayer.strobe > 0) {
+            startLayerStrobe(selectedLayer);
+          } else {
+            // Reset to normal opacity when strobe is disabled
+            selectedLayer.element.style.opacity = selectedLayer.opacity / 100;
+          }
+        }
+      });
+      
+      impactControl.addEventListener('input', () => {
+        if (selectedLayer) {
+          selectedLayer.impact = parseInt(impactControl.value);
+          impactValue.textContent = selectedLayer.impact;
+          
+          // Stop existing impact if any
+          if (selectedLayer.impactInterval) {
+            clearInterval(selectedLayer.impactInterval);
+            selectedLayer.impactInterval = null;
+          }
+          
+          // Start new impact if value > 0
+          if (selectedLayer.impact > 0) {
+            startLayerImpact(selectedLayer);
+          } else {
+            // Reset to normal scale when impact is disabled
+            const scale = selectedLayer.size / 100;
+            if (!selectedLayer.jitterEnabled) {
+              selectedLayer.element.style.transform = `scale(${scale}) translate(${selectedLayer.x}px, ${selectedLayer.y}px)`;
+            }
+          }
+        }
+      });
+      
+      playPauseBtn.addEventListener('click', () => {
+        if (globalPaused) {
+          globalResume();
+          playPauseBtn.textContent = '⏸️ Pause All';
+          frameControls.style.display = 'none'; // Hide frame controls when playing
+        } else {
+          globalPause();
+          playPauseBtn.textContent = '▶️ Resume All';
+          frameControls.style.display = 'block'; // Show frame controls when paused
+        }
+      });
+      
+      // Frame control button event listeners
+      backBtn.addEventListener('click', stepBackward);
+      forwardBtn.addEventListener('click', stepForward);
+      
+      // Keyboard event listeners for arrow keys and shortcuts
+      document.addEventListener('keydown', (event) => {
+        switch(event.key) {
+          case 'ArrowLeft':
+            if (globalPaused) {
+              event.preventDefault();
+              stepBackward();
+            }
+            break;
+          case 'ArrowRight':
+            if (globalPaused) {
+              event.preventDefault();
+              stepForward();
+            }
+            break;
+          case 'i':
+          case 'I':
+            // Toggle inverse on default background with 'I' key
+            if (defaultBackground.style.display !== 'none') {
+              event.preventDefault();
+              toggleDefaultBackgroundInverse();
+            }
+            break;
+        }
+      });
+      
+      // Loop slider drag functionality
+      let isDraggingLoopStart = false;
+      let isDraggingLoopEnd = false;
+      
+      loopStartHandle.addEventListener('mousedown', (e) => {
+        isDraggingLoopStart = true;
+        e.preventDefault();
+      });
+      
+      loopEndHandle.addEventListener('mousedown', (e) => {
+        isDraggingLoopEnd = true;
+        e.preventDefault();
+      });
+      
+      document.addEventListener('mousemove', (e) => {
+        if (!isDraggingLoopStart && !isDraggingLoopEnd) return;
+        
+        const rect = loopSliderContainer.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const percent = Math.max(0, Math.min(100, (x / rect.width) * 100));
+        const imageIndex = Math.round((percent / 100) * Math.max(totalImages - 1, 1));
+        
+        if (isDraggingLoopStart) {
+          loopStart = Math.min(imageIndex, loopEnd);
+        } else if (isDraggingLoopEnd) {
+          loopEnd = Math.max(imageIndex, loopStart);
+        }
+        
+        updateLoopSlider();
+      });
+      
+      document.addEventListener('mouseup', () => {
+        isDraggingLoopStart = false;
+        isDraggingLoopEnd = false;
+      });
+      
+
+      
+      // Add Layer button event listener
+      document.getElementById('addLayerBtn').addEventListener('click', () => {
+        createLayer();
+      });
+      
+      // Initialize sidebar controls
+      updateSidebarControls();
+      
+      // Don't create any default layers - start with empty black screen
+      
+      // Initialize loop slider
+      setTimeout(() => {
+        totalImages = calculateTotalImages();
+        // Always reset loop range to include all available images on initialization
+        loopStart = 0;
+        loopEnd = Math.max(totalImages - 1, 0);
+        updateLoopSlider();
+      }, 100);
+      
+      // Start continuous preview updates for live animation
+      startPreviewUpdates();
+      
+      // Removed layers palette toggle logic
+
+      function updatePlaceholderVisibility() {
+        // Always show black screen - no default background or placeholder
+        defaultBackground.style.display = 'none';
+        placeholder.style.display = 'none';
+      }
+      
+      function setDefaultBackground(imagePath) {
+        if (imagePath) {
+          defaultBackgroundImage.src = 'file://' + encodeURI(imagePath);
+        }
+        updatePlaceholderVisibility();
+        sendPreviewUpdate();
+      }
+      
+      function reorderLayersInOutput(layerOrder) {
+        // Reorder the layers array to match the new order
+        const newLayers = [];
+        layerOrder.forEach(layerId => {
+          const layer = layers.find(l => l.id === layerId);
+          if (layer) {
+            newLayers.push(layer);
+          }
+        });
+        
+        // Update the layers array
+        layers = newLayers;
+        
+        // Update z-index of layer elements based on new order
+        layers.forEach((layer, index) => {
+          if (layer.element) {
+            // Higher index = higher z-index (layers on top)
+            layer.element.style.zIndex = 100 + index;
+          }
+        });
+        
+        // Send updated layer data back to control window
+        sendLayersUpdate();
+      }
+      
+      // Add inverse functionality to default background
+      function toggleDefaultBackgroundInverse() {
+        const currentFilter = defaultBackgroundImage.style.filter;
+        if (currentFilter.includes('invert(1)')) {
+          defaultBackgroundImage.style.filter = 'none';
+        } else {
+          defaultBackgroundImage.style.filter = 'invert(1)';
+        }
+      }
+
+    });
+  </script>
+</body>
+</html> 

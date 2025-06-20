@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Animator - Controls</title>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background: #1a1a1a;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #fff;
+    }
+    
+    body {
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      gap: 20px;
+      overflow-y: auto;
+    }
+    
+    .control-panel {
+      background: rgba(30,30,30,0.95);
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+    
+    .control-panel h3 {
+      margin: 0 0 15px 0;
+      color: #4af;
+      font-size: 18px;
+    }
+    
+    /* Layers Section */
+    #layers-section {
+      margin-bottom: 20px;
+      border-bottom: 1px solid #444;
+      padding-bottom: 15px;
+    }
+    
+    .layer-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+      padding: 8px;
+      background: rgba(40,40,40,0.8);
+      border-radius: 6px;
+      cursor: pointer;
+      min-height: 40px;
+    }
+    
+    .layer-item:hover {
+      background: rgba(60,60,60,0.8);
+    }
+    
+    .layer-item.active {
+      background: rgba(68,170,255,0.4);
+      border: 2px solid #4af;
+      box-shadow: 0 0 8px rgba(68,170,255,0.5);
+      transform: scale(1.02);
+    }
+    
+    .layer-thumbnail {
+      width: 32px;
+      height: 24px;
+      object-fit: cover;
+      border-radius: 4px;
+      margin-right: 10px;
+      flex-shrink: 0;
+    }
+    
+    .layer-info {
+      flex: 1;
+      font-size: 12px;
+      margin-right: 8px;
+    }
+    
+    .layer-controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-shrink: 0;
+      padding: 4px;
+    }
+    
+    .layer-controls button {
+      padding: 6px 8px;
+      font-size: 14px;
+      background: #444;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      min-width: 28px;
+      min-height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 10;
+    }
+    
+    .layer-controls button:hover {
+      background: #666;
+      transform: scale(1.1);
+    }
+    
+    .layer-controls button:active {
+      background: #777;
+      transform: scale(0.95);
+    }
+    
+    .layer-controls button.select-btn {
+      background: #666;
+    }
+    
+    .layer-item.active .layer-controls button.select-btn {
+      background: #4af;
+      color: #000;
+    }
+    
+    /* Control sliders */
+    .control-group {
+      margin-bottom: 18px;
+    }
+    
+    .control-label {
+      color: #fff;
+      font-size: 16px;
+      margin-bottom: 10px;
+      display: block;
+    }
+    
+    .control-input {
+      width: 100%;
+      margin-bottom: 10px;
+    }
+    
+    button {
+      padding: 8px 16px;
+      font-size: 16px;
+      border-radius: 6px;
+      border: none;
+      background: #444;
+      color: #fff;
+      cursor: pointer;
+      margin-bottom: 10px;
+      width: 100%;
+    }
+    
+    button:hover {
+      background: #666;
+    }
+    
+    button.primary {
+      background: #4af;
+      color: #000;
+    }
+    
+    button.primary:hover {
+      background: #5bf;
+    }
+    
+    /* Loop slider */
+    #loopSliderContainer {
+      position: relative;
+      height: 30px;
+      margin: 10px 0;
+    }
+    
+    #loopSliderTrack {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: #444;
+      border-radius: 2px;
+      transform: translateY(-50%);
+    }
+    
+    #loopSliderRange {
+      position: absolute;
+      top: 50%;
+      height: 4px;
+      background: #4af;
+      border-radius: 2px;
+      transform: translateY(-50%);
+    }
+    
+    .loop-handle {
+      position: absolute;
+      top: 50%;
+      width: 16px;
+      height: 16px;
+      background: #4af;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      cursor: pointer;
+      transform: translate(-50%, -50%);
+      z-index: 10;
+    }
+    
+    #thumbnails-container {
+      max-height: 120px;
+      overflow-y: auto;
+      border: 1px solid #444;
+      border-radius: 6px;
+      padding: 10px;
+    }
+    
+    #thumbnails {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    
+    .thumbnail {
+      width: 60px;
+      height: 40px;
+      object-fit: cover;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: border 0.2s;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.5);
+      border: 2px solid transparent;
+    }
+    
+    .thumbnail:hover {
+      border: 2px solid #4af;
+    }
+    
+    .slider-value {
+      color: #fff;
+      margin-left: 8px;
+      font-size: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div class="control-panel">
+    <h3>🎬 Image Animator Controls</h3>
+    
+    <!-- Layers Section -->
+    <div id="layers-section">
+      <h3 style="color: #4af; margin: 0 0 10px 0; font-size: 16px;">Layers</h3>
+      <div style="font-size: 11px; color: #888; margin-bottom: 10px; text-align: center;">
+        📌 to select • 👁 visibility • 📁 load images • ⧉ duplicate • ✕ delete
+      </div>
+      <div id="layers-list" style="max-height: 300px; overflow-y: auto; margin-bottom: 10px;"></div>
+      <button id="addLayerBtn" class="primary">+ Add Layer</button>
+    </div>
+  </div>
+  
+  <div class="control-panel">
+    <h3>Layer Controls</h3>
+    
+    <div id="selectedLayerInfo" style="color: #4af; font-size: 14px; margin-bottom: 15px; text-align: center;">
+      No layer selected
+    </div>
+    
+    <div class="control-group">
+      <label class="control-label" for="speedControl">Speed: <span id="speedValue">100</span> ms</label>
+      <input type="range" id="speedControl" class="control-input" min="0" max="100" value="20" step="1">
+    </div>
+    
+    <div class="control-group">
+      <label class="control-label" for="sizeControl">Size: <span id="sizeValue">100</span>%</label>
+      <input type="range" id="sizeControl" class="control-input" min="10" max="500" value="100" step="5">
+    </div>
+    
+    <div class="control-group">
+      <label class="control-label" for="jitterControl">Jitter: <span id="jitterValue">0</span>px</label>
+      <input type="range" id="jitterControl" class="control-input" min="0" max="200" value="0" step="5">
+    </div>
+    
+    <div class="control-group">
+      <label class="control-label" for="opacityControl">Opacity: <span id="opacityValue">100</span>%</label>
+      <input type="range" id="opacityControl" class="control-input" min="0" max="100" value="100" step="5">
+    </div>
+    
+    <div class="control-group">
+      <label class="control-label" for="strobeControl">Strobe: <span id="strobeValue">0</span> Hz</label>
+      <input type="range" id="strobeControl" class="control-input" min="0" max="20" value="0" step="1">
+    </div>
+    
+    <div class="control-group">
+      <label class="control-label" for="impactControl">Impact: <span id="impactValue">0</span> Hz</label>
+      <input type="range" id="impactControl" class="control-input" min="0" max="20" value="0" step="1">
+    </div>
+    
+    <button id="playPauseBtn" class="primary">⏸️ Pause All</button>
+    
+    <div id="frameControls" style="display: none; margin: 10px 0;">
+      <div style="display: flex; gap: 5px;">
+        <button id="backBtn" style="flex: 1;">⬅️ Back 1</button>
+        <button id="forwardBtn" style="flex: 1;">➡️ Forward 1</button>
+      </div>
+    </div>
+  </div>
+  
+  <div class="control-panel">
+    <h3>Loop Range</h3>
+    
+    <div class="control-group">
+      <label class="control-label">Loop Range: <span id="loopRangeValue">1 - 1</span></label>
+      <div id="loopSliderContainer">
+        <div id="loopSliderTrack"></div>
+        <div id="loopSliderRange"></div>
+        <div id="loopStartHandle" class="loop-handle"></div>
+        <div id="loopEndHandle" class="loop-handle"></div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="control-panel">
+    <h3>Thumbnails</h3>
+    <div id="thumbnails-container">
+      <div id="thumbnails"></div>
+    </div>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+    
+    // Control window state
+    let layers = [];
+    let selectedLayer = null;
+    let imageFiles = [];
+    let current = 0;
+    let globalPaused = false;
+    let loopStart = 0;
+    let loopEnd = 0;
+    let totalImages = 0;
+    
+    // DOM elements
+    const layersList = document.getElementById('layers-list');
+    const selectedLayerInfo = document.getElementById('selectedLayerInfo');
+    const speedControl = document.getElementById('speedControl');
+    const speedValue = document.getElementById('speedValue');
+    const sizeControl = document.getElementById('sizeControl');
+    const sizeValue = document.getElementById('sizeValue');
+    const jitterControl = document.getElementById('jitterControl');
+    const jitterValue = document.getElementById('jitterValue');
+    const opacityControl = document.getElementById('opacityControl');
+    const opacityValue = document.getElementById('opacityValue');
+    const strobeControl = document.getElementById('strobeControl');
+    const strobeValue = document.getElementById('strobeValue');
+    const impactControl = document.getElementById('impactControl');
+    const impactValue = document.getElementById('impactValue');
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const frameControls = document.getElementById('frameControls');
+    const backBtn = document.getElementById('backBtn');
+    const forwardBtn = document.getElementById('forwardBtn');
+    const loopSliderContainer = document.getElementById('loopSliderContainer');
+    const loopSliderRange = document.getElementById('loopSliderRange');
+    const loopStartHandle = document.getElementById('loopStartHandle');
+    const loopEndHandle = document.getElementById('loopEndHandle');
+    const loopRangeValue = document.getElementById('loopRangeValue');
+    const thumbnailsDiv = document.getElementById('thumbnails');
+    
+    // Utility functions
+    function sliderToMs(x) {
+      x = Number(x);
+      if (x <= 50) {
+        return Math.round((x / 50) * 250);
+      } else {
+        return Math.round(250 + Math.pow((x - 50) / 50, 2) * (20000 - 250));
+      }
+    }
+    
+    // Send commands to output window
+    function sendToOutput(command, data = {}) {
+      ipcRenderer.send('control-to-output', { command, data });
+    }
+    
+    // Receive updates from output window
+    ipcRenderer.on('output-to-control', (event, message) => {
+      const { command, data } = message;
+      
+      switch (command) {
+        case 'layers-updated':
+          layers = data.layers;
+          updateLayersList();
+          break;
+        case 'layer-selected':
+          selectedLayer = data.layer;
+          updateSidebarControls();
+          updateLayersList();
+          break;
+        case 'thumbnails-updated':
+          imageFiles = data.imageFiles;
+          current = data.current;
+          renderThumbnails();
+          break;
+        case 'loop-updated':
+          loopStart = data.loopStart;
+          loopEnd = data.loopEnd;
+          totalImages = data.totalImages;
+          updateLoopSlider();
+          break;
+        case 'global-pause-changed':
+          globalPaused = data.globalPaused;
+          playPauseBtn.textContent = globalPaused ? '▶️ Resume All' : '⏸️ Pause All';
+          frameControls.style.display = globalPaused ? 'block' : 'none';
+          break;
+      }
+    });
+    
+    // Layer management functions
+    function selectLayer(layer) {
+      sendToOutput('select-layer', { layerId: layer.id });
+    }
+    
+    function addLayer() {
+      sendToOutput('add-layer');
+    }
+    
+    function removeLayer(layerId) {
+      sendToOutput('remove-layer', { layerId });
+    }
+    
+    function duplicateLayer(layerId) {
+      sendToOutput('duplicate-layer', { layerId });
+    }
+    
+    function toggleLayerVisibility(layerId) {
+      sendToOutput('toggle-visibility', { layerId });
+    }
+    
+    async function loadImagesIntoLayer(layer) {
+      const { dialog } = require('@electron/remote');
+      const result = await dialog.showOpenDialog({
+        properties: ['openFile', 'openDirectory', 'multiSelections'],
+        filters: [
+          { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif'] },
+          { name: 'All Files', extensions: ['*'] }
+        ]
+      });
+      
+      if (!result.canceled && result.filePaths.length > 0) {
+        sendToOutput('load-images', { layerId: layer.id, filePaths: result.filePaths });
+      }
+    }
+    
+    // UI update functions
+    function updateLayersList() {
+      layersList.innerHTML = '';
+      layers.forEach(layer => {
+        const layerItem = document.createElement('div');
+        layerItem.className = 'layer-item';
+        if (selectedLayer && selectedLayer.id === layer.id) {
+          layerItem.classList.add('active');
+        }
+        
+        const thumbnail = document.createElement('img');
+        thumbnail.src = layer.imageSrc || '';
+        thumbnail.className = 'layer-thumbnail';
+        
+        const layerInfo = document.createElement('div');
+        layerInfo.className = 'layer-info';
+        layerInfo.innerHTML = `
+          <div>${layer.name}</div>
+          <div style="font-size:10px; color:#888;">Frame ${layer.imageIndex + 1}${layer.imageFiles ? ` of ${layer.imageFiles.length}` : ''}</div>
+        `;
+        
+        const controlsContainer = document.createElement('div');
+        controlsContainer.className = 'layer-controls';
+        
+        // Select button
+        const selectBtn = document.createElement('button');
+        selectBtn.className = 'select-btn';
+        selectBtn.title = 'Select this layer';
+        selectBtn.textContent = '📌';
+        selectBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          selectLayer(layer);
+        });
+        
+        // Visibility button
+        const visibilityBtn = document.createElement('button');
+        visibilityBtn.title = 'Toggle visibility';
+        visibilityBtn.textContent = layer.visible ? '👁' : '🚫';
+        visibilityBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toggleLayerVisibility(layer.id);
+        });
+        
+        // Load images button
+        const loadBtn = document.createElement('button');
+        loadBtn.title = 'Load images/folder';
+        loadBtn.textContent = '📁';
+        loadBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          loadImagesIntoLayer(layer);
+        });
+        
+        // Duplicate button
+        const duplicateBtn = document.createElement('button');
+        duplicateBtn.title = 'Duplicate layer';
+        duplicateBtn.textContent = '⧉';
+        duplicateBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          duplicateLayer(layer.id);
+        });
+        
+        controlsContainer.appendChild(selectBtn);
+        controlsContainer.appendChild(visibilityBtn);
+        controlsContainer.appendChild(loadBtn);
+        controlsContainer.appendChild(duplicateBtn);
+        
+        // Delete button only for non-main layers
+        if (!layer.isMainLayer) {
+          const deleteBtn = document.createElement('button');
+          deleteBtn.title = 'Delete layer';
+          deleteBtn.textContent = '✕';
+          deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            removeLayer(layer.id);
+          });
+          controlsContainer.appendChild(deleteBtn);
+        }
+        
+        layerItem.appendChild(thumbnail);
+        layerItem.appendChild(layerInfo);
+        layerItem.appendChild(controlsContainer);
+        layersList.appendChild(layerItem);
+      });
+    }
+    
+    function updateSidebarControls() {
+      if (!selectedLayer) {
+        selectedLayerInfo.textContent = 'No layer selected';
+        speedControl.disabled = true;
+        sizeControl.disabled = true;
+        jitterControl.disabled = true;
+        opacityControl.disabled = true;
+        strobeControl.disabled = true;
+        impactControl.disabled = true;
+        return;
+      }
+      
+      selectedLayerInfo.textContent = `Controlling: ${selectedLayer.name}`;
+      speedControl.disabled = false;
+      sizeControl.disabled = false;
+      jitterControl.disabled = false;
+      opacityControl.disabled = false;
+      strobeControl.disabled = false;
+      impactControl.disabled = false;
+      
+      speedControl.value = selectedLayer.speed;
+      sizeControl.value = selectedLayer.size;
+      jitterControl.value = selectedLayer.jitterAmount;
+      opacityControl.value = selectedLayer.opacity;
+      strobeControl.value = selectedLayer.strobe;
+      impactControl.value = selectedLayer.impact;
+      
+      speedValue.textContent = sliderToMs(selectedLayer.speed);
+      sizeValue.textContent = selectedLayer.size;
+      jitterValue.textContent = selectedLayer.jitterAmount;
+      opacityValue.textContent = selectedLayer.opacity;
+      strobeValue.textContent = selectedLayer.strobe;
+      impactValue.textContent = selectedLayer.impact;
+    }
+    
+    function renderThumbnails() {
+      thumbnailsDiv.innerHTML = '';
+      imageFiles.forEach((file, idx) => {
+        const thumb = document.createElement('img');
+        thumb.src = 'file://' + encodeURI(file);
+        thumb.className = 'thumbnail';
+        thumb.title = `Frame ${idx+1}`;
+        thumb.style.border = idx === current ? '2px solid #4af' : '2px solid transparent';
+        thumb.addEventListener('click', () => {
+          sendToOutput('set-current-frame', { frameIndex: idx });
+        });
+        thumbnailsDiv.appendChild(thumb);
+      });
+    }
+    
+    function updateLoopSlider() {
+      if (totalImages <= 1) return;
+      
+      const containerWidth = loopSliderContainer.offsetWidth;
+      const startPercent = (loopStart / Math.max(totalImages - 1, 1)) * 100;
+      const endPercent = (loopEnd / Math.max(totalImages - 1, 1)) * 100;
+      
+      loopStartHandle.style.left = startPercent + '%';
+      loopEndHandle.style.left = endPercent + '%';
+      
+      loopSliderRange.style.left = startPercent + '%';
+      loopSliderRange.style.width = (endPercent - startPercent) + '%';
+      
+      loopRangeValue.textContent = `${loopStart + 1} - ${loopEnd + 1}`;
+    }
+    
+    // Event listeners
+    speedControl.addEventListener('input', () => {
+      if (selectedLayer) {
+        speedValue.textContent = sliderToMs(parseInt(speedControl.value));
+        sendToOutput('update-layer-property', {
+          layerId: selectedLayer.id,
+          property: 'speed',
+          value: parseInt(speedControl.value)
+        });
+      }
+    });
+    
+    sizeControl.addEventListener('input', () => {
+      if (selectedLayer) {
+        sizeValue.textContent = sizeControl.value;
+        sendToOutput('update-layer-property', {
+          layerId: selectedLayer.id,
+          property: 'size',
+          value: parseInt(sizeControl.value)
+        });
+      }
+    });
+    
+    jitterControl.addEventListener('input', () => {
+      if (selectedLayer) {
+        jitterValue.textContent = jitterControl.value;
+        sendToOutput('update-layer-property', {
+          layerId: selectedLayer.id,
+          property: 'jitterAmount',
+          value: parseInt(jitterControl.value)
+        });
+      }
+    });
+    
+    opacityControl.addEventListener('input', () => {
+      if (selectedLayer) {
+        opacityValue.textContent = opacityControl.value;
+        sendToOutput('update-layer-property', {
+          layerId: selectedLayer.id,
+          property: 'opacity',
+          value: parseInt(opacityControl.value)
+        });
+      }
+    });
+    
+    strobeControl.addEventListener('input', () => {
+      if (selectedLayer) {
+        strobeValue.textContent = strobeControl.value;
+        sendToOutput('update-layer-property', {
+          layerId: selectedLayer.id,
+          property: 'strobe',
+          value: parseInt(strobeControl.value)
+        });
+      }
+    });
+    
+    impactControl.addEventListener('input', () => {
+      if (selectedLayer) {
+        impactValue.textContent = impactControl.value;
+        sendToOutput('update-layer-property', {
+          layerId: selectedLayer.id,
+          property: 'impact',
+          value: parseInt(impactControl.value)
+        });
+      }
+    });
+    
+    playPauseBtn.addEventListener('click', () => {
+      sendToOutput('toggle-global-pause');
+    });
+    
+    backBtn.addEventListener('click', () => {
+      sendToOutput('step-backward');
+    });
+    
+    forwardBtn.addEventListener('click', () => {
+      sendToOutput('step-forward');
+    });
+    
+    document.getElementById('addLayerBtn').addEventListener('click', addLayer);
+    
+    // Loop slider drag functionality
+    let isDraggingLoopStart = false;
+    let isDraggingLoopEnd = false;
+    
+    loopStartHandle.addEventListener('mousedown', (e) => {
+      isDraggingLoopStart = true;
+      e.preventDefault();
+    });
+    
+    loopEndHandle.addEventListener('mousedown', (e) => {
+      isDraggingLoopEnd = true;
+      e.preventDefault();
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+      if (!isDraggingLoopStart && !isDraggingLoopEnd) return;
+      
+      const rect = loopSliderContainer.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const percent = Math.max(0, Math.min(100, (x / rect.width) * 100));
+      const imageIndex = Math.round((percent / 100) * Math.max(totalImages - 1, 1));
+      
+      if (isDraggingLoopStart) {
+        const newLoopStart = Math.min(imageIndex, loopEnd);
+        sendToOutput('update-loop-range', { loopStart: newLoopStart, loopEnd });
+      } else if (isDraggingLoopEnd) {
+        const newLoopEnd = Math.max(imageIndex, loopStart);
+        sendToOutput('update-loop-range', { loopStart, loopEnd: newLoopEnd });
+      }
+    });
+    
+    document.addEventListener('mouseup', () => {
+      isDraggingLoopStart = false;
+      isDraggingLoopEnd = false;
+    });
+    
+    // Initialize
+    updateSidebarControls();
+    sendToOutput('request-initial-state');
+  </script>
+</body>
+</html> 

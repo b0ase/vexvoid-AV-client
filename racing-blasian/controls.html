@@ -1,0 +1,1536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>V3XV0ID Image Animator - Controls</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap');
+    
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      font-family: 'Courier New', 'Courier Prime', monospace;
+      background: #000000;
+      color: #ffffff;
+      overflow: hidden;
+      font-size: 12px;
+      line-height: 1.0;
+      font-weight: normal;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+      cursor: crosshair;
+      position: relative;
+    }
+
+    /* Scan lines effect */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(255, 255, 255, 0.005) 2px,
+        rgba(255, 255, 255, 0.005) 4px
+      );
+      pointer-events: none;
+      z-index: 1000;
+    }
+
+    /* V3XV0ID branding header */
+    .v3xv0id-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0, 0, 0, 0.95);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 12px 20px;
+      z-index: 999;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .v3xv0id-brand {
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      font-size: 16px;
+      color: #ffffff;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      text-shadow: 0 0 3px rgba(255, 255, 255, 0.8);
+    }
+
+    .v3xv0id-subtitle {
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .cyber-text {
+      color: #ffffff;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+    }
+
+    .main-container {
+      display: flex;
+      height: 100vh;
+      gap: 15px;
+      padding: 70px 15px 15px 15px;
+      box-sizing: border-box;
+    }
+
+    /* Left Column - Dual Layer Palettes */
+    .layers-column {
+      flex: 0 0 300px;
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    /* Crossfader Section */
+    .crossfader-section {
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      padding: 15px;
+    }
+
+    .crossfader-header {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .crossfader-label {
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      font-size: 16px;
+      color: #ffffff;
+      text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+      min-width: 20px;
+      text-align: center;
+    }
+
+    .crossfader-container {
+      flex: 1;
+      position: relative;
+      height: 40px;
+      display: flex;
+      align-items: center;
+    }
+
+    .crossfader {
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.2);
+      outline: none;
+      -webkit-appearance: none;
+      cursor: crosshair;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      position: relative;
+      z-index: 2;
+    }
+
+    .crossfader::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 30px;
+      background: #ffffff;
+      cursor: crosshair;
+      border: 2px solid #000000;
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+    }
+
+    .crossfader::-webkit-slider-thumb:hover {
+      box-shadow: 0 0 12px rgba(255, 255, 255, 0.8);
+    }
+
+    .crossfader-track {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(to right, #ffffff 0%, rgba(255,255,255,0.3) 50%, #ffffff 100%);
+      transform: translateY(-50%);
+      z-index: 1;
+    }
+
+    /* Palette Sections */
+    .palette-section {
+      flex: 1;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      min-height: 200px;
+    }
+
+    .palette-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .palette-header h3 {
+      margin: 0;
+      font-size: 12px;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #ffffff;
+      text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+    }
+
+    .add-layer-btn {
+      background: #ffffff;
+      color: #000000;
+      border: 1px solid #ffffff;
+      padding: 6px 12px;
+      cursor: crosshair;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      transition: all 0.2s;
+    }
+
+    .add-layer-btn:hover {
+      background: #000000;
+      color: #ffffff;
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+    }
+
+    .layers-list {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .layer-item {
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      padding: 12px;
+      cursor: crosshair;
+      transition: all 0.2s;
+      user-select: none;
+    }
+
+    .layer-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+
+    .layer-item.selected {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: #ffffff;
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+    }
+
+    .layer-item.dragging {
+      opacity: 0.5;
+      transform: rotate(2deg);
+      z-index: 1000;
+    }
+
+    .layer-item.drag-over {
+      border-color: #ffffff;
+      border-style: dashed;
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .drag-handle {
+      display: inline-block;
+      margin-right: 8px;
+      color: #888;
+      cursor: crosshair;
+      font-size: 12px;
+      font-family: 'Courier New', monospace;
+    }
+
+    .layer-name {
+      font-weight: bold;
+      margin-bottom: 8px;
+      font-size: 12px;
+      font-family: 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .layer-buttons {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .layer-btn {
+      background: rgba(0, 0, 0, 0.8);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      padding: 4px 8px;
+      cursor: crosshair;
+      font-size: 10px;
+      font-family: 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      transition: all 0.2s;
+      min-width: 24px;
+      text-align: center;
+    }
+
+    .layer-btn:hover {
+      background: #ffffff;
+      color: #000000;
+      border-color: #ffffff;
+    }
+
+    .layer-btn.active {
+      background: #ffffff;
+      color: #000000;
+      border-color: #ffffff;
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+    }
+
+    /* Middle Column - Controls */
+    .controls-column {
+      flex: 0 0 400px;
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .controls-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .controls-header h2 {
+      margin: 0;
+      font-size: 14px;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #ffffff;
+      text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+    }
+
+    .selected-layer-info {
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 12px;
+      margin-bottom: 20px;
+      text-align: center;
+      color: #ffffff;
+      font-size: 11px;
+      font-family: 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .control-group {
+      margin-bottom: 20px;
+    }
+
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 11px;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .control-value {
+      color: #ffffff;
+      font-weight: bold;
+      text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+    }
+
+    .control-slider {
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.2);
+      outline: none;
+      -webkit-appearance: none;
+      cursor: crosshair;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .control-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      background: #ffffff;
+      cursor: crosshair;
+      transition: all 0.2s;
+      border: 1px solid rgba(0, 0, 0, 0.2);
+    }
+
+    .control-slider::-webkit-slider-thumb:hover {
+      background: #ffffff;
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+    }
+
+    .global-controls {
+      margin-top: auto;
+      padding-top: 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .global-btn {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      padding: 12px;
+      cursor: crosshair;
+      font-size: 12px;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 10px;
+      transition: all 0.2s;
+    }
+
+    .global-btn:hover {
+      background: #ffffff;
+      color: #000000;
+      border-color: #ffffff;
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+    }
+
+    .global-btn.pause {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: #ffffff;
+    }
+
+    .global-btn.pause:hover {
+      background: #ffffff;
+      color: #000000;
+    }
+
+    .global-btn.resume {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: #ffffff;
+    }
+
+    .global-btn.resume:hover {
+      background: #ffffff;
+      color: #000000;
+    }
+
+    /* Right Column - Preview */
+    .preview-column {
+      flex: 1;
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .preview-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .preview-header h2 {
+      margin: 0;
+      font-size: 14px;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #ffffff;
+      text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+    }
+
+    .preview-screen {
+      flex: 1;
+      background: #000000;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 8px;
+      overflow: hidden;
+      min-height: 400px;
+    }
+
+    .preview-row {
+      flex: 1;
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      min-height: 120px;
+    }
+
+    .preview-row.output-preview {
+      border: 1px solid #ffffff;
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+    }
+
+    .preview-row-label {
+      position: absolute;
+      top: 4px;
+      left: 8px;
+      font-size: 9px;
+      color: #ffffff;
+      background: rgba(0,0,0,0.9);
+      padding: 2px 6px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      z-index: 10;
+      font-family: 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .preview-image {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      filter: contrast(1.1);
+    }
+
+    .preview-placeholder {
+      color: #888;
+      font-size: 11px;
+      text-align: center;
+      font-family: 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Inverse button styling */
+    .inverse-btn {
+      background: rgba(156, 39, 176, 0.8);
+      color: #ffffff;
+      border: 1px solid rgba(156, 39, 176, 0.6);
+      padding: 4px 8px;
+      cursor: crosshair;
+      font-size: 10px;
+      font-family: 'Courier New', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      transition: all 0.2s;
+      min-width: 24px;
+      text-align: center;
+    }
+
+    .inverse-btn:hover {
+      background: #9c27b0;
+      border-color: #9c27b0;
+      box-shadow: 0 0 8px rgba(156, 39, 176, 0.5);
+    }
+
+    .inverse-btn.active {
+      background: #ffffff;
+      color: #9c27b0;
+      border-color: #ffffff;
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+    }
+
+    /* Scrollbar styling */
+    .layers-list::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .layers-list::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .layers-list::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .layers-list::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.5);
+    }
+  </style>
+</head>
+<body>
+  <!-- V3XV0ID Header -->
+  <div class="v3xv0id-header">
+    <div class="v3xv0id-brand">V3XV0ID</div>
+    <div class="v3xv0id-subtitle">Image Animator Controls</div>
+  </div>
+  
+  <div class="main-container">
+    <!-- Left Column - Dual Layer Palettes -->
+    <div class="layers-column">
+      <!-- Top Palette (A) -->
+      <div class="palette-section">
+        <div class="palette-header">
+          <h3>PALETTE A</h3>
+          <button class="add-layer-btn" id="addLayerABtn">+ ADD</button>
+        </div>
+        <div class="layers-list" id="layersListA">
+          <!-- Palette A layers will be populated here -->
+        </div>
+      </div>
+      
+      <!-- Crossfader Section - Between Palettes -->
+      <div class="crossfader-section">
+        <div class="crossfader-header">
+          <span class="crossfader-label">A</span>
+          <div class="crossfader-container">
+            <input type="range" class="crossfader" id="crossfader" min="0" max="100" value="0">
+            <div class="crossfader-track"></div>
+          </div>
+          <span class="crossfader-label">B</span>
+        </div>
+      </div>
+      
+      <!-- Bottom Palette (B) -->
+      <div class="palette-section">
+        <div class="palette-header">
+          <h3>PALETTE B</h3>
+          <button class="add-layer-btn" id="addLayerBBtn">+ ADD</button>
+        </div>
+        <div class="layers-list" id="layersListB">
+          <!-- Palette B layers will be populated here -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Middle Column - Controls -->
+    <div class="controls-column">
+      <div class="controls-header">
+        <h2>CONTROLS</h2>
+      </div>
+      
+      <div class="selected-layer-info" id="selectedLayerInfo">
+        No layer selected
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>Speed</span>
+          <span class="control-value" id="speedValue">100 ms</span>
+        </div>
+        <input type="range" class="control-slider" id="speedControl" min="1" max="100" value="20">
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>Size</span>
+          <span class="control-value" id="sizeValue">100%</span>
+        </div>
+        <input type="range" class="control-slider" id="sizeControl" min="10" max="300" value="100">
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>Jitter</span>
+          <span class="control-value" id="jitterValue">0px</span>
+        </div>
+        <input type="range" class="control-slider" id="jitterControl" min="0" max="100" value="0">
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>Opacity</span>
+          <span class="control-value" id="opacityValue">100%</span>
+        </div>
+        <input type="range" class="control-slider" id="opacityControl" min="0" max="100" value="100">
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>Strobe</span>
+          <span class="control-value" id="strobeValue">0 Hz</span>
+        </div>
+        <input type="range" class="control-slider" id="strobeControl" min="0" max="20" value="0">
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
+          <span>Impact</span>
+          <span class="control-value" id="impactValue">0 Hz</span>
+        </div>
+        <input type="range" class="control-slider" id="impactControl" min="0" max="20" value="0">
+      </div>
+
+      <div class="global-controls">
+        <button class="global-btn resume" id="playPauseBtn">⏸️ PAUSE ALL</button>
+        <button class="global-btn" id="setBackgroundBtn">🖼️ SET DEFAULT BACKGROUND</button>
+      </div>
+    </div>
+
+    <!-- Right Column - Preview -->
+    <div class="preview-column">
+      <div class="preview-header">
+        <h2>PREVIEW</h2>
+      </div>
+      <div class="preview-screen" id="previewScreen">
+        <div class="preview-row output-preview" id="outputPreview">
+          <div class="preview-row-label">OUTPUT WINDOW</div>
+          <div class="preview-placeholder">NO OUTPUT CONTENT</div>
+        </div>
+        <div class="preview-row" id="preview2">
+          <div class="preview-row-label">PALETTE A</div>
+          <div class="preview-placeholder">NO CONTENT</div>
+        </div>
+        <div class="preview-row" id="preview3">
+          <div class="preview-row-label">PALETTE B</div>
+          <div class="preview-placeholder">NO CONTENT</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', function() {
+      const { ipcRenderer } = require('electron');
+      const { dialog } = require('@electron/remote');
+      const fs = require('fs');
+      const path = require('path');
+      
+      // State variables
+      let layersA = []; // Palette A layers
+      let layersB = []; // Palette B layers
+      let selectedLayer = null;
+      let globalPaused = false;
+      let crossfaderValue = 0; // 0 = full A, 100 = full B, start with full A
+      let activePalette = 'A'; // Which palette is currently being shown
+      
+      // DOM elements
+      const layersListA = document.getElementById('layersListA');
+      const layersListB = document.getElementById('layersListB');
+      const crossfader = document.getElementById('crossfader');
+      const selectedLayerInfo = document.getElementById('selectedLayerInfo');
+      const addLayerABtn = document.getElementById('addLayerABtn');
+      const addLayerBBtn = document.getElementById('addLayerBBtn');
+      const playPauseBtn = document.getElementById('playPauseBtn');
+      const setBackgroundBtn = document.getElementById('setBackgroundBtn');
+      const previewScreen = document.getElementById('previewScreen');
+      const outputPreview = document.getElementById('outputPreview');
+      const preview2 = document.getElementById('preview2');
+      const preview3 = document.getElementById('preview3');
+      
+      // Control elements
+      const speedControl = document.getElementById('speedControl');
+      const sizeControl = document.getElementById('sizeControl');
+      const jitterControl = document.getElementById('jitterControl');
+      const opacityControl = document.getElementById('opacityControl');
+      const strobeControl = document.getElementById('strobeControl');
+      const impactControl = document.getElementById('impactControl');
+      
+      // Control value displays
+      const speedValue = document.getElementById('speedValue');
+      const sizeValue = document.getElementById('sizeValue');
+      const jitterValue = document.getElementById('jitterValue');
+      const opacityValue = document.getElementById('opacityValue');
+      const strobeValue = document.getElementById('strobeValue');
+      const impactValue = document.getElementById('impactValue');
+      
+      // Send commands to output window
+      function sendToOutput(command, data = {}) {
+        ipcRenderer.send('control-to-output', { command, data });
+      }
+      
+      // Handle messages from output window
+      ipcRenderer.on('output-message', (event, message) => {
+        const { command, data } = message;
+        
+        switch (command) {
+          case 'layers-updated':
+            updateLayersFromOutput(data.layers);
+            updateLayersList();
+            updatePreview();
+            break;
+          case 'layer-selected':
+            if (data.layer) {
+              selectedLayer = data.layer;
+              updateSelectedLayer();
+            } else {
+              selectedLayer = null;
+              updateSelectedLayer();
+            }
+            break;
+          case 'global-pause-changed':
+            globalPaused = data.globalPaused;
+            updatePlayPauseButton();
+            break;
+          case 'preview-update':
+            updateOutputPreview(data);
+            updatePalettePreview(data);
+            break;
+        }
+      });
+      
+      function updateLayersFromOutput(outputLayers) {
+        // Clear both palettes and redistribute based on actual palette assignment from output
+        layersA = [];
+        layersB = [];
+        
+        outputLayers.forEach(layer => {
+          // Use the actual palette assignment from the output window
+          const layerPalette = layer.palette || 'A';
+          
+          if (layerPalette === 'A') {
+            layersA.push(layer);
+          } else {
+            layersB.push(layer);
+          }
+        });
+      }
+      
+      function updateCrossfader() {
+        crossfaderValue = parseInt(crossfader.value);
+        
+        // Apply crossfader logic to output window
+        // 0 = full A, 100 = full B, 50 = mix
+        const aOpacity = crossfaderValue <= 50 ? 1 : (100 - crossfaderValue) / 50;
+        const bOpacity = crossfaderValue >= 50 ? 1 : crossfaderValue / 50;
+        
+        // Send crossfader values to output window
+        sendToOutput('crossfader-update', { 
+          aOpacity, 
+          bOpacity, 
+          crossfaderValue 
+        });
+        
+        // Update which palette is considered "active" for new layers
+        activePalette = crossfaderValue < 50 ? 'A' : 'B';
+      }
+      
+      function updateLayersList() {
+        updatePaletteList(layersListA, layersA, 'A');
+        updatePaletteList(layersListB, layersB, 'B');
+      }
+      
+      function updatePaletteList(paletteElement, layers, paletteName) {
+        paletteElement.innerHTML = '';
+        
+        layers.forEach(layer => {
+          const layerItem = document.createElement('div');
+          layerItem.className = 'layer-item';
+          if (selectedLayer && selectedLayer.id === layer.id) {
+            layerItem.classList.add('selected');
+          }
+          
+          layerItem.innerHTML = `
+            <div class="layer-name">
+              <span class="drag-handle" title="Drag to reorder">⋮⋮</span>
+              ${layer.name}
+            </div>
+            <div class="layer-buttons">
+              <button class="layer-btn ${layer.visible ? 'active' : ''}" onclick="toggleVisibility(${layer.id})" title="Toggle Visibility">👁</button>
+              <button class="layer-btn" onclick="loadImages(${layer.id})" title="Load Images">📁</button>
+              <button class="layer-btn" onclick="duplicateLayer(${layer.id})" title="Duplicate">⧉</button>
+              <button class="layer-btn" onclick="removeLayer(${layer.id})" title="Delete">✕</button>
+              <button class="inverse-btn ${layer.inverse ? 'active' : ''}" onclick="toggleInverse(${layer.id})" title="Inverse Colors">⚫⚪</button>
+            </div>
+          `;
+          
+          // Make layer item draggable
+          layerItem.draggable = true;
+          layerItem.dataset.layerId = layer.id;
+          layerItem.dataset.palette = paletteName;
+          
+          layerItem.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'BUTTON' && !e.target.classList.contains('drag-handle')) {
+              selectLayer(layer.id);
+            }
+          });
+          
+          // Add drag and drop event listeners
+          layerItem.addEventListener('dragstart', handleDragStart);
+          layerItem.addEventListener('dragover', handleDragOver);
+          layerItem.addEventListener('dragenter', handleDragEnter);
+          layerItem.addEventListener('dragleave', handleDragLeave);
+          layerItem.addEventListener('drop', handleDrop);
+          layerItem.addEventListener('dragend', handleDragEnd);
+          
+          paletteElement.appendChild(layerItem);
+        });
+      }
+      
+      function updateSelectedLayer() {
+        if (selectedLayer) {
+          selectedLayerInfo.textContent = `Controlling: ${selectedLayer.name}`;
+          
+          // Update control values
+          speedControl.value = selectedLayer.speed;
+          sizeControl.value = selectedLayer.size;
+          jitterControl.value = selectedLayer.jitterAmount;
+          opacityControl.value = selectedLayer.opacity;
+          strobeControl.value = selectedLayer.strobe;
+          impactControl.value = selectedLayer.impact;
+          
+          // Update display values
+          speedValue.textContent = sliderToMs(selectedLayer.speed) + ' ms';
+          sizeValue.textContent = selectedLayer.size + '%';
+          jitterValue.textContent = selectedLayer.jitterAmount + 'px';
+          opacityValue.textContent = selectedLayer.opacity + '%';
+          strobeValue.textContent = selectedLayer.strobe + ' Hz';
+          impactValue.textContent = selectedLayer.impact + ' Hz';
+          
+          // Enable controls
+          [speedControl, sizeControl, jitterControl, opacityControl, strobeControl, impactControl].forEach(control => {
+            control.disabled = false;
+          });
+        } else {
+          selectedLayerInfo.textContent = 'No layer selected';
+          
+          // Disable controls
+          [speedControl, sizeControl, jitterControl, opacityControl, strobeControl, impactControl].forEach(control => {
+            control.disabled = true;
+          });
+        }
+        
+        updateLayersList();
+      }
+      
+      function updatePlayPauseButton() {
+        if (globalPaused) {
+          playPauseBtn.textContent = '▶️ Resume All';
+          playPauseBtn.className = 'global-btn resume';
+        } else {
+          playPauseBtn.textContent = '⏸️ Pause All';
+          playPauseBtn.className = 'global-btn pause';
+        }
+      }
+      
+      function updatePreview() {
+        // Preview 2 shows Palette A (topmost visible layer)
+        const visibleLayersA = layersA.filter(l => l.visible);
+        const topLayerA = visibleLayersA.length > 0 ? 
+          visibleLayersA.reduce((top, layer) => {
+            return layer.id > top.id ? layer : top; // Get highest ID (most recent)
+          }) : null;
+        updatePreviewRow(preview2, topLayerA);
+        
+        // Preview 3 shows Palette B (topmost visible layer)
+        const visibleLayersB = layersB.filter(l => l.visible);
+        const topLayerB = visibleLayersB.length > 0 ? 
+          visibleLayersB.reduce((top, layer) => {
+            return layer.id > top.id ? layer : top; // Get highest ID (most recent)
+          }) : null;
+        updatePreviewRow(preview3, topLayerB);
+      }
+      
+      function updatePalettePreview(data) {
+        // Update Palette A preview with live data
+        if (data.paletteA) {
+          updatePreviewWithData(preview2, data.paletteA);
+        } else {
+          // Clear Palette A preview
+          const label = preview2.querySelector('.preview-row-label');
+          preview2.innerHTML = '';
+          preview2.appendChild(label);
+          const placeholder = document.createElement('div');
+          placeholder.className = 'preview-placeholder';
+          placeholder.textContent = 'NO CONTENT';
+          preview2.appendChild(placeholder);
+        }
+        
+        // Update Palette B preview with live data
+        if (data.paletteB) {
+          updatePreviewWithData(preview3, data.paletteB);
+        } else {
+          // Clear Palette B preview
+          const label = preview3.querySelector('.preview-row-label');
+          preview3.innerHTML = '';
+          preview3.appendChild(label);
+          const placeholder = document.createElement('div');
+          placeholder.className = 'preview-placeholder';
+          placeholder.textContent = 'NO CONTENT';
+          preview3.appendChild(placeholder);
+        }
+      }
+      
+      function updatePreviewWithData(previewElement, data) {
+        const label = previewElement.querySelector('.preview-row-label');
+        previewElement.innerHTML = '';
+        previewElement.appendChild(label);
+        
+        if (data.imageSrc) {
+          // Determine if it's a video or image
+          const isVideo = data.imageSrc && (
+            data.imageSrc.includes('.mp4') || 
+            data.imageSrc.includes('.mov') || 
+            data.imageSrc.includes('.avi') || 
+            data.imageSrc.includes('.webm') || 
+            data.imageSrc.includes('.mkv')
+          );
+          
+          if (isVideo) {
+            const previewVideo = document.createElement('video');
+            previewVideo.className = 'preview-image';
+            previewVideo.src = data.imageSrc;
+            previewVideo.autoplay = true;
+            previewVideo.loop = true;
+            previewVideo.muted = true;
+            previewVideo.playsInline = true;
+            previewVideo.style.cssText = `
+              max-width: 100%;
+              max-height: 100%;
+              object-fit: contain;
+              opacity: ${data.opacity || 1};
+              transform: scale(${Math.min(data.scale || 1, 0.9)});
+            `;
+            
+            if (data.inverse) {
+              previewVideo.style.filter = 'invert(1)';
+            }
+            
+            // Ensure video starts playing
+            previewVideo.addEventListener('loadeddata', () => {
+              previewVideo.play().catch(e => console.log('Preview video autoplay prevented:', e));
+            });
+            
+            previewVideo.onerror = () => {
+              previewElement.innerHTML = '<div class="preview-placeholder">VIDEO NOT FOUND</div>';
+              previewElement.appendChild(label);
+            };
+            
+            previewElement.appendChild(previewVideo);
+          } else {
+            const previewImg = document.createElement('img');
+            previewImg.className = 'preview-image';
+            previewImg.src = data.imageSrc;
+            previewImg.style.cssText = `
+              max-width: 100%;
+              max-height: 100%;
+              object-fit: contain;
+              opacity: ${data.opacity || 1};
+              transform: scale(${Math.min(data.scale || 1, 0.9)});
+            `;
+            
+            if (data.inverse) {
+              previewImg.style.filter = 'invert(1)';
+            }
+            
+            previewImg.onerror = () => {
+              previewElement.innerHTML = '<div class="preview-placeholder">IMAGE NOT FOUND</div>';
+              previewElement.appendChild(label);
+            };
+            
+            previewElement.appendChild(previewImg);
+          }
+        }
+      }
+      
+      function updateOutputPreview(data) {
+        // Update the output preview row with data from the output window
+        const label = outputPreview.querySelector('.preview-row-label');
+        
+        // Clear previous content but keep the label
+        outputPreview.innerHTML = '';
+        outputPreview.appendChild(label);
+        
+        if (data.imageSrc) {
+          // Determine if it's a video or image
+          const isVideo = data.imageSrc && (
+            data.imageSrc.includes('.mp4') || 
+            data.imageSrc.includes('.mov') || 
+            data.imageSrc.includes('.avi') || 
+            data.imageSrc.includes('.webm') || 
+            data.imageSrc.includes('.mkv')
+          );
+          
+          if (isVideo) {
+            const previewVideo = document.createElement('video');
+            previewVideo.className = 'preview-image';
+            previewVideo.src = data.imageSrc;
+            previewVideo.autoplay = true;
+            previewVideo.loop = true;
+            previewVideo.muted = true;
+            previewVideo.playsInline = true;
+            previewVideo.style.cssText = `
+              max-width: 100%;
+              max-height: 100%;
+              object-fit: contain;
+              opacity: ${data.opacity || 1};
+              transform: scale(${Math.min(data.scale || 1, 0.9)});
+            `;
+            
+            if (data.inverse) {
+              previewVideo.style.filter = 'invert(1)';
+            }
+            
+            // Ensure video starts playing
+            previewVideo.addEventListener('loadeddata', () => {
+              previewVideo.play().catch(e => console.log('Output preview video autoplay prevented:', e));
+            });
+            
+            previewVideo.onerror = () => {
+              outputPreview.innerHTML = '<div class="preview-placeholder">VIDEO NOT FOUND</div>';
+              outputPreview.appendChild(label);
+            };
+            
+            outputPreview.appendChild(previewVideo);
+          } else {
+            const previewImg = document.createElement('img');
+            previewImg.className = 'preview-image';
+            previewImg.src = data.imageSrc;
+            previewImg.style.cssText = `
+              max-width: 100%;
+              max-height: 100%;
+              object-fit: contain;
+              opacity: ${data.opacity || 1};
+              transform: scale(${Math.min(data.scale || 1, 0.9)});
+            `;
+            
+            if (data.inverse) {
+              previewImg.style.filter = 'invert(1)';
+            }
+            
+            previewImg.onerror = () => {
+              outputPreview.innerHTML = '<div class="preview-placeholder">IMAGE NOT FOUND</div>';
+              outputPreview.appendChild(label);
+            };
+            
+            outputPreview.appendChild(previewImg);
+          }
+        } else if (data.hasDefaultBackground) {
+          const previewImg = document.createElement('img');
+          previewImg.className = 'preview-image';
+          previewImg.src = '../vexvoid.png';
+          previewImg.style.cssText = `
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+          `;
+          
+          if (data.defaultBackgroundInverse) {
+            previewImg.style.filter = 'invert(1)';
+          }
+          
+          outputPreview.appendChild(previewImg);
+        } else {
+          const placeholder = document.createElement('div');
+          placeholder.className = 'preview-placeholder';
+          placeholder.textContent = 'NO OUTPUT CONTENT';
+          outputPreview.appendChild(placeholder);
+        }
+        
+        // Update individual layer previews
+        if (data.layers && data.layers.length > 0) {
+          updatePreviewRow(preview2, data.layers[1]); // Second layer
+          updatePreviewRow(preview3, data.layers[2]); // Third layer
+        }
+      }
+      
+      function updatePreviewRow(previewRow, layer) {
+        const label = previewRow.querySelector('.preview-row-label');
+        
+        // Clear previous content but keep the label
+        previewRow.innerHTML = '';
+        previewRow.appendChild(label);
+        
+        if (layer && layer.visible && layer.imageSrc) {
+          // Determine if it's a video or image
+          const isVideo = layer.imageSrc && (
+            layer.imageSrc.includes('.mp4') || 
+            layer.imageSrc.includes('.mov') || 
+            layer.imageSrc.includes('.avi') || 
+            layer.imageSrc.includes('.webm') || 
+            layer.imageSrc.includes('.mkv')
+          );
+          
+          if (isVideo) {
+            const previewVideo = document.createElement('video');
+            previewVideo.className = 'preview-image';
+            previewVideo.src = layer.imageSrc;
+            previewVideo.autoplay = true;
+            previewVideo.loop = true;
+            previewVideo.muted = true;
+            previewVideo.playsInline = true;
+            previewVideo.style.cssText = `
+              max-width: 100%;
+              max-height: 100%;
+              object-fit: contain;
+              opacity: ${layer.opacity || 1};
+              transform: scale(${Math.min(layer.scale || 1, 0.9)});
+            `;
+            
+            // Apply inverse filter if enabled
+            if (layer.inverse) {
+              previewVideo.style.filter = 'invert(1)';
+            }
+            
+            // Ensure video starts playing
+            previewVideo.addEventListener('loadeddata', () => {
+              previewVideo.play().catch(e => console.log('Layer preview video autoplay prevented:', e));
+            });
+            
+            previewVideo.onerror = () => {
+              const placeholder = document.createElement('div');
+              placeholder.className = 'preview-placeholder';
+              placeholder.textContent = `${layer.name} - VIDEO ERROR`;
+              previewRow.innerHTML = '';
+              previewRow.appendChild(label);
+              previewRow.appendChild(placeholder);
+            };
+            
+            previewRow.appendChild(previewVideo);
+          } else {
+            const previewImg = document.createElement('img');
+            previewImg.className = 'preview-image';
+            previewImg.src = layer.imageSrc;
+            previewImg.style.cssText = `
+              max-width: 100%;
+              max-height: 100%;
+              object-fit: contain;
+              opacity: ${layer.opacity || 1};
+              transform: scale(${Math.min(layer.scale || 1, 0.9)});
+            `;
+            
+            // Apply inverse filter if enabled
+            if (layer.inverse) {
+              previewImg.style.filter = 'invert(1)';
+            }
+            
+            previewImg.onerror = () => {
+              const placeholder = document.createElement('div');
+              placeholder.className = 'preview-placeholder';
+              placeholder.textContent = `${layer.name} - IMAGE ERROR`;
+              previewRow.innerHTML = '';
+              previewRow.appendChild(label);
+              previewRow.appendChild(placeholder);
+            };
+            
+            previewRow.appendChild(previewImg);
+          }
+        } else {
+          const placeholder = document.createElement('div');
+          placeholder.className = 'preview-placeholder';
+          placeholder.textContent = layer ? `${layer.name} (hidden)` : 'NO LAYER';
+          previewRow.appendChild(placeholder);
+        }
+      }
+      
+      function sliderToMs(x) {
+        x = Number(x);
+        if (x <= 50) {
+          return Math.round((x / 50) * 250);
+        } else {
+          return Math.round(250 + Math.pow((x - 50) / 50, 2) * (20000 - 250));
+        }
+      }
+      
+      // Global functions for button clicks
+      window.selectLayer = function(layerId) {
+        sendToOutput('select-layer', { layerId });
+      };
+      
+      window.toggleVisibility = function(layerId) {
+        sendToOutput('toggle-visibility', { layerId });
+      };
+      
+      window.loadImages = async function(layerId) {
+        const result = await dialog.showOpenDialog({
+          properties: ['openFile', 'openDirectory', 'multiSelections'],
+          filters: [
+            { name: 'Media Files', extensions: ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov', 'avi', 'webm', 'mkv'] },
+            { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif'] },
+            { name: 'Videos', extensions: ['mp4', 'mov', 'avi', 'webm', 'mkv'] },
+            { name: 'All Files', extensions: ['*'] }
+          ]
+        });
+        
+        if (!result.canceled && result.filePaths.length > 0) {
+          sendToOutput('load-images', { layerId, filePaths: result.filePaths });
+        }
+      };
+      
+      window.duplicateLayer = function(layerId) {
+        sendToOutput('duplicate-layer', { layerId });
+      };
+      
+      window.removeLayer = function(layerId) {
+        sendToOutput('remove-layer', { layerId });
+      };
+      
+      window.toggleInverse = function(layerId) {
+        sendToOutput('toggle-inverse', { layerId });
+      };
+      
+      // Drag and drop functionality for layer reordering
+      let draggedElement = null;
+      let draggedLayerId = null;
+      
+      function handleDragStart(e) {
+        draggedElement = e.target;
+        draggedLayerId = parseInt(e.target.dataset.layerId);
+        e.target.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/html', e.target.outerHTML);
+      }
+      
+      function handleDragOver(e) {
+        if (e.preventDefault) {
+          e.preventDefault();
+        }
+        e.dataTransfer.dropEffect = 'move';
+        return false;
+      }
+      
+      function handleDragEnter(e) {
+        if (e.target !== draggedElement) {
+          e.target.classList.add('drag-over');
+        }
+      }
+      
+      function handleDragLeave(e) {
+        e.target.classList.remove('drag-over');
+      }
+      
+      function handleDrop(e) {
+        if (e.stopPropagation) {
+          e.stopPropagation();
+        }
+        
+        if (draggedElement !== e.target) {
+          const targetLayerId = parseInt(e.target.dataset.layerId);
+          if (targetLayerId && draggedLayerId && targetLayerId !== draggedLayerId) {
+            reorderLayers(draggedLayerId, targetLayerId);
+          }
+        }
+        
+        e.target.classList.remove('drag-over');
+        return false;
+      }
+      
+      function handleDragEnd(e) {
+        e.target.classList.remove('dragging');
+        // Clean up any remaining drag-over classes
+        document.querySelectorAll('.drag-over').forEach(el => {
+          el.classList.remove('drag-over');
+        });
+        draggedElement = null;
+        draggedLayerId = null;
+      }
+      
+      function reorderLayers(draggedId, targetId) {
+        // Find which palette the layers are in
+        const allLayers = [...layersA, ...layersB];
+        const draggedIndex = allLayers.findIndex(l => l.id === draggedId);
+        const targetIndex = allLayers.findIndex(l => l.id === targetId);
+        
+        if (draggedIndex === -1 || targetIndex === -1) return;
+        
+        // Determine which palettes the layers belong to
+        const draggedPalette = layersA.find(l => l.id === draggedId) ? 'A' : 'B';
+        const targetPalette = layersA.find(l => l.id === targetId) ? 'A' : 'B';
+        
+        // If layers are in different palettes, don't allow reordering
+        if (draggedPalette !== targetPalette) return;
+        
+        // Work with the appropriate palette
+        const palette = draggedPalette === 'A' ? layersA : layersB;
+        const draggedPaletteIndex = palette.findIndex(l => l.id === draggedId);
+        const targetPaletteIndex = palette.findIndex(l => l.id === targetId);
+        
+        // Remove the dragged layer and insert it at the target position
+        const [draggedLayer] = palette.splice(draggedPaletteIndex, 1);
+        palette.splice(targetPaletteIndex, 0, draggedLayer);
+        
+        // Renumber layers based on new order (skip main layer)
+        let layerNumber = 1;
+        palette.forEach(layer => {
+          if (!layer.isMainLayer) {
+            // Extract content name, handling different naming patterns
+            let contentName = layer.name;
+            if (contentName.startsWith('Layer ')) {
+              contentName = contentName.replace(/^Layer \d+: /, '');
+            }
+            // If no content name remains, it was just "Layer X"
+            if (contentName === layer.name && /^Layer \d+$/.test(contentName)) {
+              contentName = '';
+            }
+            
+            // Set new name
+            if (contentName) {
+              layer.name = `Layer ${layerNumber}: ${contentName}`;
+            } else {
+              layer.name = `Layer ${layerNumber}`;
+            }
+            layerNumber++;
+          }
+        });
+        
+        // Send reorder command to output window
+        const allLayersOrdered = [...layersA, ...layersB];
+        sendToOutput('reorder-layers', { layers: allLayersOrdered.map(l => l.id) });
+        
+        // Update the UI
+        updateLayersList();
+        updatePreview();
+      }
+      
+      window.setDefaultBackground = async function() {
+        const result = await dialog.showOpenDialog({
+          properties: ['openFile'],
+          filters: [
+            { name: 'Media Files', extensions: ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov', 'avi', 'webm', 'mkv'] },
+            { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif'] },
+            { name: 'Videos', extensions: ['mp4', 'mov', 'avi', 'webm', 'mkv'] },
+            { name: 'All Files', extensions: ['*'] }
+          ]
+        });
+        
+        if (!result.canceled && result.filePaths.length > 0) {
+          sendToOutput('set-default-background', { imagePath: result.filePaths[0] });
+        }
+      };
+      
+      // Event listeners
+      addLayerABtn.addEventListener('click', () => {
+        activePalette = 'A';
+        sendToOutput('add-layer', { palette: 'A' });
+      });
+      
+      addLayerBBtn.addEventListener('click', () => {
+        activePalette = 'B';
+        sendToOutput('add-layer', { palette: 'B' });
+      });
+      
+      crossfader.addEventListener('input', () => {
+        updateCrossfader();
+      });
+      
+      playPauseBtn.addEventListener('click', () => {
+        sendToOutput('toggle-global-pause');
+      });
+      
+      setBackgroundBtn.addEventListener('click', () => {
+        setDefaultBackground();
+      });
+      
+      // Control event listeners
+      speedControl.addEventListener('input', () => {
+        if (selectedLayer) {
+          const value = parseInt(speedControl.value);
+          speedValue.textContent = sliderToMs(value) + ' ms';
+          sendToOutput('update-layer-property', { 
+            layerId: selectedLayer.id, 
+            property: 'speed', 
+            value: value 
+          });
+        }
+      });
+      
+      sizeControl.addEventListener('input', () => {
+        if (selectedLayer) {
+          const value = parseInt(sizeControl.value);
+          sizeValue.textContent = value + '%';
+          sendToOutput('update-layer-property', { 
+            layerId: selectedLayer.id, 
+            property: 'size', 
+            value: value 
+          });
+        }
+      });
+      
+      jitterControl.addEventListener('input', () => {
+        if (selectedLayer) {
+          const value = parseInt(jitterControl.value);
+          jitterValue.textContent = value + 'px';
+          sendToOutput('update-layer-property', { 
+            layerId: selectedLayer.id, 
+            property: 'jitterAmount', 
+            value: value 
+          });
+        }
+      });
+      
+      opacityControl.addEventListener('input', () => {
+        if (selectedLayer) {
+          const value = parseInt(opacityControl.value);
+          opacityValue.textContent = value + '%';
+          sendToOutput('update-layer-property', { 
+            layerId: selectedLayer.id, 
+            property: 'opacity', 
+            value: value 
+          });
+        }
+      });
+      
+      strobeControl.addEventListener('input', () => {
+        if (selectedLayer) {
+          const value = parseInt(strobeControl.value);
+          strobeValue.textContent = value + ' Hz';
+          sendToOutput('update-layer-property', { 
+            layerId: selectedLayer.id, 
+            property: 'strobe', 
+            value: value 
+          });
+        }
+      });
+      
+      impactControl.addEventListener('input', () => {
+        if (selectedLayer) {
+          const value = parseInt(impactControl.value);
+          impactValue.textContent = value + ' Hz';
+          sendToOutput('update-layer-property', { 
+            layerId: selectedLayer.id, 
+            property: 'impact', 
+            value: value 
+          });
+        }
+      });
+      
+      // Initialize crossfader to show Palette A by default
+      updateCrossfader();
+      
+      // Request initial state from output window
+      setTimeout(() => {
+        sendToOutput('request-initial-state');
+      }, 100);
+    });
+  </script>
+</body>
+</html>

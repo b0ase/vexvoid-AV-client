@@ -1,0 +1,85 @@
+{
+  "name": "image-animator",
+  "version": "1.0.0",
+  "description": "Multi-layer image animation tool with effects",
+  "main": "racing-blasian/main.js",
+  "homepage": "./",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "electron ./racing-blasian/main.js",
+    "build": "electron-builder",
+    "build-mac": "electron-builder --mac",
+    "build-win": "electron-builder --win",
+    "build-linux": "electron-builder --linux",
+    "dist": "electron-builder --publish=never"
+  },
+  "keywords": ["animation", "image", "electron", "effects"],
+  "author": "FRESH",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^36.4.0",
+    "electron-builder": "^26.0.12"
+  },
+  "dependencies": {
+    "@electron/remote": "^2.1.2"
+  },
+  "build": {
+    "appId": "com.fresh.image-animator",
+    "productName": "V3XV0ID Image Animator",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "racing-blasian/**/*",
+      "node_modules/**/*",
+      "package.json",
+      "vexvoid-icon.png"
+    ],
+    "icon": "vexvoid-icon.png",
+    "mac": {
+      "category": "public.app-category.graphics-design",
+      "icon": "vexvoid-icon.png",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64", "arm64"]
+        }
+      ]
+    },
+    "win": {
+      "icon": "vexvoid-icon.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "linux": {
+      "icon": "vexvoid-icon.png",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        },
+        {
+          "target": "deb",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
