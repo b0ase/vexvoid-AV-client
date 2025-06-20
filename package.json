@@ -1,19 +1,31 @@
 {
-  "name": "image-animator",
-  "version": "1.0.0",
-  "description": "Multi-layer image animation tool with effects",
-  "main": "racing-blasian/main.js",
+  "name": "v3xv0id-av-client",
+  "version": "2.0.0",
+  "description": "V3XV0ID AV Client - Professional Live Visual Performance Tool with Cloud-Connected Audio-Visual Sequencing",
+  "main": "v3xv0id-av-client/main.js",
   "homepage": "./",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "electron ./racing-blasian/main.js",
+    "start": "electron ./v3xv0id-av-client/main.js",
     "build": "electron-builder",
     "build-mac": "electron-builder --mac",
     "build-win": "electron-builder --win",
     "build-linux": "electron-builder --linux",
     "dist": "electron-builder --publish=never"
   },
-  "keywords": ["animation", "image", "electron", "effects"],
+  "keywords": [
+    "animation",
+    "image",
+    "electron",
+    "effects",
+    "vj",
+    "performance",
+    "visual",
+    "audio",
+    "sequencer",
+    "v3xv0id",
+    "cloud"
+  ],
   "author": "FRESH",
   "license": "ISC",
   "type": "commonjs",
@@ -22,16 +34,17 @@
     "electron-builder": "^26.0.12"
   },
   "dependencies": {
-    "@electron/remote": "^2.1.2"
+    "@electron/remote": "^2.1.2",
+    "@supabase/supabase-js": "^2.50.0"
   },
   "build": {
-    "appId": "com.fresh.image-animator",
-    "productName": "V3XV0ID Image Animator",
+    "appId": "com.fresh.v3xv0id-av-client",
+    "productName": "V3XV0ID AV Client",
     "directories": {
       "output": "dist"
     },
     "files": [
-      "racing-blasian/**/*",
+      "v3xv0id-av-client/**/*",
       "node_modules/**/*",
       "package.json",
       "vexvoid-icon.png"
@@ -43,11 +56,17 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         },
         {
           "target": "zip",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ]
     },
@@ -56,11 +75,15 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },
@@ -69,11 +92,15 @@
       "target": [
         {
           "target": "AppImage",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "deb",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },

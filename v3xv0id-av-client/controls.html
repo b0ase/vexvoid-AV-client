@@ -604,9 +604,51 @@
     <div class="v3xv0id-subtitle">Image Animator Controls</div>
   </div>
   
-  <div class="main-container">
-    <!-- Left Column - Dual Layer Palettes -->
-    <div class="layers-column">
+      <div class="main-container">
+      <!-- V3XV0ID Cloud Performance Section -->
+      <div class="v3xv0id-performance-section" style="position: fixed; top: 70px; right: 15px; width: 300px; background: rgba(0, 0, 0, 0.95); border: 2px solid rgba(255, 255, 255, 0.3); padding: 15px; z-index: 998; display: none;">
+        <div class="performance-header" style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.2);">
+          <h3 style="margin: 0; font-size: 14px; font-family: 'Courier New', monospace; font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em; color: #ffffff; text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);">🎭 V3XV0ID CLOUD</h3>
+          <div style="font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 5px;">PERFORMANCE SYSTEM</div>
+        </div>
+        
+        <div class="performance-status" style="margin-bottom: 15px; padding: 10px; background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 255, 255, 0.2);">
+          <div id="cloudStatus" style="font-size: 11px; font-family: 'Courier New', monospace; color: #888; text-transform: uppercase;">🌐 CONNECTING...</div>
+          <div id="performanceStatus" style="font-size: 11px; font-family: 'Courier New', monospace; color: #888; text-transform: uppercase; margin-top: 5px;">⏹️ READY</div>
+        </div>
+        
+        <div class="performance-controls" style="display: flex; flex-direction: column; gap: 10px;">
+          <button id="initCloudBtn" class="performance-btn" style="background: #ffffff; color: #000000; border: 1px solid #ffffff; padding: 10px; cursor: crosshair; font-family: 'Courier New', monospace; font-weight: bold; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s;">
+            🌐 CONNECT TO CLOUD
+          </button>
+          
+          <button id="startPerformanceBtn" class="performance-btn" style="background: rgba(0, 0, 0, 0.8); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.3); padding: 10px; cursor: crosshair; font-family: 'Courier New', monospace; font-weight: bold; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s;" disabled>
+            🎭 START PERFORMANCE
+          </button>
+          
+          <button id="stopPerformanceBtn" class="performance-btn" style="background: rgba(0, 0, 0, 0.8); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.3); padding: 10px; cursor: crosshair; font-family: 'Courier New', monospace; font-weight: bold; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s;" disabled>
+            🛑 STOP PERFORMANCE
+          </button>
+        </div>
+        
+        <div class="performance-info" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.2);">
+          <div id="currentTrack" style="font-size: 10px; font-family: 'Courier New', monospace; color: #888; text-transform: uppercase; margin-bottom: 5px;">NO TRACK</div>
+          <div id="performanceProgress" style="width: 100%; height: 4px; background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 5px;">
+            <div id="progressBar" style="height: 100%; background: #ffffff; width: 0%; transition: width 0.1s;"></div>
+          </div>
+          <div id="performanceTime" style="font-size: 10px; font-family: 'Courier New', monospace; color: #888; text-transform: uppercase;">00:00 / 00:00</div>
+        </div>
+        
+        <button id="togglePerformancePanel" style="position: absolute; top: -15px; right: -15px; width: 30px; height: 30px; background: rgba(0, 0, 0, 0.95); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.3); cursor: crosshair; font-family: 'Courier New', monospace; font-size: 12px;">✕</button>
+      </div>
+      
+      <!-- V3XV0ID Cloud Toggle Button -->
+      <button id="showPerformanceBtn" style="position: fixed; top: 80px; right: 15px; background: rgba(0, 0, 0, 0.95); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.3); padding: 8px 12px; cursor: crosshair; font-family: 'Courier New', monospace; font-weight: bold; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; z-index: 997; transition: all 0.2s;">
+        🎭 V3XV0ID
+      </button>
+
+      <!-- Left Column - Dual Layer Palettes -->
+      <div class="layers-column">
       <!-- Top Palette (A) -->
       <div class="palette-section">
         <div class="palette-header">
@@ -1530,6 +1572,227 @@
       setTimeout(() => {
         sendToOutput('request-initial-state');
       }, 100);
+
+      // ========== V3XV0ID PERFORMANCE SYSTEM ==========
+      let performanceSequencer = null;
+      let performanceActive = false;
+      
+      // V3XV0ID Performance DOM elements
+      const showPerformanceBtn = document.getElementById('showPerformanceBtn');
+      const performancePanel = document.querySelector('.v3xv0id-performance-section');
+      const togglePerformancePanel = document.getElementById('togglePerformancePanel');
+      const initCloudBtn = document.getElementById('initCloudBtn');
+      const startPerformanceBtn = document.getElementById('startPerformanceBtn');
+      const stopPerformanceBtn = document.getElementById('stopPerformanceBtn');
+      const cloudStatus = document.getElementById('cloudStatus');
+      const performanceStatus = document.getElementById('performanceStatus');
+      const currentTrack = document.getElementById('currentTrack');
+      const progressBar = document.getElementById('progressBar');
+      const performanceTime = document.getElementById('performanceTime');
+      
+      // Show/hide performance panel
+      showPerformanceBtn.addEventListener('click', () => {
+        performancePanel.style.display = 'block';
+        showPerformanceBtn.style.display = 'none';
+      });
+      
+      togglePerformancePanel.addEventListener('click', () => {
+        performancePanel.style.display = 'none';
+        showPerformanceBtn.style.display = 'block';
+      });
+      
+      // Initialize V3XV0ID Cloud Performance
+      initCloudBtn.addEventListener('click', async () => {
+        try {
+          cloudStatus.textContent = '🌐 CONNECTING...';
+          initCloudBtn.disabled = true;
+          
+          // Import the performance sequencer
+          const V3XV0IDPerformanceSequencer = require('./performance-sequencer');
+          performanceSequencer = new V3XV0IDPerformanceSequencer();
+          
+          // Initialize cloud connection and download content
+          const success = await performanceSequencer.initialize();
+          
+          if (success) {
+            cloudStatus.textContent = '✅ CLOUD CONNECTED';
+            performanceStatus.textContent = '🎭 READY TO PERFORM';
+            startPerformanceBtn.disabled = false;
+            
+            // Set up performance event callbacks
+            performanceSequencer.onPerformanceEvent((event, data) => {
+              handlePerformanceEvent(event, data);
+            });
+            
+            console.log('🎭 V3XV0ID Performance System initialized successfully');
+          } else {
+            throw new Error('Failed to initialize performance system');
+          }
+          
+        } catch (error) {
+          console.error('❌ Failed to initialize V3XV0ID Performance System:', error);
+          cloudStatus.textContent = '❌ CONNECTION FAILED';
+          performanceStatus.textContent = '⚠️ ERROR';
+          initCloudBtn.disabled = false;
+        }
+      });
+      
+      // Start V3XV0ID Performance
+      startPerformanceBtn.addEventListener('click', async () => {
+        if (!performanceSequencer) return;
+        
+        try {
+          performanceStatus.textContent = '🎭 STARTING...';
+          startPerformanceBtn.disabled = true;
+          
+          const success = await performanceSequencer.startPerformance();
+          
+          if (success) {
+            performanceActive = true;
+            performanceStatus.textContent = '🎭 PERFORMING';
+            stopPerformanceBtn.disabled = false;
+            
+            console.log('🎭 V3XV0ID Performance started');
+          } else {
+            throw new Error('Failed to start performance');
+          }
+          
+        } catch (error) {
+          console.error('❌ Failed to start performance:', error);
+          performanceStatus.textContent = '❌ START FAILED';
+          startPerformanceBtn.disabled = false;
+        }
+      });
+      
+      // Stop V3XV0ID Performance
+      stopPerformanceBtn.addEventListener('click', () => {
+        if (!performanceSequencer) return;
+        
+        performanceSequencer.stopPerformance();
+        performanceActive = false;
+        performanceStatus.textContent = '⏹️ STOPPED';
+        startPerformanceBtn.disabled = false;
+        stopPerformanceBtn.disabled = true;
+        
+        currentTrack.textContent = 'NO TRACK';
+        progressBar.style.width = '0%';
+        performanceTime.textContent = '00:00 / 00:00';
+        
+        console.log('🛑 V3XV0ID Performance stopped');
+      });
+      
+      // Handle performance events
+      function handlePerformanceEvent(event, data) {
+        switch (event) {
+          case 'performance-started':
+            console.log('🎭 Performance started:', data.name);
+            currentTrack.textContent = data.name.toUpperCase();
+            break;
+            
+          case 'visual-sync':
+            updatePerformanceProgress(data);
+            break;
+            
+          case 'image-change':
+            loadPerformanceImage(data.imagePath);
+            break;
+            
+          case 'video-change':
+            loadPerformanceVideo(data.videoPath);
+            break;
+            
+          case 'palette-switch':
+            switchPaletteAutomatically();
+            break;
+        }
+      }
+      
+      // Update performance progress UI
+      function updatePerformanceProgress(data) {
+        const { progress, currentTime, duration } = data;
+        
+        progressBar.style.width = (progress * 100) + '%';
+        
+        const currentMin = Math.floor(currentTime / 60);
+        const currentSec = Math.floor(currentTime % 60);
+        const durationMin = Math.floor(duration / 60);
+        const durationSec = Math.floor(duration % 60);
+        
+        performanceTime.textContent = 
+          `${currentMin.toString().padStart(2, '0')}:${currentSec.toString().padStart(2, '0')} / ` +
+          `${durationMin.toString().padStart(2, '0')}:${durationSec.toString().padStart(2, '0')}`;
+      }
+      
+      // Load performance content into layers
+      function loadPerformanceImage(imagePath) {
+        const targetPalette = activePalette;
+        const layers = targetPalette === 'A' ? layersA : layersB;
+        
+        if (layers.length === 0) {
+          sendToOutput('add-layer', { palette: targetPalette });
+          setTimeout(() => {
+            const newLayers = targetPalette === 'A' ? layersA : layersB;
+            if (newLayers.length > 0) {
+              const layerId = newLayers[newLayers.length - 1].id;
+              sendToOutput('load-images', { layerId, filePaths: [imagePath] });
+            }
+          }, 100);
+        } else {
+          const layerIndex = Math.floor(Math.random() * layers.length);
+          const layerId = layers[layerIndex].id;
+          sendToOutput('load-images', { layerId, filePaths: [imagePath] });
+        }
+      }
+      
+      function loadPerformanceVideo(videoPath) {
+        const targetPalette = activePalette === 'A' ? 'B' : 'A';
+        const layers = targetPalette === 'A' ? layersA : layersB;
+        
+        if (layers.length === 0) {
+          sendToOutput('add-layer', { palette: targetPalette });
+          setTimeout(() => {
+            const newLayers = targetPalette === 'A' ? layersA : layersB;
+            if (newLayers.length > 0) {
+              const layerId = newLayers[newLayers.length - 1].id;
+              sendToOutput('load-images', { layerId, filePaths: [videoPath] });
+            }
+          }, 100);
+        } else {
+          const layerIndex = Math.floor(Math.random() * layers.length);
+          const layerId = layers[layerIndex].id;
+          sendToOutput('load-images', { layerId, filePaths: [videoPath] });
+        }
+      }
+      
+      // Automatically switch between palettes
+      function switchPaletteAutomatically() {
+        const currentValue = parseInt(crossfader.value);
+        const targetValue = currentValue < 50 ? 100 : 0;
+        animateCrossfader(currentValue, targetValue, 2000);
+      }
+      
+      function animateCrossfader(fromValue, toValue, duration) {
+        const startTime = Date.now();
+        const valueRange = toValue - fromValue;
+        
+        function update() {
+          const elapsed = Date.now() - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          const easedProgress = 0.5 - Math.cos(progress * Math.PI) / 2;
+          const currentValue = fromValue + (valueRange * easedProgress);
+          
+          crossfader.value = Math.round(currentValue);
+          updateCrossfader();
+          
+          if (progress < 1) {
+            requestAnimationFrame(update);
+          }
+        }
+        
+        update();
+      }
+      
+      console.log('🎭 V3XV0ID Performance System UI initialized');
     });
   </script>
 </body>

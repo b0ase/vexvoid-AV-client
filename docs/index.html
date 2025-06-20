@@ -10,26 +10,19 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
         html, body {
-            height: 100%;
-            background: #000000;
-            color: #ffffff;
+            height: 100%; background: #000000; color: #ffffff;
             font-family: 'Courier New', 'Courier Prime', monospace;
-            font-size: 14px;
-            line-height: 1.4;
-            overflow-x: hidden;
+            font-size: 14px; line-height: 1.4; overflow-x: hidden;
         }
         
         body::before {
-            content: '';
-            position: fixed;
+            content: ''; position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
             background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255, 255, 255, 0.01) 2px, rgba(255, 255, 255, 0.01) 4px);
-            pointer-events: none;
-            z-index: 1000;
+            pointer-events: none; z-index: 1000;
         }
         
         .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; position: relative; z-index: 1; }
-        
         .header { text-align: center; padding: 60px 0 40px; border-bottom: 1px solid rgba(255, 255, 255, 0.2); }
         
         .logo {
@@ -63,6 +56,17 @@
             text-align: center; margin-bottom: 40px; text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
         }
         
+        .version-badge {
+            display: inline-block; background: #ffffff; color: #000000; padding: 5px 10px;
+            font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em;
+            margin-left: 15px; border: 1px solid #ffffff; animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
         .download-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; margin-top: 40px; }
         
         .download-card {
@@ -92,6 +96,18 @@
         .feature-icon { font-size: 32px; margin-bottom: 15px; display: block; }
         .feature-title { font-size: 18px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px; }
         .feature-description { opacity: 0.8; line-height: 1.5; }
+        
+        .cloud-feature {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            position: relative;
+        }
+        
+        .cloud-feature::before {
+            content: 'NEW'; position: absolute; top: -10px; right: -10px;
+            background: #ffffff; color: #000000; padding: 5px 8px;
+            font-size: 10px; font-weight: bold; letter-spacing: 0.1em;
+        }
         
         .footer { text-align: center; padding: 40px 0; opacity: 0.6; }
         .footer-links { display: flex; justify-content: center; gap: 30px; margin-bottom: 20px; flex-wrap: wrap; }
@@ -125,11 +141,8 @@
     <div class="container">
         <header class="header">
             <h1 class="logo">V3XV0ID</h1>
-            <p class="tagline">AV CLIENT</p>
-            <p class="description">
-                A cutting-edge dual-palette crossfading image and video animator with V3XV0ID cyber aesthetic branding, 
-                designed for VJs, live performers, and visual artists.
-            </p>
+            <p class="tagline">AV CLIENT<span class="version-badge">v2.0.0 CLOUD</span></p>
+            <p class="description">Professional Live Visual Performance Tool with Cloud-Connected Audio-Visual Sequencing. Download once, perform anywhere with curated V3XV0ID content automatically streamed from the cloud.</p>
         </header>
 
         <nav class="nav">
@@ -141,18 +154,18 @@
         </nav>
 
         <section id="download" class="section">
-            <h2 class="section-title">Download V3XV0ID AV Client</h2>
-            <p class="text-center mb-30">Choose your platform and download the latest version (v1.0.0)</p>
+            <h2 class="section-title">Download V3XV0ID AV Client v2.0.0</h2>
+            <p class="text-center mb-30">Choose your platform and download the latest version with cloud performance features</p>
             
             <div class="download-grid">
                 <div class="download-card">
                     <span class="platform-icon">🍎</span>
                     <h3 class="platform-name">macOS</h3>
                     <div class="download-links">
-                        <a href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v1.0.0/V3XV0ID-Image-Animator-1.0.0.dmg" class="download-btn primary">Intel Mac (DMG)</a>
-                        <a href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v1.0.0/V3XV0ID-Image-Animator-1.0.0-arm64.dmg" class="download-btn primary">Apple Silicon (DMG)</a>
-                        <a href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v1.0.0/V3XV0ID-Image-Animator-1.0.0-mac.zip" class="download-btn">Intel Mac (ZIP)</a>
-                        <a href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v1.0.0/V3XV0ID-Image-Animator-1.0.0-arm64-mac.zip" class="download-btn">Apple Silicon (ZIP)</a>
+                        <a href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v2.0.0/V3XV0ID-AV-Client-2.0.0.dmg" class="download-btn primary">Intel Mac (DMG)</a>
+                        <a href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v2.0.0/V3XV0ID-AV-Client-2.0.0-arm64.dmg" class="download-btn primary">Apple Silicon (DMG)</a>
+                        <a href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v2.0.0/V3XV0ID-AV-Client-2.0.0-mac.zip" class="download-btn">Intel Mac (ZIP)</a>
+                        <a href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v2.0.0/V3XV0ID-AV-Client-2.0.0-arm64-mac.zip" class="download-btn">Apple Silicon (ZIP)</a>
                     </div>
                 </div>
 
@@ -160,8 +173,8 @@
                     <span class="platform-icon">🪟</span>
                     <h3 class="platform-name">Windows</h3>
                     <div class="download-links">
-                        <a href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v1.0.0/V3XV0ID-Image-Animator-Setup-1.0.0.exe" class="download-btn primary">Installer (EXE)</a>
-                        <a href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v1.0.0/V3XV0ID-Image-Animator-1.0.0-portable.exe" class="download-btn">Portable (EXE)</a>
+                        <a href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v2.0.0/V3XV0ID-AV-Client-Setup-2.0.0.exe" class="download-btn primary">Installer (EXE)</a>
+                        <a href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v2.0.0/V3XV0ID-AV-Client-2.0.0-portable.exe" class="download-btn">Portable (EXE)</a>
                     </div>
                 </div>
 
@@ -169,8 +182,8 @@
                     <span class="platform-icon">🐧</span>
                     <h3 class="platform-name">Linux</h3>
                     <div class="download-links">
-                        <a href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v1.0.0/V3XV0ID-Image-Animator-1.0.0.AppImage" class="download-btn primary">AppImage</a>
-                        <a href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v1.0.0/v3xv0id-image-animator_1.0.0_amd64.deb" class="download-btn">Debian Package</a>
+                        <a href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v2.0.0/V3XV0ID-AV-Client-2.0.0.AppImage" class="download-btn primary">AppImage</a>
+                        <a href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v2.0.0/v3xv0id-av-client_2.0.0_amd64.deb" class="download-btn">Debian Package</a>
                     </div>
                 </div>
             </div>
@@ -180,6 +193,24 @@
             <h2 class="section-title">Features</h2>
             
             <div class="features-grid">
+                <div class="feature-card cloud-feature">
+                    <span class="feature-icon">🌐</span>
+                    <h3 class="feature-title">Cloud Performance System</h3>
+                    <p class="feature-description">Connect to V3XV0ID cloud storage and automatically download curated music, images, and videos. One-click setup for instant live performances with professional V3XV0ID content.</p>
+                </div>
+
+                <div class="feature-card cloud-feature">
+                    <span class="feature-icon">🎵</span>
+                    <h3 class="feature-title">Audio-Visual Synchronization</h3>
+                    <p class="feature-description">Built-in audio playback engine with beat-synchronized visual changes. Music automatically triggers image sequences, video clips, and palette transitions for seamless AV performances.</p>
+                </div>
+
+                <div class="feature-card cloud-feature">
+                    <span class="feature-icon">🎭</span>
+                    <h3 class="feature-title">Automated Performance Sequences</h3>
+                    <p class="feature-description">Pre-programmed V3XV0ID sets with intelligent auto-mixing, crossfading, and BPM-based visual transitions. Perfect for live performances, installations, and projection mapping.</p>
+                </div>
+
                 <div class="feature-card">
                     <span class="feature-icon">🎛️</span>
                     <h3 class="feature-title">Dual Palette System</h3>
@@ -222,28 +253,33 @@
             <h2 class="section-title">Quick Start Guide</h2>
             
             <div style="max-width: 800px; margin: 0 auto; text-align: left;">
-                <div style="border: 1px solid rgba(255,255,255,0.2); padding: 30px; background: rgba(0,0,0,0.3);">
-                    <h3 style="margin-bottom: 20px; text-transform: uppercase; letter-spacing: 0.1em;">🚀 Getting Started</h3>
-                    
-                    <ol style="line-height: 2; opacity: 0.9;">
-                        <li><strong>Launch</strong> the V3XV0ID Image Animator</li>
-                        <li><strong>Add Layers</strong> to Palette A and B using the "+ ADD" buttons</li>
-                        <li><strong>Load Content</strong> into layers using the 📁 button (supports folders and individual files)</li>
-                        <li><strong>Mix Palettes</strong> using the crossfader between A and B</li>
-                        <li><strong>Adjust Effects</strong> with the controls panel (speed, size, opacity, etc.)</li>
-                        <li><strong>Position Layers</strong> by dragging them in the output window</li>
-                        <li><strong>Live Performance</strong> - Use dual monitors for control and output separation</li>
-                    </ol>
-                    
-                    <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
-                        <h4 style="margin-bottom: 15px; text-transform: uppercase; letter-spacing: 0.05em;">💡 Pro Tips</h4>
-                        <ul style="line-height: 1.8; opacity: 0.8;">
-                            <li>Pre-load all content before live performance</li>
-                            <li>Use dual monitors: control window on laptop, output on projector</li>
-                            <li>Practice crossfader transitions between palettes</li>
-                            <li>Press 'I' key for inverse color toggle during performance</li>
-                        </ul>
-                    </div>
+                <h3 style="font-size: 18px; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 0.1em;">🎭 V3XV0ID Cloud Performance Mode:</h3>
+                <ol style="margin-bottom: 30px; padding-left: 20px; line-height: 1.8;">
+                    <li>Launch V3XV0ID AV Client</li>
+                    <li>Click the "🎭 V3XV0ID" button in the top-right corner</li>
+                    <li>Click "🌐 CONNECT TO CLOUD" to download V3XV0ID content</li>
+                    <li>Click "🎭 START PERFORMANCE" for automatic audio-visual shows</li>
+                    <li>Use crossfader to mix between palettes during performance</li>
+                </ol>
+
+                <h3 style="font-size: 18px; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 0.1em;">🎛️ Manual Mode:</h3>
+                <ol style="margin-bottom: 30px; padding-left: 20px; line-height: 1.8;">
+                    <li>Add layers using "+ ADD" buttons in Palette A and B</li>
+                    <li>Load images/videos by clicking the folder icon on each layer</li>
+                    <li>Use the crossfader to mix between palettes</li>
+                    <li>Adjust layer properties: speed, size, opacity, effects</li>
+                    <li>Preview your mix in the preview window</li>
+                </ol>
+
+                <div style="background: rgba(255, 255, 255, 0.1); padding: 20px; border: 1px solid rgba(255, 255, 255, 0.2); margin-top: 30px;">
+                    <h4 style="margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.1em;">💡 Pro Tips:</h4>
+                    <ul style="padding-left: 20px; line-height: 1.6;">
+                        <li>Use dual monitors for control window + output projection</li>
+                        <li>Cloud mode works offline after initial download</li>
+                        <li>Crossfader automatically switches palettes in performance mode</li>
+                        <li>Layer effects sync to music BPM in cloud performance mode</li>
+                        <li>Press spacebar for global pause/resume</li>
+                    </ul>
                 </div>
             </div>
         </section>
