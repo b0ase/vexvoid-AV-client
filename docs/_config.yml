@@ -1,0 +1,25 @@
+title: V3XV0ID AV Client
+description: Professional Live Visual Performance Tool
+url: https://b0ase.github.io/vexvoid-AV-client
+baseurl: /vexvoid-AV-client
+
+# GitHub Pages settings
+plugins:
+  - jekyll-relative-links
+
+# Markdown settings
+markdown: kramdown
+highlighter: rouge
+
+# Collections
+collections_dir: docs
+
+# Exclude files
+exclude:
+  - README.md
+  - LICENSE
+  - package.json
+  - node_modules/
+  - racing-blasian/
+  - dist/
+  - .github/ 
