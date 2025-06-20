@@ -87,12 +87,76 @@
       text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
     }
 
+    /* Tab Navigation */
+    .tab-navigation {
+      position: fixed;
+      top: 60px;
+      left: 0;
+      right: 0;
+      background: rgba(0, 0, 0, 0.9);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 0 20px;
+      z-index: 998;
+      display: flex;
+      gap: 2px;
+    }
+
+    .tab-button {
+      background: rgba(0, 0, 0, 0.6);
+      color: #888;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-bottom: none;
+      padding: 10px 20px;
+      cursor: crosshair;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .tab-button:hover {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.4);
+    }
+
+    .tab-button.active {
+      background: rgba(0, 0, 0, 0.8);
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.5);
+      text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+    }
+
+    .tab-button.active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: rgba(0, 0, 0, 0.8);
+    }
+
     .main-container {
       display: flex;
       height: 100vh;
       gap: 15px;
-      padding: 70px 15px 15px 15px;
+      padding: 110px 15px 15px 15px;
       box-sizing: border-box;
+    }
+
+    .tab-content {
+      display: none;
+      width: 100%;
+      height: 100%;
+    }
+
+    .tab-content.active {
+      display: flex;
+      gap: 15px;
     }
 
     /* Left Column - Dual Layer Palettes */
@@ -603,8 +667,20 @@
     <div class="v3xv0id-brand">V3XV0ID</div>
     <div class="v3xv0id-subtitle">Image Animator Controls</div>
   </div>
+
+  <!-- Tab Navigation -->
+  <div class="tab-navigation">
+    <button class="tab-button active" data-tab="layers">🎛️ LAYERS</button>
+    <button class="tab-button" data-tab="patterns">🎨 PATTERNS</button>
+    <button class="tab-button" data-tab="music">🎵 MUSIC</button>
+    <button class="tab-button" data-tab="videos">🎬 VIDEOS</button>
+    <button class="tab-button" data-tab="images">🖼️ IMAGES</button>
+    <button class="tab-button" data-tab="composer">🎭 COMPOSER</button>
+  </div>
   
       <div class="main-container">
+    <!-- Layers Tab Content -->
+    <div class="tab-content active" id="layersTab">
       <!-- V3XV0ID Cloud Performance Section -->
       <div class="v3xv0id-performance-section" style="position: fixed; top: 70px; right: 15px; width: 300px; background: rgba(0, 0, 0, 0.95); border: 2px solid rgba(255, 255, 255, 0.3); padding: 15px; z-index: 998; display: none;">
         <div class="performance-header" style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.2);">
@@ -766,6 +842,47 @@
           <div class="preview-row-label">PALETTE B</div>
           <div class="preview-placeholder">NO CONTENT</div>
         </div>
+      </div>
+    </div>
+    </div>
+
+    <!-- Patterns Tab Content -->
+    <div class="tab-content" id="patternsTab">
+      <div style="padding: 20px; text-align: center; color: #888;">
+        <h2>🎨 PATTERNS</h2>
+        <p>Pattern generator coming soon...</p>
+      </div>
+    </div>
+
+    <!-- Music Tab Content -->
+    <div class="tab-content" id="musicTab">
+      <div style="padding: 20px; text-align: center; color: #888;">
+        <h2>🎵 MUSIC</h2>
+        <p>Music player coming soon...</p>
+      </div>
+    </div>
+
+    <!-- Videos Tab Content -->
+    <div class="tab-content" id="videosTab">
+      <div style="padding: 20px; text-align: center; color: #888;">
+        <h2>🎬 VIDEOS</h2>
+        <p>Video browser coming soon...</p>
+      </div>
+    </div>
+
+    <!-- Images Tab Content -->
+    <div class="tab-content" id="imagesTab">
+      <div style="padding: 20px; text-align: center; color: #888;">
+        <h2>🖼️ IMAGES</h2>
+        <p>Image browser coming soon...</p>
+      </div>
+    </div>
+
+    <!-- Composer Tab Content -->
+    <div class="tab-content" id="composerTab">
+      <div style="padding: 20px; text-align: center; color: #888;">
+        <h2>🎭 COMPOSER</h2>
+        <p>Sequence composer coming soon...</p>
       </div>
     </div>
   </div>
@@ -1793,6 +1910,32 @@
       }
       
       console.log('🎭 V3XV0ID Performance System UI initialized');
+
+      // ========== TAB NAVIGATION SYSTEM ==========
+      const tabButtons = document.querySelectorAll('.tab-button');
+      const tabContents = document.querySelectorAll('.tab-content');
+
+      // Tab switching functionality
+      tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+          const targetTab = button.getAttribute('data-tab');
+          
+          // Remove active class from all buttons and content
+          tabButtons.forEach(btn => btn.classList.remove('active'));
+          tabContents.forEach(content => content.classList.remove('active'));
+          
+          // Add active class to clicked button and corresponding content
+          button.classList.add('active');
+          const targetContent = document.getElementById(targetTab + 'Tab');
+          if (targetContent) {
+            targetContent.classList.add('active');
+          }
+          
+          console.log(`🎛️ Switched to ${targetTab.toUpperCase()} tab`);
+        });
+      });
+
+      console.log('🎛️ V3XV0ID Tab Navigation System initialized');
     });
   </script>
 </body>

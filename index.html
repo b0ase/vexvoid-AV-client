@@ -421,6 +421,9 @@
           case 'crossfader-update':
             handleCrossfaderUpdate(data);
             break;
+          case 'apply-pattern':
+            applyPatternToLayers(data);
+            break;
         }
       });
       
@@ -593,6 +596,9 @@
           case 'opacity':
             layer.element.style.opacity = layer.opacity / 100;
             break;
+          case 'blendMode':
+            layer.element.style.mixBlendMode = layer.blendMode;
+            break;
           case 'strobe':
             if (layer.strobeInterval) {
               clearInterval(layer.strobeInterval);
@@ -662,6 +668,7 @@
           size: layer.size,
           jitterAmount: layer.jitterAmount,
           opacity: layer.opacity,
+          blendMode: layer.blendMode || 'normal',
           strobe: layer.strobe,
           impact: layer.impact,
           inverse: layer.inverse || false,
@@ -669,6 +676,81 @@
         }));
         
         sendToControl('layers-updated', { layers: layerData });
+      }
+
+      // P5.js Pattern Application System
+      function applyPatternToLayers(data) {
+        const { code, targetLayers } = data;
+        
+        console.log('🎨 Applying pattern to layers:', targetLayers);
+        
+        targetLayers.forEach(layerId => {
+          const layer = layers.find(l => l.id === layerId);
+          if (!layer) return;
+          
+          try {
+            // Create pattern canvas for this layer
+            let layerPatternCanvas = layer.element.querySelector('.pattern-canvas');
+            if (!layerPatternCanvas) {
+              layerPatternCanvas = document.createElement('canvas');
+              layerPatternCanvas.className = 'pattern-canvas';
+              layerPatternCanvas.style.width = '100%';
+              layerPatternCanvas.style.height = '100%';
+              layerPatternCanvas.style.position = 'absolute';
+              layerPatternCanvas.style.top = '0';
+              layerPatternCanvas.style.left = '0';
+              layer.element.appendChild(layerPatternCanvas);
+            }
+            
+            layerPatternCanvas.width = 400;
+            layerPatternCanvas.height = 400;
+            
+            // Hide original content
+            if (layer.imageElement) {
+              layer.imageElement.style.display = 'none';
+            }
+            
+            // Create P5 instance
+            const layerSketch = new p5((p) => {
+              try {
+                const func = new Function('p', `with(p) { ${code} }`);
+                func(p);
+                
+                const originalSetup = p.setup;
+                p.setup = function() {
+                  p._renderer = new p5.Renderer2D(layerPatternCanvas, p, false);
+                  p._renderer.resize(400, 400);
+                  if (originalSetup) originalSetup.call(p);
+                };
+                
+                if (p.setup) p.setup();
+                
+                layer.patternSketch = p;
+                layer.isPattern = true;
+                layer.name = layer.name.replace(' (PATTERN)', '') + ' (PATTERN)';
+                
+                const animate = () => {
+                  if (!layer.isPattern) return;
+                  try {
+                    if (p.draw) p.draw();
+                  } catch (e) {
+                    console.error('Pattern error:', e);
+                  }
+                  requestAnimationFrame(animate);
+                };
+                requestAnimationFrame(animate);
+                
+              } catch (error) {
+                console.error('Pattern setup error:', error);
+              }
+            });
+            
+          } catch (error) {
+            console.error('Pattern application error:', error);
+          }
+        });
+        
+        sendLayersUpdate();
       }
       
       // Helper function to update main layer name when global images are loaded
@@ -799,6 +881,7 @@
           jitterEnabled: false, // Start with no jitter
           jitterAmount: 0, // Default to 0
           opacity: 100, // Default to 100% opacity
+          blendMode: 'normal', // Default blend mode
           strobe: 0, // Default to no strobe
           strobeInterval: null,
           impact: 0, // Default to no impact
@@ -811,9 +894,10 @@
           palette: 'A' // Main layer defaults to palette A
         };
         
-        // Set the main layer scale and opacity
+        // Set the main layer scale, opacity, and blend mode
         mainLayerCanvas.style.transform = `scale(${mainLayer.size / 100})`;
         mainLayerCanvas.style.opacity = mainLayer.opacity / 100;
+        mainLayerCanvas.style.mixBlendMode = mainLayer.blendMode;
         
         layers = [mainLayer];
         makeDraggable(mainLayerCanvas, mainLayer);
@@ -838,6 +922,7 @@
           jitterEnabled: false, // Start with no jitter
           jitterAmount: 0, // Default to 0
           opacity: 100, // Default to 100% opacity
+          blendMode: 'normal', // Default blend mode
           strobe: 0, // Default to no strobe
           strobeInterval: null,
           impact: 0, // Default to no impact
@@ -854,6 +939,7 @@
         canvasElement.className = 'layer-canvas draggable';
         canvasElement.style.transform = `scale(${layer.size / 100}) translate(${layer.x}px, ${layer.y}px)`;
         canvasElement.style.opacity = layer.opacity / 100;
+        canvasElement.style.mixBlendMode = layer.blendMode;
         
         const imageElement = document.createElement('img');
         if (imageFiles.length > 0) {
@@ -970,6 +1056,7 @@
           size: layer.size,
           jitterAmount: layer.jitterAmount,
           opacity: layer.opacity,
+          blendMode: layer.blendMode,
           strobe: layer.strobe,
           impact: layer.impact
         };
@@ -1394,6 +1481,7 @@
           jitterEnabled: originalLayer.jitterEnabled,
           jitterAmount: originalLayer.jitterAmount,
           opacity: originalLayer.opacity, // Copy opacity from original
+          blendMode: originalLayer.blendMode || 'normal', // Copy blend mode from original
           strobe: originalLayer.strobe, // Copy strobe from original
           strobeInterval: null,
           impact: originalLayer.impact, // Copy impact from original
@@ -1409,6 +1497,7 @@
         canvasElement.className = 'layer-canvas draggable';
         canvasElement.style.transform = `scale(${newLayer.size / 100}) translate(${newLayer.x}px, ${newLayer.y}px)`;
         canvasElement.style.opacity = newLayer.opacity / 100;
+        canvasElement.style.mixBlendMode = newLayer.blendMode;
         
         const imageElement = document.createElement('img');
         const originalImageElement = originalLayer.imageElement || originalLayer.element.querySelector('.layer-image');
