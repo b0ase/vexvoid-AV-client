@@ -2,11 +2,11 @@
   "name": "v3xv0id-av-client",
   "version": "2.0.0",
   "description": "V3XV0ID AV Client - Professional Live Visual Performance Tool with Cloud-Connected Audio-Visual Sequencing",
-  "main": "v3xv0id-av-client/main.js",
+  "main": "main.js",
   "homepage": "./",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "electron ./v3xv0id-av-client/main.js",
+    "start": "electron ./main.js",
     "build": "electron-builder",
     "build-mac": "electron-builder --mac",
     "build-win": "electron-builder --win",
