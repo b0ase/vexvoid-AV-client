@@ -185,6 +185,36 @@
       align-items: center;
     }
 
+    .cloud-status {
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 4px 8px;
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
+    }
+
+    .cloud-status.connected {
+      color: #00ff00;
+      border-color: rgba(0, 255, 0, 0.3);
+      background: rgba(0, 255, 0, 0.1);
+    }
+
+    .cloud-status.demo {
+      color: #ffaa00;
+      border-color: rgba(255, 170, 0, 0.3);
+      background: rgba(255, 170, 0, 0.1);
+    }
+
+    .cloud-status.error {
+      color: #ff0000;
+      border-color: rgba(255, 0, 0, 0.3);
+      background: rgba(255, 0, 0, 0.1);
+    }
+
     .browser-btn {
       background: rgba(0, 0, 0, 0.8);
       color: #ffffff;
@@ -1524,6 +1554,7 @@ function draw() {
         <!-- Music Player Header -->
         <div class="music-player-header">
           <h2 class="cyber-text">🎵 MUSIC PLAYER</h2>
+          <div class="cloud-status" id="musicCloudStatus">🌐 CONNECTING...</div>
           <div class="music-controls">
             <button id="loadLocalMusicBtn" class="browser-btn">📁 LOAD LOCAL</button>
             <button id="refreshMusicBtn" class="browser-btn">🔄 REFRESH</button>
@@ -1589,6 +1620,7 @@ function draw() {
         <!-- Video Browser Header -->
         <div class="video-browser-header">
           <h2 class="cyber-text">🎬 VIDEO BROWSER</h2>
+          <div class="cloud-status" id="videoCloudStatus">🌐 CONNECTING...</div>
           <div class="video-browser-controls">
             <button id="loadLocalVideosBtn" class="browser-btn">📁 LOAD LOCAL</button>
             <button id="refreshVideosBtn" class="browser-btn">🔄 REFRESH</button>
@@ -1631,6 +1663,7 @@ function draw() {
         <!-- Image Browser Header -->
         <div class="image-browser-header">
           <h2 class="cyber-text">🖼️ IMAGE BROWSER</h2>
+          <div class="cloud-status" id="imageCloudStatus">🌐 CONNECTING...</div>
           <div class="image-browser-controls">
             <button id="loadLocalImagesBtn" class="browser-btn">📁 LOAD LOCAL</button>
             <button id="refreshImagesBtn" class="browser-btn">🔄 REFRESH</button>
@@ -2805,30 +2838,57 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
       // Initialize Videos Tab
       async function initializeVideosTab() {
         try {
-          // Try to load from cloud first
+          console.log('🎬 Loading V3XV0ID video library...');
+          
+          // Load V3XV0ID cloud manager
           const V3XV0IDCloudManager = require('./supabase-config');
           const cloudManager = new V3XV0IDCloudManager();
           
-          const cloudVideos = await cloudManager.listFiles('v3xv0id-videos');
+          // Initialize cloud connection
+          await cloudManager.initialize();
+          
+          // Get video files from v3xv0id-videos bucket
+          const cloudVideos = await cloudManager.getVideoFiles();
+          console.log(`📹 Found ${cloudVideos.length} videos in V3XV0ID cloud`);
+          
           videoLibrary = cloudVideos.map((video, index) => ({
             id: index,
             name: video.name,
-            url: video.url,
+            url: cloudManager.getPublicUrl('v3xv0id-videos', video.name),
             source: 'cloud',
-            format: video.name.split('.').pop().toUpperCase()
+            format: video.name.split('.').pop().toUpperCase(),
+            size: video.metadata?.size || 'Unknown',
+            created: video.created_at
           }));
           
+          // Update cloud status
+          const statusEl = document.getElementById('videoCloudStatus');
+          if (statusEl) {
+            statusEl.textContent = `✅ CLOUD (${cloudVideos.length} VIDEOS)`;
+            statusEl.className = 'cloud-status connected';
+          }
+          
         } catch (error) {
-          console.log('Cloud videos not available, using demo mode');
+          console.log('⚠️ Cloud videos not available, using demo mode:', error.message);
+          
+          // Update cloud status
+          const statusEl = document.getElementById('videoCloudStatus');
+          if (statusEl) {
+            statusEl.textContent = '🎭 DEMO MODE';
+            statusEl.className = 'cloud-status demo';
+          }
           // Demo videos
           videoLibrary = [
             { id: 0, name: 'DEMO_ABSTRACT_01.mp4', url: null, source: 'demo', format: 'MP4' },
             { id: 1, name: 'DEMO_TUNNEL_02.mp4', url: null, source: 'demo', format: 'MP4' },
-            { id: 2, name: 'DEMO_FRACTAL_03.mp4', url: null, source: 'demo', format: 'MP4' }
+            { id: 2, name: 'DEMO_FRACTAL_03.mp4', url: null, source: 'demo', format: 'MP4' },
+            { id: 3, name: 'DEMO_CYBER_04.mp4', url: null, source: 'demo', format: 'MP4' },
+            { id: 4, name: 'DEMO_MATRIX_05.mp4', url: null, source: 'demo', format: 'MP4' }
           ];
         }
         
         renderVideoLibrary();
+        console.log(`✅ Video library loaded: ${videoLibrary.length} videos`);
       }
 
       function renderVideoLibrary() {
@@ -2888,30 +2948,58 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
       // Initialize Images Tab
       async function initializeImagesTab() {
         try {
-          // Try to load from cloud first
+          console.log('🖼️ Loading V3XV0ID image library...');
+          
+          // Load V3XV0ID cloud manager
           const V3XV0IDCloudManager = require('./supabase-config');
           const cloudManager = new V3XV0IDCloudManager();
           
-          const cloudImages = await cloudManager.listFiles('v3xv0id-images');
+          // Initialize cloud connection
+          await cloudManager.initialize();
+          
+          // Get image files from v3xv0id-images bucket
+          const cloudImages = await cloudManager.getImageSequences();
+          console.log(`🎨 Found ${cloudImages.length} images in V3XV0ID cloud`);
+          
           imageLibrary = cloudImages.map((image, index) => ({
             id: index,
             name: image.name,
-            url: image.url,
+            url: cloudManager.getPublicUrl('v3xv0id-images', image.name),
             source: 'cloud',
-            format: image.name.split('.').pop().toUpperCase()
+            format: image.name.split('.').pop().toUpperCase(),
+            size: image.metadata?.size || 'Unknown',
+            created: image.created_at
           }));
           
+          // Update cloud status
+          const statusEl = document.getElementById('imageCloudStatus');
+          if (statusEl) {
+            statusEl.textContent = `✅ CLOUD (${cloudImages.length} IMAGES)`;
+            statusEl.className = 'cloud-status connected';
+          }
+          
         } catch (error) {
-          console.log('Cloud images not available, using demo mode');
+          console.log('⚠️ Cloud images not available, using demo mode:', error.message);
+          
+          // Update cloud status
+          const statusEl = document.getElementById('imageCloudStatus');
+          if (statusEl) {
+            statusEl.textContent = '🎭 DEMO MODE';
+            statusEl.className = 'cloud-status demo';
+          }
           // Demo images
           imageLibrary = [
             { id: 0, name: 'DEMO_ABSTRACT_01.jpg', url: null, source: 'demo', format: 'JPG' },
             { id: 1, name: 'DEMO_GEOMETRIC_02.png', url: null, source: 'demo', format: 'PNG' },
-            { id: 2, name: 'DEMO_FRACTAL_03.jpg', url: null, source: 'demo', format: 'JPG' }
+            { id: 2, name: 'DEMO_FRACTAL_03.jpg', url: null, source: 'demo', format: 'JPG' },
+            { id: 3, name: 'DEMO_CYBER_04.jpg', url: null, source: 'demo', format: 'JPG' },
+            { id: 4, name: 'DEMO_NEON_05.png', url: null, source: 'demo', format: 'PNG' },
+            { id: 5, name: 'DEMO_GLITCH_06.jpg', url: null, source: 'demo', format: 'JPG' }
           ];
         }
         
         renderImageLibrary();
+        console.log(`✅ Image library loaded: ${imageLibrary.length} images`);
       }
 
       function renderImageLibrary() {
@@ -3165,32 +3253,59 @@ function draw() {
       // Initialize Music Tab
       async function initializeMusicTab() {
         try {
-          // Try to load from cloud first
+          console.log('🎵 Loading V3XV0ID music library...');
+          
+          // Load V3XV0ID cloud manager
           const V3XV0IDCloudManager = require('./supabase-config');
           const cloudManager = new V3XV0IDCloudManager();
           
-          const cloudTracks = await cloudManager.listFiles('v3xv0id-music');
+          // Initialize cloud connection
+          await cloudManager.initialize();
+          
+          // Get music tracks from v3xv0id-music bucket
+          const cloudTracks = await cloudManager.getMusicTracks();
+          console.log(`🎶 Found ${cloudTracks.length} tracks in V3XV0ID cloud`);
+          
           musicLibraryTracks = cloudTracks.map((track, index) => ({
             id: index,
             name: track.name.replace(/\.[^/.]+$/, ''),
             artist: 'V3XV0ID',
             format: track.name.split('.').pop().toUpperCase(),
-            duration: '00:00',
-            url: track.url
+            duration: '00:00', // Will be updated when loaded
+            url: cloudManager.getPublicUrl('v3xv0id-music', track.name),
+            size: track.metadata?.size || 'Unknown',
+            created: track.created_at
           }));
           
+          // Update cloud status
+          const statusEl = document.getElementById('musicCloudStatus');
+          if (statusEl) {
+            statusEl.textContent = `✅ CLOUD (${cloudTracks.length} TRACKS)`;
+            statusEl.className = 'cloud-status connected';
+          }
+          
         } catch (error) {
-          console.log('Cloud music not available, using demo mode');
+          console.log('⚠️ Cloud music not available, using demo mode:', error.message);
+          
+          // Update cloud status
+          const statusEl = document.getElementById('musicCloudStatus');
+          if (statusEl) {
+            statusEl.textContent = '🎭 DEMO MODE';
+            statusEl.className = 'cloud-status demo';
+          }
           // Demo tracks
           musicLibraryTracks = [
-            { id: 0, name: 'DEMO TRACK 01', artist: 'V3XV0ID', format: 'MP3', duration: '03:45', url: null },
-            { id: 1, name: 'DEMO TRACK 02', artist: 'V3XV0ID', format: 'MP3', duration: '04:12', url: null },
-            { id: 2, name: 'DEMO TRACK 03', artist: 'V3XV0ID', format: 'MP3', duration: '03:28', url: null }
+            { id: 0, name: 'ECHOES IN THE ABYSS', artist: 'V3XV0ID', format: 'MP3', duration: '03:45', url: null },
+            { id: 1, name: 'DIGITAL SHADOWS', artist: 'V3XV0ID', format: 'MP3', duration: '04:12', url: null },
+            { id: 2, name: 'CYBER DREAMS', artist: 'V3XV0ID', format: 'MP3', duration: '03:28', url: null },
+            { id: 3, name: 'NEON PULSE', artist: 'V3XV0ID', format: 'MP3', duration: '04:56', url: null },
+            { id: 4, name: 'DATA STREAM', artist: 'V3XV0ID', format: 'MP3', duration: '03:15', url: null }
           ];
         }
         
         renderMusicLibrary();
         initializeAudioVisualizer();
+        console.log(`✅ Music library loaded: ${musicLibraryTracks.length} tracks`);
       }
 
       function renderMusicLibrary() {

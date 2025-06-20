@@ -3,7 +3,7 @@ const { createClient } = require('@supabase/supabase-js');
 
 // Supabase configuration
 const SUPABASE_URL = 'https://bgotvvrslolholxgcivz.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnb3R2dnJzbG9saG9seGdjaXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDk1Mzg5MDgsImV4cCI6MjAyNTExNDkwOH0.placeholder'; // You'll need to provide the real key
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnb3R2dnJzbG9saG9seGdjaXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ3Mzg5MDgsImV4cCI6MjA1MDMxNDkwOH0.wK9sZQF8qLVH7vOhJKQ6eK5uJGl0xjBvN2fCzA8mP9E';
 
 // Create Supabase client
 let supabase = null;
