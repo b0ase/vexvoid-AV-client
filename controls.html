@@ -159,6 +159,610 @@
       gap: 15px;
     }
 
+    /* ========== TAB CONTENT STYLES ========== */
+    
+    /* Video Browser Styles */
+    .video-browser-container, .image-browser-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .video-browser-header, .image-browser-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px;
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .video-browser-controls, .image-browser-controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .browser-btn {
+      background: rgba(0, 0, 0, 0.8);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      padding: 8px 15px;
+      cursor: crosshair;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      transition: all 0.2s;
+    }
+
+    .browser-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+
+    .search-input {
+      background: rgba(0, 0, 0, 0.8);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      padding: 8px 12px;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      width: 200px;
+    }
+
+    .search-input::placeholder {
+      color: #888;
+    }
+
+    .video-library, .image-library {
+      flex: 1;
+      overflow-y: auto;
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 15px;
+    }
+
+    .video-grid, .image-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 15px;
+    }
+
+    .video-item, .image-item {
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 10px;
+      cursor: crosshair;
+      transition: all 0.2s;
+      text-align: center;
+    }
+
+    .video-item:hover, .image-item:hover {
+      border-color: rgba(255, 255, 255, 0.5);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .video-thumbnail, .image-thumbnail {
+      width: 100%;
+      height: 80px;
+      background: rgba(255, 255, 255, 0.1);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+
+    .video-name, .image-name {
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+      color: #ffffff;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Pattern Generator Styles */
+    .patterns-container {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      grid-template-columns: 1fr 400px;
+      grid-template-rows: auto 1fr auto;
+      gap: 15px;
+      grid-template-areas:
+        "header header"
+        "studio preview"
+        "library targets";
+    }
+
+    .patterns-header {
+      grid-area: header;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px;
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .pattern-status {
+      display: flex;
+      gap: 15px;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      color: #888;
+      text-transform: uppercase;
+    }
+
+    .pattern-studio {
+      grid-area: studio;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .pattern-editor {
+      flex: 1;
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 15px;
+    }
+
+    .editor-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+
+    .editor-controls {
+      display: flex;
+      gap: 8px;
+    }
+
+    .pattern-btn {
+      background: rgba(0, 0, 0, 0.8);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      padding: 6px 12px;
+      cursor: crosshair;
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+      text-transform: uppercase;
+      transition: all 0.2s;
+    }
+
+    .pattern-btn.run:hover {
+      background: #00ff00;
+      color: #000000;
+    }
+
+    .pattern-btn.stop:hover {
+      background: #ff0000;
+      color: #ffffff;
+    }
+
+    .code-editor {
+      width: 100%;
+      height: 300px;
+      background: rgba(0, 0, 0, 0.9);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 15px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      resize: vertical;
+    }
+
+    .pattern-preview {
+      grid-area: preview;
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 15px;
+    }
+
+    .preview-container {
+      width: 100%;
+      height: 400px;
+      background: rgba(0, 0, 0, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 15px;
+    }
+
+    /* Music Player Styles */
+    .music-player-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .music-player-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px;
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .music-controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .music-library-section {
+      flex: 1;
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 15px;
+      overflow-y: auto;
+    }
+
+    .music-library {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .music-track-item {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      cursor: crosshair;
+      transition: all 0.2s;
+    }
+
+    .music-track-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.4);
+    }
+
+    .music-track-item.playing {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.6);
+    }
+
+    .track-number {
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      color: #888;
+      min-width: 30px;
+    }
+
+    .track-details {
+      flex: 1;
+    }
+
+    .track-name {
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      color: #ffffff;
+      text-transform: uppercase;
+      font-weight: bold;
+    }
+
+    .track-meta {
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+      color: #888;
+      text-transform: uppercase;
+    }
+
+    .track-duration {
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      color: #888;
+    }
+
+    .audio-player {
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .player-info {
+      display: flex;
+      gap: 15px;
+      align-items: center;
+    }
+
+    .track-artwork {
+      width: 60px;
+      height: 60px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .artwork-placeholder {
+      font-size: 24px;
+    }
+
+    .track-title {
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      color: #ffffff;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+
+    .track-artist {
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      color: #888;
+      text-transform: uppercase;
+    }
+
+    .track-format {
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+      color: #666;
+      text-transform: uppercase;
+    }
+
+    .player-controls {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .player-btn {
+      background: rgba(0, 0, 0, 0.8);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      padding: 10px 15px;
+      cursor: crosshair;
+      font-size: 16px;
+      transition: all 0.2s;
+    }
+
+    .player-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+
+    .player-btn.play-pause {
+      font-size: 20px;
+      padding: 12px 18px;
+    }
+
+    .player-progress {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      color: #888;
+    }
+
+    .progress-slider {
+      flex: 1;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.2);
+      outline: none;
+      cursor: crosshair;
+    }
+
+    .player-volume {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      color: #888;
+    }
+
+    .volume-slider {
+      width: 100px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.2);
+      outline: none;
+      cursor: crosshair;
+    }
+
+    .audio-visualizer {
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 15px;
+      text-align: center;
+    }
+
+    #audioVisualizerCanvas {
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(0, 0, 0, 0.9);
+    }
+
+    /* Composer Styles */
+    .composer-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .composer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px;
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .composer-status {
+      display: flex;
+      gap: 15px;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      color: #888;
+      text-transform: uppercase;
+    }
+
+    .recording-controls {
+      display: flex;
+      gap: 10px;
+      padding: 15px;
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .record-btn {
+      background: rgba(0, 0, 0, 0.8);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      padding: 10px 15px;
+      cursor: crosshair;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      transition: all 0.2s;
+    }
+
+    .record-btn:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+
+    .record-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .ai-generator {
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 15px;
+    }
+
+    .ai-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    .ai-prompt {
+      width: 100%;
+      height: 80px;
+      background: rgba(0, 0, 0, 0.8);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      padding: 10px;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      resize: vertical;
+    }
+
+    .ai-btn {
+      background: rgba(0, 0, 0, 0.8);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      padding: 12px 20px;
+      cursor: crosshair;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: bold;
+      transition: all 0.2s;
+    }
+
+    .ai-btn:hover {
+      background: #ffff00;
+      color: #000000;
+      border-color: #ffff00;
+    }
+
+    .ai-presets {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .preset-btn {
+      background: rgba(0, 0, 0, 0.8);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      padding: 6px 12px;
+      cursor: crosshair;
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+      text-transform: uppercase;
+      transition: all 0.2s;
+    }
+
+    .preset-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+
+    .sequence-timeline {
+      flex: 1;
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 15px;
+    }
+
+    .timeline-container {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      margin-top: 15px;
+    }
+
+    .timeline-track {
+      display: flex;
+      align-items: center;
+      min-height: 40px;
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .track-label {
+      width: 100px;
+      padding: 10px;
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+      color: #888;
+      text-transform: uppercase;
+      border-right: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .track-content {
+      flex: 1;
+      padding: 5px;
+      min-height: 30px;
+    }
+
+    .sequence-library {
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 15px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
     /* Left Column - Dual Layer Palettes */
     .layers-column {
       flex: 0 0 300px;
@@ -848,41 +1452,285 @@
 
     <!-- Patterns Tab Content -->
     <div class="tab-content" id="patternsTab">
-      <div style="padding: 20px; text-align: center; color: #888;">
-        <h2>🎨 PATTERNS</h2>
-        <p>Pattern generator coming soon...</p>
+      <div class="patterns-container">
+        <!-- Pattern Generator Header -->
+        <div class="patterns-header">
+          <h2 class="cyber-text">🎨 PATTERN GENERATOR</h2>
+          <div class="pattern-status">
+            <span id="patternStatus">READY</span>
+            <span id="patternFPS">0 FPS</span>
+          </div>
+        </div>
+
+        <!-- Pattern Studio -->
+        <div class="pattern-studio">
+          <!-- Code Editor -->
+          <div class="pattern-editor">
+            <div class="editor-header">
+              <h3>CODE EDITOR</h3>
+              <div class="editor-controls">
+                <button id="runPatternBtn" class="pattern-btn run">▶️ RUN</button>
+                <button id="stopPatternBtn" class="pattern-btn stop">⏹️ STOP</button>
+                <button id="exportPatternBtn" class="pattern-btn export">💾 EXPORT</button>
+              </div>
+            </div>
+            <textarea id="patternCodeEditor" class="code-editor" placeholder="// Write your P5.js pattern code here...
+function setup() {
+  createCanvas(400, 400);
+}
+
+function draw() {
+  background(0);
+  fill(255);
+  ellipse(mouseX, mouseY, 50, 50);
+}"></textarea>
+          </div>
+
+          <!-- Preview Canvas -->
+          <div class="pattern-preview">
+            <div class="preview-header">
+              <h3>LIVE PREVIEW</h3>
+            </div>
+            <div id="patternPreviewContainer" class="preview-container">
+              <!-- P5.js canvas will be inserted here -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Pattern Library -->
+        <div class="pattern-library">
+          <h3>PATTERN LIBRARY</h3>
+          <div class="pattern-presets" id="patternPresets">
+            <!-- Pattern presets will be populated here -->
+          </div>
+        </div>
+
+        <!-- Target Layers -->
+        <div class="pattern-targets">
+          <h3>TARGET LAYERS</h3>
+          <div class="target-layers-list" id="targetLayersList">
+            <!-- Target layers will be populated here -->
+          </div>
+          <div class="target-info">
+            <span id="activeTargetsCount">0</span> layers selected
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- Music Tab Content -->
     <div class="tab-content" id="musicTab">
-      <div style="padding: 20px; text-align: center; color: #888;">
-        <h2>🎵 MUSIC</h2>
-        <p>Music player coming soon...</p>
+      <div class="music-player-container">
+        <!-- Music Player Header -->
+        <div class="music-player-header">
+          <h2 class="cyber-text">🎵 MUSIC PLAYER</h2>
+          <div class="music-controls">
+            <button id="loadLocalMusicBtn" class="browser-btn">📁 LOAD LOCAL</button>
+            <button id="refreshMusicBtn" class="browser-btn">🔄 REFRESH</button>
+            <input type="text" id="musicSearch" class="search-input" placeholder="SEARCH MUSIC...">
+          </div>
+        </div>
+
+        <!-- Music Library -->
+        <div class="music-library-section">
+          <div class="music-library" id="musicLibrary">
+            <!-- Music tracks will be populated here -->
+          </div>
+        </div>
+
+        <!-- Audio Player -->
+        <div class="audio-player">
+          <div class="player-info">
+            <div class="track-artwork">
+              <div class="artwork-placeholder">🎵</div>
+            </div>
+            <div class="track-details">
+              <div class="track-title" id="currentTrackTitle">NO TRACK</div>
+              <div class="track-artist" id="currentTrackArtist">UNKNOWN ARTIST</div>
+              <div class="track-format" id="trackFormat">---</div>
+            </div>
+          </div>
+
+          <div class="player-controls">
+            <button id="prevTrackBtn" class="player-btn">⏮️</button>
+            <button id="playPauseTrackBtn" class="player-btn play-pause">▶️</button>
+            <button id="nextTrackBtn" class="player-btn">⏭️</button>
+            <button id="shuffleBtn" class="player-btn toggle">🔀</button>
+            <button id="repeatBtn" class="player-btn toggle">🔁</button>
+          </div>
+
+          <div class="player-progress">
+            <span id="currentTime">00:00</span>
+            <input type="range" id="progressSlider" class="progress-slider" min="0" max="100" value="0">
+            <span id="totalTime">00:00</span>
+          </div>
+
+          <div class="player-volume">
+            <span>🔊</span>
+            <input type="range" id="volumeSlider" class="volume-slider" min="0" max="100" value="50">
+            <span id="volumeValue">50%</span>
+          </div>
+
+          <div class="player-status">
+            <span id="playerStatus">READY</span>
+          </div>
+        </div>
+
+        <!-- Audio Visualizer -->
+        <div class="audio-visualizer">
+          <canvas id="audioVisualizerCanvas" width="400" height="100"></canvas>
+        </div>
       </div>
     </div>
 
     <!-- Videos Tab Content -->
     <div class="tab-content" id="videosTab">
-      <div style="padding: 20px; text-align: center; color: #888;">
-        <h2>🎬 VIDEOS</h2>
-        <p>Video browser coming soon...</p>
+      <div class="video-browser-container">
+        <!-- Video Browser Header -->
+        <div class="video-browser-header">
+          <h2 class="cyber-text">🎬 VIDEO BROWSER</h2>
+          <div class="video-browser-controls">
+            <button id="loadLocalVideosBtn" class="browser-btn">📁 LOAD LOCAL</button>
+            <button id="refreshVideosBtn" class="browser-btn">🔄 REFRESH</button>
+            <input type="text" id="videoSearch" class="search-input" placeholder="SEARCH VIDEOS...">
+          </div>
+        </div>
+
+        <!-- Video Library -->
+        <div class="video-library">
+          <div class="video-grid" id="videoGrid">
+            <!-- Videos will be populated here -->
+          </div>
+        </div>
+
+        <!-- Video Preview Panel -->
+        <div class="video-preview-panel" id="videoPreviewPanel" style="display: none;">
+          <div class="video-preview-header">
+            <h3 id="videoPreviewTitle">VIDEO PREVIEW</h3>
+            <button id="closeVideoPreview" class="close-btn">✕</button>
+          </div>
+          <div class="video-preview-content">
+            <video id="videoPreviewPlayer" controls muted loop>
+              <source id="videoPreviewSource" src="" type="video/mp4">
+            </video>
+            <div class="video-preview-info">
+              <div id="videoPreviewDetails"></div>
+              <div class="video-preview-actions">
+                <button id="loadToLayerBtn" class="action-btn">📥 LOAD TO LAYER</button>
+                <button id="loadToBackgroundBtn" class="action-btn">🖼️ SET AS BACKGROUND</button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- Images Tab Content -->
     <div class="tab-content" id="imagesTab">
-      <div style="padding: 20px; text-align: center; color: #888;">
-        <h2>🖼️ IMAGES</h2>
-        <p>Image browser coming soon...</p>
+      <div class="image-browser-container">
+        <!-- Image Browser Header -->
+        <div class="image-browser-header">
+          <h2 class="cyber-text">🖼️ IMAGE BROWSER</h2>
+          <div class="image-browser-controls">
+            <button id="loadLocalImagesBtn" class="browser-btn">📁 LOAD LOCAL</button>
+            <button id="refreshImagesBtn" class="browser-btn">🔄 REFRESH</button>
+            <input type="text" id="imageSearch" class="search-input" placeholder="SEARCH IMAGES...">
+          </div>
+        </div>
+
+        <!-- Image Library -->
+        <div class="image-library">
+          <div class="image-grid" id="imageGrid">
+            <!-- Images will be populated here -->
+          </div>
+        </div>
+
+        <!-- Image Preview Panel -->
+        <div class="image-preview-panel" id="imagePreviewPanel" style="display: none;">
+          <div class="image-preview-header">
+            <h3 id="imagePreviewTitle">IMAGE PREVIEW</h3>
+            <button id="closeImagePreview" class="close-btn">✕</button>
+          </div>
+          <div class="image-preview-content">
+            <img id="imagePreviewImg" src="" alt="Preview">
+            <div class="image-preview-info">
+              <div id="imagePreviewDetails"></div>
+              <div class="image-preview-actions">
+                <button id="loadImageToLayerBtn" class="action-btn">📥 LOAD TO LAYER</button>
+                <button id="loadImageToBackgroundBtn" class="action-btn">🖼️ SET AS BACKGROUND</button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- Composer Tab Content -->
     <div class="tab-content" id="composerTab">
-      <div style="padding: 20px; text-align: center; color: #888;">
-        <h2>🎭 COMPOSER</h2>
-        <p>Sequence composer coming soon...</p>
+      <div class="composer-container">
+        <!-- Composer Header -->
+        <div class="composer-header">
+          <h2 class="cyber-text">🎭 SEQUENCE COMPOSER</h2>
+          <div class="composer-status">
+            <span id="composerStatus">READY</span>
+            <span id="recordingTime">00:00</span>
+          </div>
+        </div>
+
+        <!-- Recording Controls -->
+        <div class="recording-controls">
+          <button id="startRecordingBtn" class="record-btn">🎬 START RECORDING</button>
+          <button id="stopRecordingBtn" class="record-btn" disabled>⏹️ STOP RECORDING</button>
+          <button id="playSequenceBtn" class="record-btn" disabled>▶️ PLAY SEQUENCE</button>
+          <button id="saveSequenceBtn" class="record-btn" disabled>💾 SAVE SEQUENCE</button>
+        </div>
+
+        <!-- AI Sequence Generator -->
+        <div class="ai-generator">
+          <h3>🤖 AI SEQUENCE GENERATOR</h3>
+          <div class="ai-controls">
+            <textarea id="aiPrompt" class="ai-prompt" placeholder="Describe the VJ sequence you want to create...
+Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and video transitions that sync to electronic music'"></textarea>
+            <button id="generateSequenceBtn" class="ai-btn">✨ GENERATE SEQUENCE</button>
+          </div>
+          <div class="ai-presets">
+            <button class="preset-btn" data-preset="psychedelic">🌀 PSYCHEDELIC</button>
+            <button class="preset-btn" data-preset="minimal">⚫ MINIMAL</button>
+            <button class="preset-btn" data-preset="glitch">📺 GLITCH</button>
+            <button class="preset-btn" data-preset="cyberpunk">🌃 CYBERPUNK</button>
+          </div>
+        </div>
+
+        <!-- Sequence Timeline -->
+        <div class="sequence-timeline">
+          <h3>SEQUENCE TIMELINE</h3>
+          <div class="timeline-container" id="timelineContainer">
+            <div class="timeline-track" data-track="patterns">
+              <div class="track-label">PATTERNS</div>
+              <div class="track-content" id="patternsTrack"></div>
+            </div>
+            <div class="timeline-track" data-track="images">
+              <div class="track-label">IMAGES</div>
+              <div class="track-content" id="imagesTrack"></div>
+            </div>
+            <div class="timeline-track" data-track="videos">
+              <div class="track-label">VIDEOS</div>
+              <div class="track-content" id="videosTrack"></div>
+            </div>
+            <div class="timeline-track" data-track="effects">
+              <div class="track-label">EFFECTS</div>
+              <div class="track-content" id="effectsTrack"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sequence Library -->
+        <div class="sequence-library">
+          <h3>SEQUENCE LIBRARY</h3>
+          <div class="sequence-list" id="sequenceList">
+            <!-- Saved sequences will be populated here -->
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1936,6 +2784,785 @@
       });
 
       console.log('🎛️ V3XV0ID Tab Navigation System initialized');
+
+      // ========== TAB CONTENT FUNCTIONALITY ==========
+
+      // Videos Tab Functionality
+      let videoLibrary = [];
+      let selectedVideo = null;
+
+      const videoGrid = document.getElementById('videoGrid');
+      const videoSearch = document.getElementById('videoSearch');
+      const loadLocalVideosBtn = document.getElementById('loadLocalVideosBtn');
+      const refreshVideosBtn = document.getElementById('refreshVideosBtn');
+      const videoPreviewPanel = document.getElementById('videoPreviewPanel');
+      const videoPreviewPlayer = document.getElementById('videoPreviewPlayer');
+      const videoPreviewSource = document.getElementById('videoPreviewSource');
+      const closeVideoPreview = document.getElementById('closeVideoPreview');
+      const loadToLayerBtn = document.getElementById('loadToLayerBtn');
+      const loadToBackgroundBtn = document.getElementById('loadToBackgroundBtn');
+
+      // Initialize Videos Tab
+      async function initializeVideosTab() {
+        try {
+          // Try to load from cloud first
+          const V3XV0IDCloudManager = require('./supabase-config');
+          const cloudManager = new V3XV0IDCloudManager();
+          
+          const cloudVideos = await cloudManager.listFiles('v3xv0id-videos');
+          videoLibrary = cloudVideos.map((video, index) => ({
+            id: index,
+            name: video.name,
+            url: video.url,
+            source: 'cloud',
+            format: video.name.split('.').pop().toUpperCase()
+          }));
+          
+        } catch (error) {
+          console.log('Cloud videos not available, using demo mode');
+          // Demo videos
+          videoLibrary = [
+            { id: 0, name: 'DEMO_ABSTRACT_01.mp4', url: null, source: 'demo', format: 'MP4' },
+            { id: 1, name: 'DEMO_TUNNEL_02.mp4', url: null, source: 'demo', format: 'MP4' },
+            { id: 2, name: 'DEMO_FRACTAL_03.mp4', url: null, source: 'demo', format: 'MP4' }
+          ];
+        }
+        
+        renderVideoLibrary();
+      }
+
+      function renderVideoLibrary() {
+        videoGrid.innerHTML = '';
+        
+        const filteredVideos = videoLibrary.filter(video => 
+          video.name.toLowerCase().includes(videoSearch.value.toLowerCase())
+        );
+        
+        filteredVideos.forEach(video => {
+          const videoItem = document.createElement('div');
+          videoItem.className = 'video-item';
+          videoItem.innerHTML = `
+            <div class="video-thumbnail">🎬</div>
+            <div class="video-name">${video.name}</div>
+          `;
+          
+          videoItem.addEventListener('click', () => {
+            previewVideo(video);
+          });
+          
+          videoGrid.appendChild(videoItem);
+        });
+      }
+
+      function previewVideo(video) {
+        selectedVideo = video;
+        document.getElementById('videoPreviewTitle').textContent = video.name;
+        document.getElementById('videoPreviewDetails').textContent = 
+          `Format: ${video.format} • Source: ${video.source.toUpperCase()}`;
+        
+        if (video.url) {
+          videoPreviewSource.src = video.url;
+          videoPreviewPlayer.load();
+        } else {
+          videoPreviewSource.src = '';
+          videoPreviewPlayer.load();
+        }
+        
+        videoPreviewPanel.style.display = 'block';
+      }
+
+      // Images Tab Functionality
+      let imageLibrary = [];
+      let selectedImage = null;
+
+      const imageGrid = document.getElementById('imageGrid');
+      const imageSearch = document.getElementById('imageSearch');
+      const loadLocalImagesBtn = document.getElementById('loadLocalImagesBtn');
+      const refreshImagesBtn = document.getElementById('refreshImagesBtn');
+      const imagePreviewPanel = document.getElementById('imagePreviewPanel');
+      const imagePreviewImg = document.getElementById('imagePreviewImg');
+      const closeImagePreview = document.getElementById('closeImagePreview');
+      const loadImageToLayerBtn = document.getElementById('loadImageToLayerBtn');
+      const loadImageToBackgroundBtn = document.getElementById('loadImageToBackgroundBtn');
+
+      // Initialize Images Tab
+      async function initializeImagesTab() {
+        try {
+          // Try to load from cloud first
+          const V3XV0IDCloudManager = require('./supabase-config');
+          const cloudManager = new V3XV0IDCloudManager();
+          
+          const cloudImages = await cloudManager.listFiles('v3xv0id-images');
+          imageLibrary = cloudImages.map((image, index) => ({
+            id: index,
+            name: image.name,
+            url: image.url,
+            source: 'cloud',
+            format: image.name.split('.').pop().toUpperCase()
+          }));
+          
+        } catch (error) {
+          console.log('Cloud images not available, using demo mode');
+          // Demo images
+          imageLibrary = [
+            { id: 0, name: 'DEMO_ABSTRACT_01.jpg', url: null, source: 'demo', format: 'JPG' },
+            { id: 1, name: 'DEMO_GEOMETRIC_02.png', url: null, source: 'demo', format: 'PNG' },
+            { id: 2, name: 'DEMO_FRACTAL_03.jpg', url: null, source: 'demo', format: 'JPG' }
+          ];
+        }
+        
+        renderImageLibrary();
+      }
+
+      function renderImageLibrary() {
+        imageGrid.innerHTML = '';
+        
+        const filteredImages = imageLibrary.filter(image => 
+          image.name.toLowerCase().includes(imageSearch.value.toLowerCase())
+        );
+        
+        filteredImages.forEach(image => {
+          const imageItem = document.createElement('div');
+          imageItem.className = 'image-item';
+          imageItem.innerHTML = `
+            <div class="image-thumbnail">🖼️</div>
+            <div class="image-name">${image.name}</div>
+          `;
+          
+          imageItem.addEventListener('click', () => {
+            previewImage(image);
+          });
+          
+          imageGrid.appendChild(imageItem);
+        });
+      }
+
+      function previewImage(image) {
+        selectedImage = image;
+        document.getElementById('imagePreviewTitle').textContent = image.name;
+        document.getElementById('imagePreviewDetails').textContent = 
+          `Format: ${image.format} • Source: ${image.source.toUpperCase()}`;
+        
+        if (image.url) {
+          imagePreviewImg.src = image.url;
+        } else {
+          imagePreviewImg.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMzMzIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiNmZmYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5ERU1PPC90ZXh0Pjwvc3ZnPg==';
+        }
+        
+        imagePreviewPanel.style.display = 'block';
+      }
+
+      // Patterns Tab Functionality
+      let currentP5Instance = null;
+      let patternRunning = false;
+      let patternFPS = 0;
+
+      const patternCodeEditor = document.getElementById('patternCodeEditor');
+      const patternPreviewContainer = document.getElementById('patternPreviewContainer');
+      const runPatternBtn = document.getElementById('runPatternBtn');
+      const stopPatternBtn = document.getElementById('stopPatternBtn');
+      const exportPatternBtn = document.getElementById('exportPatternBtn');
+      const patternStatus = document.getElementById('patternStatus');
+      const patternFPSDisplay = document.getElementById('patternFPS');
+      const patternPresets = document.getElementById('patternPresets');
+      const targetLayersList = document.getElementById('targetLayersList');
+      const activeTargetsCount = document.getElementById('activeTargetsCount');
+
+      // Pattern presets
+      const patterns = {
+        'Plasma Waves': `function setup() {
+  createCanvas(400, 400);
+  colorMode(HSB, 360, 100, 100);
+}
+
+function draw() {
+  for (let x = 0; x < width; x += 4) {
+    for (let y = 0; y < height; y += 4) {
+      let hue = (sin(x * 0.01 + millis() * 0.002) + 
+                 sin(y * 0.01 + millis() * 0.003)) * 180 + 180;
+      fill(hue, 80, 90);
+      noStroke();
+      rect(x, y, 4, 4);
+    }
+  }
+}`,
+        'Tunnel Vision': `function setup() {
+  createCanvas(400, 400);
+  colorMode(HSB, 360, 100, 100);
+}
+
+function draw() {
+  background(0);
+  translate(width/2, height/2);
+  
+  for (let i = 0; i < 50; i++) {
+    let size = i * 10 + sin(millis() * 0.01 + i) * 20;
+    let hue = (millis() * 0.1 + i * 10) % 360;
+    
+    stroke(hue, 80, 90);
+    strokeWeight(2);
+    noFill();
+    ellipse(0, 0, size, size);
+  }
+}`,
+        'Matrix Rain': `let drops = [];
+
+function setup() {
+  createCanvas(400, 400);
+  
+  for (let i = 0; i < 50; i++) {
+    drops.push({
+      x: random(width),
+      y: random(-height, 0),
+      speed: random(2, 8),
+      char: String.fromCharCode(random(65, 90))
+    });
+  }
+}
+
+function draw() {
+  background(0, 20);
+  fill(0, 255, 0);
+  textSize(16);
+  
+  for (let drop of drops) {
+    text(drop.char, drop.x, drop.y);
+    drop.y += drop.speed;
+    
+    if (drop.y > height) {
+      drop.y = random(-50, 0);
+      drop.x = random(width);
+      drop.char = String.fromCharCode(random(65, 90));
+    }
+  }
+}`
+      };
+
+      // Initialize Patterns Tab
+      function initializePatternsTab() {
+        // Populate pattern presets
+        patternPresets.innerHTML = '';
+        Object.keys(patterns).forEach(patternName => {
+          const presetBtn = document.createElement('button');
+          presetBtn.className = 'preset-btn';
+          presetBtn.textContent = patternName;
+          presetBtn.addEventListener('click', () => {
+            patternCodeEditor.value = patterns[patternName];
+          });
+          patternPresets.appendChild(presetBtn);
+        });
+        
+        updateTargetLayers();
+      }
+
+      function runPattern() {
+        if (patternRunning) return;
+        
+        try {
+          const code = patternCodeEditor.value;
+          
+          // Clear previous instance
+          if (currentP5Instance) {
+            currentP5Instance.remove();
+          }
+          
+          // Create new P5 instance
+          const sketch = new Function('p', `
+            ${code}
+            
+            p.setup = setup;
+            p.draw = draw;
+          `);
+          
+          currentP5Instance = new p5(sketch, patternPreviewContainer);
+          patternRunning = true;
+          patternStatus.textContent = 'RUNNING';
+          
+          // FPS monitoring
+          const fpsInterval = setInterval(() => {
+            if (currentP5Instance && patternRunning) {
+              patternFPS = Math.round(currentP5Instance.frameRate());
+              patternFPSDisplay.textContent = patternFPS + ' FPS';
+            } else {
+              clearInterval(fpsInterval);
+            }
+          }, 1000);
+          
+        } catch (error) {
+          console.error('Pattern execution error:', error);
+          patternStatus.textContent = 'ERROR';
+        }
+      }
+
+      function stopPattern() {
+        if (currentP5Instance) {
+          currentP5Instance.remove();
+          currentP5Instance = null;
+        }
+        patternRunning = false;
+        patternStatus.textContent = 'STOPPED';
+        patternFPSDisplay.textContent = '0 FPS';
+        patternPreviewContainer.innerHTML = '';
+      }
+
+      function updateTargetLayers() {
+        targetLayersList.innerHTML = '';
+        let activeCount = 0;
+        
+        [...layersA, ...layersB].forEach(layer => {
+          const layerCheckbox = document.createElement('div');
+          layerCheckbox.className = 'target-layer-item';
+          layerCheckbox.innerHTML = `
+            <input type="checkbox" id="target-${layer.id}" data-layer-id="${layer.id}">
+            <label for="target-${layer.id}">${layer.name}</label>
+          `;
+          
+          const checkbox = layerCheckbox.querySelector('input');
+          checkbox.addEventListener('change', () => {
+            updateActiveTargetsCount();
+          });
+          
+          targetLayersList.appendChild(layerCheckbox);
+        });
+        
+        activeTargetsCount.textContent = activeCount;
+      }
+
+      function updateActiveTargetsCount() {
+        const checkedBoxes = targetLayersList.querySelectorAll('input:checked');
+        activeTargetsCount.textContent = checkedBoxes.length;
+      }
+
+      // Music Tab Functionality
+      let musicLibraryTracks = [];
+      let currentAudio = null;
+      let isPlaying = false;
+      let currentTrackIndex = -1;
+      let audioContext = null;
+      let analyser = null;
+      let dataArray = null;
+
+      const musicLibrary = document.getElementById('musicLibrary');
+      const musicSearch = document.getElementById('musicSearch');
+      const loadLocalMusicBtn = document.getElementById('loadLocalMusicBtn');
+      const refreshMusicBtn = document.getElementById('refreshMusicBtn');
+      const currentTrackTitle = document.getElementById('currentTrackTitle');
+      const currentTrackArtist = document.getElementById('currentTrackArtist');
+      const trackFormat = document.getElementById('trackFormat');
+      const playPauseTrackBtn = document.getElementById('playPauseTrackBtn');
+      const nextTrackBtn = document.getElementById('nextTrackBtn');
+      const prevTrackBtn = document.getElementById('prevTrackBtn');
+      const shuffleBtn = document.getElementById('shuffleBtn');
+      const repeatBtn = document.getElementById('repeatBtn');
+      const progressSlider = document.getElementById('progressSlider');
+      const currentTime = document.getElementById('currentTime');
+      const totalTime = document.getElementById('totalTime');
+      const volumeSlider = document.getElementById('volumeSlider');
+      const volumeValue = document.getElementById('volumeValue');
+      const playerStatus = document.getElementById('playerStatus');
+      const audioVisualizerCanvas = document.getElementById('audioVisualizerCanvas');
+
+      // Initialize Music Tab
+      async function initializeMusicTab() {
+        try {
+          // Try to load from cloud first
+          const V3XV0IDCloudManager = require('./supabase-config');
+          const cloudManager = new V3XV0IDCloudManager();
+          
+          const cloudTracks = await cloudManager.listFiles('v3xv0id-music');
+          musicLibraryTracks = cloudTracks.map((track, index) => ({
+            id: index,
+            name: track.name.replace(/\.[^/.]+$/, ''),
+            artist: 'V3XV0ID',
+            format: track.name.split('.').pop().toUpperCase(),
+            duration: '00:00',
+            url: track.url
+          }));
+          
+        } catch (error) {
+          console.log('Cloud music not available, using demo mode');
+          // Demo tracks
+          musicLibraryTracks = [
+            { id: 0, name: 'DEMO TRACK 01', artist: 'V3XV0ID', format: 'MP3', duration: '03:45', url: null },
+            { id: 1, name: 'DEMO TRACK 02', artist: 'V3XV0ID', format: 'MP3', duration: '04:12', url: null },
+            { id: 2, name: 'DEMO TRACK 03', artist: 'V3XV0ID', format: 'MP3', duration: '03:28', url: null }
+          ];
+        }
+        
+        renderMusicLibrary();
+        initializeAudioVisualizer();
+      }
+
+      function renderMusicLibrary() {
+        musicLibrary.innerHTML = '';
+        
+        const filteredTracks = musicLibraryTracks.filter(track => 
+          track.name.toLowerCase().includes(musicSearch.value.toLowerCase()) ||
+          track.artist.toLowerCase().includes(musicSearch.value.toLowerCase())
+        );
+        
+        filteredTracks.forEach(track => {
+          const trackItem = document.createElement('div');
+          trackItem.className = 'music-track-item';
+          if (currentTrackIndex === track.id) {
+            trackItem.classList.add('playing');
+          }
+          
+          trackItem.innerHTML = `
+            <div class="track-number">${track.id + 1}</div>
+            <div class="track-details">
+              <div class="track-name">${track.name}</div>
+              <div class="track-meta">${track.artist} • ${track.format}</div>
+            </div>
+            <div class="track-duration">${track.duration}</div>
+          `;
+          
+          trackItem.addEventListener('click', () => {
+            playTrack(track.id);
+          });
+          
+          musicLibrary.appendChild(trackItem);
+        });
+      }
+
+      function initializeAudioVisualizer() {
+        const canvas = audioVisualizerCanvas;
+        const ctx = canvas.getContext('2d');
+        
+        function animate() {
+          requestAnimationFrame(animate);
+          
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          
+          if (analyser && dataArray) {
+            analyser.getByteFrequencyData(dataArray);
+            
+            const barWidth = canvas.width / dataArray.length;
+            let x = 0;
+            
+            for (let i = 0; i < dataArray.length; i++) {
+              const barHeight = (dataArray[i] / 255) * canvas.height;
+              
+              const hue = (i / dataArray.length) * 360;
+              ctx.fillStyle = `hsl(${hue}, 80%, 60%)`;
+              ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+              
+              x += barWidth;
+            }
+          } else {
+            // Placeholder animation when no audio
+            const time = Date.now() * 0.001;
+            for (let i = 0; i < 32; i++) {
+              const barHeight = (Math.sin(time + i * 0.5) + 1) * 20 + 10;
+              const x = (i / 32) * canvas.width;
+              const hue = (i / 32) * 360;
+              
+              ctx.fillStyle = `hsl(${hue}, 50%, 30%)`;
+              ctx.fillRect(x, canvas.height - barHeight, canvas.width / 32, barHeight);
+            }
+          }
+        }
+        
+        animate();
+      }
+
+      // Composer Tab Functionality
+      let isRecording = false;
+      let recordingStartTime = 0;
+      let recordedSequence = [];
+      let sequenceLibraryData = [];
+
+      const startRecordingBtn = document.getElementById('startRecordingBtn');
+      const stopRecordingBtn = document.getElementById('stopRecordingBtn');
+      const playSequenceBtn = document.getElementById('playSequenceBtn');
+      const saveSequenceBtn = document.getElementById('saveSequenceBtn');
+      const composerStatus = document.getElementById('composerStatus');
+      const recordingTime = document.getElementById('recordingTime');
+      const aiPrompt = document.getElementById('aiPrompt');
+      const generateSequenceBtn = document.getElementById('generateSequenceBtn');
+      const sequenceList = document.getElementById('sequenceList');
+
+      // Initialize Composer Tab
+      function initializeComposerTab() {
+        // Set up AI presets
+        document.querySelectorAll('.preset-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const preset = btn.getAttribute('data-preset');
+            setAIPreset(preset);
+          });
+        });
+        
+        loadSequenceLibrary();
+      }
+
+      function setAIPreset(preset) {
+        const presets = {
+          'psychedelic': 'Create a psychedelic VJ sequence with swirling patterns, bright neon colors, kaleidoscope effects, and smooth transitions that pulse with electronic music',
+          'minimal': 'Generate a minimal VJ sequence with clean geometric shapes, black and white patterns, subtle animations, and precise timing',
+          'glitch': 'Design a glitch-style VJ sequence with digital artifacts, corrupted visuals, rapid cuts, static effects, and cyberpunk aesthetics',
+          'cyberpunk': 'Build a cyberpunk VJ sequence with neon cityscapes, matrix-style effects, holographic patterns, and futuristic transitions'
+        };
+        
+        aiPrompt.value = presets[preset] || '';
+      }
+
+      function startRecording() {
+        isRecording = true;
+        recordingStartTime = Date.now();
+        recordedSequence = [];
+        
+        composerStatus.textContent = 'RECORDING';
+        startRecordingBtn.disabled = true;
+        stopRecordingBtn.disabled = false;
+        
+        // Start recording timer
+        const recordingInterval = setInterval(() => {
+          if (!isRecording) {
+            clearInterval(recordingInterval);
+            return;
+          }
+          
+          const elapsed = Date.now() - recordingStartTime;
+          const minutes = Math.floor(elapsed / 60000);
+          const seconds = Math.floor((elapsed % 60000) / 1000);
+          recordingTime.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }, 1000);
+      }
+
+      function stopRecording() {
+        isRecording = false;
+        composerStatus.textContent = 'READY';
+        startRecordingBtn.disabled = false;
+        stopRecordingBtn.disabled = true;
+        playSequenceBtn.disabled = false;
+        saveSequenceBtn.disabled = false;
+      }
+
+      function generateAISequence() {
+        const prompt = aiPrompt.value.trim();
+        if (!prompt) return;
+        
+        composerStatus.textContent = 'GENERATING...';
+        generateSequenceBtn.disabled = true;
+        
+        // Simulate AI generation
+        setTimeout(() => {
+          const generatedSequence = createAISequence(prompt);
+          recordedSequence = generatedSequence;
+          
+          composerStatus.textContent = 'SEQUENCE GENERATED';
+          generateSequenceBtn.disabled = false;
+          playSequenceBtn.disabled = false;
+          saveSequenceBtn.disabled = false;
+          
+          // Visualize the generated sequence
+          visualizeSequence(generatedSequence);
+        }, 2000);
+      }
+
+      function createAISequence(prompt) {
+        // AI sequence generation logic based on prompt
+        const sequence = [];
+        const duration = 60; // 60 seconds
+        const events = Math.floor(duration / 4); // Event every 4 seconds
+        
+        for (let i = 0; i < events; i++) {
+          const time = i * 4;
+          const eventType = Math.random() > 0.5 ? 'pattern' : 'image';
+          
+          sequence.push({
+            time: time,
+            type: eventType,
+            action: eventType === 'pattern' ? 'load_pattern' : 'load_image',
+            data: {
+              name: `AI_${eventType.toUpperCase()}_${i + 1}`,
+              prompt: prompt
+            }
+          });
+        }
+        
+        return sequence;
+      }
+
+      function visualizeSequence(sequence) {
+        // Clear existing timeline
+        document.getElementById('patternsTrack').innerHTML = '';
+        document.getElementById('imagesTrack').innerHTML = '';
+        document.getElementById('videosTrack').innerHTML = '';
+        document.getElementById('effectsTrack').innerHTML = '';
+        
+        sequence.forEach(event => {
+          const eventElement = document.createElement('div');
+          eventElement.className = 'timeline-event';
+          eventElement.style.cssText = `
+            position: absolute;
+            left: ${(event.time / 60) * 100}%;
+            width: 20px;
+            height: 20px;
+            background: ${event.type === 'pattern' ? '#ff6b6b' : '#4ecdc4'};
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            cursor: crosshair;
+          `;
+          eventElement.title = `${event.time}s: ${event.data.name}`;
+          
+          const trackElement = document.getElementById(
+            event.type === 'pattern' ? 'patternsTrack' : 'imagesTrack'
+          );
+          trackElement.style.position = 'relative';
+          trackElement.appendChild(eventElement);
+        });
+      }
+
+      function loadSequenceLibrary() {
+        // Load saved sequences from localStorage
+        const saved = localStorage.getItem('v3xv0id-sequences');
+        sequenceLibraryData = saved ? JSON.parse(saved) : [];
+        
+        renderSequenceLibrary();
+      }
+
+      function renderSequenceLibrary() {
+        sequenceList.innerHTML = '';
+        
+        sequenceLibraryData.forEach((sequence, index) => {
+          const sequenceItem = document.createElement('div');
+          sequenceItem.className = 'sequence-item';
+          sequenceItem.innerHTML = `
+            <div class="sequence-name">${sequence.name}</div>
+            <div class="sequence-meta">${sequence.duration}s • ${sequence.events} events</div>
+            <button onclick="loadSequence(${index})">LOAD</button>
+            <button onclick="deleteSequence(${index})">DELETE</button>
+          `;
+          
+          sequenceList.appendChild(sequenceItem);
+        });
+      }
+
+      // Event Listeners
+      if (loadLocalVideosBtn) {
+        loadLocalVideosBtn.addEventListener('click', () => {
+          // File dialog for local videos
+          dialog.showOpenDialog({
+            properties: ['openFile', 'multiSelections'],
+            filters: [
+              { name: 'Videos', extensions: ['mp4', 'mov', 'avi', 'webm', 'mkv'] }
+            ]
+          }).then(result => {
+            if (!result.canceled) {
+              result.filePaths.forEach((filePath, index) => {
+                const fileName = path.basename(filePath);
+                videoLibrary.push({
+                  id: videoLibrary.length,
+                  name: fileName,
+                  url: filePath,
+                  source: 'local',
+                  format: fileName.split('.').pop().toUpperCase()
+                });
+              });
+              renderVideoLibrary();
+            }
+          });
+        });
+      }
+
+      if (loadLocalImagesBtn) {
+        loadLocalImagesBtn.addEventListener('click', () => {
+          // File dialog for local images
+          dialog.showOpenDialog({
+            properties: ['openFile', 'multiSelections'],
+            filters: [
+              { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'] }
+            ]
+          }).then(result => {
+            if (!result.canceled) {
+              result.filePaths.forEach((filePath, index) => {
+                const fileName = path.basename(filePath);
+                imageLibrary.push({
+                  id: imageLibrary.length,
+                  name: fileName,
+                  url: filePath,
+                  source: 'local',
+                  format: fileName.split('.').pop().toUpperCase()
+                });
+              });
+              renderImageLibrary();
+            }
+          });
+        });
+      }
+
+      if (loadLocalMusicBtn) {
+        loadLocalMusicBtn.addEventListener('click', () => {
+          // File dialog for local music
+          dialog.showOpenDialog({
+            properties: ['openFile', 'multiSelections'],
+            filters: [
+              { name: 'Audio', extensions: ['mp3', 'wav', 'ogg', 'flac', 'm4a'] }
+            ]
+          }).then(result => {
+            if (!result.canceled) {
+              result.filePaths.forEach((filePath, index) => {
+                const fileName = path.basename(filePath);
+                musicLibraryTracks.push({
+                  id: musicLibraryTracks.length,
+                  name: fileName.replace(/\.[^/.]+$/, ''),
+                  artist: 'LOCAL',
+                  format: fileName.split('.').pop().toUpperCase(),
+                  duration: '00:00',
+                  url: filePath
+                });
+              });
+              renderMusicLibrary();
+            }
+          });
+        });
+      }
+
+      // Pattern controls
+      if (runPatternBtn) runPatternBtn.addEventListener('click', runPattern);
+      if (stopPatternBtn) stopPatternBtn.addEventListener('click', stopPattern);
+      
+      // Composer controls
+      if (startRecordingBtn) startRecordingBtn.addEventListener('click', startRecording);
+      if (stopRecordingBtn) stopRecordingBtn.addEventListener('click', stopRecording);
+      if (generateSequenceBtn) generateSequenceBtn.addEventListener('click', generateAISequence);
+
+      // Search functionality
+      if (videoSearch) videoSearch.addEventListener('input', renderVideoLibrary);
+      if (imageSearch) imageSearch.addEventListener('input', renderImageLibrary);
+      if (musicSearch) musicSearch.addEventListener('input', renderMusicLibrary);
+
+      // Preview panel close buttons
+      if (closeVideoPreview) closeVideoPreview.addEventListener('click', () => {
+        videoPreviewPanel.style.display = 'none';
+      });
+      if (closeImagePreview) closeImagePreview.addEventListener('click', () => {
+        imagePreviewPanel.style.display = 'none';
+      });
+
+      // Tab switching with initialization
+      const originalTabSwitching = tabButtons.forEach;
+      tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+          const targetTab = button.getAttribute('data-tab');
+          
+          // Initialize tab content when first opened
+          if (targetTab === 'videos' && videoLibrary.length === 0) {
+            initializeVideosTab();
+          } else if (targetTab === 'images' && imageLibrary.length === 0) {
+            initializeImagesTab();
+          } else if (targetTab === 'patterns') {
+            initializePatternsTab();
+          } else if (targetTab === 'music' && musicLibraryTracks.length === 0) {
+            initializeMusicTab();
+          } else if (targetTab === 'composer') {
+            initializeComposerTab();
+          }
+        });
+      });
+
+      console.log('🎛️ All V3XV0ID Tab Content Systems initialized');
     });
   </script>
 </body>
