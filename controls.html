@@ -423,6 +423,168 @@
       margin-top: 15px;
     }
 
+    /* Compact Pattern Generator Styles */
+    .patterns-container-compact {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .patterns-header-compact {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 15px;
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      min-height: 50px;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .status-indicators {
+      display: flex;
+      gap: 10px;
+    }
+
+    .status-badge, .fps-badge {
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+      padding: 2px 6px;
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #00ff00;
+    }
+
+    .header-controls {
+      display: flex;
+      gap: 8px;
+    }
+
+    .patterns-grid-compact {
+      display: grid;
+      grid-template-columns: 1fr 280px 180px;
+      gap: 10px;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .patterns-left, .patterns-center, .patterns-right {
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 10px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .section-header {
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      color: #ffffff;
+      text-transform: uppercase;
+      margin: 0 0 8px 0;
+      padding-bottom: 5px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .code-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 10px;
+    }
+
+    .code-editor-compact {
+      width: 100%;
+      flex: 1;
+      background: rgba(0, 0, 0, 0.9);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 10px;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      resize: none;
+      min-height: 200px;
+    }
+
+    .presets-section {
+      height: 100px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .presets-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 5px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .preset-btn {
+      background: rgba(0, 0, 0, 0.8);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      padding: 4px 6px;
+      cursor: crosshair;
+      font-family: 'Courier New', monospace;
+      font-size: 8px;
+      text-transform: uppercase;
+      transition: all 0.2s;
+    }
+
+    .preset-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.6);
+    }
+
+    .preview-container-compact {
+      width: 100%;
+      height: 280px;
+      background: rgba(0, 0, 0, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+    }
+
+    .target-layers-compact {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .target-layer-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px;
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+    }
+
+    .target-layer-item input[type="checkbox"] {
+      margin: 0;
+    }
+
+    .target-layer-item label {
+      color: #ffffff;
+      cursor: crosshair;
+      flex: 1;
+    }
+
     /* Music Player Styles */
     .music-player-container {
       width: 100%;
@@ -1497,68 +1659,58 @@
 
     <!-- Patterns Tab Content -->
     <div class="tab-content" id="patternsTab">
-      <div class="patterns-container">
-        <!-- Pattern Generator Header -->
-        <div class="patterns-header">
-          <h2 class="cyber-text">🎨 PATTERN GENERATOR</h2>
-          <div class="pattern-status">
-            <span id="patternStatus">READY</span>
-            <span id="patternFPS">0 FPS</span>
+      <div class="patterns-container-compact">
+        <!-- Compact Header -->
+        <div class="patterns-header-compact">
+          <div class="header-left">
+            <h2 class="cyber-text">🎨 PATTERN GENERATOR</h2>
+            <div class="status-indicators">
+              <span id="patternStatus" class="status-badge">READY</span>
+              <span id="patternFPS" class="fps-badge">0 FPS</span>
+            </div>
+          </div>
+          <div class="header-controls">
+            <button id="runPatternBtn" class="pattern-btn run">▶️ RUN</button>
+            <button id="stopPatternBtn" class="pattern-btn stop">⏹️ STOP</button>
+            <button id="exportPatternBtn" class="pattern-btn export">💾 EXPORT</button>
+            <button id="applyToLayersBtn" class="pattern-btn apply">🎭 APPLY TO LAYERS</button>
           </div>
         </div>
 
-        <!-- Pattern Studio -->
-        <div class="pattern-studio">
-          <!-- Code Editor -->
-          <div class="pattern-editor">
-            <div class="editor-header">
-              <h3>CODE EDITOR</h3>
-              <div class="editor-controls">
-                        <button id="runPatternBtn" class="pattern-btn run">▶️ RUN</button>
-        <button id="stopPatternBtn" class="pattern-btn stop">⏹️ STOP</button>
-        <button id="exportPatternBtn" class="pattern-btn export">💾 EXPORT</button>
-        <button id="applyToLayersBtn" class="pattern-btn apply">🎭 APPLY TO LAYERS</button>
-              </div>
-            </div>
-            <textarea id="patternCodeEditor" class="code-editor" placeholder="// Write your P5.js pattern code here...
+        <!-- Compact 3-Column Layout -->
+        <div class="patterns-grid-compact">
+          <!-- Left: Code Editor + Presets -->
+          <div class="patterns-left">
+            <div class="code-section">
+              <h3 class="section-header">CODE EDITOR</h3>
+              <textarea id="patternCodeEditor" class="code-editor-compact" placeholder="// Write your P5.js pattern code here...
 function setup() {
-  createCanvas(400, 400);
+  createCanvas(300, 300);
+  colorMode(HSB, 360, 100, 100);
 }
 
 function draw() {
   background(0);
-  fill(255);
+  fill((frameCount * 2) % 360, 80, 90);
   ellipse(mouseX, mouseY, 50, 50);
 }"></textarea>
-          </div>
-
-          <!-- Preview Canvas -->
-          <div class="pattern-preview">
-            <div class="preview-header">
-              <h3>LIVE PREVIEW</h3>
             </div>
-            <div id="patternPreviewContainer" class="preview-container">
-              <!-- P5.js canvas will be inserted here -->
+            <div class="presets-section">
+              <h3 class="section-header">PRESETS</h3>
+              <div id="patternPresets" class="presets-grid"></div>
             </div>
           </div>
-        </div>
 
-        <!-- Pattern Library -->
-        <div class="pattern-library">
-          <h3>PATTERN LIBRARY</h3>
-          <div class="pattern-presets" id="patternPresets">
-            <!-- Pattern presets will be populated here -->
+          <!-- Center: Live Preview -->
+          <div class="patterns-center">
+            <h3 class="section-header">LIVE PREVIEW</h3>
+            <div id="patternPreviewContainer" class="preview-container-compact"></div>
           </div>
-        </div>
 
-        <!-- Target Layers -->
-        <div class="pattern-targets">
-          <h3>TARGET LAYERS</h3>
-          <div class="target-layers-list" id="targetLayersList">
-            <!-- Target layers will be populated here -->
-          </div>
-          <div class="target-info">
-            <span id="activeTargetsCount">0</span> layers selected
+          <!-- Right: Target Layers -->
+          <div class="patterns-right">
+            <h3 class="section-header">TARGET LAYERS (<span id="activeTargetsCount">0</span>)</h3>
+            <div id="targetLayersList" class="target-layers-compact"></div>
           </div>
         </div>
       </div>
@@ -3038,7 +3190,7 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
       // Initialize Videos Tab
       async function initializeVideosTab() {
         try {
-          console.log('🎬 Loading V3XV0ID video library...');
+          console.log('🎬 Loading V3XV0ID video library from Supabase...');
           
           // Load V3XV0ID cloud manager
           const V3XV0IDCloudManager = require('./supabase-config');
@@ -3047,24 +3199,31 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
           // Initialize cloud connection
           await cloudManager.initialize();
           
-          // Get video files from v3xv0id-videos bucket
-          const cloudVideos = await cloudManager.getVideoFiles();
-          console.log(`📹 Found ${cloudVideos.length} videos in V3XV0ID cloud`);
+          // Get all files from v3xv0id-videos bucket (including folders like vex_video_jam_01)
+          const allFiles = await cloudManager.listFiles('v3xv0id-videos');
+          const videoFiles = allFiles.filter(file => 
+            file.name.match(/\.(mp4|mov|avi|webm|mkv)$/i) && 
+            !file.name.includes('/.') // Exclude hidden files
+          );
           
-          videoLibrary = cloudVideos.map((video, index) => ({
+          console.log(`📹 Found ${videoFiles.length} video files in V3XV0ID cloud`);
+          
+          videoLibrary = videoFiles.map((video, index) => ({
             id: index,
-            name: video.name,
+            name: video.name.replace(/.*\//, ''), // Remove path, keep filename
             url: cloudManager.getPublicUrl('v3xv0id-videos', video.name),
             source: 'cloud',
             format: video.name.split('.').pop().toUpperCase(),
             size: video.metadata?.size || 'Unknown',
-            created: video.created_at
+            created: video.created_at,
+            path: video.name, // Keep full path for reference
+            folder: video.name.includes('/') ? video.name.split('/')[0] : 'root'
           }));
           
           // Update cloud status
           const statusEl = document.getElementById('videoCloudStatus');
           if (statusEl) {
-            statusEl.textContent = `✅ CLOUD (${cloudVideos.length} VIDEOS)`;
+            statusEl.textContent = `✅ CLOUD (${videoFiles.length} VIDEOS)`;
             statusEl.className = 'cloud-status connected';
           }
           
@@ -3148,7 +3307,7 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
       // Initialize Images Tab
       async function initializeImagesTab() {
         try {
-          console.log('🖼️ Loading V3XV0ID image library...');
+          console.log('🖼️ Loading V3XV0ID image library from Supabase...');
           
           // Load V3XV0ID cloud manager
           const V3XV0IDCloudManager = require('./supabase-config');
@@ -3157,24 +3316,31 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
           // Initialize cloud connection
           await cloudManager.initialize();
           
-          // Get image files from v3xv0id-images bucket
-          const cloudImages = await cloudManager.getImageSequences();
-          console.log(`🎨 Found ${cloudImages.length} images in V3XV0ID cloud`);
+          // Get all files from v3xv0id-images bucket (including folders)
+          const allFiles = await cloudManager.listFiles('v3xv0id-images');
+          const imageFiles = allFiles.filter(file => 
+            file.name.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i) && 
+            !file.name.includes('/.') // Exclude hidden files
+          );
           
-          imageLibrary = cloudImages.map((image, index) => ({
+          console.log(`🎨 Found ${imageFiles.length} image files in V3XV0ID cloud`);
+          
+          imageLibrary = imageFiles.map((image, index) => ({
             id: index,
-            name: image.name,
+            name: image.name.replace(/.*\//, ''), // Remove path, keep filename
             url: cloudManager.getPublicUrl('v3xv0id-images', image.name),
             source: 'cloud',
             format: image.name.split('.').pop().toUpperCase(),
             size: image.metadata?.size || 'Unknown',
-            created: image.created_at
+            created: image.created_at,
+            path: image.name, // Keep full path for reference
+            folder: image.name.includes('/') ? image.name.split('/')[0] : 'root'
           }));
           
           // Update cloud status
           const statusEl = document.getElementById('imageCloudStatus');
           if (statusEl) {
-            statusEl.textContent = `✅ CLOUD (${cloudImages.length} IMAGES)`;
+            statusEl.textContent = `✅ CLOUD (${imageFiles.length} IMAGES)`;
             statusEl.className = 'cloud-status connected';
           }
           
@@ -3244,6 +3410,7 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
       let currentP5Instance = null;
       let patternRunning = false;
       let patternFPS = 0;
+      let fpsMonitorInterval = null;
 
       const patternCodeEditor = document.getElementById('patternCodeEditor');
       const patternPreviewContainer = document.getElementById('patternPreviewContainer');
@@ -3352,38 +3519,75 @@ function draw() {
         if (patternRunning) return;
         
         try {
-          const code = patternCodeEditor.value;
+          const code = patternCodeEditor.value.trim();
+          if (!code) {
+            patternStatus.textContent = 'NO CODE';
+            return;
+          }
           
           // Clear previous instance
           if (currentP5Instance) {
             currentP5Instance.remove();
+            currentP5Instance = null;
           }
           
-          // Create new P5 instance
-          const sketch = new Function('p', `
-            ${code}
-            
-            p.setup = setup;
-            p.draw = draw;
-          `);
+          // Clear preview container
+          patternPreviewContainer.innerHTML = '';
           
-          currentP5Instance = new p5(sketch, patternPreviewContainer);
+          // Create P5 sketch function
+          const sketchFunction = function(p) {
+            // Inject the user code into the p5 instance
+            try {
+              eval(`
+                (function() {
+                  ${code}
+                  
+                  // Bind functions to p5 instance
+                  if (typeof setup === 'function') {
+                    p.setup = setup;
+                  }
+                  if (typeof draw === 'function') {
+                    p.draw = draw;
+                  }
+                  
+                  // Add other common p5 functions if they exist
+                  if (typeof mousePressed === 'function') p.mousePressed = mousePressed;
+                  if (typeof mouseReleased === 'function') p.mouseReleased = mouseReleased;
+                  if (typeof keyPressed === 'function') p.keyPressed = keyPressed;
+                  if (typeof keyReleased === 'function') p.keyReleased = keyReleased;
+                })();
+              `);
+            } catch (error) {
+              console.error('Pattern code error:', error);
+              patternStatus.textContent = 'CODE ERROR';
+              return;
+            }
+          };
+          
+          // Create new P5 instance
+          currentP5Instance = new p5(sketchFunction, patternPreviewContainer);
           patternRunning = true;
           patternStatus.textContent = 'RUNNING';
           
           // FPS monitoring
-          const fpsInterval = setInterval(() => {
+          fpsMonitorInterval = setInterval(() => {
             if (currentP5Instance && patternRunning) {
-              patternFPS = Math.round(currentP5Instance.frameRate());
-              patternFPSDisplay.textContent = patternFPS + ' FPS';
+              try {
+                patternFPS = Math.round(currentP5Instance.frameRate()) || 0;
+                patternFPSDisplay.textContent = patternFPS + ' FPS';
+              } catch (e) {
+                // Ignore FPS errors
+              }
             } else {
-              clearInterval(fpsInterval);
+              clearInterval(fpsMonitorInterval);
             }
           }, 1000);
           
+          console.log('✅ Pattern started successfully');
+          
         } catch (error) {
           console.error('Pattern execution error:', error);
-          patternStatus.textContent = 'ERROR';
+          patternStatus.textContent = 'ERROR: ' + error.message;
         }
       }
 
@@ -3392,10 +3596,15 @@ function draw() {
           currentP5Instance.remove();
           currentP5Instance = null;
         }
+        if (fpsMonitorInterval) {
+          clearInterval(fpsMonitorInterval);
+          fpsMonitorInterval = null;
+        }
         patternRunning = false;
         patternStatus.textContent = 'STOPPED';
         patternFPSDisplay.textContent = '0 FPS';
         patternPreviewContainer.innerHTML = '';
+        console.log('⏹️ Pattern stopped');
       }
 
       function updateTargetLayers() {
@@ -3611,7 +3820,7 @@ function draw() {
       // Initialize Music Tab
       async function initializeMusicTab() {
         try {
-          console.log('🎵 Loading V3XV0ID music library...');
+          console.log('🎵 Loading V3XV0ID music library from Supabase...');
           
           // Load V3XV0ID cloud manager
           const V3XV0IDCloudManager = require('./supabase-config');
@@ -3620,25 +3829,31 @@ function draw() {
           // Initialize cloud connection
           await cloudManager.initialize();
           
-          // Get music tracks from v3xv0id-music bucket
-          const cloudTracks = await cloudManager.getMusicTracks();
-          console.log(`🎶 Found ${cloudTracks.length} tracks in V3XV0ID cloud`);
+          // Get music tracks from v3xv0id-music bucket (including folders)
+          const allFiles = await cloudManager.listFiles('v3xv0id-music');
+          const musicFiles = allFiles.filter(file => 
+            file.name.match(/\.(mp3|wav|m4a|flac|ogg)$/i) && 
+            !file.name.includes('/.') // Exclude hidden files
+          );
           
-          musicLibraryTracks = cloudTracks.map((track, index) => ({
+          console.log(`🎶 Found ${musicFiles.length} music files in V3XV0ID cloud`);
+          
+          musicLibraryTracks = musicFiles.map((track, index) => ({
             id: index,
-            name: track.name.replace(/\.[^/.]+$/, ''),
+            name: track.name.replace(/\.[^/.]+$/, '').replace(/.*\//, ''), // Remove path and extension
             artist: 'V3XV0ID',
             format: track.name.split('.').pop().toUpperCase(),
             duration: '00:00', // Will be updated when loaded
             url: cloudManager.getPublicUrl('v3xv0id-music', track.name),
             size: track.metadata?.size || 'Unknown',
-            created: track.created_at
+            created: track.created_at,
+            path: track.name // Keep full path for reference
           }));
           
           // Update cloud status
           const statusEl = document.getElementById('musicCloudStatus');
           if (statusEl) {
-            statusEl.textContent = `✅ CLOUD (${cloudTracks.length} TRACKS)`;
+            statusEl.textContent = `✅ CLOUD (${musicFiles.length} TRACKS)`;
             statusEl.className = 'cloud-status connected';
           }
           
