@@ -1470,6 +1470,252 @@
     .layers-list::-webkit-scrollbar-thumb:hover {
       background: rgba(255, 255, 255, 0.5);
     }
+
+    /* VEXVOID Tab Styles */
+    .vexvoid-tab {
+      background: linear-gradient(45deg, #ffffff, #333333) !important;
+      color: #000000 !important;
+      text-shadow: 0 0 10px #ffffff;
+      animation: pulse-white 2s infinite;
+    }
+
+    @keyframes pulse-white {
+      0%, 100% { box-shadow: 0 0 5px #ffffff; }
+      50% { box-shadow: 0 0 20px #ffffff, 0 0 30px #ffffff; }
+    }
+
+    .vexvoid-container {
+      height: calc(100vh - 120px);
+      background: #000000;
+      color: #ffffff;
+      font-family: 'Courier New', monospace;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .vexvoid-header {
+      text-align: center;
+      padding: 15px;
+      background: linear-gradient(45deg, #333333, #000000);
+      border-bottom: 2px solid #ffffff;
+    }
+
+    .vexvoid-title {
+      font-size: 36px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 6px;
+      margin: 0;
+      text-shadow: 0 0 20px #ffffff, 0 0 40px #ffffff;
+      animation: glitch-title 3s infinite;
+    }
+
+    @keyframes glitch-title {
+      0%, 90%, 100% { transform: translate(0); }
+      20% { transform: translate(-1px, 1px); }
+      40% { transform: translate(-1px, -1px); }
+      60% { transform: translate(1px, 1px); }
+      80% { transform: translate(1px, -1px); }
+    }
+
+    .vexvoid-subtitle {
+      font-size: 14px;
+      letter-spacing: 3px;
+      color: #cccccc;
+      text-transform: uppercase;
+      margin-top: 8px;
+    }
+
+    .vexvoid-main {
+      position: relative;
+      height: 65%;
+      background: #000000;
+      border: 2px solid #ffffff;
+      margin: 15px;
+      overflow: hidden;
+    }
+
+    .vexvoid-canvas {
+      width: 100%;
+      height: 100%;
+      background: #000000;
+      cursor: crosshair;
+      display: block;
+    }
+
+    .vexvoid-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .glitch-text {
+      font-size: 48px;
+      font-weight: bold;
+      color: #ffffff;
+      text-shadow: 
+        0 0 5px #ffffff,
+        0 0 10px #ffffff,
+        0 0 20px #ffffff;
+      animation: glitch-overlay 2s infinite;
+      opacity: 0.6;
+    }
+
+    @keyframes glitch-overlay {
+      0%, 90%, 100% { 
+        transform: translate(0);
+        filter: none;
+      }
+      10% { 
+        transform: translate(-2px, 2px);
+        filter: invert(1);
+      }
+      20% { 
+        transform: translate(-2px, -2px);
+        filter: none;
+      }
+      30% { 
+        transform: translate(2px, 2px);
+        filter: invert(1);
+      }
+      40% { 
+        transform: translate(2px, -2px);
+        filter: none;
+      }
+    }
+
+    .vexvoid-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      padding: 15px;
+      background: rgba(255, 255, 255, 0.05);
+      border-top: 2px solid #ffffff;
+      height: auto;
+      min-height: 120px;
+    }
+
+    .vexvoid-control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 180px;
+      flex: 1;
+    }
+
+    .vexvoid-label {
+      font-size: 11px;
+      font-weight: bold;
+      color: #cccccc;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .vexvoid-btn {
+      background: #000000;
+      color: #ffffff;
+      border: 2px solid #ffffff;
+      padding: 10px 20px;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      cursor: crosshair;
+      transition: all 0.3s;
+    }
+
+    .vexvoid-btn:hover {
+      background: #ffffff;
+      color: #000000;
+      box-shadow: 0 0 15px #ffffff;
+      transform: scale(1.02);
+    }
+
+    .vexvoid-btn.primary {
+      background: #ffffff;
+      color: #000000;
+      animation: pulse-primary 1.5s infinite;
+    }
+
+    @keyframes pulse-primary {
+      0%, 100% { box-shadow: 0 0 5px #ffffff; }
+      50% { box-shadow: 0 0 20px #ffffff, 0 0 30px #ffffff; }
+    }
+
+    .vexvoid-slider {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 6px;
+      background: #333333;
+      border: 1px solid #ffffff;
+      outline: none;
+      cursor: crosshair;
+    }
+
+    .vexvoid-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      background: #ffffff;
+      cursor: crosshair;
+      box-shadow: 0 0 8px #ffffff;
+    }
+
+    .vexvoid-select {
+      background: #000000;
+      color: #ffffff;
+      border: 2px solid #ffffff;
+      padding: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      cursor: crosshair;
+    }
+
+    .vexvoid-value {
+      color: #ffffff;
+      font-weight: bold;
+      font-size: 14px;
+      text-align: center;
+      min-width: 35px;
+    }
+
+    .vexvoid-stats {
+      display: flex;
+      justify-content: space-around;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.9);
+      border-top: 1px solid #ffffff;
+    }
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .stat-label {
+      font-size: 9px;
+      color: #cccccc;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .stat-value {
+      font-size: 14px;
+      font-weight: bold;
+      color: #ffffff;
+      text-shadow: 0 0 3px #ffffff;
+    }
   </style>
 </head>
 <body>
@@ -1487,6 +1733,7 @@
     <button class="tab-button" data-tab="videos">🎬 VIDEOS</button>
     <button class="tab-button" data-tab="images">🖼️ IMAGES</button>
     <button class="tab-button" data-tab="composer">🎭 COMPOSER</button>
+    <button class="tab-button vexvoid-tab" data-tab="vexvoid">⚡ VEXVOID</button>
   </div>
   
       <div class="main-container">
@@ -1932,6 +2179,76 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
             <!-- Saved sequences will be populated here -->
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- VEXVOID Tab Content -->
+    <div class="tab-content" id="vexvoidTab">
+      <div class="vexvoid-container">
+                 <!-- VEXVOID Header -->
+         <div class="vexvoid-header">
+           <h2 class="vexvoid-title">V E X V O I D</h2>
+           <div class="vexvoid-subtitle">URBAN VISUAL ENGINE</div>
+         </div>
+
+        <!-- Main VEXVOID Canvas -->
+        <div class="vexvoid-main">
+          <canvas id="vexvoidCanvas" class="vexvoid-canvas"></canvas>
+          <div class="vexvoid-overlay">
+            <div class="glitch-text" id="glitchText">V3XV0ID</div>
+          </div>
+        </div>
+
+        <!-- VEXVOID Controls -->
+        <div class="vexvoid-controls">
+                     <div class="vexvoid-control-group">
+             <button id="vexvoidStart" class="vexvoid-btn primary">⚡ START</button>
+             <button id="vexvoidStop" class="vexvoid-btn">⏹ STOP</button>
+             <button id="vexvoidReset" class="vexvoid-btn">↻ RESET</button>
+           </div>
+
+          <div class="vexvoid-control-group">
+            <label class="vexvoid-label">INTENSITY</label>
+            <input type="range" id="chaosLevel" class="vexvoid-slider" min="1" max="10" value="5">
+            <span id="chaosValue" class="vexvoid-value">5</span>
+          </div>
+
+          <div class="vexvoid-control-group">
+            <label class="vexvoid-label">DISTORTION</label>
+            <input type="range" id="glitchIntensity" class="vexvoid-slider" min="0" max="100" value="30">
+            <span id="glitchValue" class="vexvoid-value">30</span>
+          </div>
+
+          <div class="vexvoid-control-group">
+            <label class="vexvoid-label">VISUAL MODE</label>
+            <select id="visualMode" class="vexvoid-select">
+              <option value="matrix">CODE RAIN</option>
+              <option value="glitch">STATIC STORM</option>
+              <option value="plasma">WAVE FORM</option>
+              <option value="tunnel">DEPTH FIELD</option>
+              <option value="fractals">NEURAL NET</option>
+              <option value="particles">DATA STREAM</option>
+              <option value="cyberpunk">GRID SYSTEM</option>
+              <option value="all">FULL SPECTRUM</option>
+            </select>
+          </div>
+        </div>
+
+                 <!-- VEXVOID Stats -->
+         <div class="vexvoid-stats">
+           <div class="stat-item">
+             <span class="stat-label">FPS:</span>
+             <span id="vexvoidFPS" class="stat-value">0</span>
+           </div>
+           <div class="stat-item">
+             <span class="stat-label">MODE:</span>
+             <span id="currentMode" class="stat-value">OFFLINE</span>
+           </div>
+           <div class="stat-item">
+             <span class="stat-label">STATUS:</span>
+             <span id="chaosStatus" class="stat-value">READY</span>
+           </div>
+         </div>
       </div>
     </div>
   </div>
@@ -4246,9 +4563,417 @@ function draw() {
             initializeMusicTab();
           } else if (targetTab === 'composer') {
             initializeComposerTab();
+          } else if (targetTab === 'vexvoid') {
+            initializeVexvoidTab();
           }
         });
       });
+
+      // VEXVOID Visual System
+      let vexvoidCanvas, vexvoidCtx;
+      let vexvoidActive = false;
+      let vexvoidAnimationId;
+      let chaosLevel = 5;
+      let glitchIntensity = 30;
+      let visualMode = 'matrix';
+      let vexvoidFPS = 0;
+      let vexvoidFrameCount = 0;
+      let vexvoidLastTime = 0;
+
+      // Visual effects data
+      let matrixChars = [];
+      let particles = [];
+      let glitchData = [];
+      let plasmaTime = 0;
+      let tunnelRotation = 0;
+      let fractalDepth = 0;
+
+      function initializeVexvoidTab() {
+        console.log('💀 Initializing VEXVOID Visual System...');
+        
+        vexvoidCanvas = document.getElementById('vexvoidCanvas');
+        if (!vexvoidCanvas) return;
+        
+        vexvoidCtx = vexvoidCanvas.getContext('2d');
+        
+        // Set canvas size
+        resizeVexvoidCanvas();
+        window.addEventListener('resize', resizeVexvoidCanvas);
+        
+        // Initialize visual effects
+        initializeMatrixRain();
+        initializeParticles();
+        initializeGlitchData();
+        
+        // Event listeners
+        document.getElementById('vexvoidStart').addEventListener('click', startVexvoid);
+        document.getElementById('vexvoidStop').addEventListener('click', stopVexvoid);
+        document.getElementById('vexvoidReset').addEventListener('click', resetVexvoid);
+        
+        document.getElementById('chaosLevel').addEventListener('input', (e) => {
+          chaosLevel = parseInt(e.target.value);
+          document.getElementById('chaosValue').textContent = chaosLevel;
+          updateChaosStatus();
+        });
+        
+        document.getElementById('glitchIntensity').addEventListener('input', (e) => {
+          glitchIntensity = parseInt(e.target.value);
+          document.getElementById('glitchValue').textContent = glitchIntensity;
+        });
+        
+        document.getElementById('visualMode').addEventListener('change', (e) => {
+          visualMode = e.target.value;
+          document.getElementById('currentMode').textContent = visualMode.toUpperCase();
+        });
+        
+        console.log('💀 VEXVOID Visual System initialized');
+      }
+
+      function resizeVexvoidCanvas() {
+        if (!vexvoidCanvas) return;
+        
+        const container = vexvoidCanvas.parentElement;
+        const rect = container.getBoundingClientRect();
+        vexvoidCanvas.width = rect.width - 4; // Account for border
+        vexvoidCanvas.height = rect.height - 4; // Account for border
+        vexvoidCanvas.style.width = (rect.width - 4) + 'px';
+        vexvoidCanvas.style.height = (rect.height - 4) + 'px';
+      }
+
+      function startVexvoid() {
+        if (vexvoidActive) return;
+        
+        vexvoidActive = true;
+        document.getElementById('currentMode').textContent = visualMode.toUpperCase();
+        updateChaosStatus();
+        
+        vexvoidLoop();
+        
+        console.log('⚡ VEXVOID ACTIVATED!');
+      }
+
+      function stopVexvoid() {
+        vexvoidActive = false;
+        if (vexvoidAnimationId) {
+          cancelAnimationFrame(vexvoidAnimationId);
+        }
+        
+        document.getElementById('currentMode').textContent = 'OFFLINE';
+        document.getElementById('chaosStatus').textContent = 'READY';
+        document.getElementById('vexvoidFPS').textContent = '0';
+        
+        console.log('⏹ VEXVOID DEACTIVATED');
+      }
+
+      function resetVexvoid() {
+        stopVexvoid();
+        
+        // Clear canvas
+        if (vexvoidCtx) {
+          vexvoidCtx.fillStyle = '#000000';
+          vexvoidCtx.fillRect(0, 0, vexvoidCanvas.width, vexvoidCanvas.height);
+        }
+        
+        // Reset all visual effects
+        matrixChars = [];
+        particles = [];
+        glitchData = [];
+        plasmaTime = 0;
+        tunnelRotation = 0;
+        fractalDepth = 0;
+        
+        initializeMatrixRain();
+        initializeParticles();
+        initializeGlitchData();
+        
+        console.log('↻ VEXVOID RESET');
+      }
+
+      function vexvoidLoop() {
+        if (!vexvoidActive) return;
+        
+        const currentTime = performance.now();
+        
+        // Calculate FPS
+        vexvoidFrameCount++;
+        if (currentTime - vexvoidLastTime >= 1000) {
+          vexvoidFPS = Math.round((vexvoidFrameCount * 1000) / (currentTime - vexvoidLastTime));
+          document.getElementById('vexvoidFPS').textContent = vexvoidFPS;
+          vexvoidFrameCount = 0;
+          vexvoidLastTime = currentTime;
+        }
+        
+        // Clear canvas with chaos-based opacity
+        const clearOpacity = Math.max(0.05, 0.3 - (chaosLevel * 0.02));
+        vexvoidCtx.fillStyle = `rgba(0, 0, 0, ${clearOpacity})`;
+        vexvoidCtx.fillRect(0, 0, vexvoidCanvas.width, vexvoidCanvas.height);
+        
+        // Render based on visual mode
+        switch (visualMode) {
+          case 'matrix':
+            renderMatrixRain();
+            break;
+          case 'glitch':
+            renderGlitchStorm();
+            break;
+          case 'plasma':
+            renderPlasmaVoid();
+            break;
+          case 'tunnel':
+            renderTunnelVision();
+            break;
+          case 'fractals':
+            renderFractalChaos();
+            break;
+          case 'particles':
+            renderParticleHell();
+            break;
+          case 'cyberpunk':
+            renderCyberpunkGrid();
+            break;
+          case 'all':
+            renderTotalChaos();
+            break;
+        }
+        
+        // Apply glitch effect
+        if (glitchIntensity > 0) {
+          applyGlitchEffect();
+        }
+        
+        vexvoidAnimationId = requestAnimationFrame(vexvoidLoop);
+      }
+
+      function initializeMatrixRain() {
+        matrixChars = [];
+        const chars = '01ABCDEFGHIJKLMNOPQRSTUVWXYZ!@#$%^&*()_+-=[]{}|;:,.<>?/~`';
+        
+        for (let i = 0; i < 100; i++) {
+          matrixChars.push({
+            x: Math.random() * (vexvoidCanvas?.width || 800),
+            y: Math.random() * (vexvoidCanvas?.height || 600),
+            char: chars[Math.floor(Math.random() * chars.length)],
+            speed: Math.random() * 3 + 1,
+            opacity: Math.random()
+          });
+        }
+      }
+
+      function renderMatrixRain() {
+        vexvoidCtx.font = '12px Courier New';
+        
+        matrixChars.forEach(char => {
+          vexvoidCtx.fillStyle = `rgba(255, 255, 255, ${char.opacity})`;
+          vexvoidCtx.fillText(char.char, char.x, char.y);
+          
+          char.y += char.speed * chaosLevel;
+          char.opacity -= 0.01;
+          
+          if (char.y > vexvoidCanvas.height || char.opacity <= 0) {
+            char.y = -20;
+            char.x = Math.random() * vexvoidCanvas.width;
+            char.opacity = 1;
+          }
+        });
+      }
+
+      function renderGlitchStorm() {
+        // Random glitch rectangles in black and white
+        for (let i = 0; i < chaosLevel * 3; i++) {
+          const x = Math.random() * vexvoidCanvas.width;
+          const y = Math.random() * vexvoidCanvas.height;
+          const w = Math.random() * 80;
+          const h = Math.random() * 15;
+          
+          const intensity = Math.random();
+          vexvoidCtx.fillStyle = `rgba(255, 255, 255, ${intensity})`;
+          vexvoidCtx.fillRect(x, y, w, h);
+        }
+      }
+
+      function renderPlasmaVoid() {
+        const imageData = vexvoidCtx.createImageData(vexvoidCanvas.width, vexvoidCanvas.height);
+        const data = imageData.data;
+        
+        for (let x = 0; x < vexvoidCanvas.width; x += 3) {
+          for (let y = 0; y < vexvoidCanvas.height; y += 3) {
+            const index = (y * vexvoidCanvas.width + x) * 4;
+            
+            const value1 = Math.sin(x * 0.01 + plasmaTime);
+            const value2 = Math.sin(y * 0.01 + plasmaTime);
+            const plasma = (value1 + value2) * 127 + 127;
+            
+            const intensity = plasma * (chaosLevel / 10);
+            data[index] = intensity;     // Red
+            data[index + 1] = intensity; // Green
+            data[index + 2] = intensity; // Blue
+            data[index + 3] = 255;       // Alpha
+          }
+        }
+        
+        vexvoidCtx.putImageData(imageData, 0, 0);
+        plasmaTime += 0.08 * chaosLevel;
+      }
+
+      function renderTunnelVision() {
+        const centerX = vexvoidCanvas.width / 2;
+        const centerY = vexvoidCanvas.height / 2;
+        
+        for (let i = 0; i < chaosLevel * 8; i++) {
+          const angle = (i / (chaosLevel * 8)) * Math.PI * 2 + tunnelRotation;
+          const radius = i * 4;
+          
+          const x = centerX + Math.cos(angle) * radius;
+          const y = centerY + Math.sin(angle) * radius;
+          
+          const intensity = 1 - (radius / (vexvoidCanvas.width / 2));
+          vexvoidCtx.fillStyle = `rgba(255, 255, 255, ${Math.max(0, intensity)})`;
+          vexvoidCtx.fillRect(x, y, 2, 2);
+        }
+        
+        tunnelRotation += 0.04 * chaosLevel;
+      }
+
+      function initializeParticles() {
+        particles = [];
+        for (let i = 0; i < 200; i++) {
+          particles.push({
+            x: Math.random() * (vexvoidCanvas?.width || 800),
+            y: Math.random() * (vexvoidCanvas?.height || 600),
+            vx: (Math.random() - 0.5) * 4,
+            vy: (Math.random() - 0.5) * 4,
+            life: Math.random(),
+            color: `hsl(${Math.random() * 360}, 100%, 50%)`
+          });
+        }
+      }
+
+      function renderParticleHell() {
+        particles.forEach(particle => {
+          vexvoidCtx.fillStyle = `rgba(255, 255, 255, ${particle.life})`;
+          vexvoidCtx.globalAlpha = particle.life;
+          vexvoidCtx.fillRect(particle.x, particle.y, 2, 2);
+          
+          particle.x += particle.vx * chaosLevel;
+          particle.y += particle.vy * chaosLevel;
+          particle.life -= 0.008;
+          
+          if (particle.life <= 0 || particle.x < 0 || particle.x > vexvoidCanvas.width || 
+              particle.y < 0 || particle.y > vexvoidCanvas.height) {
+            particle.x = Math.random() * vexvoidCanvas.width;
+            particle.y = Math.random() * vexvoidCanvas.height;
+            particle.vx = (Math.random() - 0.5) * 4;
+            particle.vy = (Math.random() - 0.5) * 4;
+            particle.life = 1;
+          }
+        });
+        
+        vexvoidCtx.globalAlpha = 1;
+      }
+
+      function renderFractalChaos() {
+        const centerX = vexvoidCanvas.width / 2;
+        const centerY = vexvoidCanvas.height / 2;
+        
+        drawFractalBranch(centerX, centerY, 100, fractalDepth, 6);
+        fractalDepth += 0.1 * chaosLevel;
+      }
+
+      function drawFractalBranch(x, y, length, angle, depth) {
+        if (depth === 0) return;
+        
+        const endX = x + Math.cos(angle) * length;
+        const endY = y + Math.sin(angle) * length;
+        
+        const intensity = depth / 6;
+        vexvoidCtx.strokeStyle = `rgba(255, 255, 255, ${intensity})`;
+        vexvoidCtx.lineWidth = Math.max(1, depth / 2);
+        vexvoidCtx.beginPath();
+        vexvoidCtx.moveTo(x, y);
+        vexvoidCtx.lineTo(endX, endY);
+        vexvoidCtx.stroke();
+        
+        drawFractalBranch(endX, endY, length * 0.7, angle - 0.4, depth - 1);
+        drawFractalBranch(endX, endY, length * 0.7, angle + 0.4, depth - 1);
+      }
+
+      function renderCyberpunkGrid() {
+        vexvoidCtx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        vexvoidCtx.lineWidth = 1;
+        
+        // Grid lines
+        for (let x = 0; x < vexvoidCanvas.width; x += 40) {
+          vexvoidCtx.beginPath();
+          vexvoidCtx.moveTo(x, 0);
+          vexvoidCtx.lineTo(x, vexvoidCanvas.height);
+          vexvoidCtx.stroke();
+        }
+        
+        for (let y = 0; y < vexvoidCanvas.height; y += 40) {
+          vexvoidCtx.beginPath();
+          vexvoidCtx.moveTo(0, y);
+          vexvoidCtx.lineTo(vexvoidCanvas.width, y);
+          vexvoidCtx.stroke();
+        }
+        
+        // Random urban elements
+        for (let i = 0; i < chaosLevel * 2; i++) {
+          const x = Math.random() * vexvoidCanvas.width;
+          const y = Math.random() * vexvoidCanvas.height;
+          
+          vexvoidCtx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+          vexvoidCtx.fillRect(x, y, 8, 1);
+        }
+      }
+
+      function renderTotalChaos() {
+        // Combine all effects
+        renderMatrixRain();
+        renderGlitchStorm();
+        renderParticleHell();
+        renderCyberpunkGrid();
+      }
+
+      function initializeGlitchData() {
+        glitchData = [];
+        for (let i = 0; i < 20; i++) {
+          glitchData.push({
+            x: Math.random() * (vexvoidCanvas?.width || 800),
+            y: Math.random() * (vexvoidCanvas?.height || 600),
+            width: Math.random() * 200 + 50,
+            height: Math.random() * 50 + 10,
+            life: Math.random()
+          });
+        }
+      }
+
+      function applyGlitchEffect() {
+        if (Math.random() < (glitchIntensity / 100) * 0.1) {
+          // RGB shift effect
+          const imageData = vexvoidCtx.getImageData(0, 0, vexvoidCanvas.width, vexvoidCanvas.height);
+          const data = imageData.data;
+          
+          const shiftAmount = Math.floor(Math.random() * 10) + 1;
+          
+          for (let i = 0; i < data.length; i += 4) {
+            if (Math.random() < 0.1) {
+              const shift = shiftAmount * 4;
+              if (i + shift < data.length) {
+                data[i] = data[i + shift]; // Red shift
+              }
+            }
+          }
+          
+          vexvoidCtx.putImageData(imageData, 0, 0);
+        }
+      }
+
+      function updateChaosStatus() {
+        const status = chaosLevel <= 3 ? 'READY' : 
+                      chaosLevel <= 6 ? 'ACTIVE' : 
+                      chaosLevel <= 8 ? 'INTENSE' : 'OVERLOAD';
+        document.getElementById('chaosStatus').textContent = status;
+      }
 
       console.log('🎛️ All V3XV0ID Tab Content Systems initialized');
     });
