@@ -20,8 +20,10 @@ function createOutputWindow() {
     height: targetDisplay.workAreaSize.height,
     x: targetDisplay.bounds.x,
     y: targetDisplay.bounds.y,
-    title: 'Image Animator - Output',
+    title: 'V3XV0ID AV Client - Output',
     fullscreen: true,
+    show: false, // Don't show until ready
+    backgroundColor: '#000000', // Start with black background
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -32,9 +34,10 @@ function createOutputWindow() {
   outputWindow.loadFile(path.join(__dirname, 'index.html'));
   remoteMain.enable(outputWindow.webContents);
   
-  // Ensure fullscreen after loading
+  // Show only when ready to prevent white flash
   outputWindow.once('ready-to-show', () => {
     outputWindow.setFullScreen(true);
+    outputWindow.show();
   });
   
   outputWindow.on('closed', () => {
@@ -50,8 +53,9 @@ function createControlWindow() {
     height: primaryDisplay.workAreaSize.height,
     x: primaryDisplay.bounds.x,
     y: primaryDisplay.bounds.y,
-    title: 'Image Animator - Controls',
+    title: 'V3XV0ID AV Client - Controls',
     fullscreen: true,
+    backgroundColor: '#000000',
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
