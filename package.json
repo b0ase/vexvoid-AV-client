@@ -44,7 +44,13 @@
       "output": "dist"
     },
     "files": [
-      "v3xv0id-av-client/**/*",
+      "main.js",
+      "index.html",
+      "controls.html",
+      "control-window.html",
+      "supabase-config.js",
+      "audio-manager.js",
+      "performance-sequencer.js",
       "node_modules/**/*",
       "package.json",
       "vexvoid-icon.png"
