@@ -1142,6 +1142,16 @@
       background: rgba(255, 255, 255, 0.15);
     }
 
+    .layers-list.drag-over {
+      background: rgba(255, 255, 255, 0.05);
+      border: 2px dashed rgba(255, 255, 255, 0.3);
+    }
+
+    .palette-section.drag-over {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
     .drag-handle {
       display: inline-block;
       margin-right: 8px;
@@ -2282,6 +2292,9 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
       const preview2 = document.getElementById('preview2');
       const preview3 = document.getElementById('preview3');
       
+      // Set up palette drop zones
+      setupPaletteDropZones();
+      
       // Control elements
       const speedControl = document.getElementById('speedControl');
       const sizeControl = document.getElementById('sizeControl');
@@ -3059,6 +3072,10 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
         document.querySelectorAll('.drag-over').forEach(el => {
           el.classList.remove('drag-over');
         });
+        // Clean up palette drag-over classes
+        [layersListA, layersListB].forEach(palette => {
+          palette.classList.remove('drag-over');
+        });
         draggedElement = null;
         draggedLayerId = null;
       }
@@ -3075,10 +3092,13 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
         const draggedPalette = layersA.find(l => l.id === draggedId) ? 'A' : 'B';
         const targetPalette = layersA.find(l => l.id === targetId) ? 'A' : 'B';
         
-        // If layers are in different palettes, don't allow reordering
-        if (draggedPalette !== targetPalette) return;
+        // Handle cross-palette dragging
+        if (draggedPalette !== targetPalette) {
+          moveLayerToPalette(draggedId, targetPalette, targetId);
+          return;
+        }
         
-        // Work with the appropriate palette
+        // Same palette reordering (existing logic)
         const palette = draggedPalette === 'A' ? layersA : layersB;
         const draggedPaletteIndex = palette.findIndex(l => l.id === draggedId);
         const targetPaletteIndex = palette.findIndex(l => l.id === targetId);
@@ -3088,6 +3108,74 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
         palette.splice(targetPaletteIndex, 0, draggedLayer);
         
         // Renumber layers based on new order (skip main layer)
+        renumberPaletteLayers(palette);
+        
+        // Send reorder command to output window
+        const allLayersOrdered = [...layersA, ...layersB];
+        sendToOutput('reorder-layers', { layers: allLayersOrdered.map(l => l.id) });
+        
+        // Update the UI
+        updateLayersList();
+        updatePreview();
+      }
+      
+      function moveLayerToPalette(draggedId, targetPalette, targetId = null) {
+        // Find the dragged layer in both palettes
+        const draggedFromA = layersA.find(l => l.id === draggedId);
+        const draggedFromB = layersB.find(l => l.id === draggedId);
+        const draggedLayer = draggedFromA || draggedFromB;
+        
+        if (!draggedLayer) return;
+        
+        // Remove from source palette
+        if (draggedFromA) {
+          const index = layersA.findIndex(l => l.id === draggedId);
+          layersA.splice(index, 1);
+        } else {
+          const index = layersB.findIndex(l => l.id === draggedId);
+          layersB.splice(index, 1);
+        }
+        
+        // Update the layer's palette property
+        draggedLayer.palette = targetPalette;
+        
+        // Add to target palette
+        const targetPaletteArray = targetPalette === 'A' ? layersA : layersB;
+        
+        if (targetId) {
+          // Insert at specific position
+          const targetIndex = targetPaletteArray.findIndex(l => l.id === targetId);
+          if (targetIndex !== -1) {
+            targetPaletteArray.splice(targetIndex, 0, draggedLayer);
+          } else {
+            targetPaletteArray.push(draggedLayer);
+          }
+        } else {
+          // Add to end of palette
+          targetPaletteArray.push(draggedLayer);
+        }
+        
+        // Renumber layers in both palettes
+        renumberPaletteLayers(layersA);
+        renumberPaletteLayers(layersB);
+        
+        // Update the layer's palette in the output window
+        sendToOutput('update-layer-property', {
+          layerId: draggedId,
+          property: 'palette',
+          value: targetPalette
+        });
+        
+        // Send reorder command to output window
+        const allLayersOrdered = [...layersA, ...layersB];
+        sendToOutput('reorder-layers', { layers: allLayersOrdered.map(l => l.id) });
+        
+        // Update the UI
+        updateLayersList();
+        updatePreview();
+      }
+      
+      function renumberPaletteLayers(palette) {
         let layerNumber = 1;
         palette.forEach(layer => {
           if (!layer.isMainLayer) {
@@ -3110,14 +3198,60 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
             layerNumber++;
           }
         });
+      }
+      
+      function setupPaletteDropZones() {
+        // Add drop zone event listeners to both palette lists
+        [layersListA, layersListB].forEach(paletteList => {
+          paletteList.addEventListener('dragover', handlePaletteDragOver);
+          paletteList.addEventListener('dragenter', handlePaletteDragEnter);
+          paletteList.addEventListener('dragleave', handlePaletteDragLeave);
+          paletteList.addEventListener('drop', handlePaletteDrop);
+        });
+      }
+      
+      function handlePaletteDragOver(e) {
+        if (e.preventDefault) {
+          e.preventDefault();
+        }
+        e.dataTransfer.dropEffect = 'move';
+        return false;
+      }
+      
+      function handlePaletteDragEnter(e) {
+        if (draggedElement && draggedLayerId) {
+          e.target.classList.add('drag-over');
+        }
+      }
+      
+      function handlePaletteDragLeave(e) {
+        // Only remove drag-over if we're leaving the palette container entirely
+        if (!e.currentTarget.contains(e.relatedTarget)) {
+          e.target.classList.remove('drag-over');
+        }
+      }
+      
+      function handlePaletteDrop(e) {
+        if (e.stopPropagation) {
+          e.stopPropagation();
+        }
         
-        // Send reorder command to output window
-        const allLayersOrdered = [...layersA, ...layersB];
-        sendToOutput('reorder-layers', { layers: allLayersOrdered.map(l => l.id) });
+        e.target.classList.remove('drag-over');
         
-        // Update the UI
-        updateLayersList();
-        updatePreview();
+        if (draggedElement && draggedLayerId) {
+          // Determine which palette this drop zone belongs to
+          const targetPalette = e.target.id === 'layersListA' ? 'A' : 'B';
+          
+          // Find the dragged layer's current palette
+          const draggedPalette = layersA.find(l => l.id === draggedLayerId) ? 'A' : 'B';
+          
+          // Only move if dropping on a different palette
+          if (draggedPalette !== targetPalette) {
+            moveLayerToPalette(draggedLayerId, targetPalette);
+          }
+        }
+        
+        return false;
       }
       
       window.setDefaultBackground = async function() {
