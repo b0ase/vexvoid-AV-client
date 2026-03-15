@@ -33,11 +33,12 @@ function createOutputWindow() {
 
   outputWindow.loadFile(path.join(__dirname, 'index.html'));
   remoteMain.enable(outputWindow.webContents);
-  
+
   // Show only when ready to prevent white flash
   outputWindow.once('ready-to-show', () => {
     outputWindow.setFullScreen(true);
     outputWindow.show();
+    // outputWindow.webContents.openDevTools({ mode: 'detach' });
   });
   
   outputWindow.on('closed', () => {
@@ -65,10 +66,11 @@ function createControlWindow() {
 
   controlWindow.loadFile(path.join(__dirname, 'controls.html'));
   remoteMain.enable(controlWindow.webContents);
-  
+
   // Ensure fullscreen after loading
   controlWindow.once('ready-to-show', () => {
     controlWindow.setFullScreen(true);
+    // controlWindow.webContents.openDevTools({ mode: 'detach' });
   });
   
   controlWindow.on('closed', () => {

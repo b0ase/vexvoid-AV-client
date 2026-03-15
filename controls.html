@@ -1897,6 +1897,7 @@
       <div class="preview-header">
         <h2>PREVIEW</h2>
       </div>
+      <div id="previewDebugOverlay" style="background:rgba(255,0,0,0.9);color:#fff;font-family:monospace;font-size:10px;padding:6px 10px;border:1px solid red;margin-bottom:4px;word-break:break-all;">DEBUG: waiting for IPC...</div>
       <div class="preview-screen" id="previewScreen">
         <div class="preview-row output-preview" id="outputPreview">
           <div class="preview-row-label">OUTPUT WINDOW</div>
@@ -2317,9 +2318,20 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
       }
       
       // Handle messages from output window
+      let _previewDebugCount = 0;
       ipcRenderer.on('output-message', (event, message) => {
         const { command, data } = message;
-        
+
+        if (command === 'preview-update') {
+          _previewDebugCount++;
+          const dbg = document.getElementById('previewDebugOverlay');
+          if (dbg) {
+            const info = `#${_previewDebugCount} | src: ${data.imageSrc ? data.imageSrc.slice(-40) : 'NULL'} | layers: ${data.layers ? data.layers.length : 0} | palA: ${data.paletteA ? (data.paletteA.imageSrc ? data.paletteA.imageSrc.slice(-30) : 'no-src') : 'NULL'}`;
+            dbg.textContent = info;
+            dbg.style.background = data.imageSrc || (data.paletteA && data.paletteA.imageSrc) ? 'rgba(0,180,0,0.9)' : 'rgba(255,100,0,0.9)';
+          }
+        }
+
         switch (command) {
           case 'layers-updated':
             updateLayersFromOutput(data.layers);
@@ -2481,454 +2493,129 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
       }
       
       function updatePreview() {
-        // Preview 2 shows Palette A composition (all visible layers combined)
-        updatePaletteComposition(preview2, layersA, 'PALETTE A');
-        
-        // Preview 3 shows Palette B composition (all visible layers combined)
-        updatePaletteComposition(preview3, layersB, 'PALETTE B');
+        // Trigger a static preview update from local layer data
+        // (used when layers are added/removed, not for live animation)
       }
 
-      function updatePaletteComposition(previewRow, layers, paletteName) {
-        const label = previewRow.querySelector('.preview-row-label');
-        
-        // Clear previous content but keep the label
-        previewRow.innerHTML = '';
-        previewRow.appendChild(label);
-        
-        // Get visible layers sorted by layer order (bottom to top)
-        const visibleLayers = layers.filter(l => l.visible).sort((a, b) => a.id - b.id);
-        
-        if (visibleLayers.length === 0) {
-          const placeholder = document.createElement('div');
-          placeholder.className = 'preview-placeholder';
-          placeholder.textContent = `${paletteName} - NO VISIBLE LAYERS`;
-          previewRow.appendChild(placeholder);
+      // ========== CACHED PREVIEW SYSTEM ==========
+      // Previous approach destroyed and recreated DOM elements 20x/sec.
+      // Images never rendered because they were killed before loading.
+      // This system reuses elements and only updates src when it changes.
+
+      const previewCache = {
+        output: { src: null, element: null, type: null },
+        paletteA: { src: null, element: null, type: null },
+        paletteB: { src: null, element: null, type: null }
+      };
+
+      function isVideoSrc(src) {
+        return src && /\.(mp4|mov|avi|webm|mkv)/i.test(src);
+      }
+
+      function createMediaElement(src) {
+        if (isVideoSrc(src)) {
+          const el = document.createElement('video');
+          el.className = 'preview-image';
+          el.autoplay = true;
+          el.loop = true;
+          el.muted = true;
+          el.playsInline = true;
+          el.src = src;
+          el.addEventListener('loadeddata', () => {
+            el.play().catch(() => {});
+          });
+          return { element: el, type: 'video' };
+        } else {
+          const el = document.createElement('img');
+          el.className = 'preview-image';
+          el.src = src;
+          return { element: el, type: 'image' };
+        }
+      }
+
+      function updatePreviewSlot(container, cache, src, opacity, scale, inverse) {
+        const label = container.querySelector('.preview-row-label');
+
+        if (!src) {
+          // No content — show placeholder if not already showing one
+          if (cache.src !== null || !cache.element) {
+            container.innerHTML = '';
+            if (label) container.appendChild(label);
+            const ph = document.createElement('div');
+            ph.className = 'preview-placeholder';
+            ph.textContent = container === outputPreview ? 'NO OUTPUT CONTENT' :
+                             container === preview2 ? 'PALETTE A' : 'PALETTE B';
+            container.appendChild(ph);
+            cache.src = null;
+            cache.element = null;
+            cache.type = null;
+          }
           return;
         }
-        
-        // Create composition container
-        const compositionContainer = document.createElement('div');
-        compositionContainer.className = 'composition-container';
-        compositionContainer.style.cssText = `
-          position: relative;
-          width: 100%;
-          height: 100%;
-          max-width: 160px;
-          max-height: 90px;
-          background: #000;
-          overflow: hidden;
-          border-radius: 2px;
-        `;
-        
-        // Add each visible layer to the composition
-        visibleLayers.forEach((layer, index) => {
-          if (layer.imageSrc || layer.type === 'pattern') {
-            const layerElement = createLayerElement(layer, index);
-            if (layerElement) {
-              compositionContainer.appendChild(layerElement);
-            }
-          }
-        });
-        
-        // Add composition info overlay
-        const infoOverlay = document.createElement('div');
-        infoOverlay.className = 'composition-info';
-        infoOverlay.style.cssText = `
-          position: absolute;
-          bottom: 2px;
-          left: 2px;
-          background: rgba(0, 0, 0, 0.7);
-          color: #00ff00;
-          font-size: 8px;
-          padding: 1px 3px;
-          font-family: 'Courier New', monospace;
-          border-radius: 1px;
-          z-index: 1000;
-        `;
-        infoOverlay.textContent = `${visibleLayers.length} LAYERS`;
-        compositionContainer.appendChild(infoOverlay);
-        
-        previewRow.appendChild(compositionContainer);
-      }
 
-      function createLayerElement(layer, zIndex) {
-        let element = null;
-        
-        if (layer.type === 'pattern') {
-          // Handle P5.js pattern layers
-          element = document.createElement('canvas');
-          element.width = 160;
-          element.height = 90;
-          element.style.cssText = `
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: ${zIndex + 1};
-            opacity: ${(layer.opacity || 100) / 100};
-            mix-blend-mode: ${layer.blendMode || 'normal'};
-          `;
-          
-          // Apply inverse filter if enabled
-          if (layer.inverse) {
-            element.style.filter = 'invert(1)';
-          }
-          
-          // Create a mini P5 instance for preview
-          if (layer.patternCode) {
-            try {
-              const ctx = element.getContext('2d');
-              // Simple pattern preview (could be enhanced with actual P5 rendering)
-              ctx.fillStyle = '#00ff00';
-              ctx.fillRect(0, 0, element.width, element.height);
-              ctx.fillStyle = '#000';
-              ctx.font = '10px Courier New';
-              ctx.fillText('P5.JS', 5, 15);
-              ctx.fillText('PATTERN', 5, 30);
-            } catch (e) {
-              console.warn('Pattern preview error:', e);
-            }
-          }
-          
-        } else if (layer.imageSrc) {
-          // Determine if it's a video or image
-          const isVideo = layer.imageSrc && (
-            layer.imageSrc.includes('.mp4') || 
-            layer.imageSrc.includes('.mov') || 
-            layer.imageSrc.includes('.avi') || 
-            layer.imageSrc.includes('.webm') || 
-            layer.imageSrc.includes('.mkv')
-          );
-          
-          if (isVideo) {
-            element = document.createElement('video');
-            element.src = layer.imageSrc;
-            element.autoplay = true;
-            element.loop = true;
-            element.muted = true;
-            element.playsInline = true;
-            
-            // Ensure video starts playing
-            element.addEventListener('loadeddata', () => {
-              element.play().catch(e => console.log('Composition preview video autoplay prevented:', e));
-            });
-          } else {
-            element = document.createElement('img');
-            element.src = layer.imageSrc;
-          }
-          
-          element.style.cssText = `
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            z-index: ${zIndex + 1};
-            opacity: ${(layer.opacity || 100) / 100};
-            transform: scale(${layer.scale || 1});
-            mix-blend-mode: ${layer.blendMode || 'normal'};
-          `;
-          
-          // Apply inverse filter if enabled
-          if (layer.inverse) {
-            element.style.filter = (element.style.filter || '') + ' invert(1)';
-          }
-        }
-        
-        return element;
-      }
-      
-      function updatePalettePreview(data) {
-        // Update Palette A preview with live data
-        if (data.paletteA) {
-          updatePreviewWithData(preview2, data.paletteA);
-        } else {
-          // Clear Palette A preview
-          const label = preview2.querySelector('.preview-row-label');
-          preview2.innerHTML = '';
-          preview2.appendChild(label);
-          const placeholder = document.createElement('div');
-          placeholder.className = 'preview-placeholder';
-          placeholder.textContent = 'NO CONTENT';
-          preview2.appendChild(placeholder);
-        }
-        
-        // Update Palette B preview with live data
-        if (data.paletteB) {
-          updatePreviewWithData(preview3, data.paletteB);
-        } else {
-          // Clear Palette B preview
-          const label = preview3.querySelector('.preview-row-label');
-          preview3.innerHTML = '';
-          preview3.appendChild(label);
-          const placeholder = document.createElement('div');
-          placeholder.className = 'preview-placeholder';
-          placeholder.textContent = 'NO CONTENT';
-          preview3.appendChild(placeholder);
-        }
-      }
-      
-      function updatePreviewWithData(previewElement, data) {
-        const label = previewElement.querySelector('.preview-row-label');
-        previewElement.innerHTML = '';
-        previewElement.appendChild(label);
-        
-        if (data.imageSrc) {
-          // Determine if it's a video or image
-          const isVideo = data.imageSrc && (
-            data.imageSrc.includes('.mp4') || 
-            data.imageSrc.includes('.mov') || 
-            data.imageSrc.includes('.avi') || 
-            data.imageSrc.includes('.webm') || 
-            data.imageSrc.includes('.mkv')
-          );
-          
-          if (isVideo) {
-            const previewVideo = document.createElement('video');
-            previewVideo.className = 'preview-image';
-            previewVideo.src = data.imageSrc;
-            previewVideo.autoplay = true;
-            previewVideo.loop = true;
-            previewVideo.muted = true;
-            previewVideo.playsInline = true;
-            previewVideo.style.cssText = `
-              max-width: 100%;
-              max-height: 100%;
-              object-fit: contain;
-              opacity: ${data.opacity || 1};
-              transform: scale(${Math.min(data.scale || 1, 0.9)});
-            `;
-            
-            if (data.inverse) {
-              previewVideo.style.filter = 'invert(1)';
-            }
-            
-            // Ensure video starts playing
-            previewVideo.addEventListener('loadeddata', () => {
-              previewVideo.play().catch(e => console.log('Preview video autoplay prevented:', e));
-            });
-            
-            previewVideo.onerror = () => {
-              previewElement.innerHTML = '<div class="preview-placeholder">VIDEO NOT FOUND</div>';
-              previewElement.appendChild(label);
-            };
-            
-            previewElement.appendChild(previewVideo);
-          } else {
-            const previewImg = document.createElement('img');
-            previewImg.className = 'preview-image';
-            previewImg.src = data.imageSrc;
-            previewImg.style.cssText = `
-              max-width: 100%;
-              max-height: 100%;
-              object-fit: contain;
-              opacity: ${data.opacity || 1};
-              transform: scale(${Math.min(data.scale || 1, 0.9)});
-            `;
-            
-            if (data.inverse) {
-              previewImg.style.filter = 'invert(1)';
-            }
-            
-            previewImg.onerror = () => {
-              previewElement.innerHTML = '<div class="preview-placeholder">IMAGE NOT FOUND</div>';
-              previewElement.appendChild(label);
-            };
-            
-            previewElement.appendChild(previewImg);
-          }
-        }
-      }
-      
-      function updateOutputPreview(data) {
-        // Update the output preview row with data from the output window
-        const label = outputPreview.querySelector('.preview-row-label');
-        
-        // Clear previous content but keep the label
-        outputPreview.innerHTML = '';
-        outputPreview.appendChild(label);
-        
-        if (data.imageSrc) {
-          // Determine if it's a video or image
-          const isVideo = data.imageSrc && (
-            data.imageSrc.includes('.mp4') || 
-            data.imageSrc.includes('.mov') || 
-            data.imageSrc.includes('.avi') || 
-            data.imageSrc.includes('.webm') || 
-            data.imageSrc.includes('.mkv')
-          );
-          
-          if (isVideo) {
-            const previewVideo = document.createElement('video');
-            previewVideo.className = 'preview-image';
-            previewVideo.src = data.imageSrc;
-            previewVideo.autoplay = true;
-            previewVideo.loop = true;
-            previewVideo.muted = true;
-            previewVideo.playsInline = true;
-            previewVideo.style.cssText = `
-              max-width: 100%;
-              max-height: 100%;
-              object-fit: contain;
-              opacity: ${data.opacity || 1};
-              transform: scale(${Math.min(data.scale || 1, 0.9)});
-            `;
-            
-            if (data.inverse) {
-              previewVideo.style.filter = 'invert(1)';
-            }
-            
-            // Ensure video starts playing
-            previewVideo.addEventListener('loadeddata', () => {
-              previewVideo.play().catch(e => console.log('Output preview video autoplay prevented:', e));
-            });
-            
-            previewVideo.onerror = () => {
-              outputPreview.innerHTML = '<div class="preview-placeholder">VIDEO NOT FOUND</div>';
-              outputPreview.appendChild(label);
-            };
-            
-            outputPreview.appendChild(previewVideo);
-          } else {
-            const previewImg = document.createElement('img');
-            previewImg.className = 'preview-image';
-            previewImg.src = data.imageSrc;
-            previewImg.style.cssText = `
-              max-width: 100%;
-              max-height: 100%;
-              object-fit: contain;
-              opacity: ${data.opacity || 1};
-              transform: scale(${Math.min(data.scale || 1, 0.9)});
-            `;
-            
-            if (data.inverse) {
-              previewImg.style.filter = 'invert(1)';
-            }
-            
-            previewImg.onerror = () => {
-              outputPreview.innerHTML = '<div class="preview-placeholder">IMAGE NOT FOUND</div>';
-              outputPreview.appendChild(label);
-            };
-            
-            outputPreview.appendChild(previewImg);
-          }
-        } else if (data.hasDefaultBackground) {
-          const previewImg = document.createElement('img');
-          previewImg.className = 'preview-image';
-          previewImg.src = '../vexvoid.png';
-          previewImg.style.cssText = `
+        // Source changed — need a new element
+        if (src !== cache.src) {
+          container.innerHTML = '';
+          if (label) container.appendChild(label);
+
+          const media = createMediaElement(src);
+          media.element.style.cssText = `
             max-width: 100%;
             max-height: 100%;
             object-fit: contain;
+            opacity: ${opacity || 1};
+            transform: scale(${Math.min(scale || 1, 0.9)});
           `;
-          
-          if (data.defaultBackgroundInverse) {
-            previewImg.style.filter = 'invert(1)';
-          }
-          
-          outputPreview.appendChild(previewImg);
-        } else {
-          const placeholder = document.createElement('div');
-          placeholder.className = 'preview-placeholder';
-          placeholder.textContent = 'NO OUTPUT CONTENT';
-          outputPreview.appendChild(placeholder);
-        }
-        
-        // Update individual layer previews
-        if (data.layers && data.layers.length > 0) {
-          updatePreviewRow(preview2, data.layers[1]); // Second layer
-          updatePreviewRow(preview3, data.layers[2]); // Third layer
+          if (inverse) media.element.style.filter = 'invert(1)';
+
+          media.element.onerror = () => {
+            container.innerHTML = '';
+            if (label) container.appendChild(label);
+            const ph = document.createElement('div');
+            ph.className = 'preview-placeholder';
+            ph.textContent = 'MEDIA ERROR';
+            container.appendChild(ph);
+          };
+
+          container.appendChild(media.element);
+          cache.src = src;
+          cache.element = media.element;
+          cache.type = media.type;
+        } else if (cache.element) {
+          // Same source — just update style properties (no DOM rebuild)
+          cache.element.style.opacity = opacity || 1;
+          cache.element.style.transform = `scale(${Math.min(scale || 1, 0.9)})`;
+          cache.element.style.filter = inverse ? 'invert(1)' : '';
         }
       }
-      
-      function updatePreviewRow(previewRow, layer) {
-        const label = previewRow.querySelector('.preview-row-label');
-        
-        // Clear previous content but keep the label
-        previewRow.innerHTML = '';
-        previewRow.appendChild(label);
-        
-        if (layer && layer.visible && layer.imageSrc) {
-          // Determine if it's a video or image
-          const isVideo = layer.imageSrc && (
-            layer.imageSrc.includes('.mp4') || 
-            layer.imageSrc.includes('.mov') || 
-            layer.imageSrc.includes('.avi') || 
-            layer.imageSrc.includes('.webm') || 
-            layer.imageSrc.includes('.mkv')
-          );
-          
-          if (isVideo) {
-            const previewVideo = document.createElement('video');
-            previewVideo.className = 'preview-image';
-            previewVideo.src = layer.imageSrc;
-            previewVideo.autoplay = true;
-            previewVideo.loop = true;
-            previewVideo.muted = true;
-            previewVideo.playsInline = true;
-            previewVideo.style.cssText = `
-              max-width: 100%;
-              max-height: 100%;
-              object-fit: contain;
-              opacity: ${layer.opacity || 1};
-              transform: scale(${Math.min(layer.scale || 1, 0.9)});
-            `;
-            
-            // Apply inverse filter if enabled
-            if (layer.inverse) {
-              previewVideo.style.filter = 'invert(1)';
-            }
-            
-            // Ensure video starts playing
-            previewVideo.addEventListener('loadeddata', () => {
-              previewVideo.play().catch(e => console.log('Layer preview video autoplay prevented:', e));
-            });
-            
-            previewVideo.onerror = () => {
-              const placeholder = document.createElement('div');
-              placeholder.className = 'preview-placeholder';
-              placeholder.textContent = `${layer.name} - VIDEO ERROR`;
-              previewRow.innerHTML = '';
-              previewRow.appendChild(label);
-              previewRow.appendChild(placeholder);
-            };
-            
-            previewRow.appendChild(previewVideo);
-          } else {
-            const previewImg = document.createElement('img');
-            previewImg.className = 'preview-image';
-            previewImg.src = layer.imageSrc;
-            previewImg.style.cssText = `
-              max-width: 100%;
-              max-height: 100%;
-              object-fit: contain;
-              opacity: ${layer.opacity || 1};
-              transform: scale(${Math.min(layer.scale || 1, 0.9)});
-            `;
-            
-            // Apply inverse filter if enabled
-            if (layer.inverse) {
-              previewImg.style.filter = 'invert(1)';
-            }
-            
-            previewImg.onerror = () => {
-              const placeholder = document.createElement('div');
-              placeholder.className = 'preview-placeholder';
-              placeholder.textContent = `${layer.name} - IMAGE ERROR`;
-              previewRow.innerHTML = '';
-              previewRow.appendChild(label);
-              previewRow.appendChild(placeholder);
-            };
-            
-            previewRow.appendChild(previewImg);
-          }
+
+      function updateOutputPreview(data) {
+        if (data.imageSrc) {
+          updatePreviewSlot(outputPreview, previewCache.output,
+            data.imageSrc, data.opacity, data.scale, data.inverse);
+        } else if (data.hasDefaultBackground) {
+          updatePreviewSlot(outputPreview, previewCache.output,
+            './vexvoid-icon.png', 1, 1, data.defaultBackgroundInverse);
         } else {
-          const placeholder = document.createElement('div');
-          placeholder.className = 'preview-placeholder';
-          placeholder.textContent = layer ? `${layer.name} (hidden)` : 'NO LAYER';
-          previewRow.appendChild(placeholder);
+          updatePreviewSlot(outputPreview, previewCache.output, null);
+        }
+      }
+
+      function updatePalettePreview(data) {
+        if (data.paletteA && data.paletteA.imageSrc) {
+          updatePreviewSlot(preview2, previewCache.paletteA,
+            data.paletteA.imageSrc, data.paletteA.opacity,
+            data.paletteA.scale, data.paletteA.inverse);
+        } else {
+          updatePreviewSlot(preview2, previewCache.paletteA, null);
+        }
+
+        if (data.paletteB && data.paletteB.imageSrc) {
+          updatePreviewSlot(preview3, previewCache.paletteB,
+            data.paletteB.imageSrc, data.paletteB.opacity,
+            data.paletteB.scale, data.paletteB.inverse);
+        } else {
+          updatePreviewSlot(preview3, previewCache.paletteB, null);
         }
       }
       
@@ -3644,7 +3331,7 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
           console.log('🎬 Loading V3XV0ID video library from Supabase...');
           
           // Load V3XV0ID cloud manager
-          const V3XV0IDCloudManager = require('./supabase-config');
+          const { V3XV0IDCloudManager } = require('./supabase-config');
           const cloudManager = new V3XV0IDCloudManager();
           
           // Initialize cloud connection
@@ -3761,7 +3448,7 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
           console.log('🖼️ Loading V3XV0ID image library from Supabase...');
           
           // Load V3XV0ID cloud manager
-          const V3XV0IDCloudManager = require('./supabase-config');
+          const { V3XV0IDCloudManager } = require('./supabase-config');
           const cloudManager = new V3XV0IDCloudManager();
           
           // Initialize cloud connection
@@ -3858,6 +3545,7 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
       }
 
       // Patterns Tab Functionality
+      let p5Lib = null; // Loaded lazily when patterns tab is used
       let currentP5Instance = null;
       let patternRunning = false;
       let patternFPS = 0;
@@ -4015,8 +3703,17 @@ function draw() {
             }
           };
           
-          // Create new P5 instance
-          currentP5Instance = new p5(sketchFunction, patternPreviewContainer);
+          // Lazy-load p5 (v2 uses ESM, can't require at top level in Electron)
+          if (!p5Lib) {
+            try {
+              p5Lib = require('p5');
+            } catch (e) {
+              console.warn('P5.js not available:', e.message);
+              patternStatus.textContent = 'P5 NOT INSTALLED';
+              return;
+            }
+          }
+          currentP5Instance = new p5Lib(sketchFunction, patternPreviewContainer);
           patternRunning = true;
           patternStatus.textContent = 'RUNNING';
           
@@ -4242,7 +3939,6 @@ function draw() {
       // Music Tab Functionality
       let musicLibraryTracks = [];
       let currentAudio = null;
-      let isPlaying = false;
       let currentTrackIndex = -1;
       let audioContext = null;
       let analyser = null;
@@ -4274,7 +3970,7 @@ function draw() {
           console.log('🎵 Loading V3XV0ID music library from Supabase...');
           
           // Load V3XV0ID cloud manager
-          const V3XV0IDCloudManager = require('./supabase-config');
+          const { V3XV0IDCloudManager } = require('./supabase-config');
           const cloudManager = new V3XV0IDCloudManager();
           
           // Initialize cloud connection

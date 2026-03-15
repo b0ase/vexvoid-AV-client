@@ -250,7 +250,7 @@
       </div>
     </div>
     <div id="defaultBackground" style="display:none;">
-      <img id="defaultBackgroundImage" src="../vexvoid.png" alt="Default Background" />
+      <img id="defaultBackgroundImage" src="./vexvoid-icon.png" alt="Default Background" />
     </div>
     <div id="placeholder" style="display:none;">No folders loaded.<br>Add a folder to begin.</div>
   </div>
@@ -423,6 +423,9 @@
             break;
           case 'apply-pattern':
             applyPatternToLayers(data);
+            break;
+          case 'load-composition':
+            loadCompositionToOutputLayer(data.layerId, data.composition);
             break;
         }
       });
@@ -973,6 +976,37 @@
         selectLayer(layer); // This will set the proper cursor and selection
         sendLayersUpdate();
       }
+
+      function loadCompositionToOutputLayer(layerId, composition) {
+        const layer = layers.find(l => l.id === layerId);
+        if (!layer) {
+          console.warn('Layer not found for composition:', layerId);
+          return;
+        }
+
+        // Mark layer as a pattern type
+        layer.type = 'pattern';
+        layer.patternCode = composition.code;
+        layer.name = `Layer ${layer.id}: ${composition.name}`;
+
+        // Create a canvas element for the pattern
+        const canvas = document.createElement('canvas');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        canvas.className = 'layer-image';
+        canvas.style.cssText = 'width: 100%; height: 100%;';
+
+        // Replace image element with canvas
+        if (layer.imageElement && layer.imageElement.parentNode) {
+          layer.imageElement.parentNode.replaceChild(canvas, layer.imageElement);
+        }
+        layer.imageElement = canvas;
+
+        console.log('Composition loaded to layer:', composition.name);
+        sendLayersUpdate();
+        sendPreviewUpdate();
+      }
+
       function makeDraggable(element, layer) {
         // Store dragging state on the layer object
         layer.isDragging = false;
@@ -1067,46 +1101,7 @@
         sendToControl('layer-selected', { layer: layerData });
       }
       function updateSidebarControls() {
-        if (!selectedLayer) {
-          selectedLayerInfo.textContent = 'No layer selected';
-          speedControl.disabled = true;
-          sizeControl.disabled = true;
-          jitterControl.disabled = true;
-          opacityControl.disabled = true;
-          strobeControl.disabled = true;
-          impactControl.disabled = true;
-          // playPauseBtn.disabled = true; // Keep enabled since it's global
-  
-          return;
-        }
-        
-        selectedLayerInfo.textContent = `Controlling: ${selectedLayer.name}`;
-        speedControl.disabled = false;
-        sizeControl.disabled = false;
-        jitterControl.disabled = false;
-        opacityControl.disabled = false;
-        strobeControl.disabled = false;
-        impactControl.disabled = false;
-        // playPauseBtn.disabled = false; // Always enabled since it's global
-
-        
-        // Update control values to match selected layer
-        speedControl.value = selectedLayer.speed;
-        sizeControl.value = selectedLayer.size;
-        jitterControl.value = selectedLayer.jitterAmount;
-        opacityControl.value = selectedLayer.opacity;
-        strobeControl.value = selectedLayer.strobe;
-        impactControl.value = selectedLayer.impact;
-        
-        // Update display values
-        speedValue.textContent = sliderToMs(selectedLayer.speed);
-        sizeValue.textContent = selectedLayer.size;
-        jitterValue.textContent = selectedLayer.jitterAmount;
-        opacityValue.textContent = selectedLayer.opacity;
-        strobeValue.textContent = selectedLayer.strobe;
-        impactValue.textContent = selectedLayer.impact;
-        
-        // Play/pause button is now global - don't update text here
+        // Controls are in the control window — nothing to update here
       }
       function startLayerAnimation(layer) {
         if (layer.animationInterval) clearInterval(layer.animationInterval);
@@ -1425,24 +1420,27 @@
       
       function updateLoopSlider() {
         totalImages = calculateTotalImages();
-        
+
         // Update loop end if it's beyond total images
         if (loopEnd >= totalImages) loopEnd = totalImages - 1;
         if (loopStart >= totalImages) loopStart = totalImages - 1;
         if (loopStart > loopEnd) loopStart = loopEnd;
-        
+
         // Ensure minimum valid range
         if (loopEnd < 0) loopEnd = 0;
         if (loopStart < 0) loopStart = 0;
-        
+
+        // Loop slider UI was removed — skip DOM updates
+        if (!loopSliderContainer) return;
+
         // Update slider positions
         const containerWidth = loopSliderContainer.offsetWidth;
         const startPercent = (loopStart / Math.max(totalImages - 1, 1)) * 100;
         const endPercent = (loopEnd / Math.max(totalImages - 1, 1)) * 100;
-        
+
         loopStartHandle.style.left = startPercent + '%';
         loopEndHandle.style.left = endPercent + '%';
-        
+
         // Update range bar
         loopSliderRange.style.left = startPercent + '%';
         loopSliderRange.style.width = (endPercent - startPercent) + '%';
@@ -1621,122 +1619,7 @@
           return Math.round(250 + Math.pow((x - 50) / 50, 2) * (20000 - 250));
         }
       }
-      // Removed updateSpeedFromSlider function
-      // Removed sidebar control event listeners
-      // Removed initialization code for sidebar controls
-      
-      // Open sidebar by default for easy access to buttons
-      sidebar.classList.add('open');
-      // Layer control event listeners
-      speedControl.addEventListener('input', () => {
-        if (selectedLayer) {
-          selectedLayer.speed = parseInt(speedControl.value);
-          speedValue.textContent = sliderToMs(selectedLayer.speed);
-          if (selectedLayer.isPlaying) {
-            startLayerAnimation(selectedLayer);
-          }
-        }
-      });
-      
-      sizeControl.addEventListener('input', () => {
-        if (selectedLayer) {
-          selectedLayer.size = parseInt(sizeControl.value);
-          sizeValue.textContent = selectedLayer.size;
-          
-          const scale = selectedLayer.size / 100;
-          if (!selectedLayer.jitterEnabled) {
-            selectedLayer.element.style.transform = `scale(${scale}) translate(${selectedLayer.x}px, ${selectedLayer.y}px)`;
-          }
-        }
-      });
-      
-      jitterControl.addEventListener('input', () => {
-        if (selectedLayer) {
-          selectedLayer.jitterAmount = parseInt(jitterControl.value);
-          jitterValue.textContent = selectedLayer.jitterAmount;
-          
-          const shouldJitter = selectedLayer.jitterAmount > 0;
-          
-          if (shouldJitter && !selectedLayer.jitterEnabled) {
-            selectedLayer.jitterEnabled = true;
-            startLayerJitter(selectedLayer);
-          } else if (!shouldJitter && selectedLayer.jitterEnabled) {
-            selectedLayer.jitterEnabled = false;
-            stopLayerJitter(selectedLayer);
-          }
-        }
-      });
-      
-      opacityControl.addEventListener('input', () => {
-        if (selectedLayer) {
-          selectedLayer.opacity = parseInt(opacityControl.value);
-          opacityValue.textContent = selectedLayer.opacity;
-          
-          const opacity = selectedLayer.opacity / 100;
-          selectedLayer.element.style.opacity = opacity;
-        }
-      });
-      
-      strobeControl.addEventListener('input', () => {
-        if (selectedLayer) {
-          selectedLayer.strobe = parseInt(strobeControl.value);
-          strobeValue.textContent = selectedLayer.strobe;
-          
-          // Stop existing strobe if any
-          if (selectedLayer.strobeInterval) {
-            clearInterval(selectedLayer.strobeInterval);
-            selectedLayer.strobeInterval = null;
-          }
-          
-          // Start new strobe if value > 0
-          if (selectedLayer.strobe > 0) {
-            startLayerStrobe(selectedLayer);
-          } else {
-            // Reset to normal opacity when strobe is disabled
-            selectedLayer.element.style.opacity = selectedLayer.opacity / 100;
-          }
-        }
-      });
-      
-      impactControl.addEventListener('input', () => {
-        if (selectedLayer) {
-          selectedLayer.impact = parseInt(impactControl.value);
-          impactValue.textContent = selectedLayer.impact;
-          
-          // Stop existing impact if any
-          if (selectedLayer.impactInterval) {
-            clearInterval(selectedLayer.impactInterval);
-            selectedLayer.impactInterval = null;
-          }
-          
-          // Start new impact if value > 0
-          if (selectedLayer.impact > 0) {
-            startLayerImpact(selectedLayer);
-          } else {
-            // Reset to normal scale when impact is disabled
-            const scale = selectedLayer.size / 100;
-            if (!selectedLayer.jitterEnabled) {
-              selectedLayer.element.style.transform = `scale(${scale}) translate(${selectedLayer.x}px, ${selectedLayer.y}px)`;
-            }
-          }
-        }
-      });
-      
-      playPauseBtn.addEventListener('click', () => {
-        if (globalPaused) {
-          globalResume();
-          playPauseBtn.textContent = '⏸️ Pause All';
-          frameControls.style.display = 'none'; // Hide frame controls when playing
-        } else {
-          globalPause();
-          playPauseBtn.textContent = '▶️ Resume All';
-          frameControls.style.display = 'block'; // Show frame controls when paused
-        }
-      });
-      
-      // Frame control button event listeners
-      backBtn.addEventListener('click', stepBackward);
-      forwardBtn.addEventListener('click', stepForward);
+      // Sidebar controls removed — all handled via IPC from control window
       
       // Keyboard event listeners for arrow keys and shortcuts
       document.addEventListener('keydown', (event) => {
@@ -1764,37 +1647,45 @@
         }
       });
       
-      // Loop slider drag functionality
+      // Loop slider drag functionality (guards for removed UI elements)
       let isDraggingLoopStart = false;
       let isDraggingLoopEnd = false;
-      
-      loopStartHandle.addEventListener('mousedown', (e) => {
-        isDraggingLoopStart = true;
-        e.preventDefault();
-      });
-      
-      loopEndHandle.addEventListener('mousedown', (e) => {
-        isDraggingLoopEnd = true;
-        e.preventDefault();
-      });
-      
+      const loopStartHandle = document.getElementById('loopStartHandle');
+      const loopEndHandle = document.getElementById('loopEndHandle');
+      const loopSliderContainer = document.getElementById('loopSliderContainer');
+      const loopSliderRange = document.getElementById('loopSliderRange');
+
+      if (loopStartHandle) {
+        loopStartHandle.addEventListener('mousedown', (e) => {
+          isDraggingLoopStart = true;
+          e.preventDefault();
+        });
+      }
+      if (loopEndHandle) {
+        loopEndHandle.addEventListener('mousedown', (e) => {
+          isDraggingLoopEnd = true;
+          e.preventDefault();
+        });
+      }
+
       document.addEventListener('mousemove', (e) => {
         if (!isDraggingLoopStart && !isDraggingLoopEnd) return;
-        
+        if (!loopSliderContainer) return;
+
         const rect = loopSliderContainer.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const percent = Math.max(0, Math.min(100, (x / rect.width) * 100));
         const imageIndex = Math.round((percent / 100) * Math.max(totalImages - 1, 1));
-        
+
         if (isDraggingLoopStart) {
           loopStart = Math.min(imageIndex, loopEnd);
         } else if (isDraggingLoopEnd) {
           loopEnd = Math.max(imageIndex, loopStart);
         }
-        
+
         updateLoopSlider();
       });
-      
+
       document.addEventListener('mouseup', () => {
         isDraggingLoopStart = false;
         isDraggingLoopEnd = false;
@@ -1824,9 +1715,22 @@
       // Removed layers palette toggle logic
 
       function updatePlaceholderVisibility() {
-        // Always show black screen - no default background or placeholder
-        defaultBackground.style.display = 'none';
-        placeholder.style.display = 'none';
+        const hasVisibleLayers = layers.some(l => l.visible && l.imageFiles && l.imageFiles.length > 0);
+        const hasDefaultBg = defaultBackgroundImage.src && !defaultBackgroundImage.src.endsWith('/');
+
+        if (hasVisibleLayers) {
+          // Layers are active — hide background and placeholder
+          defaultBackground.style.display = 'none';
+          placeholder.style.display = 'none';
+        } else if (hasDefaultBg) {
+          // No layers but a default background is set — show it
+          defaultBackground.style.display = 'flex';
+          placeholder.style.display = 'none';
+        } else {
+          // Nothing at all — black screen
+          defaultBackground.style.display = 'none';
+          placeholder.style.display = 'none';
+        }
       }
       
       function setDefaultBackground(imagePath) {
