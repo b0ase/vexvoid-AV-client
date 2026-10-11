@@ -2,13 +2,15 @@
 const { createClient } = require('@supabase/supabase-js');
 
 // Supabase configuration
-const SUPABASE_URL = 'https://bgotvvrslolholxgcivz.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnb3R2dnJzbG9saG9seGdjaXZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ3Mzg5MDgsImV4cCI6MjA1MDMxNDkwOH0.wK9sZQF8qLVH7vOhJKQ6eK5uJGl0xjBvN2fCzA8mP9E';
+// Set at launch (never hardcode keys): V3X_SUPABASE_URL, V3X_SUPABASE_ANON_KEY.
+// Unset = demo mode with local content only.
+const SUPABASE_URL = process.env.V3X_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = process.env.V3X_SUPABASE_ANON_KEY || '';
 
 // Create Supabase client
 let supabase = null;
 try {
-  supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  if (SUPABASE_URL && SUPABASE_ANON_KEY) supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 } catch (error) {
   console.warn('⚠️ Supabase client creation failed, using demo mode');
 }
@@ -32,7 +34,7 @@ class V3XV0IDCloudManager {
     };
     this.downloadQueue = [];
     this.isDownloading = false;
-    this.demoMode = !supabase || SUPABASE_ANON_KEY.includes('placeholder');
+    this.demoMode = !supabase;
   }
 
   // Initialize cloud connection
