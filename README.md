@@ -1,3 +1,32 @@
+# V3XV0ID AV Client 3.0
+
+Site and downloads: https://b0ase.github.io/vexvoid-AV-client/
+
+## 3.0: the VX engine
+
+The output window now runs a layered generative engine (`vx/vx-engine.js`) underneath your own image/video layers:
+
+- **Clip deck**: VexVoid smooth (Grok idents) and rough (writers, tunnels, trains) clips streamed from the VexVoid library. Shuffled, never repeats: random in-point, speed and zoom; mirrored except clips with lettering. Glitch cuts, ~45% void (no footage), ~35% clean (overlays fade, clip plays clean).
+- **Mercury pool** (WebGL raymarch), **point fields** mutated from @yuruyurau's Processing pieces (eye, bloom, mirrored vortex, hybrid, torn ribbon; trails + band shears), **Fairlight fleck chains**, sparse fine **grain**, chaotic animated **decal livery**, glitch-cycling **V3XV0ID title**.
+- **Sound**: Web Audio beep-boop engine on a look-ahead scheduler (default 100 BPM). Off by default.
+
+Controls window: the **VX ENGINE** panel toggles every layer, sets void/clean chances, formula, decal chaos, sound/BPM/volume, plus BLACKOUT, CLEAN NOW, NEXT CLIP and RESET. Keys (both windows): B blackout, C clean, N next clip, V video, M mercury, P field, F formula, K flecks, G grain, D decals, T title, [ ] chaos, S sound, - = BPM, , . volume, 0 reset.
+
+After editing `vx/`, run `pnpm run sync-docs` so the Pages preview uses the same engine.
+
+### Building
+
+```bash
+pnpm install
+pnpm run build-mac     # signed universal dmg + zip (Developer ID, hardened runtime)
+pnpm run build-win     # nsis installer + portable
+pnpm run build-linux   # AppImage + deb
+```
+
+Notarization runs when credentials are in the environment, e.g. `APPLE_KEYCHAIN_PROFILE=<profile> pnpm run build-mac` after a one-time `xcrun notarytool store-credentials <profile> ...`.
+
+---
+
 # V3XV0ID Image Animator
 
 ## 🎭 Professional Live Visual Performance Tool

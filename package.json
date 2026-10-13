@@ -122,10 +122,14 @@
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "V3XV0ID-AV-Client-${version}-win-${arch}-setup.${ext}"
     },
     "dmg": {
       "artifactName": "V3XV0ID-AV-Client-${version}-mac-universal.${ext}"
+    },
+    "portable": {
+      "artifactName": "V3XV0ID-AV-Client-${version}-win-${arch}-portable.${ext}"
     }
   }
 }
