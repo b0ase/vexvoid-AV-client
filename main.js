@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, desktopCapturer, dialog } = require('electron');
 const path = require('path');
 const remoteMain = require('@electron/remote/main');
 
@@ -89,6 +89,27 @@ ipcMain.on('output-to-control', (event, message) => {
   if (controlWindow && controlWindow.webContents) {
     controlWindow.webContents.send('output-message', message);
   }
+});
+
+// Recording: get output window source ID for desktopCapturer
+ipcMain.handle('get-output-source-id', async () => {
+  if (!outputWindow) return null;
+  const sources = await desktopCapturer.getSources({
+    types: ['window'],
+    thumbnailSize: { width: 0, height: 0 }
+  });
+  const outputSource = sources.find(s => {
+    // Match by window title or webContents id
+    return s.name === 'V3XV0ID AV Client - Output' ||
+           s.id === `window:${outputWindow.id}:0`;
+  });
+  return outputSource ? outputSource.id : null;
+});
+
+// Recording: save dialog
+ipcMain.handle('show-save-dialog', async (event, options) => {
+  const result = await dialog.showSaveDialog(controlWindow, options);
+  return result;
 });
 
 app.whenReady().then(() => {

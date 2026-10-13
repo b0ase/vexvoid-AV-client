@@ -184,14 +184,12 @@
     }
     .layer-image, .layer-video {
       display: block;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      box-shadow: 0 0 20px rgba(0,0,0,0.8);
-      max-width: none;
-      max-height: none;
-      filter: contrast(1.1);
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
     }
-    
-    .layer-video {
+
+    .layer-image.fit-contain, .layer-video.fit-contain {
       object-fit: contain;
     }
     .layer-canvas:hover {
@@ -427,6 +425,9 @@
           case 'load-composition':
             loadCompositionToOutputLayer(data.layerId, data.composition);
             break;
+          case 'update-video-property':
+            updateVideoProperty(data.layerId, data.property, data.value);
+            break;
         }
       });
       
@@ -444,7 +445,16 @@
           strobe: layer.strobe,
           impact: layer.impact,
           inverse: layer.inverse || false,
-          palette: layer.palette || 'A' // Include palette information
+          palette: layer.palette || 'A',
+          fillFrame: layer.fillFrame !== false,
+          isVideo: layer.isVideo || false,
+          playbackRate: layer.playbackRate || 1.0,
+          videoLoopIn: layer.videoLoopIn || 0,
+          videoLoopOut: layer.videoLoopOut || 0,
+          videoPaused: layer.videoPaused || false,
+          videoDuration: layer.videoDuration || 0,
+          videoPosition: layer.videoPosition || 0,
+          imageCount: layer.imageFiles ? layer.imageFiles.length : 0
         }));
         
         sendToControl('layers-updated', { layers: layerData });
@@ -455,18 +465,20 @@
         sendPreviewUpdate();
       }
       
+      // Track crossfader state so other opacity changes can respect it
+      let currentCrossfader = { aOpacity: 1, bOpacity: 0 };
+
       function handleCrossfaderUpdate(data) {
         const { aOpacity, bOpacity, crossfaderValue } = data;
-        
-        // Apply crossfader opacity to all layers based on their actual palette assignment
+        currentCrossfader = { aOpacity, bOpacity };
+        applyCrossfaderOpacities();
+      }
+
+      function applyCrossfaderOpacities() {
         layers.forEach(layer => {
           if (!layer.element) return;
-          
-          // Use the layer's actual palette assignment
           const isALayer = (layer.palette || 'A') === 'A';
-          const targetOpacity = isALayer ? aOpacity : bOpacity;
-          
-          // Apply crossfader opacity on top of layer's own opacity
+          const targetOpacity = isALayer ? currentCrossfader.aOpacity : currentCrossfader.bOpacity;
           const finalOpacity = (layer.opacity / 100) * targetOpacity;
           layer.element.style.opacity = finalOpacity;
         });
@@ -522,23 +534,16 @@
             if (mediaElement) {
               const firstFile = layerImages[0];
               const ext = path.extname(firstFile).toLowerCase();
-              
-              if (videoExtensions.includes(ext)) {
-                // Replace image with video element if needed
-                if (mediaElement.tagName === 'IMG') {
-                  const videoElement = document.createElement('video');
-                  videoElement.className = 'layer-video';
-                  videoElement.autoplay = true;
-                  videoElement.loop = true;
-                  videoElement.muted = true;
-                  videoElement.style.cssText = mediaElement.style.cssText;
-                  mediaElement.parentNode.replaceChild(videoElement, mediaElement);
-                  layer.imageElement = videoElement;
-                }
-                layer.imageElement.src = 'file://' + encodeURI(firstFile);
+              const allVideos = layerImages.every(f => videoExtensions.includes(path.extname(f).toLowerCase()));
+
+              if (allVideos) {
+                // Video content — set defaults for video mode
                 layer.isVideo = true;
+                if (layer.speed === 20) layer.speed = 50; // Default to 1.0x
+                layer.playbackRate = sliderToPlaybackRate(layer.speed);
+                layer.videoLoopOut = 0; // Reset — will be set per-video
               } else {
-                // Replace video with image element if needed
+                // Image content — set up the first frame
                 if (mediaElement.tagName === 'VIDEO') {
                   const imageElement = document.createElement('img');
                   imageElement.className = 'layer-image';
@@ -548,14 +553,12 @@
                 }
                 layer.imageElement.src = 'file://' + encodeURI(firstFile);
                 layer.isVideo = false;
-              }
-              
-              // Apply inverse filter if layer has inverse enabled
-              if (layer.inverse) {
-                layer.imageElement.style.filter = 'invert(1)';
+                if (layer.inverse) layer.imageElement.style.filter = 'invert(1)';
+                layer.imageElement.classList.toggle('fit-contain', !layer.fillFrame);
               }
             }
-            
+
+            // startLayerAnimation handles both video sequence and image flipbook
             startLayerAnimation(layer);
             updatePlaceholderVisibility();
             
@@ -578,7 +581,15 @@
         
         switch (property) {
           case 'speed':
-            if (layer.isPlaying) startLayerAnimation(layer);
+            if (layer.isVideo) {
+              const rate = sliderToPlaybackRate(value);
+              layer.playbackRate = rate;
+              if (layer.imageElement && layer.imageElement.tagName === 'VIDEO') {
+                layer.imageElement.playbackRate = rate;
+              }
+            } else {
+              if (layer.isPlaying) startLayerAnimation(layer);
+            }
             break;
           case 'size':
             const scale = layer.size / 100;
@@ -597,10 +608,15 @@
             }
             break;
           case 'opacity':
-            layer.element.style.opacity = layer.opacity / 100;
+            applyCrossfaderOpacities();
             break;
           case 'blendMode':
             layer.element.style.mixBlendMode = layer.blendMode;
+            break;
+          case 'fillFrame':
+            if (layer.imageElement) {
+              layer.imageElement.classList.toggle('fit-contain', !value);
+            }
             break;
           case 'strobe':
             if (layer.strobeInterval) {
@@ -610,7 +626,7 @@
             if (layer.strobe > 0) {
               startLayerStrobe(layer);
             } else {
-              layer.element.style.opacity = layer.opacity / 100;
+              applyCrossfaderOpacities();
             }
             break;
           case 'impact':
@@ -636,6 +652,43 @@
         sendLayersUpdate();
       }
       
+      function sliderToPlaybackRate(x) {
+        // 1=0.1x, 25=0.5x, 50=1.0x, 75=2.0x, 100=4.0x
+        x = Number(x);
+        if (x <= 50) {
+          return 0.1 + (x / 50) * 0.9; // 0.1 to 1.0
+        }
+        return 1.0 + Math.pow((x - 50) / 50, 1.5) * 3.0; // 1.0 to 4.0 (exponential)
+      }
+
+      function updateVideoProperty(layerId, property, value) {
+        const layer = layers.find(l => l.id === layerId);
+        if (!layer || !layer.isVideo || !layer.imageElement) return;
+        const video = layer.imageElement;
+
+        switch (property) {
+          case 'playbackRate':
+            layer.playbackRate = value;
+            video.playbackRate = value;
+            break;
+          case 'videoLoopIn':
+            layer.videoLoopIn = value;
+            break;
+          case 'videoLoopOut':
+            layer.videoLoopOut = value;
+            break;
+          case 'seek':
+            layer.videoPosition = value;
+            video.currentTime = value;
+            break;
+          case 'togglePlayPause':
+            layer.videoPaused = !layer.videoPaused;
+            if (layer.videoPaused) { video.pause(); } else { video.play(); }
+            break;
+        }
+        sendLayersUpdate();
+      }
+
       function toggleGlobalPause() {
         if (globalPaused) {
           globalResume();
@@ -679,7 +732,16 @@
           strobe: layer.strobe,
           impact: layer.impact,
           inverse: layer.inverse || false,
-          palette: layer.palette || 'A' // Include palette information
+          palette: layer.palette || 'A',
+          fillFrame: layer.fillFrame !== false,
+          isVideo: layer.isVideo || false,
+          playbackRate: layer.playbackRate || 1.0,
+          videoLoopIn: layer.videoLoopIn || 0,
+          videoLoopOut: layer.videoLoopOut || 0,
+          videoPaused: layer.videoPaused || false,
+          videoDuration: layer.videoDuration || 0,
+          videoPosition: layer.videoPosition || 0,
+          imageCount: layer.imageFiles ? layer.imageFiles.length : 0
         }));
         
         sendToControl('layers-updated', { layers: layerData });
@@ -940,7 +1002,15 @@
           isMainLayer: false,
           imageFiles: null, // Layer-specific images
           inverse: false, // Default to no inverse
-          palette: palette // Track which palette this layer belongs to
+          palette: palette, // Track which palette this layer belongs to
+          fillFrame: true, // default: scale to fill
+          isVideo: false,
+          playbackRate: 1.0,
+          videoLoopIn: 0,
+          videoLoopOut: 0,
+          videoPaused: false,
+          videoDuration: 0,
+          videoPosition: 0
         };
         const canvasElement = document.createElement('div');
         canvasElement.className = 'layer-canvas draggable';
@@ -973,7 +1043,8 @@
         makeDraggable(canvasElement, layer);
         startLayerAnimation(layer);
         updatePlaceholderVisibility();
-        selectLayer(layer); // This will set the proper cursor and selection
+        applyCrossfaderOpacities();
+        selectLayer(layer);
         sendLayersUpdate();
       }
 
@@ -1105,46 +1176,47 @@
       }
       function startLayerAnimation(layer) {
         if (layer.animationInterval) clearInterval(layer.animationInterval);
+        // Remove any previous video-ended listener
+        if (layer._onVideoEnded) {
+          layer.imageElement && layer.imageElement.removeEventListener('ended', layer._onVideoEnded);
+          layer._onVideoEnded = null;
+        }
         if (!layer.isPlaying) return;
-        
-        // Use layer-specific images if available, otherwise fall back to global imageFiles
+
         const layerImageFiles = layer.imageFiles || imageFiles;
         if (layerImageFiles.length === 0) return;
-        
-        // If this is a single video file, don't animate through files
-        if (layerImageFiles.length === 1) {
-          const ext = path.extname(layerImageFiles[0]).toLowerCase();
-          if (videoExtensions.includes(ext)) {
-            // Single video - just ensure it's playing
-            const videoElement = layer.imageElement;
-            if (videoElement && videoElement.tagName === 'VIDEO') {
-              videoElement.play();
-            }
-            return;
-          }
+
+        // Check if content is all videos
+        const allVideos = layerImageFiles.every(f => videoExtensions.includes(path.extname(f).toLowerCase()));
+        const firstExt = path.extname(layerImageFiles[0]).toLowerCase();
+        const firstIsVideo = videoExtensions.includes(firstExt);
+
+        if (firstIsVideo && allVideos) {
+          // === VIDEO SEQUENCE MODE ===
+          // Play videos in order. Each plays through, then auto-advance to next.
+          layer.isVideo = true;
+          loadVideoAtIndex(layer, layerImageFiles, layer.imageIndex);
+          return;
         }
-        
+
+        // === IMAGE SEQUENCE MODE (original flipbook behavior) ===
         layer.animationInterval = setInterval(() => {
-          // Respect loop range for layer animations
           const maxIndex = Math.min(loopEnd, layerImageFiles.length - 1);
           const minIndex = Math.min(loopStart, layerImageFiles.length - 1);
-          
+
           if (layer.imageIndex < minIndex || layer.imageIndex > maxIndex) {
             layer.imageIndex = minIndex;
           } else {
             layer.imageIndex++;
-            if (layer.imageIndex > maxIndex) {
-              layer.imageIndex = minIndex;
-            }
+            if (layer.imageIndex > maxIndex) layer.imageIndex = minIndex;
           }
-          
+
           const currentFile = layerImageFiles[layer.imageIndex];
           const ext = path.extname(currentFile).toLowerCase();
           const mediaElement = layer.imageElement || layer.element.querySelector('.layer-image, .layer-video');
-          
+
           if (mediaElement) {
             if (videoExtensions.includes(ext)) {
-              // Switch to video if needed
               if (mediaElement.tagName === 'IMG') {
                 const videoElement = document.createElement('video');
                 videoElement.className = 'layer-video';
@@ -1158,7 +1230,6 @@
               layer.imageElement.src = 'file://' + encodeURI(currentFile);
               layer.imageElement.play();
             } else {
-              // Switch to image if needed
               if (mediaElement.tagName === 'VIDEO') {
                 const imageElement = document.createElement('img');
                 imageElement.className = 'layer-image';
@@ -1168,14 +1239,75 @@
               }
               layer.imageElement.src = 'file://' + encodeURI(currentFile);
             }
-            
-            // Preserve inverse filter during animation
-            if (layer.inverse) {
-              layer.imageElement.style.filter = 'invert(1)';
-            }
+            if (layer.inverse) layer.imageElement.style.filter = 'invert(1)';
+            layer.imageElement.classList.toggle('fit-contain', !layer.fillFrame);
           }
           updateLayersList();
         }, sliderToMs(layer.speed));
+      }
+
+      // Load a video file at a given index and set up auto-advance
+      function loadVideoAtIndex(layer, files, index) {
+        if (index >= files.length) index = 0;
+        if (index < 0) index = files.length - 1;
+        layer.imageIndex = index;
+
+        const filePath = files[index];
+        const mediaElement = layer.imageElement;
+
+        // Ensure we have a video element
+        if (!mediaElement || mediaElement.tagName !== 'VIDEO') {
+          const videoElement = document.createElement('video');
+          videoElement.className = 'layer-video';
+          videoElement.muted = true;
+          videoElement.playsInline = true;
+          if (mediaElement && mediaElement.parentNode) {
+            videoElement.style.cssText = mediaElement.style.cssText;
+            mediaElement.parentNode.replaceChild(videoElement, mediaElement);
+          }
+          layer.imageElement = videoElement;
+        }
+
+        const video = layer.imageElement;
+        video.loop = false; // Don't loop individual videos — advance to next
+        video.src = 'file://' + encodeURI(filePath);
+        video.playbackRate = layer.playbackRate || 1.0;
+        if (layer.inverse) video.style.filter = 'invert(1)';
+        video.classList.toggle('fit-contain', !layer.fillFrame);
+
+        // Capture duration on metadata load
+        video.addEventListener('loadedmetadata', () => {
+          layer.videoDuration = video.duration;
+          if (!layer.videoLoopOut) layer.videoLoopOut = video.duration;
+          sendLayersUpdate();
+        }, { once: true });
+
+        // Set up loop enforcement
+        if (layer._loopHandler) video.removeEventListener('timeupdate', layer._loopHandler);
+        layer._loopHandler = () => {
+          const loopOut = layer.videoLoopOut || video.duration;
+          if (video.currentTime >= loopOut && files.length === 1) {
+            video.currentTime = layer.videoLoopIn || 0;
+          }
+          layer.videoPosition = video.currentTime;
+        };
+        video.addEventListener('timeupdate', layer._loopHandler);
+
+        // Auto-advance to next video when this one ends
+        if (layer._onVideoEnded) video.removeEventListener('ended', layer._onVideoEnded);
+        layer._onVideoEnded = () => {
+          if (!layer.isPlaying || globalPaused) return;
+          const nextIndex = (layer.imageIndex + 1) % files.length;
+          loadVideoAtIndex(layer, files, nextIndex);
+        };
+        video.addEventListener('ended', layer._onVideoEnded);
+
+        // Start playing
+        if (!layer.videoPaused && !globalPaused) {
+          video.play().catch(() => {});
+        }
+
+        sendLayersUpdate();
       }
       function stopLayerAnimation(layer) {
         if (layer.animationInterval) clearInterval(layer.animationInterval);
@@ -1285,8 +1417,8 @@
           if (layer.strobeInterval) {
             clearInterval(layer.strobeInterval);
             layer.strobeInterval = null;
-            // Reset to normal opacity
-            layer.element.style.opacity = layer.opacity / 100;
+            // Reset opacity (respecting crossfader)
+            applyCrossfaderOpacities();
           }
           // Stop all impact effects
           if (layer.impactInterval) {
@@ -1297,6 +1429,10 @@
             if (!layer.jitterEnabled) {
               layer.element.style.transform = `scale(${scale}) translate(${layer.x}px, ${layer.y}px)`;
             }
+          }
+          // Pause video layers
+          if (layer.isVideo && layer.imageElement && layer.imageElement.tagName === 'VIDEO') {
+            layer.imageElement.pause();
           }
         });
         // Also stop the main animation if it exists
@@ -1317,6 +1453,10 @@
           // Restart animations for layers that were playing
           if (layer.isPlaying) {
             startLayerAnimation(layer);
+          }
+          // Resume video layers that weren't individually paused
+          if (layer.isVideo && !layer.videoPaused && layer.imageElement && layer.imageElement.tagName === 'VIDEO') {
+            layer.imageElement.play();
           }
           // Restart jitter for layers that had it enabled
           if (layer.jitterEnabled) {

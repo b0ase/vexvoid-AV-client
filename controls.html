@@ -6,54 +6,78 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>V3XV0ID Image Animator - Controls</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap');
-    
+    /* ========== V3XV0ID DESIGN SYSTEM ========== */
+    :root {
+      --bg: #000000;
+      --bg-1: #0a0a0a;
+      --bg-2: #1a1a1a;
+      --white: #ffffff;
+      --white-80: rgba(255,255,255,0.8);
+      --white-50: rgba(255,255,255,0.5);
+      --white-30: rgba(255,255,255,0.3);
+      --white-20: rgba(255,255,255,0.2);
+      --white-15: rgba(255,255,255,0.15);
+      --white-10: rgba(255,255,255,0.1);
+      --white-06: rgba(255,255,255,0.06);
+      --white-03: rgba(255,255,255,0.03);
+      --font: 'Courier New', Courier, monospace;
+      --transition: 300ms ease;
+    }
+
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes glitch {
+      0%, 90%, 100% { transform: translate(0); }
+      20% { transform: translate(-1px, 1px); }
+      40% { transform: translate(-1px, -1px); }
+      60% { transform: translate(1px, 1px); }
+      80% { transform: translate(1px, -1px); }
+    }
+    @keyframes pulse { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
+    @keyframes scanline {
+      0% { transform: translateY(-100%); }
+      100% { transform: translateY(100vh); }
+    }
+
+
     html, body {
       height: 100%;
       margin: 0;
       padding: 0;
-      font-family: 'Courier New', 'Courier Prime', monospace;
-      background: #000000;
-      color: #ffffff;
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--white);
       overflow: hidden;
-      font-size: 12px;
-      line-height: 1.0;
+      font-size: 11px;
+      line-height: 1.4;
       font-weight: normal;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
-      text-rendering: optimizeLegibility;
-      cursor: crosshair;
+      cursor: default;
       position: relative;
     }
 
-    /* Scan lines effect */
+    * { box-sizing: border-box; }
+
+    /* Scan lines overlay */
     body::before {
       content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 2px,
-        rgba(255, 255, 255, 0.005) 2px,
-        rgba(255, 255, 255, 0.005) 4px
-      );
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.015) 2px, rgba(255,255,255,0.015) 4px);
       pointer-events: none;
-      z-index: 1000;
+      z-index: 10000;
     }
 
     /* V3XV0ID branding header */
     .v3xv0id-header {
       position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      background: rgba(0, 0, 0, 0.95);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-      padding: 12px 20px;
+      top: 0; left: 0; right: 0;
+      background: rgba(0,0,0,0.95);
+      border-bottom: 1px solid var(--white-15);
+      padding: 8px 16px;
       z-index: 999;
       display: flex;
       align-items: center;
@@ -61,91 +85,66 @@
     }
 
     .v3xv0id-brand {
-      font-family: 'Courier New', monospace;
       font-weight: bold;
-      font-size: 16px;
-      color: #ffffff;
-      text-transform: uppercase;
-      letter-spacing: 0.2em;
-      text-shadow: 0 0 3px rgba(255, 255, 255, 0.8);
+      font-size: 14px;
+      letter-spacing: 0.3em;
+      text-shadow: 0 0 2px var(--white-80);
     }
 
     .v3xv0id-subtitle {
-      font-family: 'Courier New', monospace;
-      font-size: 10px;
-      color: #888;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
+      font-size: 9px;
+      color: var(--white-50);
+      letter-spacing: 0.15em;
     }
 
     .cyber-text {
-      color: #ffffff;
-      font-family: 'Courier New', monospace;
       font-weight: bold;
       letter-spacing: 0.1em;
-      text-transform: uppercase;
-      text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+      text-shadow: 0 0 2px var(--white-80);
     }
 
     /* Tab Navigation */
     .tab-navigation {
       position: fixed;
-      top: 60px;
-      left: 0;
-      right: 0;
-      background: rgba(0, 0, 0, 0.9);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-      padding: 0 20px;
+      top: 40px; left: 0; right: 0;
+      background: rgba(0,0,0,0.9);
+      border-bottom: 1px solid var(--white-10);
+      padding: 0 12px;
       z-index: 998;
       display: flex;
-      gap: 2px;
+      gap: 0;
     }
 
     .tab-button {
-      background: rgba(0, 0, 0, 0.6);
-      color: #888;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-bottom: none;
-      padding: 10px 20px;
-      cursor: crosshair;
-      font-family: 'Courier New', monospace;
+      background: transparent;
+      color: var(--white-30);
+      border: none;
+      border-bottom: 1px solid transparent;
+      padding: 8px 14px;
+      cursor: pointer;
+      font-family: var(--font);
       font-weight: bold;
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      transition: all 0.2s;
-      position: relative;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      transition: all var(--transition);
     }
 
     .tab-button:hover {
-      color: #ffffff;
-      background: rgba(255, 255, 255, 0.05);
-      border-color: rgba(255, 255, 255, 0.4);
+      color: var(--white-80);
+      background: var(--white-03);
     }
 
     .tab-button.active {
-      background: rgba(0, 0, 0, 0.8);
-      color: #ffffff;
-      border-color: rgba(255, 255, 255, 0.5);
-      text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
-    }
-
-    .tab-button.active::after {
-      content: '';
-      position: absolute;
-      bottom: -1px;
-      left: 0;
-      right: 0;
-      height: 1px;
-      background: rgba(0, 0, 0, 0.8);
+      color: var(--white);
+      border-bottom-color: var(--white);
+      text-shadow: 0 0 2px var(--white-80);
     }
 
     .main-container {
       display: flex;
       height: 100vh;
-      gap: 15px;
-      padding: 110px 15px 15px 15px;
-      box-sizing: border-box;
+      gap: 8px;
+      padding: 80px 8px 8px 8px;
     }
 
     .tab-content {
@@ -156,7 +155,8 @@
 
     .tab-content.active {
       display: flex;
-      gap: 15px;
+      gap: 8px;
+      animation: slideUp 0.3s ease both;
     }
 
     /* ========== TAB CONTENT STYLES ========== */
@@ -186,7 +186,7 @@
     }
 
     .cloud-status {
-      font-family: 'Courier New', monospace;
+      font-family: var(--font-sans);
       font-size: 10px;
       color: #888;
       text-transform: uppercase;
@@ -216,38 +216,43 @@
     }
 
     .browser-btn {
-      background: rgba(0, 0, 0, 0.8);
-      color: #ffffff;
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      padding: 8px 15px;
-      cursor: crosshair;
-      font-family: 'Courier New', monospace;
+      background: var(--bg);
+      color: var(--white-50);
+      border: 1px solid var(--white-20);
+      padding: 6px 12px;
+      cursor: pointer;
+      font-family: var(--font);
       font-weight: bold;
-      font-size: 10px;
-      text-transform: uppercase;
+      font-size: 9px;
       letter-spacing: 0.05em;
-      transition: all 0.2s;
+      transition: all var(--transition);
     }
 
     .browser-btn:hover {
-      background: rgba(255, 255, 255, 0.1);
-      border-color: rgba(255, 255, 255, 0.5);
+      background: var(--white-06);
+      border-color: var(--white-50);
+      color: var(--white);
     }
 
     .search-input {
-      background: rgba(0, 0, 0, 0.8);
-      color: #ffffff;
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      padding: 8px 12px;
-      font-family: 'Courier New', monospace;
+      background: var(--bg);
+      color: var(--white);
+      border: 1px solid var(--white-20);
+      padding: 6px 10px;
+      font-family: var(--font);
       font-size: 10px;
-      text-transform: uppercase;
       letter-spacing: 0.05em;
       width: 200px;
+      outline: none;
+      transition: border-color var(--transition);
+    }
+
+    .search-input:focus {
+      border-color: var(--white-50);
     }
 
     .search-input::placeholder {
-      color: #888;
+      color: var(--white-20);
     }
 
     .video-library, .image-library {
@@ -268,7 +273,7 @@
       background: rgba(0, 0, 0, 0.8);
       border: 1px solid rgba(255, 255, 255, 0.2);
       padding: 10px;
-      cursor: crosshair;
+      cursor: pointer;
       transition: all 0.2s;
       text-align: center;
     }
@@ -290,7 +295,7 @@
     }
 
     .video-name, .image-name {
-      font-family: 'Courier New', monospace;
+      font-family: var(--font-sans);
       font-size: 9px;
       color: #ffffff;
       text-transform: uppercase;
@@ -324,7 +329,7 @@
     .pattern-status {
       display: flex;
       gap: 15px;
-      font-family: 'Courier New', monospace;
+      font-family: var(--font-sans);
       font-size: 10px;
       color: #888;
       text-transform: uppercase;
@@ -361,8 +366,8 @@
       color: #ffffff;
       border: 1px solid rgba(255, 255, 255, 0.3);
       padding: 6px 12px;
-      cursor: crosshair;
-      font-family: 'Courier New', monospace;
+      cursor: pointer;
+      font-family: var(--font-sans);
       font-size: 9px;
       text-transform: uppercase;
       transition: all 0.2s;
@@ -400,7 +405,7 @@
       color: #ffffff;
       border: 1px solid rgba(255, 255, 255, 0.2);
       padding: 15px;
-      font-family: 'Courier New', monospace;
+      font-family: var(--font-sans);
       font-size: 12px;
       resize: vertical;
     }
@@ -454,7 +459,7 @@
     }
 
     .status-badge, .fps-badge {
-      font-family: 'Courier New', monospace;
+      font-family: var(--font-sans);
       font-size: 9px;
       padding: 2px 6px;
       background: rgba(0, 0, 0, 0.6);
@@ -485,7 +490,7 @@
     }
 
     .section-header {
-      font-family: 'Courier New', monospace;
+      font-family: var(--font-sans);
       font-size: 10px;
       color: #ffffff;
       text-transform: uppercase;
@@ -508,7 +513,7 @@
       color: #ffffff;
       border: 1px solid rgba(255, 255, 255, 0.2);
       padding: 10px;
-      font-family: 'Courier New', monospace;
+      font-family: var(--font-sans);
       font-size: 11px;
       resize: none;
       min-height: 200px;
@@ -533,8 +538,8 @@
       color: #ffffff;
       border: 1px solid rgba(255, 255, 255, 0.3);
       padding: 4px 6px;
-      cursor: crosshair;
-      font-family: 'Courier New', monospace;
+      cursor: pointer;
+      font-family: var(--font-sans);
       font-size: 8px;
       text-transform: uppercase;
       transition: all 0.2s;
@@ -571,7 +576,7 @@
       padding: 5px;
       background: rgba(0, 0, 0, 0.6);
       border: 1px solid rgba(255, 255, 255, 0.2);
-      font-family: 'Courier New', monospace;
+      font-family: var(--font-sans);
       font-size: 9px;
     }
 
@@ -581,7 +586,7 @@
 
     .target-layer-item label {
       color: #ffffff;
-      cursor: crosshair;
+      cursor: pointer;
       flex: 1;
     }
 
@@ -630,7 +635,7 @@
       padding: 10px;
       background: rgba(0, 0, 0, 0.6);
       border: 1px solid rgba(255, 255, 255, 0.2);
-      cursor: crosshair;
+      cursor: pointer;
       transition: all 0.2s;
     }
 
@@ -645,7 +650,7 @@
     }
 
     .track-number {
-      font-family: 'Courier New', monospace;
+      font-family: var(--font-sans);
       font-size: 10px;
       color: #888;
       min-width: 30px;
@@ -656,7 +661,7 @@
     }
 
     .track-name {
-      font-family: 'Courier New', monospace;
+      font-family: var(--font-sans);
       font-size: 11px;
       color: #ffffff;
       text-transform: uppercase;
@@ -664,14 +669,14 @@
     }
 
     .track-meta {
-      font-family: 'Courier New', monospace;
+      font-family: var(--font-sans);
       font-size: 9px;
       color: #888;
       text-transform: uppercase;
     }
 
     .track-duration {
-      font-family: 'Courier New', monospace;
+      font-family: var(--font-sans);
       font-size: 10px;
       color: #888;
     }
@@ -706,7 +711,7 @@
     }
 
     .track-title {
-      font-family: 'Courier New', monospace;
+      font-family: var(--font-sans);
       font-size: 14px;
       color: #ffffff;
       font-weight: bold;
@@ -714,14 +719,14 @@
     }
 
     .track-artist {
-      font-family: 'Courier New', monospace;
+      font-family: var(--font-sans);
       font-size: 11px;
       color: #888;
       text-transform: uppercase;
     }
 
     .track-format {
-      font-family: 'Courier New', monospace;
+      font-family: var(--font-sans);
       font-size: 9px;
       color: #666;
       text-transform: uppercase;
@@ -739,7 +744,7 @@
       color: #ffffff;
       border: 1px solid rgba(255, 255, 255, 0.3);
       padding: 10px 15px;
-      cursor: crosshair;
+      cursor: pointer;
       font-size: 16px;
       transition: all 0.2s;
     }
@@ -758,7 +763,7 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      font-family: 'Courier New', monospace;
+      font-family: var(--font-sans);
       font-size: 10px;
       color: #888;
     }
@@ -768,14 +773,14 @@
       height: 4px;
       background: rgba(255, 255, 255, 0.2);
       outline: none;
-      cursor: crosshair;
+      cursor: pointer;
     }
 
     .player-volume {
       display: flex;
       align-items: center;
       gap: 10px;
-      font-family: 'Courier New', monospace;
+      font-family: var(--font-sans);
       font-size: 10px;
       color: #888;
     }
@@ -785,7 +790,7 @@
       height: 4px;
       background: rgba(255, 255, 255, 0.2);
       outline: none;
-      cursor: crosshair;
+      cursor: pointer;
     }
 
     .audio-visualizer {
@@ -821,7 +826,7 @@
     .composer-status {
       display: flex;
       gap: 15px;
-      font-family: 'Courier New', monospace;
+      font-family: var(--font-sans);
       font-size: 10px;
       color: #888;
       text-transform: uppercase;
@@ -840,8 +845,8 @@
       color: #ffffff;
       border: 1px solid rgba(255, 255, 255, 0.3);
       padding: 10px 15px;
-      cursor: crosshair;
-      font-family: 'Courier New', monospace;
+      cursor: pointer;
+      font-family: var(--font-sans);
       font-size: 10px;
       text-transform: uppercase;
       transition: all 0.2s;
@@ -877,7 +882,7 @@
       color: #ffffff;
       border: 1px solid rgba(255, 255, 255, 0.3);
       padding: 10px;
-      font-family: 'Courier New', monospace;
+      font-family: var(--font-sans);
       font-size: 11px;
       resize: vertical;
     }
@@ -887,8 +892,8 @@
       color: #ffffff;
       border: 1px solid rgba(255, 255, 255, 0.3);
       padding: 12px 20px;
-      cursor: crosshair;
-      font-family: 'Courier New', monospace;
+      cursor: pointer;
+      font-family: var(--font-sans);
       font-size: 11px;
       text-transform: uppercase;
       font-weight: bold;
@@ -912,8 +917,8 @@
       color: #ffffff;
       border: 1px solid rgba(255, 255, 255, 0.3);
       padding: 6px 12px;
-      cursor: crosshair;
-      font-family: 'Courier New', monospace;
+      cursor: pointer;
+      font-family: var(--font-sans);
       font-size: 9px;
       text-transform: uppercase;
       transition: all 0.2s;
@@ -949,7 +954,7 @@
     .track-label {
       width: 100px;
       padding: 10px;
-      font-family: 'Courier New', monospace;
+      font-family: var(--font-sans);
       font-size: 9px;
       color: #888;
       text-transform: uppercase;
@@ -972,20 +977,20 @@
 
     /* Left Column - Dual Layer Palettes */
     .layers-column {
-      flex: 0 0 300px;
-      background: rgba(0, 0, 0, 0.8);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      padding: 15px;
+      flex: 0 0 280px;
+      background: var(--bg-1);
+      border: 1px solid var(--white-15);
+      padding: 10px;
       display: flex;
       flex-direction: column;
-      gap: 15px;
+      gap: 8px;
     }
 
     /* Crossfader Section */
     .crossfader-section {
-      background: rgba(0, 0, 0, 0.6);
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      padding: 15px;
+      background: var(--bg);
+      border: 1px solid var(--white-20);
+      padding: 12px;
     }
 
     .crossfader-header {
@@ -995,13 +1000,12 @@
     }
 
     .crossfader-label {
-      font-family: 'Courier New', monospace;
       font-weight: bold;
-      font-size: 16px;
-      color: #ffffff;
-      text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+      font-size: 14px;
+      color: var(--white);
       min-width: 20px;
       text-align: center;
+      text-shadow: 0 0 2px var(--white-80);
     }
 
     .crossfader-container {
@@ -1018,7 +1022,7 @@
       background: rgba(255, 255, 255, 0.2);
       outline: none;
       -webkit-appearance: none;
-      cursor: crosshair;
+      cursor: pointer;
       border: 1px solid rgba(255, 255, 255, 0.3);
       position: relative;
       z-index: 2;
@@ -1030,7 +1034,7 @@
       width: 20px;
       height: 30px;
       background: #ffffff;
-      cursor: crosshair;
+      cursor: pointer;
       border: 2px solid #000000;
       box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
     }
@@ -1053,12 +1057,17 @@
     /* Palette Sections */
     .palette-section {
       flex: 1;
-      background: rgba(0, 0, 0, 0.4);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      padding: 15px;
+      background: var(--bg);
+      border: 1px solid var(--white-15);
+      padding: 10px;
       display: flex;
       flex-direction: column;
       min-height: 200px;
+      transition: border-color var(--transition);
+    }
+
+    .palette-section:hover {
+      border-color: var(--white-30);
     }
 
     .palette-header {
@@ -1073,33 +1082,29 @@
 
     .palette-header h3 {
       margin: 0;
-      font-size: 12px;
-      font-family: 'Courier New', monospace;
+      font-size: 10px;
       font-weight: bold;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: #ffffff;
-      text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+      letter-spacing: 0.15em;
+      color: var(--white-50);
     }
 
     .add-layer-btn {
-      background: #ffffff;
-      color: #000000;
-      border: 1px solid #ffffff;
-      padding: 6px 12px;
-      cursor: crosshair;
-      font-family: 'Courier New', monospace;
+      background: var(--white);
+      color: #000;
+      border: 1px solid var(--white);
+      padding: 4px 10px;
+      cursor: pointer;
+      font-family: var(--font);
       font-weight: bold;
-      font-size: 10px;
-      text-transform: uppercase;
+      font-size: 9px;
       letter-spacing: 0.05em;
-      transition: all 0.2s;
+      transition: all var(--transition);
     }
 
     .add-layer-btn:hover {
-      background: #000000;
-      color: #ffffff;
-      box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+      background: #000;
+      color: var(--white);
+      box-shadow: 0 0 8px var(--white-30);
     }
 
     .layers-list {
@@ -1111,23 +1116,23 @@
     }
 
     .layer-item {
-      background: rgba(0, 0, 0, 0.6);
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      padding: 12px;
-      cursor: crosshair;
-      transition: all 0.2s;
+      background: var(--bg);
+      border: 1px solid var(--white-15);
+      padding: 8px 10px;
+      cursor: pointer;
+      transition: all var(--transition);
       user-select: none;
     }
 
     .layer-item:hover {
-      background: rgba(255, 255, 255, 0.05);
-      border-color: rgba(255, 255, 255, 0.5);
+      border-color: var(--white-30);
+      background: var(--white-03);
     }
 
     .layer-item.selected {
-      background: rgba(255, 255, 255, 0.1);
-      border-color: #ffffff;
-      box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+      border-color: var(--white);
+      background: var(--white-06);
+      box-shadow: 0 0 8px var(--white-10);
     }
 
     .layer-item.dragging {
@@ -1156,17 +1161,15 @@
       display: inline-block;
       margin-right: 8px;
       color: #888;
-      cursor: crosshair;
+      cursor: pointer;
       font-size: 12px;
-      font-family: 'Courier New', monospace;
+      font-family: var(--font-sans);
     }
 
     .layer-name {
       font-weight: bold;
-      margin-bottom: 8px;
-      font-size: 12px;
-      font-family: 'Courier New', monospace;
-      text-transform: uppercase;
+      margin-bottom: 6px;
+      font-size: 10px;
       letter-spacing: 0.05em;
     }
 
@@ -1177,24 +1180,21 @@
     }
 
     .layer-btn {
-      background: rgba(0, 0, 0, 0.8);
-      color: #ffffff;
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      padding: 4px 8px;
-      cursor: crosshair;
-      font-size: 10px;
-      font-family: 'Courier New', monospace;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      transition: all 0.2s;
+      background: var(--bg);
+      color: var(--white-50);
+      border: 1px solid var(--white-15);
+      padding: 2px 6px;
+      cursor: pointer;
+      font-size: 11px;
+      transition: all var(--transition);
       min-width: 24px;
       text-align: center;
     }
 
     .layer-btn:hover {
-      background: #ffffff;
-      color: #000000;
-      border-color: #ffffff;
+      background: var(--white);
+      color: #000;
+      border-color: var(--white);
     }
 
     .layer-btn.active {
@@ -1206,10 +1206,10 @@
 
     /* Middle Column - Controls */
     .controls-column {
-      flex: 0 0 400px;
-      background: rgba(0, 0, 0, 0.8);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      padding: 20px;
+      flex: 0 0 360px;
+      background: var(--bg-1);
+      border: 1px solid var(--white-15);
+      padding: 14px;
       display: flex;
       flex-direction: column;
     }
@@ -1218,33 +1218,27 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      margin-bottom: 20px;
-      padding-bottom: 15px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--white-10);
     }
 
     .controls-header h2 {
       margin: 0;
-      font-size: 14px;
-      font-family: 'Courier New', monospace;
+      font-size: 10px;
       font-weight: bold;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: #ffffff;
-      text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+      letter-spacing: 0.2em;
+      color: var(--white-50);
     }
 
     .selected-layer-info {
-      background: rgba(0, 0, 0, 0.6);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      padding: 12px;
-      margin-bottom: 20px;
+      background: var(--bg);
+      border: 1px solid var(--white-15);
+      padding: 8px;
+      margin-bottom: 14px;
       text-align: center;
-      color: #ffffff;
-      font-size: 11px;
-      font-family: 'Courier New', monospace;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
+      color: var(--white-50);
+      font-size: 10px;
     }
 
     .control-group {
@@ -1255,44 +1249,43 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 8px;
-      font-size: 11px;
-      font-family: 'Courier New', monospace;
+      margin-bottom: 5px;
+      font-size: 9px;
       font-weight: bold;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.1em;
+      color: var(--white-50);
     }
 
     .control-value {
-      color: #ffffff;
+      color: var(--white);
       font-weight: bold;
-      text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+      text-shadow: 0 0 1px var(--white-50);
     }
 
     .control-slider {
       width: 100%;
-      height: 4px;
-      background: rgba(255, 255, 255, 0.2);
+      height: 3px;
+      background: var(--white-10);
       outline: none;
       -webkit-appearance: none;
-      cursor: crosshair;
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      cursor: pointer;
+      border: 1px solid var(--white-06);
     }
 
     .control-slider::-webkit-slider-thumb {
       -webkit-appearance: none;
       appearance: none;
-      width: 16px;
-      height: 16px;
-      background: #ffffff;
-      cursor: crosshair;
-      transition: all 0.2s;
-      border: 1px solid rgba(0, 0, 0, 0.2);
+      width: 12px;
+      height: 18px;
+      background: var(--white);
+      cursor: pointer;
+      border: 1px solid #000;
+      box-shadow: 0 0 6px var(--white-30);
+      transition: box-shadow var(--transition);
     }
 
     .control-slider::-webkit-slider-thumb:hover {
-      background: #ffffff;
-      box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+      box-shadow: 0 0 12px var(--white-50);
     }
 
     .global-controls {
@@ -1303,53 +1296,36 @@
 
     .global-btn {
       width: 100%;
-      background: rgba(0, 0, 0, 0.8);
-      color: #ffffff;
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      padding: 12px;
-      cursor: crosshair;
-      font-size: 12px;
-      font-family: 'Courier New', monospace;
+      background: var(--bg);
+      color: var(--white);
+      border: 1px solid var(--white-20);
+      padding: 8px;
+      cursor: pointer;
+      font-size: 10px;
+      font-family: var(--font);
       font-weight: bold;
-      text-transform: uppercase;
       letter-spacing: 0.05em;
-      margin-bottom: 10px;
-      transition: all 0.2s;
+      margin-bottom: 6px;
+      transition: all var(--transition);
     }
 
     .global-btn:hover {
-      background: #ffffff;
-      color: #000000;
-      border-color: #ffffff;
-      box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+      background: var(--white);
+      color: #000;
+      border-color: var(--white);
+      box-shadow: 0 0 8px var(--white-30);
     }
 
-    .global-btn.pause {
-      background: rgba(255, 255, 255, 0.1);
-      border-color: #ffffff;
-    }
-
-    .global-btn.pause:hover {
-      background: #ffffff;
-      color: #000000;
-    }
-
-    .global-btn.resume {
-      background: rgba(255, 255, 255, 0.1);
-      border-color: #ffffff;
-    }
-
-    .global-btn.resume:hover {
-      background: #ffffff;
-      color: #000000;
+    .global-btn.pause, .global-btn.resume {
+      border-color: var(--white-30);
     }
 
     /* Right Column - Preview */
     .preview-column {
       flex: 1;
-      background: rgba(0, 0, 0, 0.8);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      padding: 20px;
+      background: var(--bg-1);
+      border: 1px solid var(--white-15);
+      padding: 10px;
       display: flex;
       flex-direction: column;
     }
@@ -1358,38 +1334,35 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      margin-bottom: 20px;
-      padding-bottom: 15px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--white-10);
     }
 
     .preview-header h2 {
       margin: 0;
-      font-size: 14px;
-      font-family: 'Courier New', monospace;
+      font-size: 10px;
       font-weight: bold;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: #ffffff;
-      text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+      letter-spacing: 0.2em;
+      color: var(--white-50);
     }
 
     .preview-screen {
       flex: 1;
-      background: #000000;
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: #000;
+      border: 1px solid var(--white-15);
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      padding: 8px;
+      gap: 4px;
+      padding: 4px;
       overflow: hidden;
       min-height: 400px;
     }
 
     .preview-row {
       flex: 1;
-      background: rgba(0, 0, 0, 0.8);
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: var(--bg);
+      border: 1px solid var(--white-10);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -1399,40 +1372,34 @@
     }
 
     .preview-row.output-preview {
-      border: 1px solid #ffffff;
-      box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+      border: 1px solid var(--white);
+      box-shadow: 0 0 6px var(--white-20);
     }
 
     .preview-row-label {
       position: absolute;
-      top: 4px;
-      left: 8px;
-      font-size: 9px;
-      color: #ffffff;
-      background: rgba(0,0,0,0.9);
-      padding: 2px 6px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      top: 3px;
+      left: 6px;
+      font-size: 8px;
+      color: var(--white-50);
+      background: rgba(0,0,0,0.85);
+      padding: 1px 6px;
+      border: 1px solid var(--white-10);
       z-index: 10;
-      font-family: 'Courier New', monospace;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.1em;
     }
 
     .preview-image {
       max-width: 100%;
       max-height: 100%;
       object-fit: contain;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      filter: contrast(1.1);
     }
 
     .preview-placeholder {
-      color: #888;
-      font-size: 11px;
+      color: var(--white-20);
+      font-size: 9px;
       text-align: center;
-      font-family: 'Courier New', monospace;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.1em;
     }
 
     /* Inverse button styling */
@@ -1441,9 +1408,9 @@
       color: #ffffff;
       border: 1px solid rgba(156, 39, 176, 0.6);
       padding: 4px 8px;
-      cursor: crosshair;
+      cursor: pointer;
       font-size: 10px;
-      font-family: 'Courier New', monospace;
+      font-family: var(--font-sans);
       text-transform: uppercase;
       letter-spacing: 0.05em;
       transition: all 0.2s;
@@ -1465,83 +1432,53 @@
     }
 
     /* Scrollbar styling */
-    .layers-list::-webkit-scrollbar {
-      width: 4px;
-    }
-
-    .layers-list::-webkit-scrollbar-track {
-      background: rgba(255, 255, 255, 0.1);
-    }
-
-    .layers-list::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.3);
-    }
-
-    .layers-list::-webkit-scrollbar-thumb:hover {
-      background: rgba(255, 255, 255, 0.5);
-    }
+    ::-webkit-scrollbar { width: 3px; height: 3px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--white-15); }
+    ::-webkit-scrollbar-thumb:hover { background: var(--white-30); }
 
     /* VEXVOID Tab Styles */
     .vexvoid-tab {
-      background: linear-gradient(45deg, #ffffff, #333333) !important;
-      color: #000000 !important;
-      text-shadow: 0 0 10px #ffffff;
-      animation: pulse-white 2s infinite;
-    }
-
-    @keyframes pulse-white {
-      0%, 100% { box-shadow: 0 0 5px #ffffff; }
-      50% { box-shadow: 0 0 20px #ffffff, 0 0 30px #ffffff; }
+      color: var(--white) !important;
+      text-shadow: 0 0 4px var(--white-80);
+      animation: pulse 2s ease-in-out infinite;
     }
 
     .vexvoid-container {
-      height: calc(100vh - 120px);
-      background: #000000;
-      color: #ffffff;
-      font-family: 'Courier New', monospace;
+      height: calc(100vh - 90px);
+      background: var(--bg);
       overflow: hidden;
       position: relative;
     }
 
     .vexvoid-header {
       text-align: center;
-      padding: 15px;
-      background: linear-gradient(45deg, #333333, #000000);
-      border-bottom: 2px solid #ffffff;
+      padding: 12px;
+      border-bottom: 1px solid var(--white-20);
     }
 
     .vexvoid-title {
-      font-size: 36px;
+      font-size: 28px;
       font-weight: bold;
-      text-transform: uppercase;
-      letter-spacing: 6px;
+      letter-spacing: 8px;
       margin: 0;
-      text-shadow: 0 0 20px #ffffff, 0 0 40px #ffffff;
-      animation: glitch-title 3s infinite;
-    }
-
-    @keyframes glitch-title {
-      0%, 90%, 100% { transform: translate(0); }
-      20% { transform: translate(-1px, 1px); }
-      40% { transform: translate(-1px, -1px); }
-      60% { transform: translate(1px, 1px); }
-      80% { transform: translate(1px, -1px); }
+      text-shadow: 0 0 10px var(--white-80), 0 0 20px var(--white-30);
+      animation: glitch 3s infinite;
     }
 
     .vexvoid-subtitle {
-      font-size: 14px;
-      letter-spacing: 3px;
-      color: #cccccc;
-      text-transform: uppercase;
-      margin-top: 8px;
+      font-size: 10px;
+      letter-spacing: 4px;
+      color: var(--white-30);
+      margin-top: 4px;
     }
 
     .vexvoid-main {
       position: relative;
       height: 65%;
-      background: #000000;
-      border: 2px solid #ffffff;
-      margin: 15px;
+      background: #000;
+      border: 1px solid var(--white-20);
+      margin: 10px;
       overflow: hidden;
     }
 
@@ -1549,7 +1486,7 @@
       width: 100%;
       height: 100%;
       background: #000000;
-      cursor: crosshair;
+      cursor: pointer;
       display: block;
     }
 
@@ -1603,10 +1540,10 @@
     .vexvoid-controls {
       display: flex;
       flex-wrap: wrap;
-      gap: 15px;
-      padding: 15px;
-      background: rgba(255, 255, 255, 0.05);
-      border-top: 2px solid #ffffff;
+      gap: 10px;
+      padding: 10px;
+      background: var(--white-03);
+      border-top: 1px solid var(--white-15);
       height: auto;
       min-height: 120px;
     }
@@ -1620,111 +1557,104 @@
     }
 
     .vexvoid-label {
-      font-size: 11px;
+      font-size: 9px;
       font-weight: bold;
-      color: #cccccc;
-      text-transform: uppercase;
-      letter-spacing: 1px;
+      color: var(--white-50);
+      letter-spacing: 0.1em;
     }
 
     .vexvoid-btn {
-      background: #000000;
-      color: #ffffff;
-      border: 2px solid #ffffff;
-      padding: 10px 20px;
-      font-family: 'Courier New', monospace;
+      background: #000;
+      color: var(--white);
+      border: 1px solid var(--white-30);
+      padding: 8px 16px;
+      font-family: var(--font);
       font-weight: bold;
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      cursor: crosshair;
-      transition: all 0.3s;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      transition: all var(--transition);
     }
 
     .vexvoid-btn:hover {
-      background: #ffffff;
-      color: #000000;
-      box-shadow: 0 0 15px #ffffff;
-      transform: scale(1.02);
+      background: var(--white);
+      color: #000;
+      border-color: var(--white);
+      box-shadow: 0 0 10px var(--white-30);
     }
 
     .vexvoid-btn.primary {
-      background: #ffffff;
-      color: #000000;
-      animation: pulse-primary 1.5s infinite;
-    }
-
-    @keyframes pulse-primary {
-      0%, 100% { box-shadow: 0 0 5px #ffffff; }
-      50% { box-shadow: 0 0 20px #ffffff, 0 0 30px #ffffff; }
+      background: var(--white);
+      color: #000;
+      border-color: var(--white);
     }
 
     .vexvoid-slider {
       -webkit-appearance: none;
       width: 100%;
-      height: 6px;
-      background: #333333;
-      border: 1px solid #ffffff;
+      height: 3px;
+      background: var(--white-10);
+      border: 1px solid var(--white-06);
       outline: none;
-      cursor: crosshair;
+      cursor: pointer;
     }
 
     .vexvoid-slider::-webkit-slider-thumb {
       -webkit-appearance: none;
-      appearance: none;
-      width: 16px;
-      height: 16px;
-      background: #ffffff;
-      cursor: crosshair;
-      box-shadow: 0 0 8px #ffffff;
+      width: 12px;
+      height: 18px;
+      background: var(--white);
+      cursor: pointer;
+      border: 1px solid #000;
+      box-shadow: 0 0 6px var(--white-30);
     }
 
     .vexvoid-select {
-      background: #000000;
-      color: #ffffff;
-      border: 2px solid #ffffff;
-      padding: 8px;
-      font-family: 'Courier New', monospace;
-      font-size: 11px;
-      text-transform: uppercase;
-      cursor: crosshair;
+      background: #000;
+      color: var(--white);
+      border: 1px solid var(--white-20);
+      padding: 6px 8px;
+      font-family: var(--font);
+      font-size: 10px;
+      cursor: pointer;
+      outline: none;
     }
 
     .vexvoid-value {
-      color: #ffffff;
+      color: var(--white);
       font-weight: bold;
-      font-size: 14px;
+      font-size: 12px;
       text-align: center;
-      min-width: 35px;
+      min-width: 30px;
+      text-shadow: 0 0 2px var(--white-50);
     }
 
     .vexvoid-stats {
       display: flex;
       justify-content: space-around;
-      padding: 12px;
-      background: rgba(0, 0, 0, 0.9);
-      border-top: 1px solid #ffffff;
+      padding: 8px;
+      background: rgba(0,0,0,0.9);
+      border-top: 1px solid var(--white-15);
     }
 
     .stat-item {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 4px;
+      gap: 2px;
     }
 
     .stat-label {
-      font-size: 9px;
-      color: #cccccc;
-      text-transform: uppercase;
-      letter-spacing: 1px;
+      font-size: 8px;
+      color: var(--white-30);
+      letter-spacing: 0.15em;
     }
 
     .stat-value {
-      font-size: 14px;
+      font-size: 12px;
       font-weight: bold;
-      color: #ffffff;
-      text-shadow: 0 0 3px #ffffff;
+      color: var(--white);
+      text-shadow: 0 0 2px var(--white-50);
     }
   </style>
 </head>
@@ -1752,42 +1682,42 @@
       <!-- V3XV0ID Cloud Performance Section -->
       <div class="v3xv0id-performance-section" style="position: fixed; top: 70px; right: 15px; width: 300px; background: rgba(0, 0, 0, 0.95); border: 2px solid rgba(255, 255, 255, 0.3); padding: 15px; z-index: 998; display: none;">
         <div class="performance-header" style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.2);">
-          <h3 style="margin: 0; font-size: 14px; font-family: 'Courier New', monospace; font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em; color: #ffffff; text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);">🎭 V3XV0ID CLOUD</h3>
+          <h3 style="margin: 0; font-size: 14px; font-family: var(--font-sans); font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em; color: #ffffff; text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);">🎭 V3XV0ID CLOUD</h3>
           <div style="font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 5px;">PERFORMANCE SYSTEM</div>
         </div>
         
         <div class="performance-status" style="margin-bottom: 15px; padding: 10px; background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 255, 255, 0.2);">
-          <div id="cloudStatus" style="font-size: 11px; font-family: 'Courier New', monospace; color: #888; text-transform: uppercase;">🌐 CONNECTING...</div>
-          <div id="performanceStatus" style="font-size: 11px; font-family: 'Courier New', monospace; color: #888; text-transform: uppercase; margin-top: 5px;">⏹️ READY</div>
+          <div id="cloudStatus" style="font-size: 11px; font-family: var(--font-sans); color: #888; text-transform: uppercase;">🌐 CONNECTING...</div>
+          <div id="performanceStatus" style="font-size: 11px; font-family: var(--font-sans); color: #888; text-transform: uppercase; margin-top: 5px;">⏹️ READY</div>
         </div>
         
         <div class="performance-controls" style="display: flex; flex-direction: column; gap: 10px;">
-          <button id="initCloudBtn" class="performance-btn" style="background: #ffffff; color: #000000; border: 1px solid #ffffff; padding: 10px; cursor: crosshair; font-family: 'Courier New', monospace; font-weight: bold; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s;">
+          <button id="initCloudBtn" class="performance-btn" style="background: #ffffff; color: #000000; border: 1px solid #ffffff; padding: 10px; cursor: pointer; font-family: var(--font-sans); font-weight: bold; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s;">
             🌐 CONNECT TO CLOUD
           </button>
           
-          <button id="startPerformanceBtn" class="performance-btn" style="background: rgba(0, 0, 0, 0.8); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.3); padding: 10px; cursor: crosshair; font-family: 'Courier New', monospace; font-weight: bold; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s;" disabled>
+          <button id="startPerformanceBtn" class="performance-btn" style="background: rgba(0, 0, 0, 0.8); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.3); padding: 10px; cursor: pointer; font-family: var(--font-sans); font-weight: bold; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s;" disabled>
             🎭 START PERFORMANCE
           </button>
           
-          <button id="stopPerformanceBtn" class="performance-btn" style="background: rgba(0, 0, 0, 0.8); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.3); padding: 10px; cursor: crosshair; font-family: 'Courier New', monospace; font-weight: bold; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s;" disabled>
+          <button id="stopPerformanceBtn" class="performance-btn" style="background: rgba(0, 0, 0, 0.8); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.3); padding: 10px; cursor: pointer; font-family: var(--font-sans); font-weight: bold; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s;" disabled>
             🛑 STOP PERFORMANCE
           </button>
         </div>
         
         <div class="performance-info" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.2);">
-          <div id="currentTrack" style="font-size: 10px; font-family: 'Courier New', monospace; color: #888; text-transform: uppercase; margin-bottom: 5px;">NO TRACK</div>
+          <div id="currentTrack" style="font-size: 10px; font-family: var(--font-sans); color: #888; text-transform: uppercase; margin-bottom: 5px;">NO TRACK</div>
           <div id="performanceProgress" style="width: 100%; height: 4px; background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 5px;">
             <div id="progressBar" style="height: 100%; background: #ffffff; width: 0%; transition: width 0.1s;"></div>
           </div>
-          <div id="performanceTime" style="font-size: 10px; font-family: 'Courier New', monospace; color: #888; text-transform: uppercase;">00:00 / 00:00</div>
+          <div id="performanceTime" style="font-size: 10px; font-family: var(--font-sans); color: #888; text-transform: uppercase;">00:00 / 00:00</div>
         </div>
         
-        <button id="togglePerformancePanel" style="position: absolute; top: -15px; right: -15px; width: 30px; height: 30px; background: rgba(0, 0, 0, 0.95); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.3); cursor: crosshair; font-family: 'Courier New', monospace; font-size: 12px;">✕</button>
+        <button id="togglePerformancePanel" style="position: absolute; top: -15px; right: -15px; width: 30px; height: 30px; background: rgba(0, 0, 0, 0.95); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.3); cursor: pointer; font-family: var(--font-sans); font-size: 12px;">✕</button>
       </div>
       
       <!-- V3XV0ID Cloud Toggle Button -->
-      <button id="showPerformanceBtn" style="position: fixed; top: 80px; right: 15px; background: rgba(0, 0, 0, 0.95); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.3); padding: 8px 12px; cursor: crosshair; font-family: 'Courier New', monospace; font-weight: bold; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; z-index: 997; transition: all 0.2s;">
+      <button id="showPerformanceBtn" style="position: fixed; top: 80px; right: 15px; background: rgba(0, 0, 0, 0.95); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.3); padding: 8px 12px; cursor: pointer; font-family: var(--font-sans); font-weight: bold; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; z-index: 997; transition: all 0.2s;">
         🎭 V3XV0ID
       </button>
 
@@ -1856,6 +1786,13 @@
 
       <div class="control-group">
         <div class="control-label">
+          <span>Fill Mode</span>
+        </div>
+        <button class="global-btn" id="fillFrameBtn" style="margin:0; padding: 8px;">FILL FRAME</button>
+      </div>
+
+      <div class="control-group">
+        <div class="control-label">
           <span>Jitter</span>
           <span class="control-value" id="jitterValue">0px</span>
         </div>
@@ -1886,9 +1823,61 @@
         <input type="range" class="control-slider" id="impactControl" min="0" max="20" value="0">
       </div>
 
+      <div class="control-group">
+        <div class="control-label">
+          <span>Blend Mode</span>
+        </div>
+        <select class="vexvoid-select" id="blendModeControl" style="width: 100%;">
+          <option value="normal">Normal</option>
+          <option value="multiply">Multiply</option>
+          <option value="screen">Screen</option>
+          <option value="overlay">Overlay</option>
+          <option value="darken">Darken</option>
+          <option value="lighten">Lighten</option>
+          <option value="color-dodge">Color Dodge</option>
+          <option value="color-burn">Color Burn</option>
+          <option value="hard-light">Hard Light</option>
+          <option value="soft-light">Soft Light</option>
+          <option value="difference">Difference</option>
+          <option value="exclusion">Exclusion</option>
+          <option value="hue">Hue</option>
+          <option value="luminosity">Luminosity</option>
+        </select>
+      </div>
+
+      <!-- Video Controls (hidden for image layers) -->
+      <div class="control-group" id="videoControlsSection" style="display: none;">
+        <div style="border-top: 1px solid var(--border-subtle); padding-top: 12px; margin-top: 4px;">
+          <div class="control-label" style="margin-bottom: 10px;">
+            <span style="color: var(--accent);">VIDEO CONTROLS</span>
+            <span class="control-value" id="videoDurationDisplay">0:00</span>
+          </div>
+          <div style="display: flex; gap: 6px; margin-bottom: 12px;">
+            <button class="global-btn" id="videoPlayPauseBtn" style="flex:1; padding: 8px; margin: 0;">⏸ PAUSE</button>
+          </div>
+          <div class="control-label">
+            <span>Seek</span>
+            <span class="control-value" id="seekValue">0:00</span>
+          </div>
+          <input type="range" class="control-slider" id="seekControl" min="0" max="1000" value="0" step="1">
+          <div class="control-label" style="margin-top: 12px;">
+            <span>Loop In</span>
+            <span class="control-value" id="loopInValue">0:00</span>
+          </div>
+          <input type="range" class="control-slider" id="loopInControl" min="0" max="1000" value="0" step="1">
+          <div class="control-label" style="margin-top: 12px;">
+            <span>Loop Out</span>
+            <span class="control-value" id="loopOutValue">END</span>
+          </div>
+          <input type="range" class="control-slider" id="loopOutControl" min="0" max="1000" value="1000" step="1">
+        </div>
+      </div>
+
       <div class="global-controls">
-        <button class="global-btn resume" id="playPauseBtn">⏸️ PAUSE ALL</button>
-        <button class="global-btn" id="setBackgroundBtn">🖼️ SET DEFAULT BACKGROUND</button>
+        <button class="global-btn resume" id="playPauseBtn">⏸ PAUSE ALL</button>
+        <button class="global-btn" id="setBackgroundBtn">SET BACKGROUND</button>
+        <button class="global-btn" id="recordBtn" style="border-color: var(--white-30);">● REC</button>
+        <div id="recordStatus" style="font-size:9px;color:var(--white-30);text-align:center;margin-top:2px;letter-spacing:0.1em;display:none;"></div>
       </div>
     </div>
 
@@ -1899,13 +1888,13 @@
       </div>
       <div id="previewDebugOverlay" style="background:rgba(255,0,0,0.9);color:#fff;font-family:monospace;font-size:10px;padding:6px 10px;border:1px solid red;margin-bottom:4px;word-break:break-all;">DEBUG: waiting for IPC...</div>
       <div class="preview-screen" id="previewScreen">
-        <div class="preview-row output-preview" id="outputPreview">
-          <div class="preview-row-label">OUTPUT WINDOW</div>
-          <div class="preview-placeholder">NO OUTPUT CONTENT</div>
-        </div>
         <div class="preview-row" id="preview2">
           <div class="preview-row-label">PALETTE A</div>
           <div class="preview-placeholder">NO CONTENT</div>
+        </div>
+        <div class="preview-row output-preview" id="outputPreview">
+          <div class="preview-row-label">OUTPUT</div>
+          <div class="preview-placeholder">NO OUTPUT CONTENT</div>
         </div>
         <div class="preview-row" id="preview3">
           <div class="preview-row-label">PALETTE B</div>
@@ -2409,10 +2398,12 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
             layerItem.classList.add('selected');
           }
           
+          const badge = layer.isVideo ? '<span style="color:var(--accent);font-size:9px;margin-left:6px;font-family:var(--font-mono);">VIDEO</span>' :
+            (layer.imageCount > 1 ? `<span style="color:var(--text-muted);font-size:9px;margin-left:6px;font-family:var(--font-mono);">${layer.imageCount} IMG</span>` : '');
           layerItem.innerHTML = `
             <div class="layer-name">
               <span class="drag-handle" title="Drag to reorder">⋮⋮</span>
-              ${layer.name}
+              ${layer.name}${badge}
             </div>
             <div class="layer-buttons">
               <button class="layer-btn ${layer.visible ? 'active' : ''}" onclick="toggleVisibility(${layer.id})" title="Toggle Visibility">👁</button>
@@ -2449,7 +2440,7 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
       function updateSelectedLayer() {
         if (selectedLayer) {
           selectedLayerInfo.textContent = `Controlling: ${selectedLayer.name}`;
-          
+
           // Update control values
           speedControl.value = selectedLayer.speed;
           sizeControl.value = selectedLayer.size;
@@ -2457,28 +2448,59 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
           opacityControl.value = selectedLayer.opacity;
           strobeControl.value = selectedLayer.strobe;
           impactControl.value = selectedLayer.impact;
-          
-          // Update display values
-          speedValue.textContent = sliderToMs(selectedLayer.speed) + ' ms';
+          blendModeControl.value = selectedLayer.blendMode || 'normal';
+          updateFillFrameBtn();
+
+          // Adapt speed label for video vs image sequence
+          const speedLabel = speedControl.closest('.control-group').querySelector('.control-label span:first-child');
+          if (selectedLayer.isVideo) {
+            speedLabel.textContent = 'Playback Rate';
+            speedValue.textContent = sliderToPlaybackRate(selectedLayer.speed).toFixed(2) + 'x';
+          } else {
+            speedLabel.textContent = 'Speed';
+            speedValue.textContent = sliderToMs(selectedLayer.speed) + ' ms';
+          }
+
           sizeValue.textContent = selectedLayer.size + '%';
           jitterValue.textContent = selectedLayer.jitterAmount + 'px';
           opacityValue.textContent = selectedLayer.opacity + '%';
           strobeValue.textContent = selectedLayer.strobe + ' Hz';
           impactValue.textContent = selectedLayer.impact + ' Hz';
-          
+
           // Enable controls
           [speedControl, sizeControl, jitterControl, opacityControl, strobeControl, impactControl].forEach(control => {
             control.disabled = false;
           });
+
+          // Show/hide video controls
+          if (selectedLayer.isVideo) {
+            videoControlsSection.style.display = 'block';
+            const duration = selectedLayer.videoDuration || 1;
+            videoDurationDisplay.textContent = formatTime(duration);
+            videoPlayPauseBtn.textContent = selectedLayer.videoPaused ? '▶ PLAY' : '⏸ PAUSE';
+
+            if (!isSeeking) {
+              seekControl.value = (selectedLayer.videoPosition / duration) * 1000;
+              seekValue.textContent = formatTime(selectedLayer.videoPosition || 0);
+            }
+            loopInControl.value = ((selectedLayer.videoLoopIn || 0) / duration) * 1000;
+            loopInValue.textContent = formatTime(selectedLayer.videoLoopIn || 0);
+            const loopOut = selectedLayer.videoLoopOut || duration;
+            loopOutControl.value = (loopOut / duration) * 1000;
+            loopOutValue.textContent = loopOut >= duration - 0.5 ? 'END' : formatTime(loopOut);
+          } else {
+            videoControlsSection.style.display = 'none';
+          }
         } else {
           selectedLayerInfo.textContent = 'No layer selected';
-          
+          videoControlsSection.style.display = 'none';
+
           // Disable controls
           [speedControl, sizeControl, jitterControl, opacityControl, strobeControl, impactControl].forEach(control => {
             control.disabled = true;
           });
         }
-        
+
         updateLayersList();
       }
       
@@ -2984,11 +3006,15 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
       speedControl.addEventListener('input', () => {
         if (selectedLayer) {
           const value = parseInt(speedControl.value);
-          speedValue.textContent = sliderToMs(value) + ' ms';
-          sendToOutput('update-layer-property', { 
-            layerId: selectedLayer.id, 
-            property: 'speed', 
-            value: value 
+          if (selectedLayer.isVideo) {
+            speedValue.textContent = sliderToPlaybackRate(value).toFixed(2) + 'x';
+          } else {
+            speedValue.textContent = sliderToMs(value) + ' ms';
+          }
+          sendToOutput('update-layer-property', {
+            layerId: selectedLayer.id,
+            property: 'speed',
+            value: value
           });
         }
       });
@@ -3053,6 +3079,231 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
         }
       });
       
+      // Fill frame toggle
+      const fillFrameBtn = document.getElementById('fillFrameBtn');
+      function updateFillFrameBtn() {
+        if (selectedLayer) {
+          const fill = selectedLayer.fillFrame !== false;
+          fillFrameBtn.textContent = fill ? 'FILL FRAME' : 'FIT CONTAIN';
+          fillFrameBtn.style.borderColor = fill ? 'var(--accent)' : 'var(--border-default)';
+          fillFrameBtn.style.color = fill ? 'var(--accent)' : 'var(--text-secondary)';
+        }
+      }
+      fillFrameBtn.addEventListener('click', () => {
+        if (selectedLayer) {
+          selectedLayer.fillFrame = selectedLayer.fillFrame === false;
+          updateFillFrameBtn();
+          sendToOutput('update-layer-property', {
+            layerId: selectedLayer.id,
+            property: 'fillFrame',
+            value: selectedLayer.fillFrame
+          });
+        }
+      });
+
+      // Blend mode control
+      const blendModeControl = document.getElementById('blendModeControl');
+      blendModeControl.addEventListener('change', () => {
+        if (selectedLayer) {
+          sendToOutput('update-layer-property', {
+            layerId: selectedLayer.id,
+            property: 'blendMode',
+            value: blendModeControl.value
+          });
+        }
+      });
+
+      // Video-specific controls
+      const videoControlsSection = document.getElementById('videoControlsSection');
+      const videoPlayPauseBtn = document.getElementById('videoPlayPauseBtn');
+      const seekControl = document.getElementById('seekControl');
+      const loopInControl = document.getElementById('loopInControl');
+      const loopOutControl = document.getElementById('loopOutControl');
+      const seekValue = document.getElementById('seekValue');
+      const loopInValue = document.getElementById('loopInValue');
+      const loopOutValue = document.getElementById('loopOutValue');
+      const videoDurationDisplay = document.getElementById('videoDurationDisplay');
+      let isSeeking = false;
+
+      function formatTime(seconds) {
+        const m = Math.floor(seconds / 60);
+        const s = Math.floor(seconds % 60);
+        return `${m}:${s.toString().padStart(2, '0')}`;
+      }
+
+      function sliderToPlaybackRate(x) {
+        x = Number(x);
+        if (x <= 50) {
+          return 0.1 + (x / 50) * 0.9;
+        }
+        return 1.0 + Math.pow((x - 50) / 50, 1.5) * 3.0;
+      }
+
+      videoPlayPauseBtn.addEventListener('click', () => {
+        if (selectedLayer && selectedLayer.isVideo) {
+          sendToOutput('update-video-property', {
+            layerId: selectedLayer.id,
+            property: 'togglePlayPause'
+          });
+          selectedLayer.videoPaused = !selectedLayer.videoPaused;
+          videoPlayPauseBtn.textContent = selectedLayer.videoPaused ? '▶ PLAY' : '⏸ PAUSE';
+        }
+      });
+
+      seekControl.addEventListener('mousedown', () => { isSeeking = true; });
+      seekControl.addEventListener('mouseup', () => { isSeeking = false; });
+      seekControl.addEventListener('input', () => {
+        if (selectedLayer && selectedLayer.isVideo) {
+          const duration = selectedLayer.videoDuration || 1;
+          const seekTime = (parseFloat(seekControl.value) / 1000) * duration;
+          seekValue.textContent = formatTime(seekTime);
+          sendToOutput('update-video-property', {
+            layerId: selectedLayer.id, property: 'seek', value: seekTime
+          });
+        }
+      });
+
+      loopInControl.addEventListener('input', () => {
+        if (selectedLayer && selectedLayer.isVideo) {
+          const duration = selectedLayer.videoDuration || 1;
+          const t = (parseFloat(loopInControl.value) / 1000) * duration;
+          loopInValue.textContent = formatTime(t);
+          sendToOutput('update-video-property', {
+            layerId: selectedLayer.id, property: 'videoLoopIn', value: t
+          });
+        }
+      });
+
+      loopOutControl.addEventListener('input', () => {
+        if (selectedLayer && selectedLayer.isVideo) {
+          const duration = selectedLayer.videoDuration || 1;
+          const t = (parseFloat(loopOutControl.value) / 1000) * duration;
+          loopOutValue.textContent = t >= duration - 0.5 ? 'END' : formatTime(t);
+          sendToOutput('update-video-property', {
+            layerId: selectedLayer.id, property: 'videoLoopOut', value: t
+          });
+        }
+      });
+
+      // ========== RECORDING SYSTEM ==========
+      const recordBtn = document.getElementById('recordBtn');
+      const recordStatus = document.getElementById('recordStatus');
+      let mediaRecorder = null;
+      let recordedChunks = [];
+      let recordingStream = null;
+      let recStartTime = null;
+      let recTimer = null;
+
+      function formatRecordTime(ms) {
+        const s = Math.floor(ms / 1000);
+        const m = Math.floor(s / 60);
+        const ss = s % 60;
+        return `${m.toString().padStart(2,'0')}:${ss.toString().padStart(2,'0')}`;
+      }
+
+      recordBtn.addEventListener('click', async () => {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+          // Stop recording
+          mediaRecorder.stop();
+          return;
+        }
+
+        try {
+          // Get output window source via main process
+          const sourceId = await ipcRenderer.invoke('get-output-source-id');
+          if (!sourceId) {
+            recordStatus.style.display = 'block';
+            recordStatus.textContent = 'ERROR: OUTPUT WINDOW NOT FOUND';
+            return;
+          }
+
+          // Capture the output window stream
+          recordingStream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+              mandatory: {
+                chromeMediaSource: 'desktop',
+                chromeMediaSourceId: sourceId,
+                minWidth: 1920,
+                minHeight: 1080,
+                maxFrameRate: 30
+              }
+            }
+          });
+
+          // Set up MediaRecorder
+          recordedChunks = [];
+          const options = { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 8000000 };
+          mediaRecorder = new MediaRecorder(recordingStream, options);
+
+          mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) recordedChunks.push(e.data);
+          };
+
+          mediaRecorder.onstop = async () => {
+            // Stop timer
+            clearInterval(recTimer);
+            recTimer = null;
+
+            // Stop stream tracks
+            recordingStream.getTracks().forEach(t => t.stop());
+            recordingStream = null;
+
+            // Update UI
+            recordBtn.textContent = '● REC';
+            recordBtn.style.borderColor = 'var(--white-30)';
+            recordBtn.style.color = '';
+            recordStatus.style.display = 'block';
+            recordStatus.textContent = 'SAVING...';
+
+            // Save file
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const result = await ipcRenderer.invoke('show-save-dialog', {
+              defaultPath: `V3XV0ID-${Date.now()}.webm`,
+              filters: [
+                { name: 'WebM Video', extensions: ['webm'] },
+                { name: 'All Files', extensions: ['*'] }
+              ]
+            });
+
+            if (!result.canceled && result.filePath) {
+              const buffer = Buffer.from(await blob.arrayBuffer());
+              require('fs').writeFileSync(result.filePath, buffer);
+              recordStatus.textContent = `SAVED: ${require('path').basename(result.filePath)}`;
+              setTimeout(() => { recordStatus.style.display = 'none'; }, 4000);
+            } else {
+              recordStatus.textContent = 'CANCELLED';
+              setTimeout(() => { recordStatus.style.display = 'none'; }, 2000);
+            }
+            recordedChunks = [];
+          };
+
+          // Start recording
+          mediaRecorder.start(100); // Collect data every 100ms
+          recStartTime = Date.now();
+
+          // Update UI — red recording state
+          recordBtn.textContent = '■ STOP';
+          recordBtn.style.borderColor = '#ff0000';
+          recordBtn.style.color = '#ff0000';
+          recordStatus.style.display = 'block';
+          recordStatus.style.color = '#ff0000';
+          recordStatus.textContent = 'REC 00:00';
+
+          // Timer
+          recTimer = setInterval(() => {
+            const elapsed = Date.now() - recStartTime;
+            recordStatus.textContent = `REC ${formatRecordTime(elapsed)}`;
+          }, 500);
+
+        } catch (err) {
+          console.error('Recording error:', err);
+          recordStatus.style.display = 'block';
+          recordStatus.style.color = 'var(--white-30)';
+          recordStatus.textContent = 'REC ERROR: ' + err.message;
+        }
+      });
+
       // Initialize crossfader to show Palette A by default
       updateCrossfader();
       
@@ -4237,7 +4488,7 @@ function draw() {
             height: 20px;
             background: ${event.type === 'pattern' ? '#ff6b6b' : '#4ecdc4'};
             border: 1px solid rgba(255, 255, 255, 0.3);
-            cursor: crosshair;
+            cursor: pointer;
           `;
           eventElement.title = `${event.time}s: ${event.data.name}`;
           
