@@ -1,311 +1,214 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>V3XV0ID AV Client - Professional Live Visual Performance Tool</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap');
-        
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
-        html, body {
-            height: 100%; background: #000000; color: #ffffff;
-            font-family: 'Courier New', 'Courier Prime', monospace;
-            font-size: 14px; line-height: 1.4; overflow-x: hidden;
-        }
-        
-        body::before {
-            content: ''; position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255, 255, 255, 0.01) 2px, rgba(255, 255, 255, 0.01) 4px);
-            pointer-events: none; z-index: 1000;
-        }
-        
-        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; position: relative; z-index: 1; }
-        .header { text-align: center; padding: 60px 0 40px; border-bottom: 1px solid rgba(255, 255, 255, 0.2); }
-        
-        .logo {
-            font-size: 48px; font-weight: bold; letter-spacing: 0.3em; text-transform: uppercase;
-            margin-bottom: 20px; text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
-            animation: glow 2s ease-in-out infinite alternate;
-        }
-        
-        @keyframes glow {
-            from { text-shadow: 0 0 10px rgba(255, 255, 255, 0.8); }
-            to { text-shadow: 0 0 20px rgba(255, 255, 255, 1), 0 0 30px rgba(255, 255, 255, 0.8); }
-        }
-        
-        .tagline { font-size: 18px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.8; margin-bottom: 30px; }
-        .description { font-size: 16px; max-width: 800px; margin: 0 auto; opacity: 0.9; }
-        
-        .nav { text-align: center; padding: 30px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
-        .nav-links { display: flex; justify-content: center; gap: 40px; flex-wrap: wrap; }
-        
-        .nav-link {
-            color: #ffffff; text-decoration: none; text-transform: uppercase; letter-spacing: 0.1em;
-            padding: 10px 20px; border: 1px solid rgba(255, 255, 255, 0.3); transition: all 0.3s ease;
-        }
-        
-        .nav-link:hover { background: #ffffff; color: #000000; box-shadow: 0 0 10px rgba(255, 255, 255, 0.5); }
-        
-        .section { padding: 60px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
-        
-        .section-title {
-            font-size: 32px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.2em;
-            text-align: center; margin-bottom: 40px; text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
-        }
-        
-        .version-badge {
-            display: inline-block; background: #ffffff; color: #000000; padding: 5px 10px;
-            font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em;
-            margin-left: 15px; border: 1px solid #ffffff; animation: pulse 2s infinite;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
-        }
-        
-        .download-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; margin-top: 40px; }
-        
-        .download-card {
-            border: 1px solid rgba(255, 255, 255, 0.3); padding: 30px; text-align: center;
-            transition: all 0.3s ease; background: rgba(0, 0, 0, 0.5);
-        }
-        
-        .download-card:hover {
-            border-color: #ffffff; box-shadow: 0 0 20px rgba(255, 255, 255, 0.2); transform: translateY(-5px);
-        }
-        
-        .platform-icon { font-size: 48px; margin-bottom: 20px; display: block; }
-        .platform-name { font-size: 24px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 15px; }
-        .download-links { display: flex; flex-direction: column; gap: 10px; }
-        
-        .download-btn {
-            display: inline-block; color: #ffffff; text-decoration: none; padding: 12px 24px;
-            border: 1px solid rgba(255, 255, 255, 0.5); text-transform: uppercase; letter-spacing: 0.05em;
-            font-size: 12px; transition: all 0.3s ease; background: transparent;
-        }
-        
-        .download-btn:hover { background: #ffffff; color: #000000; box-shadow: 0 0 10px rgba(255, 255, 255, 0.5); }
-        .download-btn.primary { border-color: #ffffff; font-weight: bold; }
-        
-        .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 30px; margin-top: 40px; }
-        .feature-card { border: 1px solid rgba(255, 255, 255, 0.2); padding: 25px; background: rgba(0, 0, 0, 0.3); }
-        .feature-icon { font-size: 32px; margin-bottom: 15px; display: block; }
-        .feature-title { font-size: 18px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px; }
-        .feature-description { opacity: 0.8; line-height: 1.5; }
-        
-        .cloud-feature {
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
-            border: 2px solid rgba(255, 255, 255, 0.4);
-            position: relative;
-        }
-        
-        .cloud-feature::before {
-            content: 'NEW'; position: absolute; top: -10px; right: -10px;
-            background: #ffffff; color: #000000; padding: 5px 8px;
-            font-size: 10px; font-weight: bold; letter-spacing: 0.1em;
-        }
-        
-        .footer { text-align: center; padding: 40px 0; opacity: 0.6; }
-        .footer-links { display: flex; justify-content: center; gap: 30px; margin-bottom: 20px; flex-wrap: wrap; }
-        .footer-link { color: #ffffff; text-decoration: none; text-transform: uppercase; letter-spacing: 0.05em; transition: opacity 0.3s ease; }
-        .footer-link:hover { opacity: 1; }
-        
-        .text-center { text-align: center; }
-        .mb-30 { margin-bottom: 30px; }
-        
-        .github-corner { position: fixed; top: 0; right: 0; z-index: 1001; }
-        .github-corner svg { fill: #ffffff; color: #000000; position: absolute; top: 0; border: 0; right: 0; }
-        
-        @media (max-width: 768px) {
-            .logo { font-size: 32px; letter-spacing: 0.2em; }
-            .nav-links { gap: 20px; }
-            .nav-link { padding: 8px 16px; font-size: 12px; }
-            .section-title { font-size: 24px; }
-            .download-grid { grid-template-columns: 1fr; }
-            .features-grid { grid-template-columns: 1fr; }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>V3XV0ID AV Client</title>
+<meta name="description" content="V3XV0ID AV Client 3.0: a live visual performance app. Clip deck, mercury pool, point fields, decal livery and a beep-boop sound engine, under your own image and video layers. Mac, Windows, Linux.">
+<link rel="icon" href="vexvoid-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Michroma&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  color-scheme: dark;
+  --void: #000; --chrome: #f4f4f2; --steel: #9a9a98; --dim: #c9c9c6;
+  --hair: rgba(255,255,255,.55); --hair2: rgba(255,255,255,.2);
+  --wide: 'Michroma', 'Eurostile', 'Arial Black', sans-serif;
+  --micro: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--void); color: var(--chrome); }
+body { margin: 0; font-family: var(--micro); font-size: 13px; line-height: 1.55; padding: 0 16px 64px; overflow-x: hidden; }
+a { color: inherit; }
+.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 72px; }
+
+/* hero = the live engine */
+.hero { position: relative; margin: 0 -16px; height: clamp(520px, 82vh, 820px); border-bottom: 1px solid var(--hair); }
+.hero-bar { position: absolute; z-index: 20; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; font-size: 10px; letter-spacing: .28em; text-transform: uppercase; color: var(--steel); pointer-events: none; }
+.hero-bar nav { display: flex; gap: 18px; pointer-events: auto; }
+.hero-bar a { text-decoration: none; color: var(--chrome); }
+.hero-bar a:hover { text-decoration: underline; }
+
+/* mini operator strip over the preview */
+.strip { position: absolute; z-index: 20; right: 16px; top: 52px; display: flex; flex-direction: column; gap: 6px; width: 190px; }
+.strip button { font: 10px/1 var(--micro); letter-spacing: .18em; text-transform: uppercase; text-align: left; background: rgba(0,0,0,.6); color: #fff; border: 1px solid rgba(255,255,255,.5); padding: 8px 10px; cursor: pointer; display: flex; justify-content: space-between; gap: 8px; backdrop-filter: blur(4px); }
+.strip button[aria-pressed="false"] { color: var(--steel); border-color: rgba(255,255,255,.22); }
+.strip button kbd { font: inherit; color: var(--steel); }
+.strip .more { display: contents; }
+@media (max-width: 640px) {
+  .strip { top: auto; bottom: 16px; right: 16px; left: 16px; width: auto; flex-direction: row; flex-wrap: wrap; }
+  .strip button { flex: 1 1 calc(33% - 6px); justify-content: center; }
+  .strip button kbd, .strip .more { display: none; }
+  .hero-bar nav a:not(.dl) { display: none; }
+}
+.snd { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 80; display: inline-flex; align-items: center; gap: 10px; font: 11px/1 var(--wide); letter-spacing: .2em; text-transform: uppercase; background: rgba(0,0,0,.75); color: #fff; border: 1px solid #fff; padding: 12px 16px; cursor: pointer; }
+.snd-dot { width: 9px; height: 9px; border: 1px solid #fff; }
+.snd[aria-pressed="true"] { background: #fff; color: #000; }
+.snd[aria-pressed="true"] .snd-dot { background: #000; border-color: #000; }
+@media (max-width: 640px) { .hero .vx-copy { bottom: 112px; } }
+@media (max-width: 640px) { .snd { position: absolute; bottom: auto; top: 46px; right: 16px; font-size: 10px; padding: 9px 12px; } }
+
+/* sections */
+.sec { display: grid; gap: 22px; }
+.sec-head { display: grid; grid-template-columns: auto 1fr auto; align-items: end; gap: 14px; border-bottom: 1px solid var(--hair); padding-bottom: 10px; }
+.sec-head .idx { font: 12px var(--wide); color: var(--steel); }
+.sec-head h2 { font: 400 clamp(17px, 2.6vw, 28px)/1.2 var(--wide); letter-spacing: .08em; text-transform: uppercase; margin: 0; }
+.sec-head .ref { font-size: 9.5px; letter-spacing: .2em; color: var(--steel); text-transform: uppercase; text-align: right; }
+@media (max-width: 640px) { .sec-head { grid-template-columns: auto 1fr; } .sec-head .ref { display: none; } }
+.lede { max-width: 68ch; color: var(--dim); font-size: 14px; margin: 0; }
+
+.layers { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); border-top: 1px solid var(--hair); }
+.layer { padding: 16px 14px 18px 0; border-bottom: 1px solid var(--hair2); display: grid; gap: 6px; min-width: 0; }
+.layer span { font-size: 9px; letter-spacing: .24em; color: var(--steel); text-transform: uppercase; }
+.layer b { font: 400 13px var(--wide); letter-spacing: .1em; text-transform: uppercase; }
+.layer p { margin: 0; color: var(--dim); max-width: 46ch; }
+
+/* downloads */
+.dls { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0; border: 1px solid var(--hair); }
+.dl-card { padding: 18px; border-right: 1px solid var(--hair2); display: grid; gap: 12px; align-content: start; min-width: 0; }
+.dl-card:last-child { border-right: 0; }
+@media (max-width: 760px) { .dl-card { border-right: 0; border-bottom: 1px solid var(--hair2); } .dl-card:last-child { border-bottom: 0; } }
+.dl-card h3 { margin: 0; font: 400 15px var(--wide); letter-spacing: .14em; text-transform: uppercase; }
+.dl-card .note { font-size: 10px; letter-spacing: .16em; color: var(--steel); text-transform: uppercase; }
+.btn { display: inline-flex; justify-content: space-between; align-items: center; gap: 10px; font: 11px/1 var(--wide); letter-spacing: .16em; text-transform: uppercase; text-decoration: none; padding: 13px 14px; border: 1px solid #fff; background: #fff; color: #000; }
+.btn.ghost { background: transparent; color: #fff; border-color: rgba(255,255,255,.55); }
+.btn:hover { outline: 1px solid #fff; outline-offset: 2px; }
+.btn small { font: 10px var(--micro); letter-spacing: .08em; text-transform: none; opacity: .7; }
+.rel { font-size: 11px; color: var(--steel); margin: 0; }
+
+/* specs + keys */
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 32px; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th, td { text-align: left; padding: 9px 8px 9px 0; border-bottom: 1px solid var(--hair2); vertical-align: top; }
+th { font-weight: 400; font-size: 9.5px; letter-spacing: .22em; color: var(--steel); text-transform: uppercase; white-space: nowrap; }
+td kbd { font: 11px var(--micro); border: 1px solid rgba(255,255,255,.45); padding: 1px 6px; white-space: nowrap; }
+ol.steps { margin: 0; padding-left: 18px; color: var(--dim); display: grid; gap: 8px; max-width: 70ch; }
+ol.steps b { color: var(--chrome); font-weight: 500; }
+
+footer { font-size: 9.5px; letter-spacing: .22em; text-transform: uppercase; color: var(--steel); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; border-top: 1px solid var(--hair); padding-top: 12px; }
+:focus-visible { outline: 1px solid #fff; outline-offset: 3px; }
+</style>
 </head>
 <body>
-    <a href="https://github.com/b0ase/vexvoid-AV-client" class="github-corner" aria-label="View source on GitHub">
-        <svg width="80" height="80" viewBox="0 0 250 250" style="fill:#fff; color:#000; position: absolute; top: 0; border: 0; right: 0;" aria-hidden="true">
-            <path d="m0,0 0,250 250,0 0,-250 z"/>
-            <path d="m127.5,110c-5.5,0 -10,4.5 -10,10 0,5.5 4.5,10 10,10 5.5,0 10,-4.5 10,-10 0,-5.5 -4.5,-10 -10,-10 z"/>
-        </svg>
-    </a>
+<button type="button" id="snd" class="snd" aria-pressed="false"><span class="snd-dot" aria-hidden="true"></span><span class="snd-label">Sound off</span></button>
 
-    <div class="container">
-        <header class="header">
-            <h1 class="logo">V3XV0ID</h1>
-            <p class="tagline">AV CLIENT<span class="version-badge">v2.0.0 CLOUD</span></p>
-            <p class="description">Professional Live Visual Performance Tool with Cloud-Connected Audio-Visual Sequencing. Download once, perform anywhere with curated V3XV0ID content automatically streamed from the cloud.</p>
-        </header>
+<header class="hero" id="hero">
+  <div class="hero-bar"><span>V3XV0ID AV Client · 3.0.0</span><nav><a href="#what">What it does</a><a href="#controls">Controls</a><a class="dl" href="#download">Download</a></nav></div>
+  <div class="strip" id="strip" role="group" aria-label="Preview layers">
+    <button type="button" data-k="video">Clips <kbd>V</kbd></button>
+    <button type="button" data-k="mercury">Mercury <kbd>M</kbd></button>
+    <button type="button" data-k="field">Point field <kbd>P</kbd></button>
+    <button type="button" data-k="decals">Decals <kbd>D</kbd></button>
+    <button type="button" data-k="flecks">Flecks <kbd>K</kbd></button>
+    <button type="button" data-k="grain">Grain <kbd>G</kbd></button>
+    <span class="more">
+      <button type="button" data-a="clean">Clean now <kbd>C</kbd></button>
+      <button type="button" data-a="next">Next clip <kbd>N</kbd></button>
+      <button type="button" data-a="formula">Formula: <span id="fname">auto</span> <kbd>F</kbd></button>
+    </span>
+  </div>
+</header>
 
-        <nav class="nav">
-            <div class="nav-links">
-                <a href="#download" class="nav-link">Download</a>
-                <a href="#features" class="nav-link">Features</a>
-                <a href="https://github.com/b0ase/vexvoid-AV-client" class="nav-link">Source Code</a>
-            </div>
-        </nav>
-
-        <section id="download" class="section">
-            <h2 class="section-title">Download V3XV0ID AV Client v2.0.0</h2>
-            <p class="text-center mb-30">Choose your platform and download the latest version with cloud performance features</p>
-            
-            <div class="download-grid">
-                <div class="download-card">
-                    <span class="platform-icon">🍎</span>
-                    <h3 class="platform-name">macOS</h3>
-                    <div class="download-links">
-                        <a href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v2.0.0/V3XV0ID-AV-Client-2.0.0.dmg" class="download-btn primary">Intel Mac (DMG)</a>
-                        <a href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v2.0.0/V3XV0ID-AV-Client-2.0.0-arm64.dmg" class="download-btn primary">Apple Silicon (DMG)</a>
-                        <a href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v2.0.0/V3XV0ID-AV-Client-2.0.0-mac.zip" class="download-btn">Intel Mac (ZIP)</a>
-                        <a href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v2.0.0/V3XV0ID-AV-Client-2.0.0-arm64-mac.zip" class="download-btn">Apple Silicon (ZIP)</a>
-                    </div>
-                </div>
-
-                <div class="download-card">
-                    <span class="platform-icon">🪟</span>
-                    <h3 class="platform-name">Windows</h3>
-                    <div class="download-links">
-                        <a href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v2.0.0/V3XV0ID-AV-Client-Setup-2.0.0.exe" class="download-btn primary">Installer (EXE)</a>
-                        <a href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v2.0.0/V3XV0ID-AV-Client-2.0.0-portable.exe" class="download-btn">Portable (EXE)</a>
-                    </div>
-                </div>
-
-                <div class="download-card">
-                    <span class="platform-icon">🐧</span>
-                    <h3 class="platform-name">Linux</h3>
-                    <div class="download-links">
-                        <a href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v2.0.0/V3XV0ID-AV-Client-2.0.0.AppImage" class="download-btn primary">AppImage</a>
-                        <a href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v2.0.0/v3xv0id-av-client_2.0.0_amd64.deb" class="download-btn">Debian Package</a>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section id="features" class="section">
-            <h2 class="section-title">Features</h2>
-            
-            <div class="features-grid">
-                <div class="feature-card cloud-feature">
-                    <span class="feature-icon">🌐</span>
-                    <h3 class="feature-title">Cloud Performance System</h3>
-                    <p class="feature-description">Connect to V3XV0ID cloud storage and automatically download curated music, images, and videos. One-click setup for instant live performances with professional V3XV0ID content.</p>
-                </div>
-
-                <div class="feature-card cloud-feature">
-                    <span class="feature-icon">🎵</span>
-                    <h3 class="feature-title">Audio-Visual Synchronization</h3>
-                    <p class="feature-description">Built-in audio playback engine with beat-synchronized visual changes. Music automatically triggers image sequences, video clips, and palette transitions for seamless AV performances.</p>
-                </div>
-
-                <div class="feature-card cloud-feature">
-                    <span class="feature-icon">🎭</span>
-                    <h3 class="feature-title">Automated Performance Sequences</h3>
-                    <p class="feature-description">Pre-programmed V3XV0ID sets with intelligent auto-mixing, crossfading, and BPM-based visual transitions. Perfect for live performances, installations, and projection mapping.</p>
-                </div>
-
-                <div class="feature-card">
-                    <span class="feature-icon">🎛️</span>
-                    <h3 class="feature-title">Dual Palette System</h3>
-                    <p class="feature-description">Professional DJ/VJ-style crossfader interface with independent Palette A and B for seamless mixing and real-time crossfading between content palettes.</p>
-                </div>
-
-                <div class="feature-card">
-                    <span class="feature-icon">🎬</span>
-                    <h3 class="feature-title">Live Video Support</h3>
-                    <p class="feature-description">Support for .mp4, .mov, .avi, .webm, .mkv files with real-time video playback, autoloop, and mixed media support in the same layer sequence.</p>
-                </div>
-
-                <div class="feature-card">
-                    <span class="feature-icon">🖼️</span>
-                    <h3 class="feature-title">Multi-Layer Animation</h3>
-                    <p class="feature-description">Unlimited layer support with individual controls, image sequence animation with customizable speed, and drag-and-drop layer positioning.</p>
-                </div>
-
-                <div class="feature-card">
-                    <span class="feature-icon">👁️</span>
-                    <h3 class="feature-title">Live Preview Windows</h3>
-                    <p class="feature-description">Real-time preview of Palette A and B content with live mixed output preview showing crossfader effects at 20fps smooth animation.</p>
-                </div>
-
-                <div class="feature-card">
-                    <span class="feature-icon">🎨</span>
-                    <h3 class="feature-title">Visual Effects</h3>
-                    <p class="feature-description">Opacity control, scale/size adjustment, jitter effects, strobe flashing, rhythmic impact pulsing, and real-time color inversion.</p>
-                </div>
-
-                <div class="feature-card">
-                    <span class="feature-icon">⚡</span>
-                    <h3 class="feature-title">Performance Optimized</h3>
-                    <p class="feature-description">Real-time rendering for live performances, dual monitor support, global pause/resume controls, and crosshair cursor precision.</p>
-                </div>
-            </div>
-        </section>
-
-        <section class="section">
-            <h2 class="section-title">Quick Start Guide</h2>
-            
-            <div style="max-width: 800px; margin: 0 auto; text-align: left;">
-                <h3 style="font-size: 18px; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 0.1em;">🎭 V3XV0ID Cloud Performance Mode:</h3>
-                <ol style="margin-bottom: 30px; padding-left: 20px; line-height: 1.8;">
-                    <li>Launch V3XV0ID AV Client</li>
-                    <li>Click the "🎭 V3XV0ID" button in the top-right corner</li>
-                    <li>Click "🌐 CONNECT TO CLOUD" to download V3XV0ID content</li>
-                    <li>Click "🎭 START PERFORMANCE" for automatic audio-visual shows</li>
-                    <li>Use crossfader to mix between palettes during performance</li>
-                </ol>
-
-                <h3 style="font-size: 18px; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 0.1em;">🎛️ Manual Mode:</h3>
-                <ol style="margin-bottom: 30px; padding-left: 20px; line-height: 1.8;">
-                    <li>Add layers using "+ ADD" buttons in Palette A and B</li>
-                    <li>Load images/videos by clicking the folder icon on each layer</li>
-                    <li>Use the crossfader to mix between palettes</li>
-                    <li>Adjust layer properties: speed, size, opacity, effects</li>
-                    <li>Preview your mix in the preview window</li>
-                </ol>
-
-                <div style="background: rgba(255, 255, 255, 0.1); padding: 20px; border: 1px solid rgba(255, 255, 255, 0.2); margin-top: 30px;">
-                    <h4 style="margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.1em;">💡 Pro Tips:</h4>
-                    <ul style="padding-left: 20px; line-height: 1.6;">
-                        <li>Use dual monitors for control window + output projection</li>
-                        <li>Cloud mode works offline after initial download</li>
-                        <li>Crossfader automatically switches palettes in performance mode</li>
-                        <li>Layer effects sync to music BPM in cloud performance mode</li>
-                        <li>Press spacebar for global pause/resume</li>
-                    </ul>
-                </div>
-            </div>
-        </section>
+<main class="wrap">
+  <section class="sec" id="what" aria-labelledby="h-what">
+    <div class="sec-head"><span class="idx">A/01</span><h2 id="h-what">What it does</h2><span class="ref">live AV · two windows</span></div>
+    <p class="lede">A performance app for VJ sets. One window goes full screen on the projector; the other is your desk. The VX engine runs underneath as a stack of generative layers, and your own image sequences and video files play on top with a two-palette crossfader. Everything above is running live in this page, on the same code the app uses.</p>
+    <div class="layers">
+      <div class="layer"><span>Layer 01</span><b>Clip deck</b><p>Smooth Grok idents and rough footage (writers, tunnels, trains), shuffled so nothing repeats: new in-point, speed and zoom every time, mirrored unless the clip has lettering. Hard glitch cuts between clips.</p></div>
+      <div class="layer"><span>Layer 02</span><b>Void and clean</b><p>About 45% of cuts drop to the void (no footage, just the engine). About 35% go clean: the overlays fade out and the clip plays on its own. Both chances are sliders.</p></div>
+      <div class="layer"><span>Layer 03</span><b>Mercury pool</b><p>A raymarched pool of liquid metal in WebGL, lit by a studio softbox. The only shine in the picture comes from it.</p></div>
+      <div class="layer"><span>Layer 04</span><b>Point fields</b><p>Five fields mutated from @yuruyurau's tweet-length Processing pieces: eye, bloom, mirrored vortex, hybrid, torn ribbon. Trails, band shears, slow drift on the constants.</p></div>
+      <div class="layer"><span>Layer 05</span><b>Decal livery</b><p>Hairline race-livery vectors: barcodes, registration marks, catalogue numbers. A chaos amount sets how hard they jitter, blink and scramble.</p></div>
+      <div class="layer"><span>Layer 06</span><b>Flecks and grain</b><p>Fairlight-style chains of fine noise flecks riding sine and Lissajous paths, plus sparse, fast single-pixel grain. Nothing falls.</p></div>
+      <div class="layer"><span>Layer 07</span><b>Title</b><p>The V3XV0ID wordmark cycles hairline, solid and wide with a short glitch cut between looks.</p></div>
+      <div class="layer"><span>Layer 08</span><b>Sound</b><p>A Web Audio engine: pad, FM bells and computer beep-boops on a 100 BPM look-ahead clock. Cuts and glitches in the picture trigger sounds. Off until you turn it on.</p></div>
+      <div class="layer"><span>On top</span><b>Your layers</b><p>Load folders of images or video into palettes A and B, set speed, size, jitter, strobe and impact per layer, and crossfade. Record the output window to a file.</p></div>
     </div>
+  </section>
 
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-links">
-                <a href="https://github.com/b0ase/vexvoid-AV-client" class="footer-link">GitHub</a>
-                <a href="https://github.com/b0ase/vexvoid-AV-client/releases" class="footer-link">Releases</a>
-                <a href="https://github.com/b0ase/vexvoid-AV-client/issues" class="footer-link">Issues</a>
-            </div>
-            <p>&copy; 2025 V3XV0ID. Open Source under ISC License.</p>
-        </div>
-    </footer>
+  <section class="sec" id="download" aria-labelledby="h-dl">
+    <div class="sec-head"><span class="idx">A/02</span><h2 id="h-dl">Download</h2><span class="ref">version 3.0.0</span></div>
+    <div class="dls">
+      <div class="dl-card">
+        <h3>macOS</h3><span class="note">Universal · Apple silicon + Intel · signed</span>
+        <a class="btn" href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v3.0.0/V3XV0ID-AV-Client-3.0.0-mac-universal.dmg">Download .dmg <small>macOS 11+</small></a>
+        <a class="btn ghost" href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v3.0.0/V3XV0ID-AV-Client-3.0.0-mac-universal.zip">.zip <small>same app</small></a>
+      </div>
+      <div class="dl-card">
+        <h3>Windows</h3><span class="note">x64 · installer or portable</span>
+        <a class="btn" href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v3.0.0/V3XV0ID-AV-Client-3.0.0-win-x64-setup.exe">Installer .exe <small>Windows 10+</small></a>
+        <a class="btn ghost" href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v3.0.0/V3XV0ID-AV-Client-3.0.0-win-x64-portable.exe">Portable .exe <small>no install</small></a>
+      </div>
+      <div class="dl-card">
+        <h3>Linux</h3><span class="note">x64 · AppImage or .deb</span>
+        <a class="btn" href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v3.0.0/V3XV0ID-AV-Client-3.0.0-linux-x86_64.AppImage">AppImage <small>any distro</small></a>
+        <a class="btn ghost" href="https://github.com/b0ase/vexvoid-AV-client/releases/download/v3.0.0/V3XV0ID-AV-Client-3.0.0-linux-amd64.deb">.deb <small>Debian / Ubuntu</small></a>
+      </div>
+    </div>
+    <p class="rel">If a link 404s, the 3.0.0 files aren't uploaded yet: see <a href="https://github.com/b0ase/vexvoid-AV-client/releases">all releases</a>. Source on <a href="https://github.com/b0ase/vexvoid-AV-client">GitHub</a>.</p>
+  </section>
 
-    <script>
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                const target = document.querySelector(this.getAttribute('href'));
-                if (target) {
-                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-            });
-        });
-    </script>
+  <section class="sec" aria-labelledby="h-req">
+    <div class="sec-head"><span class="idx">A/03</span><h2 id="h-req">System requirements</h2><span class="ref">electron 36</span></div>
+    <div class="cols">
+      <table>
+        <tr><th>macOS</th><td>11 Big Sur or later, Apple silicon or Intel</td></tr>
+        <tr><th>Windows</th><td>10 or 11, 64-bit</td></tr>
+        <tr><th>Linux</th><td>64-bit, glibc 2.28+ (Ubuntu 20.04, Debian 10, Fedora 32 or newer)</td></tr>
+        <tr><th>GPU</th><td>WebGL 1 for the mercury pool. Integrated graphics are fine at 1080p; use a dedicated GPU for 4K output.</td></tr>
+      </table>
+      <table>
+        <tr><th>Memory</th><td>8 GB RAM, 16 GB for long sets with large image folders</td></tr>
+        <tr><th>Displays</th><td>Two recommended: controls on the laptop, output full screen on the projector or second screen</td></tr>
+        <tr><th>Network</th><td>The clip deck streams from the VexVoid library, so it needs a connection. Your own layers play from disk.</td></tr>
+        <tr><th>Cloud</th><td>Optional. Set V3X_SUPABASE_URL and V3X_SUPABASE_ANON_KEY to sync sequences; without them it runs in demo mode.</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <section class="sec" id="controls" aria-labelledby="h-keys">
+    <div class="sec-head"><span class="idx">A/04</span><h2 id="h-keys">Operator controls</h2><span class="ref">keys work in both windows</span></div>
+    <ol class="steps">
+      <li><b>Start it.</b> The output window opens full screen on your second display (or the main one if there's only one). The controls window opens on your main display.</li>
+      <li><b>VX engine panel.</b> In the controls window, the VX ENGINE panel has a switch for every layer, the void and clean chances, the point-field formula, decal chaos, and sound on/off, BPM and volume. The status line shows what the engine is doing: CLIP, VOID, CLEAN or BLACKOUT.</li>
+      <li><b>Your layers.</b> Add layers to palettes A and B, drop in folders of images or video, and move the crossfader. They sit on top of the engine.</li>
+      <li><b>Panic buttons.</b> BLACKOUT cuts the engine to black at once. CLEAN NOW fades every overlay and lets the current clip play on its own.</li>
+      <li><b>Full screen.</b> F11 toggles full screen on the focused window, Esc leaves it.</li>
+    </ol>
+    <table id="keys" aria-label="Keyboard shortcuts"></table>
+  </section>
+
+  <footer><span>V3XV0ID · AV Client 3.0.0</span><span>Point fields after @yuruyurau</span><span>Footage: VexVoid library</span></footer>
+</main>
+
+<script src="vx-engine.js"></script>
+<script src="vx-keys.js"></script>
+<script>
+(function () {
+  var vx = VX.mount(document.getElementById('hero'), { compact: true, kicker: 'Live preview', state: { audio: false } });
+  var strip = document.getElementById('strip');
+  function sync() {
+    strip.querySelectorAll('[data-k]').forEach(function (b) { b.setAttribute('aria-pressed', String(!!vx.get(b.dataset.k))); });
+    document.getElementById('fname').textContent = vx.get('formula');
+    var on = !!vx.get('audio'), btn = document.getElementById('snd');
+    btn.setAttribute('aria-pressed', String(on)); btn.querySelector('.snd-label').textContent = on ? 'Sound on' : 'Sound off';
+  }
+  vx.onchange(sync); sync();
+  strip.addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.k) vx.set(b.dataset.k, !vx.get(b.dataset.k));
+    else if (b.dataset.a === 'clean') vx.cleanNow();
+    else if (b.dataset.a === 'next') vx.nextClip();
+    else if (b.dataset.a === 'formula') { var f = window.vxFormulaCycle, i = f.indexOf(String(vx.get('formula'))); vx.set('formula', f[(i + 1) % f.length]); }
+  });
+  document.getElementById('snd').addEventListener('click', function () { vx.toggleAudio(); });
+  document.addEventListener('keydown', function (e) { if (window.vxHandleKey(e, vx)) e.preventDefault(); });
+  var t = document.getElementById('keys');
+  t.innerHTML = '<tr><th>Key</th><th>Action</th></tr>' + window.vxKeyMap.map(function (r) {
+    return '<tr><td>' + r[0].split(' ').map(function (k) { return '<kbd>' + k + '</kbd>'; }).join(' ') + '</td><td>' + r[1] + '</td></tr>';
+  }).join('');
+})();
+</script>
 </body>
 </html>
