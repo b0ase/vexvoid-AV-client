@@ -1,17 +1,18 @@
 {
   "name": "v3xv0id-av-client",
-  "version": "2.0.2",
-  "description": "V3XV0ID AV Client - Professional Live Visual Performance Tool with Cloud-Connected Audio-Visual Sequencing",
+  "version": "3.0.0",
+  "description": "V3XV0ID AV Client - live visual performance tool: layered VX engine (clip deck, mercury, point fields, decals, sound) under operator image/video layers",
   "main": "main.js",
   "homepage": "./",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "electron ./main.js",
     "build": "electron-builder",
-    "build-mac": "electron-builder --mac",
-    "build-win": "electron-builder --win",
-    "build-linux": "electron-builder --linux",
-    "dist": "electron-builder --publish=never"
+    "build-mac": "electron-builder --mac --publish=never",
+    "build-win": "electron-builder --win --publish=never",
+    "build-linux": "electron-builder --linux --publish=never",
+    "dist": "electron-builder --mac --win --linux --publish=never",
+    "sync-docs": "cp vx/vx-engine.js vx/vx-keys.js docs/"
   },
   "keywords": [
     "animation",
@@ -38,7 +39,7 @@
     "@supabase/supabase-js": "^2.50.0"
   },
   "build": {
-    "appId": "com.fresh.v3xv0id-av-client",
+    "appId": "com.b0ase.v3xv0id-av-client",
     "productName": "V3XV0ID AV Client",
     "directories": {
       "output": "dist"
@@ -51,30 +52,35 @@
       "supabase-config.js",
       "audio-manager.js",
       "performance-sequencer.js",
-      "node_modules/**/*",
       "package.json",
-      "vexvoid-icon.png"
+      "vexvoid-icon.png",
+      "vx/**/*"
     ],
     "icon": "vexvoid-icon.png",
     "mac": {
       "category": "public.app-category.graphics-design",
       "icon": "vexvoid-icon.png",
+      "identity": "Richard Boase (ZQ4NX9NJ89)",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "notarize": true,
       "target": [
         {
           "target": "dmg",
           "arch": [
-            "x64",
-            "arm64"
+            "universal"
           ]
         },
         {
           "target": "zip",
           "arch": [
-            "x64",
-            "arm64"
+            "universal"
           ]
         }
-      ]
+      ],
+      "artifactName": "V3XV0ID-AV-Client-${version}-mac-universal.${ext}"
     },
     "win": {
       "icon": "vexvoid-icon.png",
@@ -91,7 +97,8 @@
             "x64"
           ]
         }
-      ]
+      ],
+      "artifactName": "V3XV0ID-AV-Client-${version}-win-${arch}.${ext}"
     },
     "linux": {
       "icon": "vexvoid-icon.png",
@@ -108,11 +115,17 @@
             "x64"
           ]
         }
-      ]
+      ],
+      "artifactName": "V3XV0ID-AV-Client-${version}-linux-${arch}.${ext}",
+      "category": "AudioVideo",
+      "maintainer": "b0ase"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
+    },
+    "dmg": {
+      "artifactName": "V3XV0ID-AV-Client-${version}-mac-universal.${ext}"
     }
   }
 }
