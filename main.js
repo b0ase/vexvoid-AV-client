@@ -4,6 +4,9 @@ const remoteMain = require('@electron/remote/main');
 
 remoteMain.initialize();
 
+// The VX engine's clip deck and sound engine start without a click in the output window
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+
 let outputWindow = null;
 let controlWindow = null;
 

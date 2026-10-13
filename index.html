@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=800, initial-scale=1.0">
-  <title>V3XV0ID Image Animator - Output</title>
+  <title>V3XV0ID AV Client - Output</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap');
     
@@ -126,6 +126,9 @@
       filter: contrast(1.1);
     }
     
+    /* VX engine stage: the generative layers sit under the operator's image/video layers */
+    #vx-stage { position: fixed; inset: 0; z-index: 0; }
+    #thumbnails-bar:has(#thumbnails:empty) { display: none; }
     #thumbnails-bar {
       position: fixed;
       left: 0; right: 0; bottom: 0;
@@ -236,8 +239,8 @@
   </style>
 </head>
 <body>
-  <!-- V3XV0ID Branding -->
-  <div class="v3xv0id-brand">V3XV0ID</div>
+  <!-- VX engine layers (video deck, mercury, point field, decals, title, grain, sound) -->
+  <div id="vx-stage"></div>
   
   <!-- Clean output window - controls moved to separate window -->
   <div id="animator">
@@ -255,6 +258,40 @@
   <div id="thumbnails-bar">
     <div id="thumbnails"></div>
   </div>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Michroma&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <script src="./vx/vx-engine.js"></script>
+  <script>
+    // ===== VX engine: mounted once, driven from the controls window over IPC ('vx' command) =====
+    window.addEventListener('DOMContentLoaded', function() {
+      const { ipcRenderer } = require('electron');
+      let saved = null;
+      try { saved = JSON.parse(localStorage.getItem('vx-state') || 'null'); } catch (e) { saved = null; }
+      if (saved) saved.blackout = false;
+      const vx = window.vxEngine = VX.mount(document.getElementById('vx-stage'), { state: saved || undefined, kicker: 'Live AV · output' });
+      vx.onchange(function (snap) {
+        try { const keep = Object.assign({}, snap); delete keep.clean; delete keep.void; delete keep.shape; delete keep.audioRunning; localStorage.setItem('vx-state', JSON.stringify(keep)); } catch (e) {}
+        ipcRenderer.send('output-to-control', { command: 'vx-state', data: snap });
+      });
+      ipcRenderer.on('control-command', function (event, message) {
+        if (!message || message.command !== 'vx') return;
+        const d = message.data || {};
+        switch (d.action) {
+          case 'set': vx.set(d.key, d.value); break;
+          case 'blackout': vx.blackout(d.value); break;
+          case 'clean': vx.cleanNow(); break;
+          case 'next': vx.nextClip(); break;
+          case 'audio': vx.toggleAudio(); break;
+          case 'reset': vx.set(Object.assign({}, VX.defaults)); break;
+          case 'state': ipcRenderer.send('output-to-control', { command: 'vx-state', data: vx.snapshot() }); break;
+        }
+      });
+      // the same shortcuts work when the output window has focus
+      document.addEventListener('keydown', function (e) { if (window.vxHandleKey && window.vxHandleKey(e, vx)) e.preventDefault(); });
+      // periodic state so the controls panel shows void/clean/current shape live
+      setInterval(function () { ipcRenderer.send('output-to-control', { command: 'vx-state', data: vx.snapshot() }); }, 1000);
+    });
+  </script>
+  <script src="./vx/vx-keys.js"></script>
   <script>
     window.addEventListener('DOMContentLoaded', function() {
       const { ipcRenderer } = require('electron');

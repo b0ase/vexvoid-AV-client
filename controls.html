@@ -1656,6 +1656,23 @@
       color: var(--white);
       text-shadow: 0 0 2px var(--white-50);
     }
+  
+    /* ===== VX engine panel ===== */
+    .vx-panel { border: 1px solid rgba(255,255,255,.55); padding: 10px; margin-bottom: 12px; display: grid; gap: 8px; font-family: 'IBM Plex Mono', 'Courier New', monospace; font-size: 11px; }
+    .vx-head { display: flex; justify-content: space-between; letter-spacing: .24em; font-size: 11px; border-bottom: 1px solid rgba(255,255,255,.3); padding-bottom: 6px; }
+    .vx-status { color: #9a9a98; letter-spacing: .14em; }
+    .vx-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .vx-btn { font: inherit; letter-spacing: .14em; background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.6); padding: 8px 4px; cursor: pointer; }
+    .vx-btn:hover { background: rgba(255,255,255,.1); }
+    .vx-btn[aria-pressed="true"] { background: #fff; color: #000; }
+    .vx-grid { display: grid; gap: 6px; }
+    .vx-tog { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+    .vx-sl { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; }
+    .vx-sl input[type=range], .vx-sl select { grid-column: 1 / -1; width: 100%; accent-color: #fff; }
+    .vx-sl select { background: #000; color: #fff; border: 1px solid rgba(255,255,255,.5); font: inherit; padding: 4px; }
+    .vx-panel kbd { font: inherit; font-size: 9px; color: #9a9a98; border: 1px solid rgba(255,255,255,.3); padding: 0 4px; }
+    .vx-panel output { color: #9a9a98; text-align: right; font-variant-numeric: tabular-nums; }
+    .vx-foot { color: #9a9a98; font-size: 9px; letter-spacing: .08em; }
   </style>
 </head>
 <body>
@@ -1760,6 +1777,36 @@
 
     <!-- Middle Column - Controls -->
     <div class="controls-column">
+      <!-- ===== VX ENGINE: the generative layers under the image/video layers ===== -->
+      <div class="vx-panel" id="vxPanel">
+        <div class="vx-head"><span>VX ENGINE</span><span class="vx-status" id="vxStatus">connecting</span></div>
+        <div class="vx-actions">
+          <button type="button" class="vx-btn vx-danger" id="vxBlackout" title="B">BLACKOUT</button>
+          <button type="button" class="vx-btn" id="vxClean" title="C">CLEAN NOW</button>
+          <button type="button" class="vx-btn" id="vxNext" title="N">NEXT CLIP</button>
+          <button type="button" class="vx-btn" id="vxReset" title="0">RESET</button>
+        </div>
+        <div class="vx-grid">
+          <label class="vx-tog"><input type="checkbox" data-vx="video"> Video deck <kbd>V</kbd></label>
+          <label class="vx-tog"><input type="checkbox" data-vx="smooth"> Smooth (Grok idents)</label>
+          <label class="vx-tog"><input type="checkbox" data-vx="rough"> Rough (writers/tunnels/trains)</label>
+          <label class="vx-sl">Void chance <output data-out="voidChance"></output><input type="range" min="0" max="1" step="0.05" data-vx="voidChance"></label>
+          <label class="vx-sl">Clean chance <output data-out="cleanChance"></output><input type="range" min="0" max="1" step="0.05" data-vx="cleanChance"></label>
+          <label class="vx-tog"><input type="checkbox" data-vx="mercury"> Mercury pool <kbd>M</kbd></label>
+          <label class="vx-tog"><input type="checkbox" data-vx="field"> Point field <kbd>P</kbd></label>
+          <label class="vx-sl">Formula <kbd>F</kbd>
+            <select data-vx="formula"><option value="auto">auto (crossfade)</option><option value="eye">eye</option><option value="bloom">bloom</option><option value="vortex">vortex (mirrored)</option><option value="hybrid">hybrid</option><option value="ribbon">torn ribbon</option></select></label>
+          <label class="vx-tog"><input type="checkbox" data-vx="flecks"> Fleck chains <kbd>K</kbd></label>
+          <label class="vx-tog"><input type="checkbox" data-vx="grain"> Grain <kbd>G</kbd></label>
+          <label class="vx-tog"><input type="checkbox" data-vx="decals"> Decal livery <kbd>D</kbd></label>
+          <label class="vx-sl">Decal chaos <kbd>[ ]</kbd> <output data-out="chaos"></output><input type="range" min="0" max="1" step="0.05" data-vx="chaos"></label>
+          <label class="vx-tog"><input type="checkbox" data-vx="title"> V3XV0ID title <kbd>T</kbd></label>
+          <label class="vx-tog"><input type="checkbox" data-vx="audio"> Sound engine <kbd>S</kbd></label>
+          <label class="vx-sl">BPM <kbd>- =</kbd> <output data-out="bpm"></output><input type="range" min="40" max="200" step="1" data-vx="bpm"></label>
+          <label class="vx-sl">Volume <kbd>, .</kbd> <output data-out="volume"></output><input type="range" min="0" max="1" step="0.05" data-vx="volume"></label>
+        </div>
+        <div class="vx-foot">Point fields after @yuruyurau. Keys work in this window and the output window.</div>
+      </div>
       <div class="controls-header">
         <h2>CONTROLS</h2>
       </div>
@@ -5057,6 +5104,55 @@ function draw() {
       }
 
       console.log('🎛️ All V3XV0ID Tab Content Systems initialized');
+    });
+  </script>
+  <script src="./vx/vx-keys.js"></script>
+  <script>
+    // ===== VX engine panel: mirrors the output window's engine state and forwards changes over IPC =====
+    window.addEventListener('DOMContentLoaded', function () {
+      const { ipcRenderer } = require('electron');
+      const panel = document.getElementById('vxPanel');
+      if (!panel) return;
+      let st = {};
+      const send = (data) => ipcRenderer.send('control-to-output', { command: 'vx', data });
+      const proxy = {
+        get: (k) => st[k],
+        set: (k, v) => { if (typeof k === 'object') { Object.assign(st, k); send({ action: 'reset' }); } else { st[k] = v; send({ action: 'set', key: k, value: v }); } render(); },
+        blackout: () => { st.blackout = !st.blackout; send({ action: 'blackout', value: st.blackout }); render(); },
+        cleanNow: () => send({ action: 'clean' }),
+        nextClip: () => send({ action: 'next' }),
+        toggleAudio: () => { st.audio = !st.audio; send({ action: 'set', key: 'audio', value: st.audio }); render(); },
+        reset: () => send({ action: 'reset' })
+      };
+      window.vxProxy = proxy;
+      function fmt(k, v) { if (k === 'bpm') return String(v); if (k === 'chaos' || k === 'volume' || /Chance$/.test(k)) return Math.round(v * 100) + '%'; return String(v); }
+      function render() {
+        panel.querySelectorAll('[data-vx]').forEach((el) => {
+          const k = el.dataset.vx; if (!(k in st) || document.activeElement === el) return;
+          if (el.type === 'checkbox') el.checked = !!st[k]; else el.value = st[k];
+        });
+        panel.querySelectorAll('[data-out]').forEach((o) => { const k = o.dataset.out; if (k in st) o.textContent = fmt(k, st[k]); });
+        document.getElementById('vxBlackout').setAttribute('aria-pressed', String(!!st.blackout));
+        const mode = st.blackout ? 'BLACKOUT' : st.void ? 'VOID' : st.clean ? 'CLEAN' : (st.video ? 'CLIP' : 'NO VIDEO');
+        document.getElementById('vxStatus').textContent = mode + (st.shape ? ' · ' + st.shape : '') + (st.audioRunning ? ' · ' + st.bpm + ' BPM' : '');
+      }
+      panel.querySelectorAll('[data-vx]').forEach((el) => {
+        const k = el.dataset.vx;
+        el.addEventListener(el.type === 'range' ? 'input' : 'change', () => {
+          const v = el.type === 'checkbox' ? el.checked : el.type === 'range' ? +el.value : el.value;
+          proxy.set(k, v);
+        });
+      });
+      document.getElementById('vxBlackout').addEventListener('click', proxy.blackout);
+      document.getElementById('vxClean').addEventListener('click', proxy.cleanNow);
+      document.getElementById('vxNext').addEventListener('click', proxy.nextClip);
+      document.getElementById('vxReset').addEventListener('click', proxy.reset);
+      ipcRenderer.on('output-message', (event, message) => {
+        if (!message || message.command !== 'vx-state') return;
+        st = Object.assign({}, message.data); render();
+      });
+      document.addEventListener('keydown', (e) => { if (window.vxHandleKey(e, proxy)) e.preventDefault(); });
+      send({ action: 'state' });
     });
   </script>
 </body>
