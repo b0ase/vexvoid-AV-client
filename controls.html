@@ -1700,6 +1700,12 @@
     .midi-sub{display:flex;justify-content:space-between;color:#999;font-size:10px;margin:6px 0 10px}
     .midi-row{display:grid;grid-template-columns:1.3fr 1fr 1fr auto auto;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid #151515}
     .midi-bind{color:#fff}
+    .claude-steps{padding-left:18px;line-height:1.7;color:#ccc}
+    .claude-steps li{margin-bottom:10px}
+    .claude-url{display:flex;gap:6px;align-items:center;margin-top:6px}
+    .claude-url code{flex:1;background:#0a0a0a;border:1px solid #333;padding:6px 8px;color:#fff;text-transform:none;user-select:all}
+    .claude-code{display:flex;gap:10px;align-items:center;margin-top:6px}
+    .claude-code span{font-size:30px;letter-spacing:.35em;color:#fff;border:1px solid #555;padding:6px 12px;min-width:220px;text-align:center}
 
     /* Set composer */
     .set-grid{flex:1;display:grid;grid-template-columns:1fr 380px;gap:10px;min-height:0}
@@ -1769,7 +1775,23 @@
   <div class="v3xv0id-header">
     <div class="v3xv0id-brand">V3XV0ID</div>
     <div class="v3xv0id-subtitle">Image Animator Controls</div>
+    <button id="claudeChip" class="midi-chip" title="Control this mixer from claude.ai">CLAUDE.AI</button>
     <button id="midiChip" class="midi-chip" title="MIDI controller mapping">MIDI · …</button>
+  </div>
+  <div id="claudePanel" class="midi-panel" style="display:none">
+    <div class="midi-head"><span>PLAY THIS MIXER FROM CLAUDE.AI</span><button id="claudeClose" class="close-btn">✕</button></div>
+    <div class="midi-sub"><span id="claudeState">…</span></div>
+    <ol class="claude-steps">
+      <li>In claude.ai open <b>Settings → Connectors → Add custom connector</b> and paste this URL:
+        <div class="claude-url"><code id="claudeUrl"></code><button id="claudeCopy" class="gen-btn">COPY</button></div></li>
+      <li>Press <b>Connect</b>. A V3XV0ID page opens and asks for a code.</li>
+      <li>Get a code here and type it in:
+        <div class="claude-code"><span id="claudePair">······</span><button id="claudeCode" class="gen-btn hot">GET A CODE</button></div>
+        <div class="dim" id="claudeExpires" style="font-size:10px"></div></li>
+      <li>Ask Claude things like “cue FLOW FIELD on the hidden deck and fade to it over the next 8 bars”. It works from the phone app too once added.</li>
+    </ol>
+    <div class="midi-sub"><span class="dim">claude.ai can crossfade, send sketches, load catalogue media, play music and see the output. It can't open files on this computer or spend on Grok.</span></div>
+    <button id="claudeOff" class="gen-btn">DISCONNECT CLAUDE.AI</button>
   </div>
   <div id="midiPanel" class="midi-panel" style="display:none">
     <div class="midi-head"><span>MIDI MAPPING</span><button id="midiClose" class="close-btn">✕</button></div>
@@ -4493,6 +4515,53 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         if (s !== lastApiState) { lastApiState = s; ipcRenderer.send('api-state', JSON.parse(s)); }
       }
       setInterval(pushApiState, 250);
+
+      // ===== CLAUDE.AI: link this mixer to the relay so claude.ai (web, phone) can play it =====
+      async function claudeStatus() {
+        try {
+          const s = await ipcRenderer.invoke('relay-status');
+          const chip = document.getElementById('claudeChip');
+          chip.textContent = !s.enabled ? 'CLAUDE.AI' : s.online ? (s.grants && s.grants.length ? 'CLAUDE.AI · ON' : 'CLAUDE.AI · READY') : 'CLAUDE.AI · OFFLINE';
+          chip.classList.toggle('on', !!(s.enabled && s.online));
+          document.getElementById('claudeUrl').textContent = (s.connectorUrl || (s.relay + '/mcp'));
+          document.getElementById('claudeState').textContent = !s.enabled ? 'Not linked.' : s.online
+            ? (s.grants && s.grants.length ? `Linked · ${s.grants.length} connected app${s.grants.length > 1 ? 's' : ''}: ${s.grants.join(', ')}` : 'Linked to the relay · waiting for claude.ai to connect')
+            : 'Trying to reach the relay…' + (s.error ? ' (' + s.error + ')' : '');
+          document.getElementById('claudeOff').disabled = !s.enabled;
+          return s;
+        } catch (e) { document.getElementById('claudeState').textContent = 'Relay unavailable: ' + e.message; }
+      }
+      document.getElementById('claudeChip').addEventListener('click', () => {
+        const p = document.getElementById('claudePanel');
+        p.style.display = p.style.display === 'none' ? 'block' : 'none';
+        if (p.style.display === 'block') claudeStatus();
+      });
+      document.getElementById('claudeClose').addEventListener('click', () => { document.getElementById('claudePanel').style.display = 'none'; });
+      document.getElementById('claudeCode').addEventListener('click', async () => {
+        const btn = document.getElementById('claudeCode');
+        btn.disabled = true; btn.textContent = 'GETTING A CODE…';
+        try {
+          const r = await ipcRenderer.invoke('relay-pair');
+          document.getElementById('claudePair').textContent = r.code;
+          document.getElementById('claudeUrl').textContent = r.connectorUrl;
+          const until = Date.now() + r.expiresIn * 1000;
+          clearInterval(window._claudeCountdown);
+          window._claudeCountdown = setInterval(() => {
+            const left = Math.max(0, Math.round((until - Date.now()) / 1000));
+            document.getElementById('claudeExpires').textContent = left ? `valid for ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}` : 'expired, get a new one';
+            if (!left) { clearInterval(window._claudeCountdown); document.getElementById('claudePair').textContent = '······'; }
+          }, 1000);
+        } catch (e) { document.getElementById('claudeState').textContent = 'Could not get a code: ' + e.message.replace(/^Error invoking remote method '[^']+': /, ''); }
+        finally { btn.disabled = false; btn.textContent = 'GET A CODE'; claudeStatus(); }
+      });
+      document.getElementById('claudeCopy').addEventListener('click', () => { navigator.clipboard.writeText(document.getElementById('claudeUrl').textContent); document.getElementById('claudeCopy').textContent = 'COPIED'; setTimeout(() => { document.getElementById('claudeCopy').textContent = 'COPY'; }, 1200); });
+      document.getElementById('claudeOff').addEventListener('click', async () => {
+        await ipcRenderer.invoke('relay-disconnect');
+        document.getElementById('claudePair').textContent = '······';
+        claudeStatus();
+      });
+      claudeStatus();
+      setInterval(claudeStatus, 8000);
 
       // ===== MIDI: any controller; LEARN binds a knob/fader/pad to a target. Mappings live in vx-settings.json. =====
       const MIDI_TARGETS = [

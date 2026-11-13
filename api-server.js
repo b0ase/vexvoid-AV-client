@@ -87,7 +87,7 @@ function start({ getControlWindow, getOutputWindow, port = Number(process.env.VX
       res.write(`event: state\ndata: ${JSON.stringify(state)}\n\n`);
       clients.add(res);
       const ping = setInterval(() => res.write(': ping\n\n'), 15000);
-      req.on('close', () => { clearInterval(ping); clients.delete(res); });
+      res.on('close', () => { clearInterval(ping); clients.delete(res); }); // not req: that fires once a GET is read
       return;
     }
     if (req.method === 'POST' && url.pathname === '/api/cmd') {
@@ -111,7 +111,7 @@ function start({ getControlWindow, getOutputWindow, port = Number(process.env.VX
     fs.writeFileSync(DISCOVERY, JSON.stringify({ url: `http://127.0.0.1:${port}`, token, pid: process.pid }, null, 2), { mode: 0o600 });
     console.log(`VX API on http://127.0.0.1:${port}`);
   });
-  return server;
+  return { server, run };
 }
 
 module.exports = { start, DISCOVERY };

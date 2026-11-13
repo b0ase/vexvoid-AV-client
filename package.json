@@ -14,7 +14,8 @@
     "dist": "electron-builder --mac --win --linux --publish=never",
     "sync-docs": "cp vx/vx-engine.js vx/vx-keys.js docs/",
     "mix": "node bin/vexvoid-mix.js",
-    "sync-catalogue": "node scripts/sync-catalogue.js"
+    "sync-catalogue": "node scripts/sync-catalogue.js",
+    "relay": "node relay/server.js"
   },
   "keywords": [
     "animation",
@@ -49,6 +50,8 @@
     "files": [
       "main.js",
       "api-server.js",
+      "mcp/**/*",
+      "relay-link.js",
       "index.html",
       "controls.html",
       "control-window.html",

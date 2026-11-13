@@ -120,7 +120,9 @@ app.whenReady().then(() => {
   createControlWindow();
 
   // Local control API for the CLI, MCP server and other tools (127.0.0.1, token in ~/.v3xv0id/api.json)
-  require('./api-server').start({ getControlWindow: () => controlWindow, getOutputWindow: () => outputWindow });
+  const api = require('./api-server').start({ getControlWindow: () => controlWindow, getOutputWindow: () => outputWindow });
+  // claude.ai link through the relay (off until the performer turns it on in the controls window)
+  require('./relay-link').start({ run: api.run, getOutputWindow: () => outputWindow });
   
   // Register global shortcuts for fullscreen control
   const { globalShortcut } = require('electron');
