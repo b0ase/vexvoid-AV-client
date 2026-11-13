@@ -10,6 +10,14 @@ app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 let outputWindow = null;
 let controlWindow = null;
 
+// One mixer per profile: a second copy would fight over the API port and the output display
+const firstInstance = app.requestSingleInstanceLock();
+if (!firstInstance) {
+  app.quit();
+} else {
+  app.on('second-instance', () => { if (controlWindow) { if (controlWindow.isMinimized()) controlWindow.restore(); controlWindow.focus(); } });
+}
+
 function createOutputWindow() {
   // Get all displays
   const displays = screen.getAllDisplays();
@@ -116,6 +124,7 @@ ipcMain.handle('show-save-dialog', async (event, options) => {
 });
 
 app.whenReady().then(() => {
+  if (!firstInstance) return;
   createOutputWindow();
   createControlWindow();
 

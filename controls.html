@@ -2314,6 +2314,12 @@
             <button id="setLoadBtn" class="gen-btn">LOAD</button>
           </div>
         </div>
+        <div class="gen-row">
+          <input id="setTitle" class="gen-select" style="width:260px;text-transform:none" placeholder="Set title" value="UNTITLED SET">
+          <span class="gen-sep"></span>
+          <input id="chainOrigin" class="gen-select" style="flex:1;text-transform:none" placeholder="Play from the chain: paste a set or sketch inscription id (txid_vout)">
+          <button id="chainOpenBtn" class="gen-btn">OPEN FROM CHAIN</button>
+        </div>
         <div class="set-grid">
           <div class="gen-col">
             <div class="gen-h">TIMELINE <span class="dim" id="setLength"></span></div>
@@ -3730,13 +3736,19 @@
       async function cacheMedia(item) {
         if (item.source === 'local') return item.url;
         const fs = require('fs'), path = require('path');
-        const ext = (item.url.split('?')[0].match(/\.[a-z0-9]+$/i) || ['.bin'])[0].toLowerCase();
         const slug = String(item.name || 'media').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'media';
-        const file = path.join(mediaCacheDir, slug + '-' + require('crypto').createHash('sha1').update(item.url).digest('hex').slice(0, 8) + ext);
-        if (fs.existsSync(file) && fs.statSync(file).size > 0) return file;
+        const base = path.join(mediaCacheDir, slug + '-' + require('crypto').createHash('sha1').update(item.url).digest('hex').slice(0, 8));
+        let ext = (item.url.split('?')[0].match(/\/[^/]*(\.[a-z0-9]{2,5})$/i) || [])[1];
+        const hit = ext ? (fs.existsSync(base + ext.toLowerCase()) ? base + ext.toLowerCase() : null)
+          : (fs.existsSync(mediaCacheDir) ? fs.readdirSync(mediaCacheDir).map(f => path.join(mediaCacheDir, f)).find(f => f.startsWith(base + '.') && !f.endsWith('.part')) : null);
+        if (hit && fs.statSync(hit).size > 0) return hit;
         fs.mkdirSync(mediaCacheDir, { recursive: true });
         const res = await fetch(item.url);
         if (!res.ok) throw new Error('download failed (' + res.status + ')');
+        // inscriptions (ORDFS) have no extension: the output picks video vs image by extension, so take it from the type
+        if (!ext) ext = { 'video/mp4': '.mp4', 'video/webm': '.webm', 'video/quicktime': '.mov', 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif' }[(res.headers.get('content-type') || '').split(';')[0].trim()] || '.bin';
+        ext = ext.toLowerCase();
+        const file = base + ext;
         fs.writeFileSync(file + '.part', Buffer.from(await res.arrayBuffer()));
         fs.renameSync(file + '.part', file);
         return file;
@@ -4440,6 +4452,20 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           [...layersA, ...layersB].filter(l => (l.palette || 'A') === hidden && / \(GEN\)$/.test(l.name)).forEach(l => sendToOutput('remove-layer', { layerId: l.id }));
           return VXCMD.sketch.run({ name: item.name, deck: hidden });
         } },
+        'set-doc': { doc: 'The composer set as a self-contained V3XV0ID set document (the format that gets inscribed)', run: () => { if (!setReady) initializeComposerTab(); return setAsDoc(); } },
+        'set-load': { args: '{doc}', doc: 'Load a V3XV0ID set document into the composer', run: async a => {
+          if (!setReady) initializeComposerTab();
+          const doc = typeof a.doc === 'string' ? JSON.parse(a.doc) : a.doc;
+          if (!doc || doc.type !== 'v3x-set') throw new Error('not a v3x-set document');
+          setFromDoc(await VXCHAIN.resolveSet(doc)); return { steps: set.steps.length, assets: Object.keys(set.assets).length };
+        } },
+        'set-play': { doc: 'Play the composer set from bar 1', run: () => { if (!setReady) initializeComposerTab(); setPlay(); return 'playing'; } },
+        'open-chain': { args: '{origin}', doc: 'Open a V3XV0ID set or sketch inscription from the chain (sets load into the composer)', run: async a => {
+          if (!setReady) initializeComposerTab();
+          setEl('chainOrigin').value = String(a.origin || ''); setEl('chainOpenBtn').click();
+          await new Promise(r => setTimeout(r, 50));
+          return 'opening ' + a.origin;
+        } },
         mutate: { doc: 'New seed for the current sketch', run: () => { mutate(); return gen.seed; } },
         evolve: { args: '{on}', doc: 'Mutate and drift the knobs every 4 bars', run: a => { gen.evolve = a.on !== false && a.on !== 'off'; genEl('genEvolveBtn').classList.toggle('active', gen.evolve); return gen.evolve; } },
         write: { args: '{prompt}', doc: 'Ask Claude to write a sketch (uses the Anthropic key; costs a little)', run: async a => {
@@ -4658,11 +4684,11 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       const SET_DRAFT = 'vxset.draft';
       const SET_SKIP = new Set(['help', 'state', 'layers', 'sketches', 'clips', 'images', 'tracks', 'write']);
       const setEl = id => document.getElementById(id);
-      const set = { steps: [], playing: false, recording: false, t0: 0, fired: new Set(), ramps: [], timer: 0, recT0: 0 };
+      const set = { steps: [], assets: {}, title: 'UNTITLED SET', playing: false, recording: false, t0: 0, fired: new Set(), ramps: [], timer: 0, recT0: 0 };
       let setReady = false;
 
-      function setLoadDraft() { try { const d = JSON.parse(localStorage.getItem(SET_DRAFT) || 'null'); if (d && Array.isArray(d.steps)) set.steps = d.steps; } catch (e) {} }
-      function setSaveDraft() { try { localStorage.setItem(SET_DRAFT, JSON.stringify({ steps: set.steps })); } catch (e) {} }
+      function setLoadDraft() { try { const d = JSON.parse(localStorage.getItem(SET_DRAFT) || 'null'); if (d && Array.isArray(d.steps)) { set.steps = d.steps; set.assets = d.assets || {}; if (d.title) setEl('setTitle').value = d.title; } } catch (e) {} }
+      function setSaveDraft() { try { localStorage.setItem(SET_DRAFT, JSON.stringify({ steps: set.steps, assets: set.assets, title: setEl('setTitle').value })); } catch (e) {} }
       function setSort() { set.steps.sort((a, b) => a.bar - b.bar); }
       function barsPerSecond() { return (VXGEN.signals.bpm || 120) / 60 / 4; }
       function setPosition() {
@@ -4712,13 +4738,48 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         });
       }
 
+      // A step that names an asset (sets from the chain) gets the asset's code or URL filled in
+      function setArgs(st) {
+        const args = { ...(st.args || {}) }, a = args.asset && set.assets[args.asset];
+        if (!a) return args;
+        delete args.asset;
+        if (a.kind === 'sketch') return { ...args, name: a.name, code: a.code, knobs: a.knobs };
+        return { ...args, url: a.url || (a.origin && VXCHAIN.ordUrl(a.origin)) };
+      }
+      function setAsDoc() {
+        const lib = name => (window.VXGEN_LIBRARY || []).find(x => x.name.toLowerCase() === String(name).toLowerCase());
+        const media = (kind, name) => {
+          const cat = catalogue();
+          const m = kind === 'clip' ? cat.clips.find(c => c.name.toLowerCase() === String(name).toLowerCase())
+            : cat.images.find(c => (c.set + '/' + c.name).toLowerCase().endsWith(String(name).toLowerCase()));
+          return m ? { kind, name: m.name, url: m.url } : null;
+        };
+        // steps that already reference assets keep them; the rest are converted
+        const doc = VXCHAIN.setDoc({ title: setEl('setTitle').value.trim() || 'UNTITLED SET', bpm: VXGEN.signals.bpm, steps: set.steps.filter(s => !(s.args && s.args.asset)), lookup: lib, media });
+        const n0 = Object.keys(doc.assets).length;
+        Object.entries(set.assets).forEach(([id, a], i) => { doc.assets['x' + (i + 1)] = a; });
+        set.steps.filter(s => s.args && s.args.asset).forEach(s => {
+          const i = Object.keys(set.assets).indexOf(s.args.asset);
+          doc.steps.push({ bar: s.bar, cmd: s.cmd, args: { ...s.args, asset: 'x' + (i + 1) } });
+        });
+        doc.steps.sort((a, b) => a.bar - b.bar);
+        return doc;
+      }
+      function setFromDoc(doc) {
+        set.steps = (doc.steps || []).filter(s => s && VXCMD[s.cmd]).map(s => ({ bar: Number(s.bar), cmd: s.cmd, args: s.args || {} }));
+        set.assets = doc.assets || {};
+        if (doc.title) setEl('setTitle').value = doc.title;
+        if (doc.bpm) VXGEN.signals.bpm = doc.bpm;
+        set.fired = new Set(); setSaveDraft(); renderSet();
+      }
+
       async function fireStep(st) {
         if (st.cmd === 'fade' && st.args && st.args.over > 0) {
           set.ramps = set.ramps.filter(r => r.kind !== 'fade');
           set.ramps.push({ kind: 'fade', from: Number(crossfader.value), to: Number(st.args.value), start: st.bar, len: Number(st.args.over) });
           return;
         }
-        try { await window.vxCommand(st.cmd, st.args); }
+        try { await window.vxCommand(st.cmd, setArgs(st)); }
         catch (e) { setEl('setNote').textContent = `Bar ${fmtBar(st.bar)} ${st.cmd}: ${e.message}`; }
       }
       function setTick() {
@@ -4792,7 +4853,28 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       setEl('startRecordingBtn').addEventListener('click', toggleRecord);
       setEl('playSequenceBtn').addEventListener('click', setPlay);
       setEl('stopRecordingBtn').addEventListener('click', setStop);
-      setEl('setClearBtn').addEventListener('click', () => { setStop(); set.steps = []; set.fired = new Set(); setSaveDraft(); renderSet(); });
+      setEl('setClearBtn').addEventListener('click', () => { setStop(); set.steps = []; set.assets = {}; set.fired = new Set(); setSaveDraft(); renderSet(); });
+      setEl('setTitle').addEventListener('input', setSaveDraft);
+      ['setTitle', 'chainOrigin'].forEach(id => setEl(id).addEventListener('keydown', e => e.stopPropagation()));
+      // Play from the chain: a set plays here; a sketch opens in PATTERNS
+      setEl('chainOpenBtn').addEventListener('click', async () => {
+        const origin = setEl('chainOrigin').value.trim(), note = setEl('setNote');
+        if (!VXCHAIN.isOrigin(origin)) { note.textContent = 'An inscription id looks like <64 hex characters>_<number>.'; return; }
+        note.textContent = 'Reading ' + origin.slice(0, 12) + '… from the chain';
+        try {
+          const doc = await VXCHAIN.fetchDoc(origin);
+          if (doc.type === 'v3x-sketch') {
+            loadSketch({ name: doc.name, code: doc.code, knobs: doc.knobs });
+            if (doc.params) setKnobs(doc.params, true);
+            if (doc.seed != null) { gen.seed = doc.seed; runPattern(); }
+            document.querySelector('[data-tab="patterns"]').click();
+            note.textContent = 'Sketch ' + doc.name + ' opened in PATTERNS.';
+          } else {
+            setFromDoc(await VXCHAIN.resolveSet(doc));
+            note.textContent = `Set "${doc.title}" from the chain: ${set.steps.length} steps. Press PLAY.`;
+          }
+        } catch (e) { note.textContent = 'Could not open it: ' + e.message; }
+      });
       setEl('setAddBtn').addEventListener('click', () => {
         try {
           set.steps.push({ bar: Math.max(1, Number(setEl('setAddBar').value) || 1), cmd: setEl('setAddCmd').value, args: parseArgs(setEl('setAddArgs').value) });
@@ -4803,17 +4885,15 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       setEl('saveSequenceBtn').addEventListener('click', async () => {
         const res = await dialog.showSaveDialog({ defaultPath: 'v3xv0id-set.json', filters: [{ name: 'V3XV0ID set', extensions: ['json'] }] });
         if (res.canceled || !res.filePath) return;
-        require('fs').writeFileSync(res.filePath, JSON.stringify({ type: 'v3xv0id-set', version: 1, bpm: VXGEN.signals.bpm, steps: set.steps }, null, 2));
+        require('fs').writeFileSync(res.filePath, JSON.stringify(setAsDoc(), null, 2));
         setEl('composerStatus').textContent = 'SAVED';
       });
       setEl('setLoadBtn').addEventListener('click', async () => {
         const res = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'V3XV0ID set', extensions: ['json'] }] });
         if (res.canceled || !res.filePaths[0]) return;
         try {
-          const d = JSON.parse(require('fs').readFileSync(res.filePaths[0], 'utf8'));
-          set.steps = (d.steps || []).filter(s => s && s.cmd && VXCMD[s.cmd]);
-          if (d.bpm) VXGEN.signals.bpm = d.bpm;
-          set.fired = new Set(); setSaveDraft(); renderSet(); setEl('composerStatus').textContent = 'LOADED ' + set.steps.length + ' STEPS';
+          setFromDoc(await VXCHAIN.resolveSet(JSON.parse(require('fs').readFileSync(res.filePaths[0], 'utf8'))));
+          setEl('composerStatus').textContent = 'LOADED ' + set.steps.length + ' STEPS';
         } catch (e) { setEl('setNote').textContent = 'Could not read that file: ' + e.message; }
       });
 
@@ -5359,6 +5439,7 @@ Reply with only the JSON array in one \`\`\`json code block.`;
   </script>
   <script src="./vx/vx-gen.js"></script>
   <script src="./vx/gen-library.js"></script>
+  <script src="./vx/chain.js"></script>
   <script src="./vx/vx-keys.js"></script>
   <script>
     // ===== VX engine panel: mirrors the output window's engine state and forwards changes over IPC =====

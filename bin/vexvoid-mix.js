@@ -22,7 +22,7 @@ const http = require('http');
 const MAIN = { fade: 'value', cut: 'deck', sketch: 'name', play: 'track', bpm: 'value', write: 'prompt', remove: 'id', layer: 'id', clear: 'deck', audio: 'source', evolve: 'on', load: 'clip' };
 
 function conf() {
-  try { return JSON.parse(fs.readFileSync(path.join(os.homedir(), '.v3xv0id', 'api.json'), 'utf8')); }
+  try { return JSON.parse(fs.readFileSync((process.env.VX_API_FILE || path.join(os.homedir(), '.v3xv0id', 'api.json')), 'utf8')); }
   catch (e) { fail('The mixer is not running (no ~/.v3xv0id/api.json). Start V3XV0ID AV Client first.'); }
 }
 function fail(msg) { console.error(msg); process.exit(1); }

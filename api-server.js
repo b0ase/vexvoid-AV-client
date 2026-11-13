@@ -17,7 +17,8 @@ const path = require('path');
 const crypto = require('crypto');
 const { ipcMain } = require('electron');
 
-const DISCOVERY = path.join(os.homedir(), '.v3xv0id', 'api.json');
+// VX_API_FILE lets a second (test) instance keep its own address and token instead of overwriting the real one
+const DISCOVERY = process.env.VX_API_FILE || path.join(os.homedir(), '.v3xv0id', 'api.json');
 
 function start({ getControlWindow, getOutputWindow, port = Number(process.env.VX_API_PORT) || 4747 }) {
   let token;
@@ -105,7 +106,8 @@ function start({ getControlWindow, getOutputWindow, port = Number(process.env.VX
     send(res, 404, { ok: false, error: 'not found' });
   });
 
-  server.on('error', e => console.error('VX API:', e.message));
+  // If the port is taken (another mixer is running) this instance has no API and leaves the discovery file alone
+  server.on('error', e => console.error('VX API not started:', e.code === 'EADDRINUSE' ? `port ${port} is in use by another mixer` : e.message));
   server.listen(port, '127.0.0.1', () => {
     fs.mkdirSync(path.dirname(DISCOVERY), { recursive: true, mode: 0o700 });
     fs.writeFileSync(DISCOVERY, JSON.stringify({ url: `http://127.0.0.1:${port}`, token, pid: process.pid }, null, 2), { mode: 0o600 });

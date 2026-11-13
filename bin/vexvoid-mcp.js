@@ -13,7 +13,7 @@ const http = require('http');
 const { tools, handleRpc } = require('../mcp/tools');
 
 function conf() {
-  return JSON.parse(fs.readFileSync(path.join(os.homedir(), '.v3xv0id', 'api.json'), 'utf8'));
+  return JSON.parse(fs.readFileSync((process.env.VX_API_FILE || path.join(os.homedir(), '.v3xv0id', 'api.json')), 'utf8'));
 }
 function call(method, route, body, raw) {
   let c;
