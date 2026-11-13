@@ -3873,6 +3873,30 @@
         videoPreviewPlayer.play().catch(() => {});
         videoPreviewPanel.style.display = 'block';
       }
+      // MINT a clip or still as its own inscription (sets that use it then point at the chain)
+      const MEDIA_TYPES = { '.mp4': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif' };
+      async function mintMedia(item, kind, statusEl, btn) {
+        const done = VXMINT.originFor(item.url);
+        if (done) { statusEl.textContent = 'Already minted: ' + done; return; }
+        btn.disabled = true;
+        try {
+          statusEl.textContent = 'PREPARING…';
+          const file = await cacheMedia(item);
+          const ext = (file.match(/\.[a-z0-9]+$/i) || [''])[0].toLowerCase(), type = MEDIA_TYPES[ext];
+          if (!type) throw new Error('unsupported file type ' + ext);
+          const data = new Uint8Array(require('fs').readFileSync(file));
+          if (data.length > VXMINT.MAX_MEDIA_BYTES) throw new Error(`${(data.length / 1048576).toFixed(1)} MB is over the 2 MB a paired wallet can take in one request: export a smaller version (480p, a few seconds) and mint that`);
+          const wallet = await mintWallet(t => { statusEl.textContent = t; });
+          statusEl.textContent = `APPROVE IN bWALLETX · ${(data.length / 1024).toFixed(0)} KB`;
+          const rec = await VXMINT.mint(wallet, { kind, name: item.name, contentType: type, data, src: item.url });
+          statusEl.textContent = 'Minted: ' + rec.origin;
+          renderMinted();
+        } catch (e) { statusEl.textContent = 'Mint failed: ' + e.message; }
+        finally { btn.disabled = false; }
+      }
+      const mintClipBtn = document.createElement('button'); mintClipBtn.className = 'action-btn'; mintClipBtn.textContent = 'MINT';
+      loadToBackgroundBtn.parentNode.appendChild(mintClipBtn);
+      mintClipBtn.addEventListener('click', () => selectedVideo && mintMedia(selectedVideo, 'clip', document.getElementById('videoPreviewDetails'), mintClipBtn));
       loadToLayerBtn.textContent = 'LOAD → DECK A';
       loadToBackgroundBtn.textContent = 'LOAD → DECK B';
       loadToLayerBtn.addEventListener('click', () => selectedVideo && loadMediaItem(selectedVideo, 'A', document.getElementById('videoPreviewDetails')));
@@ -3931,6 +3955,9 @@
         catch (e) { st.textContent = 'FAILED: ' + e.message; }
       });
       refreshImagesBtn.addEventListener('click', initializeImagesTab);
+      const mintImageBtn = document.createElement('button'); mintImageBtn.className = 'action-btn'; mintImageBtn.textContent = 'MINT';
+      loadImageToBackgroundBtn.parentNode.appendChild(mintImageBtn);
+      mintImageBtn.addEventListener('click', () => selectedImage && mintMedia(selectedImage, 'image', document.getElementById('imagePreviewDetails'), mintImageBtn));
 
       // ===== Grok Imagine (xAI): text→image, text→video, image→video, saved into the libraries =====
       // Key: XAI_API_KEY in the environment, or one saved in this app's settings. Each generation is billed by xAI.
@@ -4873,7 +4900,9 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           const cat = catalogue();
           const m = kind === 'clip' ? cat.clips.find(c => c.name.toLowerCase() === String(name).toLowerCase())
             : cat.images.find(c => (c.set + '/' + c.name).toLowerCase().endsWith(String(name).toLowerCase()));
-          return m ? { kind, name: m.name, url: m.url } : null;
+          if (!m) return null;
+          const origin = VXMINT.originFor(m.url); // minted already: the set points at the chain
+          return origin ? { kind, name: m.name, origin } : { kind, name: m.name, url: m.url };
         };
         // steps that already reference assets keep them; the rest are converted
         const doc = VXCHAIN.setDoc({ title: setEl('setTitle').value.trim() || 'UNTITLED SET', bpm: VXGEN.signals.bpm, steps: set.steps.filter(s => !(s.args && s.args.asset)), lookup: lib, media });

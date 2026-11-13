@@ -67,12 +67,18 @@
     });
     var txid = r && (r.txid || null);
     if (!txid) throw new Error('bWalletX did not return a transaction id');
-    var rec = { origin: txid + '_0', txid: txid, kind: o.kind, name: o.name, bytes: data.length, at: new Date().toISOString() };
+    var rec = { origin: txid + '_0', txid: txid, kind: o.kind, name: o.name, bytes: data.length, src: o.src || null, at: new Date().toISOString() };
     try { var list = JSON.parse(localStorage.getItem(STORE) || '[]'); list.unshift(rec); localStorage.setItem(STORE, JSON.stringify(list.slice(0, 500))); } catch (e) {}
     return rec;
   }
 
+  // Largest single inscription over phone pairing: the relay carries frames up to 4 MiB, and a request is the file
+  // base64'd, sealed and base64'd again, so 2 MB of raw file leaves headroom (bWalletX session, 13 Nov 2026).
+  // Bigger files need a chunked upload the wallet only offers CLI pairings today.
+  var MAX_MEDIA_BYTES = 2 * 1024 * 1024;
+  function originFor(src) { var m = minted().find(function (r) { return r.src && r.src === src; }); return m ? m.origin : null; }
+
   function minted() { try { return JSON.parse(localStorage.getItem(STORE) || '[]'); } catch (e) { return []; } }
 
-  root.VXMINT = { PROTOCOL: PROTOCOL, inscriptionScript: inscriptionScript, mint: mint, minted: minted, _push: push, _hex: hex, _fromHex: fromHex };
+  root.VXMINT = { PROTOCOL: PROTOCOL, MAX_MEDIA_BYTES: MAX_MEDIA_BYTES, originFor: originFor, inscriptionScript: inscriptionScript, mint: mint, minted: minted, _push: push, _hex: hex, _fromHex: fromHex };
 })(typeof window !== 'undefined' ? window : this);
