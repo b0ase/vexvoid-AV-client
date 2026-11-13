@@ -1715,6 +1715,13 @@
     .set-step code,.set-add input{text-transform:none;color:#bbb;font:11px Menlo,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .set-add{display:grid;grid-template-columns:80px 140px 1fr auto;gap:6px}
     #startRecordingBtn.active{background:#fff;color:#000}
+
+    /* Grok Imagine panel */
+    #imagesTab{flex-direction:column}
+    #imagesTab>*{width:100%}
+    .grok{border:1px solid #222;padding:10px;margin:0 0 10px;box-sizing:border-box;display:flex;flex-direction:column;gap:8px;font-family:'Courier New',monospace}
+    .grok-row{display:grid;grid-template-columns:minmax(320px,1fr) auto;gap:8px}
+    .grok-opts{display:grid;grid-template-columns:repeat(5,auto);gap:6px;align-items:start}
     /* VX GEN (patterns tab) */
     .gen{flex:1;min-width:0;width:100%;display:flex;flex-direction:column;height:calc(100vh - 90px);padding:10px 12px;gap:10px;font-family:'Courier New',monospace;color:#e8e8e6}
     .gen-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border:1px solid #222;padding:8px 10px}
@@ -2208,6 +2215,25 @@
 
     <!-- Images Tab Content -->
     <div class="tab-content" id="imagesTab">
+      <div class="grok">
+        <div class="gen-h">GROK IMAGINE <span class="dim" id="grokSpend">xAI · paid per generation</span></div>
+        <div class="grok-row">
+          <textarea id="grokPrompt" class="gen-prompt" rows="2" placeholder="e.g. a brutalist stairwell, one hard shaft of light, rain on the window"></textarea>
+          <div class="grok-opts">
+            <select id="grokMode" class="gen-select">
+              <option value="image">TEXT → IMAGE</option><option value="video">TEXT → VIDEO</option><option value="i2v">SELECTED IMAGE → VIDEO</option>
+            </select>
+            <select id="grokStyle" class="gen-select" title="VexVoid look line added to the prompt">
+              <option value="smooth">LOOK: SMOOTH</option><option value="bridge">LOOK: BRIDGE</option><option value="rough">LOOK: ROUGH</option>
+              <option value="slow">LOOK: SLOW</option><option value="fast">LOOK: FAST</option><option value="abstract">LOOK: ABSTRACT</option><option value="">LOOK: NONE</option>
+            </select>
+            <select id="grokPeople" class="gen-select"><option value="nobody">NO PEOPLE</option><option value="figure">HOODED FIGURE, BACK TURNED</option></select>
+            <select id="grokRes" class="gen-select" title="Video resolution"><option value="480p">480P · 6S</option><option value="720p">720P · 6S</option></select>
+            <button id="grokGo" class="gen-btn hot">GENERATE</button>
+          </div>
+        </div>
+        <div id="grokNote" class="gen-note"></div>
+      </div>
       <div class="image-browser-container">
         <!-- Image Browser Header -->
         <div class="image-browser-header">
@@ -3720,9 +3746,8 @@
       const loadToBackgroundBtn = document.getElementById('loadToBackgroundBtn');
 
       async function initializeVideosTab() {
-        const local = videoLibrary.filter(v => v.source === 'local');
-        videoLibrary = catalogue().clips.map(c => ({ name: c.name, url: c.url, format: 'MP4', source: c.set === 'rough' ? 'rough' : 'smooth' }));
-        local.forEach(v => videoLibrary.push(v));
+        const local = videoLibrary.filter(v => v.source === 'local' && !/^GROK · /.test(v.name));
+        videoLibrary = grokFiles('video').concat(catalogue().clips.map(c => ({ name: c.name, url: c.url, format: 'MP4', source: c.set === 'rough' ? 'rough' : 'smooth' })), local);
         videoLibrary.forEach((v, i) => { v.id = i; });
         document.getElementById('videoCloudStatus').textContent = `● V3XV0ID CLIPS · ${videoLibrary.length}`;
         renderVideoLibrary();
@@ -3773,9 +3798,8 @@
       const loadImageToBackgroundBtn = document.getElementById('loadImageToBackgroundBtn');
 
       async function initializeImagesTab() {
-        const local = imageLibrary.filter(v => v.source === 'local');
-        imageLibrary = catalogue().images.map(im => ({ name: im.name, url: im.url, format: (im.url.match(/\.([a-z]+)$/i) || [, 'IMG'])[1].toUpperCase(), source: im.set }));
-        local.forEach(v => imageLibrary.push(v));
+        const local = imageLibrary.filter(v => v.source === 'local' && !/^GROK · /.test(v.name));
+        imageLibrary = grokFiles('image').concat(catalogue().images.map(im => ({ name: im.name, url: im.url, format: (im.url.match(/\.([a-z]+)$/i) || [, 'IMG'])[1].toUpperCase(), source: im.set })), local);
         imageLibrary.forEach((v, i) => { v.id = i; });
         document.getElementById('imageCloudStatus').textContent = `● V3XV0ID IMAGES · ${imageLibrary.length}`;
         renderImageLibrary();
@@ -3813,6 +3837,115 @@
         catch (e) { st.textContent = 'FAILED: ' + e.message; }
       });
       refreshImagesBtn.addEventListener('click', initializeImagesTab);
+
+      // ===== Grok Imagine (xAI): text→image, text→video, image→video, saved into the libraries =====
+      // Key: XAI_API_KEY in the environment, or one saved in this app's settings. Each generation is billed by xAI.
+      const GROK_LOOK = {
+        rough: 'Shot on a cheap 35mm point-and-shoot with harsh direct flash, dutch angle, off-centre framing, coarse film grain, blown highlights, crushed blacks. Gritty, raw, underground. Black and white, high contrast. 16:9.',
+        bridge: 'Brutal concrete opening onto one source of hard light. Crisp and sharp, deep true blacks, high-contrast black and white, cinematic. 16:9.',
+        smooth: 'Calm, still and razor-sharp. Hard light, deep true blacks, high-contrast black and white. 16:9.',
+        fast: 'Raw handheld camera, quick and urgent, sharp not blurry. Black and white. Time only runs forward.',
+        slow: 'The camera glides slowly and smoothly, razor-sharp and calm. Black and white.',
+        abstract: 'A slow, calm, hypnotic camera glide, razor-sharp. Black and white.'
+      };
+      const GROK_PEOPLE = {
+        nobody: { still: 'No people.', motion: 'No one appears.' },
+        figure: { still: 'The person is seen from behind with a black hoodie hood up, face never visible. Plain streetwear.', motion: 'The person keeps their back to the camera; they never turn toward the camera or the light.' }
+      };
+      const grokDir = require('path').join(require('@electron/remote').app.getPath('userData'), 'generated');
+      let grokSpent = 0;
+      function xaiKey() { return process.env.XAI_API_KEY || genSettings().xaiKey || ''; }
+      function grokFiles(kind) {
+        const fs = require('fs'), path = require('path');
+        if (!fs.existsSync(grokDir)) return [];
+        return fs.readdirSync(grokDir).filter(f => kind === 'video' ? /\.mp4$/i.test(f) : /\.(jpe?g|png|webp)$/i.test(f)).sort().reverse().map(f => {
+          let meta = {}; try { meta = JSON.parse(fs.readFileSync(path.join(grokDir, f + '.json'), 'utf8')); } catch (e) {}
+          return { name: 'GROK · ' + (meta.prompt || f).slice(0, 40), url: path.join(grokDir, f), format: f.split('.').pop().toUpperCase(), source: 'local' };
+        });
+      }
+      async function xai(route, body) {
+        for (let attempt = 0; ; attempt++) {
+          const res = await fetch('https://api.x.ai' + route, {
+            method: body ? 'POST' : 'GET',
+            headers: { authorization: 'Bearer ' + xaiKey(), ...(body ? { 'content-type': 'application/json' } : {}) },
+            body: body ? JSON.stringify(body) : undefined
+          });
+          const text = await res.text();
+          let json; try { json = text ? JSON.parse(text) : {}; } catch (e) { json = { error: text }; }
+          const err = json.error, code = json.code || (err && typeof err === 'object' ? err.code : undefined);
+          if (code === 'resource-exhausted' && attempt < 5) { await new Promise(r => setTimeout(r, 1100 * (attempt + 1))); continue; }
+          if (!res.ok || err) throw new Error((typeof err === 'string' ? err : err && err.message) || json.message || ('HTTP ' + res.status));
+          return json;
+        }
+      }
+      async function grokSave(url, ext, meta) {
+        const fs = require('fs'), path = require('path');
+        const res = await fetch(url); if (!res.ok) throw new Error('download failed (' + res.status + ')');
+        fs.mkdirSync(grokDir, { recursive: true });
+        const slug = meta.prompt.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 32).replace(/-$/, '');
+        const file = path.join(grokDir, `${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}-${slug}.${ext}`);
+        fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
+        fs.writeFileSync(file + '.json', JSON.stringify(meta, null, 2));
+        return file;
+      }
+      async function grokGenerate() {
+        const note = document.getElementById('grokNote'), btn = document.getElementById('grokGo');
+        const prompt = document.getElementById('grokPrompt').value.trim();
+        const mode = document.getElementById('grokMode').value, look = document.getElementById('grokStyle').value;
+        const people = GROK_PEOPLE[document.getElementById('grokPeople').value];
+        if (!prompt) { note.textContent = 'Write a prompt first.'; return; }
+        if (!xaiKey()) {
+          note.innerHTML = 'Needs an xAI API key (or set XAI_API_KEY before starting the app):<input id="grokKeyInput" type="password" class="gen-prompt" style="width:100%;margin-top:4px" placeholder="paste key, press Enter"><span class="dim">Saved only in this app\'s settings on this computer.</span>';
+          const inp = document.getElementById('grokKeyInput');
+          inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter' && inp.value.trim()) { genSaveSettings({ xaiKey: inp.value.trim() }); note.textContent = 'Key saved.'; grokGenerate(); } });
+          inp.focus(); return;
+        }
+        if (mode === 'i2v' && (!selectedImage)) { note.textContent = 'Pick an image in the grid first (it becomes the start frame).'; return; }
+        const video = mode !== 'image';
+        const full = [prompt, GROK_LOOK[look] || '', video ? people.motion : people.still, /\b(city|street|skyline|downtown|town)\b/i.test(prompt) ? 'Anonymous city, no famous landmarks.' : '']
+          .filter(Boolean).join(' ');
+        btn.disabled = true; const t0 = Date.now();
+        const tick = setInterval(() => { note.textContent = `GENERATING ${video ? 'VIDEO' : 'IMAGE'}… ${Math.round((Date.now() - t0) / 1000)}s`; }, 500);
+        try {
+          let file, cost = 0, model;
+          if (!video) {
+            model = 'grok-imagine-image-quality';
+            const j = await xai('/v1/images/generations', { model, prompt: full, n: 1, aspect_ratio: '16:9' });
+            cost = (j.usage && j.usage.cost_in_usd_ticks || 0) / 1e10;
+            const item = (j.data || [])[0]; if (!item || !item.url) throw new Error('no image came back');
+            file = await grokSave(item.url, (item.mime_type || 'image/jpeg').includes('png') ? 'png' : 'jpg', { prompt, full, model, cost, created: new Date().toISOString() });
+          } else {
+            model = mode === 'i2v' ? 'grok-imagine-video-1.5' : 'grok-imagine-video';
+            const body = { model, prompt: full, duration: 6, resolution: document.getElementById('grokRes').value };
+            if (mode === 'i2v') {
+              const src = await cacheMedia(selectedImage);
+              const ext = (src.match(/\.(\w+)$/) || [, 'jpeg'])[1].toLowerCase().replace('jpg', 'jpeg');
+              body.image = { url: `data:image/${ext};base64,${require('fs').readFileSync(src).toString('base64')}` };
+            } else body.aspect_ratio = '16:9';
+            const sub = await xai('/v1/videos/generations', body);
+            const id = sub.request_id || sub.id; if (!id) throw new Error('no request id came back');
+            let r;
+            for (;;) {
+              await new Promise(res => setTimeout(res, 5000));
+              r = await xai('/v1/videos/' + id);
+              if (['done', 'completed', 'succeeded'].includes(r.status)) break;
+              if (['failed', 'expired'].includes(r.status)) throw new Error('video ' + r.status);
+              if (Date.now() - t0 > 10 * 60 * 1000) throw new Error('timed out after 10 minutes');
+            }
+            cost = (r.usage && r.usage.cost_in_usd_ticks || 0) / 1e10;
+            const url = (r.video && r.video.url) || r.url; if (!url) throw new Error('no video URL came back');
+            file = await grokSave(url, 'mp4', { prompt, full, model, cost, created: new Date().toISOString() });
+          }
+          grokSpent += cost;
+          document.getElementById('grokSpend').textContent = `xAI · this session $${grokSpent.toFixed(2)}`;
+          clearInterval(tick);
+          note.textContent = `DONE in ${Math.round((Date.now() - t0) / 1000)}s · $${cost.toFixed(3)} · saved to the ${video ? 'Videos' : 'Images'} library`;
+          if (video) initializeVideosTab(); else { await initializeImagesTab(); previewImage(imageLibrary.find(i => i.url === file)); }
+        } catch (e) { clearInterval(tick); note.textContent = 'Failed: ' + e.message; }
+        finally { btn.disabled = false; }
+      }
+      document.getElementById('grokGo').addEventListener('click', grokGenerate);
+      document.getElementById('grokPrompt').addEventListener('keydown', e => e.stopPropagation());
 
       // ===== VX GEN (Patterns tab): generative p5 sketches, previewed here and sent to output layers =====
       const patternCodeEditor = document.getElementById('patternCodeEditor');
