@@ -106,7 +106,7 @@
         vx.kick = signals.external ? audioKick : clockKick;
         vx.pulse = vx.kick ? 1 : vx.pulse * 0.9;
         try { if (handlers.draw) handlers.draw(); } catch (e) { fail(e); }
-        api.fps = p.frameRate();
+        api.fps = api.fps ? api.fps * 0.95 + (1000 / Math.max(1, p.deltaTime)) * 0.05 : p.frameRate(); // smoothed; p5's own figure jumps
         if (opts.onFps && p.frameCount % 30 === 0) opts.onFps(Math.round(api.fps));
       };
       HANDLERS.slice(2).forEach(function (h) {

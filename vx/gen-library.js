@@ -147,20 +147,32 @@ function draw() {
 }`);
 
   add('TERRAIN', '3d · bass', ['HEIGHT', 'DETAIL', 'SPEED', 'TILT'], `
+// A wireframe landscape flown over: the mesh is projected by hand and drawn as 2D lines (fast at 1080p).
 let fly = 0;
-function setup() { createCanvas(windowWidth, windowHeight, WEBGL); }
-function hgt(x, y) { const n = noise(x * 0.1 * (0.4 + vx.b * 1.2), y * 0.1 + fly); return n * n * (120 + vx.a * 320 + vx.bass * 260); }
+const COLS = 60, ROWS = 46;
+function setup() { createCanvas(windowWidth, windowHeight); }
 function draw() {
   background(0); noFill();
-  const cols = 56, rows = 44, s = 42;
-  fly -= 0.02 + vx.c * 0.12 + vx.bass * 0.08;
-  rotateX(PI / (2.2 + vx.d * 1.4)); translate(-cols * s / 2, -rows * s / 2 - 120, -60);
-  for (let y = 0; y < rows - 1; y++) {
-    stroke(255, map(y, 0, rows, 40, 255)); strokeWeight(1);
-    beginShape(TRIANGLE_STRIP);
-    for (let x = 0; x < cols; x++) { vertex(x * s, y * s, hgt(x, y)); vertex(x * s, (y + 1) * s, hgt(x, y + 1)); }
-    endShape();
+  fly += 0.02 + vx.c * 0.12 + vx.bass * 0.08;
+  const amp = 0.25 + vx.a * 0.9 + vx.bass * 0.7, det = 0.08 * (0.4 + vx.b * 1.4);
+  const horizon = height * (0.18 + vx.d * 0.3), cx = width / 2, eye = 1.6;
+  const pts = [];
+  for (let r = 0; r < ROWS; r++) {
+    const z = 1 + (ROWS - 1 - r) * 0.42, row = [];
+    for (let c = 0; c < COLS; c++) {
+      const x = (c / (COLS - 1) - 0.5) * 26;
+      const n = noise(c * det * 3, (r * 0.42 - fly) * det * 3);
+      const h = n * n * amp * 4;
+      row.push([cx + x / z * width * 0.18, horizon + (eye - h) / z * height * 0.55]);
+    }
+    pts.push(row);
   }
+  for (let r = 0; r < ROWS; r++) {
+    stroke(255, map(r, 0, ROWS, 30, 255)); strokeWeight(r > ROWS - 6 ? 1.4 : 1);
+    beginShape(); for (const p of pts[r]) vertex(p[0], p[1]); endShape();
+  }
+  stroke(255, 70); strokeWeight(1);
+  for (let c = 0; c < COLS; c += 2) { beginShape(); for (let r = 0; r < ROWS; r++) vertex(pts[r][c][0], pts[r][c][1]); endShape(); }
 }`);
 
   add('ORBIT HUD', 'telemetry', ['SIZE', 'ARC', 'SPIN', '—'], `
@@ -299,11 +311,11 @@ function setup() { createCanvas(windowWidth, windowHeight); }
 function draw() {
   background(0, 30 + (1 - vx.d) * 160); noFill(); translate(width / 2, height / 2);
   if (vx.kick) rings.push({ r: 0, sq: random() < vx.b, w: 1 + vx.bass * 12, rot: random(TAU) });
-  const far = max(width, height) * 1.5;
-  rings = rings.filter(g => g.r < far);
+  const far = dist(0, 0, width, height) * 1.05; // gone once it has cleared the corners
+  rings = rings.filter(g => g.r < far).slice(-24);
   for (const g of rings) {
     g.r += 6 + vx.c * 30 + vx.level * 20;
-    stroke(255, map(g.r, 0, far, 255, 20)); strokeWeight(g.w * (0.5 + vx.a));
+    stroke(255, map(g.r, 0, far, 255, 20)); strokeWeight(min(8, g.w * (0.5 + vx.a)));
     push(); rotate(g.rot + vx.t * 0.2);
     if (g.sq) rect(-g.r / 2, -g.r / 2, g.r, g.r); else ellipse(0, 0, g.r, g.r);
     pop();

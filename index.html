@@ -848,6 +848,7 @@
         layer.genKey = null; layer.genThumb = null;
       }
       function genLayers(key) { return layers.filter(l => l.gen && l.genKey === key); }
+      window.vxGenFps = () => layers.filter(l => l.gen).map(l => ({ id: l.id, name: l.genSpec.name, fps: Math.round(l.gen.fps || 0), error: l.gen.error }));
       // small JPEG of a gen layer for the controls-window previews, refreshed a few times a second
       const genThumbCanvas = document.createElement('canvas');
       genThumbCanvas.width = 320; genThumbCanvas.height = 180;
