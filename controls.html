@@ -2058,6 +2058,7 @@
             <button id="genEvolveBtn" class="gen-btn" title="Mutate and drift the knobs every 4 bars">EVOLVE</button>
             <span class="gen-sep"></span>
             <select id="genDeck" class="gen-select" title="Deck for SEND"><option value="A">DECK A</option><option value="B">DECK B</option></select>
+            <select id="genBlend" class="gen-select" title="How the sketch sits over the layers under it"><option value="normal">BLEND: NORMAL</option><option value="screen">BLEND: SCREEN (LINES OVER)</option><option value="difference">BLEND: DIFFERENCE</option><option value="multiply">BLEND: MULTIPLY</option></select>
             <button id="genSendBtn" class="gen-btn hot" title="New layer on the deck, running this sketch">SEND TO OUTPUT</button>
             <button id="applyToLayersBtn" class="gen-btn">APPLY TO TICKED</button>
             <span class="gen-sep"></span>
@@ -4064,7 +4065,7 @@
       }
 
       function genPayload() {
-        return { code: patternCodeEditor.value, name: gen.name, seed: gen.seed, params: { ...gen.params }, scale: parseFloat(genEl('genScale').value) };
+        return { code: patternCodeEditor.value, name: gen.name, seed: gen.seed, params: { ...gen.params }, scale: parseFloat(genEl('genScale').value), blend: genEl('genBlend').value };
       }
 
       function sendToDeck() {
@@ -4395,12 +4396,13 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           ids.forEach(id => sendToOutput('remove-layer', { layerId: id })); return `removed ${ids.length}`;
         } },
         sketches: { doc: 'List the generative sketches', run: () => (window.VXGEN_LIBRARY || []).map(x => ({ name: x.name, tags: x.tags, knobs: x.knobs })) },
-        sketch: { args: '{name | code, deck?, send?=true}', doc: 'Load a sketch into the preview and (by default) send it to a deck', run: a => {
+        sketch: { args: '{name | code, deck?, blend? normal|screen|difference|multiply, send?=true}', doc: 'Load a sketch into the preview and (by default) send it to a deck', run: a => {
           let item = a.code ? { name: a.name || 'REMOTE', code: String(a.code), knobs: a.knobs } : (window.VXGEN_LIBRARY || []).find(x => x.name.toLowerCase() === String(a.name || '').toLowerCase());
           if (!item) throw new Error('no sketch "' + a.name + '"; see the sketches command');
           const err = VXGEN.check(item.code); if (err) throw new Error('sketch does not compile: ' + err);
           if (!gen.ready) initializePatternsTab();
           loadSketch(item);
+          if (a.blend) genEl('genBlend').value = ['normal', 'screen', 'difference', 'multiply'].includes(a.blend) ? a.blend : 'normal';
           if (a.send !== false) { genEl('genDeck').value = deckOf(a.deck || activePalette); sendToDeck(); }
           return { name: gen.name, seed: gen.seed, key: gen.key };
         } },

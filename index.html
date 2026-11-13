@@ -835,6 +835,7 @@
         layer.genKey = g.key;
         layer.genSpec = { code: g.code, name: g.name, seed: g.seed, params: { ...g.params }, scale: g.scale || 0.75 };
         layer.name = `Layer ${layer.id}: ${g.name || 'GEN'} (GEN)`;
+        if (g.blend) { layer.blendMode = g.blend; layer.element.style.mixBlendMode = g.blend; }
         try {
           layer.gen = VXGEN.mount(host, g.code, { seed: g.seed, params: g.params, scale: layer.genSpec.scale,
             onError: msg => sendToControl('gen-error', { layerId: layer.id, error: msg }) });
