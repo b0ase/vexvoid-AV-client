@@ -13,7 +13,7 @@
   var C = root.bWalletXConnect;
   var ORIGIN = 'https://desktop.mixer.vexvoid.com'; // = APP_ORIGIN in main.js
   var STORE = 'bwx:connected';
-  var st = { wallet: null, key: null, handle: null, busy: false, label: '', error: null };
+  var st = { wallet: null, key: null, handle: null, via: null, busy: false, label: '', error: null };
 
   function get() { try { return localStorage.getItem(STORE); } catch (e) { return null; } }
   function set(v) { try { v ? localStorage.setItem(STORE, v) : localStorage.removeItem(STORE); } catch (e) {} }
@@ -32,7 +32,7 @@
     try {
       var r = await fetch('https://pay.bwallet.space/api/paymail/lookup?key=' + encodeURIComponent(k));
       var j = r.ok ? await r.json() : null;
-      if (j && typeof j.paymail === 'string' && st.key === k) { st.handle = '$' + j.paymail.split('@')[0]; draw(); }
+      if (j && typeof j.paymail === 'string' && st.key === k) { st.handle = '$' + j.paymail.split('@')[0]; draw(); document.dispatchEvent(new CustomEvent('bwalletx:handle', { detail: { handle: st.handle } })); }
     } catch (e) {}
   }
 
@@ -55,22 +55,22 @@
       var wallet = null, key = null;
       var local = await C.discoverWallets({ probeLocal: true, ms: 300 }).catch(function () { return []; });
       var found = (local || []).find(function (o) { return o && o.kind !== 'pairing' && o.wallet; });
-      if (found) wallet = found.wallet;
+      if (found) { wallet = found.wallet; st.via = 'local'; }
       if (!wallet) {
         var restored = await C.restorePairing({ origin: ORIGIN }).catch(function () { return null; });
         if (restored && !interactive) {
           if (!get()) return null; // a pairing but no remembered identity: wait for a click
-          wallet = restored; key = get();
+          wallet = restored; key = get(); st.via = 'pairing';
         } else if (restored) {
           onStatus('phone');
-          try { key = (await within(restored.getPublicKey({ identityKey: true }), PHONE_MS, 'phone did not answer')).publicKey; wallet = restored; }
+          try { key = (await within(restored.getPublicKey({ identityKey: true }), PHONE_MS, 'phone did not answer')).publicKey; wallet = restored; st.via = 'pairing'; }
           catch (e) { try { await C.clearPairing({ origin: ORIGIN }); } catch (e2) {} } // stale: pair again below
         }
         if (!wallet) {
           if (!interactive) return null;
           modal = C.pairingModal({ title: 'Connect bWalletX to V3XV0ID' });
           onStatus('pairing');
-          wallet = await C.pairBwalletX(Object.assign(modal, { origin: ORIGIN }));
+          wallet = await C.pairBwalletX(Object.assign(modal, { origin: ORIGIN })); st.via = 'pairing';
         }
       }
       if (!key) { onStatus('opening'); key = (await wallet.getPublicKey({ identityKey: true })).publicKey; }
@@ -89,7 +89,7 @@
   }
   function disconnect() {
     try { C && C.clearPairing && C.clearPairing({ origin: ORIGIN }); } catch (e) {}
-    st.wallet = null; st.key = null; st.handle = null; set(null); draw();
+    st.wallet = null; st.key = null; st.handle = null; st.via = null; set(null); draw();
     document.dispatchEvent(new CustomEvent('bwalletx:disconnected'));
   }
 
@@ -100,6 +100,7 @@
     wallet: function () { return st.wallet; },
     identityKey: function () { return st.key; },
     handle: function () { return st.handle; },
+    via: function () { return st.via; }, // 'pairing' (phone, by QR) | 'local' (extension or bwalletx serve)
     init: function () {
       var b = document.getElementById('bwxChip');
       if (b) {

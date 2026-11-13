@@ -1678,6 +1678,22 @@
 
     /* WALLET tab */
     .wb{display:flex;flex-direction:column;gap:12px;width:100%;height:100%;min-height:0}
+    .wb-id{display:grid;grid-template-columns:minmax(220px,1.1fr) 2fr minmax(260px,1.3fr);gap:14px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.6);padding:14px;font-size:11px}
+    .wb-id .who{display:flex;flex-direction:column;gap:6px;min-width:0}
+    .wb-id .handle{font-family:'Michroma','IBM Plex Mono',sans-serif;font-size:20px;letter-spacing:.08em;color:#fff;text-transform:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .wb-id .key{color:#888;text-transform:none;cursor:pointer}
+    .wb-id .via{color:#666;font-size:9px;letter-spacing:.18em}
+    .wb-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;align-content:center}
+    .wb-stat{border-left:1px solid #222;padding-left:10px}
+    .wb-stat b{display:block;font-family:'Michroma','IBM Plex Mono',sans-serif;font-weight:400;font-size:18px;color:#fff;letter-spacing:.04em}
+    .wb-stat span{font-size:9px;letter-spacing:.2em;color:#777}
+    .wb-act{display:flex;flex-direction:column;gap:6px;min-width:0}
+    .wb-act .gen-btn{padding:8px}
+    .wb-feed{max-height:92px;overflow-y:auto;border-top:1px solid #1a1a1a;padding-top:4px}
+    .wb-feed div{display:grid;grid-template-columns:62px 54px 1fr auto;gap:6px;color:#888;font-size:10px;padding:2px 0;cursor:pointer}
+    .wb-feed div > span:first-child{text-transform:none}
+    .wb-feed div:hover{color:#fff}
+    .wb-feed i{font-style:normal;color:#ddd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:none}
     .wb-filters{display:flex;flex-wrap:wrap;gap:6px}
     .wb-filters button{font:inherit;font-size:10px;letter-spacing:.2em;background:transparent;color:#9a9a98;border:1px solid rgba(255,255,255,.25);padding:6px 10px;cursor:pointer}
     .wb-filters button.on{background:#fff;color:#000;border-color:#fff}
@@ -2462,6 +2478,7 @@
             <input type="text" id="wbSearch" class="search-input" placeholder="SEARCH YOUR WALLET...">
           </div>
         </div>
+        <div class="wb-id" id="wbId"></div>
         <div class="wb-filters" id="wbFilters"></div>
         <div class="wb-body">
           <div class="wb-lib"><div class="video-grid" id="wbGrid"></div></div>
@@ -4857,6 +4874,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         if (walletScan) return walletScan;
         status.textContent = 'READING YOUR WALLET…';
         renderWalletTab();
+        readWalletActivity(w, key);
         walletScan = VXLIB.scan(w, key, (done, total) => { status.textContent = `READING YOUR WALLET · ${done}/${total}`; const t = document.getElementById('wbStatus'); if (t) t.textContent = status.textContent; })
           .then(() => { walletScan = null; refreshWalletMedia(); })
           .catch(e => { walletScan = null; status.textContent = 'COULD NOT READ: ' + String(e.message || e).slice(0, 60); renderWalletTab(); document.getElementById('wbStatus').textContent = status.textContent; });
@@ -4868,6 +4886,59 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       document.addEventListener('bwalletx:disconnected', () => { if (midiPlayback) { midiPlayback.stop(); midiPlayback = null; } refreshWalletMedia(); });
       document.getElementById('walletLibRefresh').addEventListener('click', () => scanWalletLibrary());
       renderWalletLib();
+
+      // ----- the performer at the top of the WALLET tab: who, how connected, what the mixer has done with this wallet -----
+      // Activity is the wallet's own record of actions labelled v3xv0id (mints and show tickets), via BRC-100 listActions.
+      // No balance: wallets keep spendable BSV from apps, and sending stays in bWalletX (OPEN bWALLETX).
+      const ACT_STORE = 'vx.walletActivity';
+      let bsvUsd = null;
+      function walletActivity() { try { const a = JSON.parse(localStorage.getItem(ACT_STORE) || 'null'); return a && a.key === walletKey() ? a.actions : []; } catch (e) { return []; } }
+      async function readWalletActivity(w, key) {
+        try {
+          const r = await w.listActions({ labels: ['v3xv0id'], labelQueryMode: 'any', includeLabels: true, limit: 200 });
+          const actions = ((r && r.actions) || []).map(a => ({ txid: a.txid, sats: Number(a.satoshis) || 0, status: a.status, description: a.description || '', labels: a.labels || [] }));
+          localStorage.setItem(ACT_STORE, JSON.stringify({ key, at: new Date().toISOString(), actions }));
+        } catch (e) { console.warn('bWalletX activity', e.message); }
+        renderWalletTab();
+      }
+      async function usdRate() {
+        if (bsvUsd) return bsvUsd;
+        try { const r = await fetch('https://api.whatsonchain.com/v1/bsv/main/exchangerate'); const j = await r.json(); bsvUsd = Number(j.rate) || null; } catch (e) {}
+        return bsvUsd;
+      }
+      function renderWalletId() {
+        const box = wbEl('wbId'); if (!box) return;
+        const key = walletKey();
+        if (!key) { box.style.display = 'none'; return; }
+        box.style.display = '';
+        const acts = walletActivity(), held = walletMedia().length;
+        const tickets = acts.filter(a => a.labels.includes('ticket')), mints = acts.filter(a => a.labels.includes('mint'));
+        const minted = Math.max(mints.length, VXMINT.minted().length);
+        const earnedSats = tickets.reduce((n, a) => n + Math.max(0, a.sats), 0);
+        const via = VXWALLET.via() === 'local' ? 'LOCAL WALLET ON THIS COMPUTER' : VXWALLET.via() === 'pairing' ? 'PHONE · PAIRED AS DESKTOP.MIXER.VEXVOID.COM' : 'REMEMBERED · CLICK REFRESH TO CHECK THE PHONE';
+        box.innerHTML = `<div class="who"><div class="handle"></div><div class="key" title="Copy your identity key"></div><div class="via"></div></div>
+          <div class="wb-stats"><div class="wb-stat"><b>${held}</b><span>HELD</span></div><div class="wb-stat"><b>${minted}</b><span>MINTED HERE</span></div>
+          <div class="wb-stat"><b>${tickets.length}</b><span>TICKETS SOLD</span></div><div class="wb-stat"><b id="wbEarned">${earnedSats ? '…' : '$0.00'}</b><span>EARNED FROM SHOWS</span></div></div>
+          <div class="wb-act"><button class="gen-btn" id="wbOpenWallet" title="Balance, sending and everything else lives in bWalletX">OPEN bWALLETX</button><div class="wb-feed" id="wbFeed"></div></div>`;
+        box.querySelector('.handle').textContent = VXWALLET.handle() || 'bWalletX';
+        box.querySelector('.key').textContent = key.slice(0, 12) + '…' + key.slice(-8);
+        box.querySelector('.key').addEventListener('click', () => { navigator.clipboard.writeText(key); box.querySelector('.key').textContent = 'IDENTITY KEY COPIED'; });
+        box.querySelector('.via').textContent = via;
+        wbEl('wbOpenWallet').addEventListener('click', () => require('electron').shell.openExternal('https://web.bwalletx.com'));
+        if (earnedSats) usdRate().then(r => { const e = wbEl('wbEarned'); if (e) const usd = r ? earnedSats / 1e8 * r : null; e.textContent = usd == null ? (earnedSats / 1e8).toFixed(6) + ' BSV' : '$' + usd.toFixed(usd >= 0.01 ? 2 : 4); });
+        const feed = wbEl('wbFeed');
+        feed.innerHTML = acts.length ? '' : '<div style="cursor:default"><span></span><span></span><i>No mixer activity in this wallet yet.</i><span></span></div>';
+        acts.slice(0, 30).forEach(a => {
+          const row = document.createElement('div');
+          const kind = a.labels.includes('ticket') ? 'TICKET' : a.labels.includes('mint') ? 'MINT' : 'MIXER';
+          row.innerHTML = `<span>${a.txid.slice(0, 8)}</span><span>${kind}</span><i></i><span>${a.status === 'completed' ? '' : String(a.status || '').toUpperCase()}</span>`;
+          row.querySelector('i').textContent = a.description;
+          row.title = 'Open the transaction on WhatsOnChain';
+          row.addEventListener('click', () => require('electron').shell.openExternal('https://whatsonchain.com/tx/' + a.txid));
+          feed.appendChild(row);
+        });
+      }
+      document.addEventListener('bwalletx:handle', () => renderWalletId());
 
       // ----- WALLET tab: browse everything the wallet holds, preview it, and put it to work -----
       const WB_KINDS = [['all', 'ALL'], ['clip', 'CLIPS'], ['image', 'IMAGES'], ['audio', 'AUDIO'], ['set', 'SETS'], ['setlog', 'LIVE SETS'], ['sketch', 'SKETCHES'], ['midi', 'MIDI'], ['other', 'OTHER']];
@@ -4907,6 +4978,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           grid.appendChild(card);
         });
         renderWalletDetail(all.find(i => i.origin === wb.sel) || null);
+        renderWalletId();
       }
       function renderWalletDetail(it) {
         const box = wbEl('wbDetail');
