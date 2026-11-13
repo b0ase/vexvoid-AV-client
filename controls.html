@@ -1690,6 +1690,16 @@
     .action-btn{flex:1;background:#fff;color:#000;border:1px solid #fff;padding:9px 10px;font:11px 'Courier New',monospace;letter-spacing:.15em;cursor:pointer}
     .action-btn+.action-btn{background:#000;color:#ddd;border-color:#555}
     .action-btn:hover{filter:brightness(.85)}
+
+    /* MIDI */
+    .v3xv0id-header{position:relative}
+    .midi-chip{position:absolute;right:16px;top:50%;transform:translateY(-50%);background:#000;color:#777;border:1px solid #333;font:10px 'Courier New',monospace;letter-spacing:.2em;padding:5px 9px;cursor:pointer}
+    .midi-chip.on{color:#fff;border-color:#fff}
+    .midi-panel{position:fixed;right:16px;top:44px;width:560px;max-height:80vh;overflow:auto;background:#000;border:1px solid #555;z-index:80;padding:12px;font-family:'Courier New',monospace;font-size:11px;letter-spacing:.1em;color:#ddd}
+    .midi-head{display:flex;justify-content:space-between;align-items:center;letter-spacing:.3em;margin-bottom:8px}
+    .midi-sub{display:flex;justify-content:space-between;color:#999;font-size:10px;margin:6px 0 10px}
+    .midi-row{display:grid;grid-template-columns:1.3fr 1fr 1fr auto auto;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid #151515}
+    .midi-bind{color:#fff}
     /* VX GEN (patterns tab) */
     .gen{flex:1;min-width:0;width:100%;display:flex;flex-direction:column;height:calc(100vh - 90px);padding:10px 12px;gap:10px;font-family:'Courier New',monospace;color:#e8e8e6}
     .gen-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border:1px solid #222;padding:8px 10px}
@@ -1737,6 +1747,13 @@
   <div class="v3xv0id-header">
     <div class="v3xv0id-brand">V3XV0ID</div>
     <div class="v3xv0id-subtitle">Image Animator Controls</div>
+    <button id="midiChip" class="midi-chip" title="MIDI controller mapping">MIDI · …</button>
+  </div>
+  <div id="midiPanel" class="midi-panel" style="display:none">
+    <div class="midi-head"><span>MIDI MAPPING</span><button id="midiClose" class="close-btn">✕</button></div>
+    <div class="midi-sub"><span id="midiDevices"></span><span>LAST: <b id="midiLast">—</b></span></div>
+    <div id="midiRows"></div>
+    <div class="midi-sub dim">Press LEARN, then move a knob or hit a pad on your controller.</div>
   </div>
 
   <!-- Tab Navigation -->
@@ -4270,6 +4287,14 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           const q = {}; ['a', 'b', 'c', 'd'].forEach(k => { if (a[k] != null) q[k] = num(a[k], 0, 1); });
           setKnobs(q, true); return gen.params;
         } },
+        cue: { args: '{name? | step 1|-1}', doc: 'Load a sketch on the deck nobody is watching (replacing its sketch layers), ready to fade to', run: a => {
+          const lib = window.VXGEN_LIBRARY || [];
+          let item = a.name ? lib.find(x => x.name.toLowerCase() === String(a.name).toLowerCase()) : null;
+          if (!item) { const i = lib.findIndex(x => x.name === gen.name.replace(/ \*$/, '')); item = lib[((i < 0 ? -1 : i) + (Number(a.step) || 1) + lib.length) % lib.length]; }
+          const hidden = activePalette === 'A' ? 'B' : 'A';
+          [...layersA, ...layersB].filter(l => (l.palette || 'A') === hidden && / \(GEN\)$/.test(l.name)).forEach(l => sendToOutput('remove-layer', { layerId: l.id }));
+          return VXCMD.sketch.run({ name: item.name, deck: hidden });
+        } },
         mutate: { doc: 'New seed for the current sketch', run: () => { mutate(); return gen.seed; } },
         evolve: { args: '{on}', doc: 'Mutate and drift the knobs every 4 bars', run: a => { gen.evolve = a.on !== false && a.on !== 'off'; genEl('genEvolveBtn').classList.toggle('active', gen.evolve); return gen.evolve; } },
         write: { args: '{prompt}', doc: 'Ask Claude to write a sketch (uses the Anthropic key; costs a little)', run: async a => {
@@ -4345,6 +4370,95 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         if (s !== lastApiState) { lastApiState = s; ipcRenderer.send('api-state', JSON.parse(s)); }
       }
       setInterval(pushApiState, 250);
+
+      // ===== MIDI: any controller; LEARN binds a knob/fader/pad to a target. Mappings live in vx-settings.json. =====
+      const MIDI_TARGETS = [
+        { id: 'fader', label: 'CROSSFADER', kind: 'range', run: v => VXCMD.fade.run({ value: v * 100 }) },
+        { id: 'knob-a', label: 'KNOB A', kind: 'range', run: v => setKnobs({ a: v }, true) },
+        { id: 'knob-b', label: 'KNOB B', kind: 'range', run: v => setKnobs({ b: v }, true) },
+        { id: 'knob-c', label: 'KNOB C', kind: 'range', run: v => setKnobs({ c: v }, true) },
+        { id: 'knob-d', label: 'KNOB D', kind: 'range', run: v => setKnobs({ d: v }, true) },
+        { id: 'bpm', label: 'BPM 60-180', kind: 'range', run: v => VXCMD.bpm.run({ value: Math.round(60 + v * 120) }) },
+        { id: 'vx-chaos', label: 'VX DECAL CHAOS', kind: 'range', run: v => window.vxProxy.set('chaos', +v.toFixed(2)) },
+        { id: 'vx-void', label: 'VX VOID CHANCE', kind: 'range', run: v => window.vxProxy.set('voidChance', +v.toFixed(2)) },
+        { id: 'cut-a', label: 'CUT TO A', kind: 'pad', run: () => VXCMD.cut.run({ deck: 'A' }) },
+        { id: 'cut-b', label: 'CUT TO B', kind: 'pad', run: () => VXCMD.cut.run({ deck: 'B' }) },
+        { id: 'cue-next', label: 'CUE NEXT SKETCH', kind: 'pad', run: () => VXCMD.cue.run({ step: 1 }) },
+        { id: 'cue-prev', label: 'CUE PREV SKETCH', kind: 'pad', run: () => VXCMD.cue.run({ step: -1 }) },
+        { id: 'mutate', label: 'MUTATE', kind: 'pad', run: () => mutate() },
+        { id: 'evolve', label: 'EVOLVE ON/OFF', kind: 'pad', run: () => VXCMD.evolve.run({ on: !gen.evolve }) },
+        { id: 'tap', label: 'TAP TEMPO', kind: 'pad', run: () => VXGEN.tap() },
+        { id: 'vx-next', label: 'VX NEXT CLIP', kind: 'pad', run: () => window.vxProxy.nextClip() },
+        { id: 'vx-clean', label: 'VX CLEAN', kind: 'pad', run: () => window.vxProxy.cleanNow() },
+        { id: 'blackout', label: 'BLACKOUT', kind: 'pad', run: () => window.vxProxy.blackout() },
+        { id: 'music-toggle', label: 'MUSIC PLAY/PAUSE', kind: 'pad', run: () => togglePlay() },
+        { id: 'music-next', label: 'MUSIC NEXT', kind: 'pad', run: () => nextTrack() }
+      ];
+      const midi = { access: null, map: genSettings().midi || {}, learning: null, last: '' };
+      const midiKey = (type, ch, n) => `${type}:${ch}:${n}`;
+      function midiSave() { genSaveSettings({ midi: midi.map }); }
+      function midiOnMessage(e) {
+        const [st, d1, d2 = 0] = e.data, type = st & 0xf0, ch = (st & 0x0f) + 1;
+        let key, val, press = false;
+        if (type === 0xb0) { key = midiKey('cc', ch, d1); val = d2 / 127; press = d2 > 63; }
+        else if (type === 0x90 && d2 > 0) { key = midiKey('note', ch, d1); val = d2 / 127; press = true; }
+        else if (type === 0xe0) { key = midiKey('bend', ch, 0); val = ((d2 << 7) | d1) / 16383; }
+        else return;
+        midi.last = key;
+        const lastEl = document.getElementById('midiLast'); if (lastEl) lastEl.textContent = key + ' = ' + Math.round(val * 127);
+        if (midi.learning) {
+          Object.keys(midi.map).forEach(k => { if (midi.map[k] === midi.learning) delete midi.map[k]; });
+          midi.map[key] = midi.learning; midi.learning = null; midiSave(); renderMidiPanel(); return;
+        }
+        const t = MIDI_TARGETS.find(x => x.id === midi.map[key]); if (!t) return;
+        try {
+          if (t.kind === 'range') t.run(val);
+          else if (press) { const was = midi['held:' + key]; midi['held:' + key] = true; if (!was || type === 0x90) t.run(); }
+          else midi['held:' + key] = false;
+        } catch (err) { console.warn('MIDI', t.id, err.message); }
+      }
+      function midiAttach() {
+        if (!midi.access) return;
+        let n = 0;
+        midi.access.inputs.forEach(inp => { inp.onmidimessage = midiOnMessage; n++; });
+        const chip = document.getElementById('midiChip');
+        chip.textContent = n ? `MIDI · ${n}` : 'MIDI · NONE';
+        chip.classList.toggle('on', n > 0);
+      }
+      async function midiInit() {
+        if (!navigator.requestMIDIAccess) { document.getElementById('midiChip').textContent = 'MIDI · N/A'; return; }
+        try {
+          midi.access = await navigator.requestMIDIAccess({ sysex: false });
+          midi.access.onstatechange = () => { midiAttach(); renderMidiPanel(); };
+          midiAttach();
+        } catch (e) { document.getElementById('midiChip').textContent = 'MIDI · BLOCKED'; }
+      }
+      function renderMidiPanel() {
+        const box = document.getElementById('midiRows'); if (!box) return;
+        const devices = midi.access ? [...midi.access.inputs.values()].map(i => i.name).join(' · ') : '';
+        document.getElementById('midiDevices').textContent = devices || 'No MIDI input connected';
+        box.innerHTML = '';
+        MIDI_TARGETS.forEach(t => {
+          const bound = Object.keys(midi.map).find(k => midi.map[k] === t.id);
+          const row = document.createElement('div');
+          row.className = 'midi-row';
+          row.innerHTML = `<span>${t.label}</span><span class="dim">${t.kind === 'range' ? 'KNOB/FADER' : 'PAD/BUTTON'}</span><span class="midi-bind">${midi.learning === t.id ? 'MOVE A CONTROL…' : (bound || '—')}</span>`;
+          const learn = document.createElement('button'); learn.className = 'gen-btn'; learn.textContent = midi.learning === t.id ? 'CANCEL' : 'LEARN';
+          learn.addEventListener('click', () => { midi.learning = midi.learning === t.id ? null : t.id; renderMidiPanel(); });
+          const clear = document.createElement('button'); clear.className = 'gen-btn'; clear.textContent = '✕'; clear.disabled = !bound;
+          clear.addEventListener('click', () => { delete midi.map[bound]; midiSave(); renderMidiPanel(); });
+          row.append(learn, clear);
+          box.appendChild(row);
+        });
+      }
+      document.getElementById('midiChip').addEventListener('click', () => {
+        const p = document.getElementById('midiPanel');
+        p.style.display = p.style.display === 'none' ? 'block' : 'none';
+        midi.learning = null; renderMidiPanel();
+      });
+      document.getElementById('midiClose').addEventListener('click', () => { document.getElementById('midiPanel').style.display = 'none'; midi.learning = null; });
+      window.vxMidi = { targets: MIDI_TARGETS.map(t => t.id), handle: midiOnMessage, map: () => midi.map };
+      midiInit();
 
       // Composer Tab Functionality
       let isRecording = false;
