@@ -1692,14 +1692,29 @@
     .action-btn:hover{filter:brightness(.85)}
 
     /* MIDI */
-    .v3xv0id-header{position:relative}
-    .midi-chip{position:absolute;right:16px;top:50%;transform:translateY(-50%);background:#000;color:#777;border:1px solid #333;font:10px 'Courier New',monospace;letter-spacing:.2em;padding:5px 9px;cursor:pointer}
+    .v3xv0id-header .v3xv0id-subtitle{margin-left:auto}
+    .midi-chip{margin-left:14px;background:#000;color:#777;border:1px solid #333;font:10px 'Courier New',monospace;letter-spacing:.2em;padding:5px 9px;cursor:pointer}
     .midi-chip.on{color:#fff;border-color:#fff}
-    .midi-panel{position:fixed;right:16px;top:44px;width:560px;max-height:80vh;overflow:auto;background:#000;border:1px solid #555;z-index:80;padding:12px;font-family:'Courier New',monospace;font-size:11px;letter-spacing:.1em;color:#ddd}
+    .midi-panel{position:fixed;right:16px;top:44px;width:560px;max-height:80vh;overflow:auto;background:#000;border:1px solid #555;z-index:1000;padding:12px;font-family:'Courier New',monospace;font-size:11px;letter-spacing:.1em;color:#ddd}
     .midi-head{display:flex;justify-content:space-between;align-items:center;letter-spacing:.3em;margin-bottom:8px}
     .midi-sub{display:flex;justify-content:space-between;color:#999;font-size:10px;margin:6px 0 10px}
     .midi-row{display:grid;grid-template-columns:1.3fr 1fr 1fr auto auto;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid #151515}
     .midi-bind{color:#fff}
+
+    /* Set composer */
+    .set-grid{flex:1;display:grid;grid-template-columns:1fr 380px;gap:10px;min-height:0}
+    .set-lane{position:relative;height:46px;border:1px solid #333;background:repeating-linear-gradient(90deg,#111 0 1px,transparent 1px 100%);overflow:hidden}
+    .set-mark{position:absolute;top:4px;bottom:4px;width:2px;background:#fff}
+    .set-mark.fade{background:#888}
+    .set-mark.done{opacity:.35}
+    .set-head{position:absolute;top:0;bottom:0;width:1px;background:#fff;box-shadow:0 0 6px #fff;z-index:2;left:0}
+    .set-steps{flex:1;overflow:auto;font-size:11px;border:1px solid #1c1c1c}
+    .set-step{display:grid;grid-template-columns:70px 120px 1fr 28px;gap:8px;align-items:center;padding:4px 8px;border-bottom:1px solid #141414}
+    .set-step.done{color:#666}
+    .set-step.next{background:#111}
+    .set-step code,.set-add input{text-transform:none;color:#bbb;font:11px Menlo,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .set-add{display:grid;grid-template-columns:80px 140px 1fr auto;gap:6px}
+    #startRecordingBtn.active{background:#fff;color:#000}
     /* VX GEN (patterns tab) */
     .gen{flex:1;min-width:0;width:100%;display:flex;flex-direction:column;height:calc(100vh - 90px);padding:10px 12px;gap:10px;font-family:'Courier New',monospace;color:#e8e8e6}
     .gen-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border:1px solid #222;padding:8px 10px}
@@ -2234,68 +2249,41 @@
 
     <!-- Composer Tab Content -->
     <div class="tab-content" id="composerTab">
-      <div class="composer-container">
-        <!-- Composer Header -->
-        <div class="composer-header">
-          <h2 class="cyber-text">🎭 SEQUENCE COMPOSER</h2>
-          <div class="composer-status">
-            <span id="composerStatus">READY</span>
-            <span id="recordingTime">00:00</span>
+      <div class="gen">
+        <div class="gen-bar">
+          <div class="gen-title">SET COMPOSER <span id="composerStatus" class="gen-badge">READY</span><span id="setPos" class="gen-badge dim">BAR 1.1</span><span id="recordingTime" class="gen-badge dim">0 STEPS</span></div>
+          <div class="gen-actions">
+            <button id="startRecordingBtn" class="gen-btn" title="Record what you do (UI, MIDI, CLI, MCP) onto the timeline">● REC</button>
+            <button id="playSequenceBtn" class="gen-btn on">▶ PLAY</button>
+            <button id="stopRecordingBtn" class="gen-btn">■ STOP</button>
+            <select id="setSync" class="gen-select" title="What the bar count follows">
+              <option value="tempo">SYNC: TEMPO</option><option value="track">SYNC: MUSIC TRACK</option>
+            </select>
+            <span class="gen-sep"></span>
+            <button id="setClearBtn" class="gen-btn">CLEAR</button>
+            <button id="saveSequenceBtn" class="gen-btn">SAVE</button>
+            <button id="setLoadBtn" class="gen-btn">LOAD</button>
           </div>
         </div>
-
-        <!-- Recording Controls -->
-        <div class="recording-controls">
-          <button id="startRecordingBtn" class="record-btn">🎬 START RECORDING</button>
-          <button id="stopRecordingBtn" class="record-btn" disabled>⏹️ STOP RECORDING</button>
-          <button id="playSequenceBtn" class="record-btn" disabled>▶️ PLAY SEQUENCE</button>
-          <button id="saveSequenceBtn" class="record-btn" disabled>💾 SAVE SEQUENCE</button>
-        </div>
-
-        <!-- AI Sequence Generator -->
-        <div class="ai-generator">
-          <h3>🤖 AI SEQUENCE GENERATOR</h3>
-          <div class="ai-controls">
-            <textarea id="aiPrompt" class="ai-prompt" placeholder="Describe the VJ sequence you want to create...
-Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and video transitions that sync to electronic music'"></textarea>
-            <button id="generateSequenceBtn" class="ai-btn">✨ GENERATE SEQUENCE</button>
-          </div>
-          <div class="ai-presets">
-            <button class="preset-btn" data-preset="psychedelic">🌀 PSYCHEDELIC</button>
-            <button class="preset-btn" data-preset="minimal">⚫ MINIMAL</button>
-            <button class="preset-btn" data-preset="glitch">📺 GLITCH</button>
-            <button class="preset-btn" data-preset="cyberpunk">🌃 CYBERPUNK</button>
-          </div>
-        </div>
-
-        <!-- Sequence Timeline -->
-        <div class="sequence-timeline">
-          <h3>SEQUENCE TIMELINE</h3>
-          <div class="timeline-container" id="timelineContainer">
-            <div class="timeline-track" data-track="patterns">
-              <div class="track-label">PATTERNS</div>
-              <div class="track-content" id="patternsTrack"></div>
-            </div>
-            <div class="timeline-track" data-track="images">
-              <div class="track-label">IMAGES</div>
-              <div class="track-content" id="imagesTrack"></div>
-            </div>
-            <div class="timeline-track" data-track="videos">
-              <div class="track-label">VIDEOS</div>
-              <div class="track-content" id="videosTrack"></div>
-            </div>
-            <div class="timeline-track" data-track="effects">
-              <div class="track-label">EFFECTS</div>
-              <div class="track-content" id="effectsTrack"></div>
+        <div class="set-grid">
+          <div class="gen-col">
+            <div class="gen-h">TIMELINE <span class="dim" id="setLength"></span></div>
+            <div id="setLane" class="set-lane"><div id="setHead" class="set-head"></div></div>
+            <div id="setSteps" class="set-steps"></div>
+            <div class="set-add">
+              <input id="setAddBar" class="gen-select" type="number" min="1" step="0.25" value="1" title="Bar (1 = first bar; 2.5 = half way through bar 2)">
+              <select id="setAddCmd" class="gen-select"></select>
+              <input id="setAddArgs" class="gen-select" placeholder='args, e.g. value=50 over=4  or  name="FLOW FIELD" deck=B'>
+              <button id="setAddBtn" class="gen-btn">ADD STEP</button>
             </div>
           </div>
-        </div>
-
-        <!-- Sequence Library -->
-        <div class="sequence-library">
-          <h3>SEQUENCE LIBRARY</h3>
-          <div class="sequence-list" id="sequenceList">
-            <!-- Saved sequences will be populated here -->
+          <div class="gen-col">
+            <div class="gen-h">WRITE A SET <span class="dim">CLAUDE</span></div>
+            <textarea id="aiPrompt" class="gen-prompt" rows="6" placeholder="e.g. 64 bars for Four Ton Shadow: start sparse on RIDGES, build with FLOW FIELD on B by bar 16, cut on the drop at 33 to WIRE TUNNEL, slow fade out over the last 8"></textarea>
+            <div class="gen-row"><label class="dim" style="font-size:10px;letter-spacing:.2em">BARS</label><input id="setBars" class="gen-select" type="number" min="4" max="512" value="64" style="width:80px"><button id="generateSequenceBtn" class="gen-btn wide" style="flex:1">WRITE SET</button></div>
+            <div id="setNote" class="gen-note"></div>
+            <div class="gen-h">HOW IT WORKS</div>
+            <div class="gen-note">A set is a list of mixer commands on bars (4 beats each). PLAY runs it against the tempo, or against the playing track's position with SYNC: MUSIC TRACK. fade steps take over=BARS for a smooth move. REC captures what you do from the UI, MIDI, the CLI and MCP.</div>
           </div>
         </div>
       </div>
@@ -4373,24 +4361,24 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
 
       // ===== MIDI: any controller; LEARN binds a knob/fader/pad to a target. Mappings live in vx-settings.json. =====
       const MIDI_TARGETS = [
-        { id: 'fader', label: 'CROSSFADER', kind: 'range', run: v => VXCMD.fade.run({ value: v * 100 }) },
-        { id: 'knob-a', label: 'KNOB A', kind: 'range', run: v => setKnobs({ a: v }, true) },
-        { id: 'knob-b', label: 'KNOB B', kind: 'range', run: v => setKnobs({ b: v }, true) },
-        { id: 'knob-c', label: 'KNOB C', kind: 'range', run: v => setKnobs({ c: v }, true) },
-        { id: 'knob-d', label: 'KNOB D', kind: 'range', run: v => setKnobs({ d: v }, true) },
-        { id: 'bpm', label: 'BPM 60-180', kind: 'range', run: v => VXCMD.bpm.run({ value: Math.round(60 + v * 120) }) },
+        { id: 'fader', rec: v => ['fade', { value: Math.round(v * 100) }],  label: 'CROSSFADER', kind: 'range', run: v => VXCMD.fade.run({ value: v * 100 }) },
+        { id: 'knob-a', rec: v => ['knobs', { a: +v.toFixed(2) }],  label: 'KNOB A', kind: 'range', run: v => setKnobs({ a: v }, true) },
+        { id: 'knob-b', rec: v => ['knobs', { b: +v.toFixed(2) }],  label: 'KNOB B', kind: 'range', run: v => setKnobs({ b: v }, true) },
+        { id: 'knob-c', rec: v => ['knobs', { c: +v.toFixed(2) }],  label: 'KNOB C', kind: 'range', run: v => setKnobs({ c: v }, true) },
+        { id: 'knob-d', rec: v => ['knobs', { d: +v.toFixed(2) }],  label: 'KNOB D', kind: 'range', run: v => setKnobs({ d: v }, true) },
+        { id: 'bpm', rec: v => ['bpm', { value: Math.round(60 + v * 120) }],  label: 'BPM 60-180', kind: 'range', run: v => VXCMD.bpm.run({ value: Math.round(60 + v * 120) }) },
         { id: 'vx-chaos', label: 'VX DECAL CHAOS', kind: 'range', run: v => window.vxProxy.set('chaos', +v.toFixed(2)) },
         { id: 'vx-void', label: 'VX VOID CHANCE', kind: 'range', run: v => window.vxProxy.set('voidChance', +v.toFixed(2)) },
-        { id: 'cut-a', label: 'CUT TO A', kind: 'pad', run: () => VXCMD.cut.run({ deck: 'A' }) },
-        { id: 'cut-b', label: 'CUT TO B', kind: 'pad', run: () => VXCMD.cut.run({ deck: 'B' }) },
-        { id: 'cue-next', label: 'CUE NEXT SKETCH', kind: 'pad', run: () => VXCMD.cue.run({ step: 1 }) },
-        { id: 'cue-prev', label: 'CUE PREV SKETCH', kind: 'pad', run: () => VXCMD.cue.run({ step: -1 }) },
-        { id: 'mutate', label: 'MUTATE', kind: 'pad', run: () => mutate() },
+        { id: 'cut-a', rec: () => ['cut', { deck: 'A' }],  label: 'CUT TO A', kind: 'pad', run: () => VXCMD.cut.run({ deck: 'A' }) },
+        { id: 'cut-b', rec: () => ['cut', { deck: 'B' }],  label: 'CUT TO B', kind: 'pad', run: () => VXCMD.cut.run({ deck: 'B' }) },
+        { id: 'cue-next', rec: () => ['cue', { step: 1 }],  label: 'CUE NEXT SKETCH', kind: 'pad', run: () => VXCMD.cue.run({ step: 1 }) },
+        { id: 'cue-prev', rec: () => ['cue', { step: -1 }],  label: 'CUE PREV SKETCH', kind: 'pad', run: () => VXCMD.cue.run({ step: -1 }) },
+        { id: 'mutate', rec: () => ['mutate', {}],  label: 'MUTATE', kind: 'pad', run: () => mutate() },
         { id: 'evolve', label: 'EVOLVE ON/OFF', kind: 'pad', run: () => VXCMD.evolve.run({ on: !gen.evolve }) },
         { id: 'tap', label: 'TAP TEMPO', kind: 'pad', run: () => VXGEN.tap() },
-        { id: 'vx-next', label: 'VX NEXT CLIP', kind: 'pad', run: () => window.vxProxy.nextClip() },
-        { id: 'vx-clean', label: 'VX CLEAN', kind: 'pad', run: () => window.vxProxy.cleanNow() },
-        { id: 'blackout', label: 'BLACKOUT', kind: 'pad', run: () => window.vxProxy.blackout() },
+        { id: 'vx-next', rec: () => ['vx-next', {}],  label: 'VX NEXT CLIP', kind: 'pad', run: () => window.vxProxy.nextClip() },
+        { id: 'vx-clean', rec: () => ['vx-clean', {}],  label: 'VX CLEAN', kind: 'pad', run: () => window.vxProxy.cleanNow() },
+        { id: 'blackout', rec: () => ['blackout', {}],  label: 'BLACKOUT', kind: 'pad', run: () => window.vxProxy.blackout() },
         { id: 'music-toggle', label: 'MUSIC PLAY/PAUSE', kind: 'pad', run: () => togglePlay() },
         { id: 'music-next', label: 'MUSIC NEXT', kind: 'pad', run: () => nextTrack() }
       ];
@@ -4412,9 +4400,11 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         }
         const t = MIDI_TARGETS.find(x => x.id === midi.map[key]); if (!t) return;
         try {
-          if (t.kind === 'range') t.run(val);
-          else if (press) { const was = midi['held:' + key]; midi['held:' + key] = true; if (!was || type === 0x90) t.run(); }
+          let fired = false;
+          if (t.kind === 'range') { t.run(val); fired = true; }
+          else if (press) { const was = midi['held:' + key]; midi['held:' + key] = true; if (!was || type === 0x90) { t.run(); fired = true; } }
           else midi['held:' + key] = false;
+          if (fired && t.rec && window.vxRecord) window.vxRecord(...t.rec(val));
         } catch (err) { console.warn('MIDI', t.id, err.message); }
       }
       function midiAttach() {
@@ -4460,177 +4450,210 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       window.vxMidi = { targets: MIDI_TARGETS.map(t => t.id), handle: midiOnMessage, map: () => midi.map };
       midiInit();
 
-      // Composer Tab Functionality
-      let isRecording = false;
-      let recordingStartTime = 0;
-      let recordedSequence = [];
-      let sequenceLibraryData = [];
+      // ===== Set composer: mixer commands on bars, played against the tempo or the playing track =====
+      const SET_DRAFT = 'vxset.draft';
+      const SET_SKIP = new Set(['help', 'state', 'layers', 'sketches', 'clips', 'images', 'tracks', 'write']);
+      const setEl = id => document.getElementById(id);
+      const set = { steps: [], playing: false, recording: false, t0: 0, fired: new Set(), ramps: [], timer: 0, recT0: 0 };
+      let setReady = false;
 
-      const startRecordingBtn = document.getElementById('startRecordingBtn');
-      const stopRecordingBtn = document.getElementById('stopRecordingBtn');
-      const playSequenceBtn = document.getElementById('playSequenceBtn');
-      const saveSequenceBtn = document.getElementById('saveSequenceBtn');
-      const composerStatus = document.getElementById('composerStatus');
-      const recordingTime = document.getElementById('recordingTime');
-      const aiPrompt = document.getElementById('aiPrompt');
-      const generateSequenceBtn = document.getElementById('generateSequenceBtn');
-      const sequenceList = document.getElementById('sequenceList');
-
-      // Initialize Composer Tab
-      function initializeComposerTab() {
-        // Set up AI presets
-        document.querySelectorAll('.preset-btn').forEach(btn => {
-          btn.addEventListener('click', () => {
-            const preset = btn.getAttribute('data-preset');
-            setAIPreset(preset);
-          });
-        });
-        
-        loadSequenceLibrary();
+      function setLoadDraft() { try { const d = JSON.parse(localStorage.getItem(SET_DRAFT) || 'null'); if (d && Array.isArray(d.steps)) set.steps = d.steps; } catch (e) {} }
+      function setSaveDraft() { try { localStorage.setItem(SET_DRAFT, JSON.stringify({ steps: set.steps })); } catch (e) {} }
+      function setSort() { set.steps.sort((a, b) => a.bar - b.bar); }
+      function barsPerSecond() { return (VXGEN.signals.bpm || 120) / 60 / 4; }
+      function setPosition() {
+        if (setEl('setSync').value === 'track' && currentAudio && !currentAudio.paused) return 1 + currentAudio.currentTime * barsPerSecond();
+        return 1 + (performance.now() - set.t0) / 1000 * barsPerSecond();
       }
-
-      function setAIPreset(preset) {
-        const presets = {
-          'psychedelic': 'Create a psychedelic VJ sequence with swirling patterns, bright neon colors, kaleidoscope effects, and smooth transitions that pulse with electronic music',
-          'minimal': 'Generate a minimal VJ sequence with clean geometric shapes, black and white patterns, subtle animations, and precise timing',
-          'glitch': 'Design a glitch-style VJ sequence with digital artifacts, corrupted visuals, rapid cuts, static effects, and cyberpunk aesthetics',
-          'cyberpunk': 'Build a cyberpunk VJ sequence with neon cityscapes, matrix-style effects, holographic patterns, and futuristic transitions'
-        };
-        
-        aiPrompt.value = presets[preset] || '';
-      }
-
-      function startRecording() {
-        isRecording = true;
-        recordingStartTime = Date.now();
-        recordedSequence = [];
-        
-        composerStatus.textContent = 'RECORDING';
-        startRecordingBtn.disabled = true;
-        stopRecordingBtn.disabled = false;
-        
-        // Start recording timer
-        const recordingInterval = setInterval(() => {
-          if (!isRecording) {
-            clearInterval(recordingInterval);
-            return;
-          }
-          
-          const elapsed = Date.now() - recordingStartTime;
-          const minutes = Math.floor(elapsed / 60000);
-          const seconds = Math.floor((elapsed % 60000) / 1000);
-          recordingTime.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-        }, 1000);
-      }
-
-      function stopRecording() {
-        isRecording = false;
-        composerStatus.textContent = 'READY';
-        startRecordingBtn.disabled = false;
-        stopRecordingBtn.disabled = true;
-        playSequenceBtn.disabled = false;
-        saveSequenceBtn.disabled = false;
-      }
-
-      function generateAISequence() {
-        const prompt = aiPrompt.value.trim();
-        if (!prompt) return;
-        
-        composerStatus.textContent = 'GENERATING...';
-        generateSequenceBtn.disabled = true;
-        
-        // Simulate AI generation
-        setTimeout(() => {
-          const generatedSequence = createAISequence(prompt);
-          recordedSequence = generatedSequence;
-          
-          composerStatus.textContent = 'SEQUENCE GENERATED';
-          generateSequenceBtn.disabled = false;
-          playSequenceBtn.disabled = false;
-          saveSequenceBtn.disabled = false;
-          
-          // Visualize the generated sequence
-          visualizeSequence(generatedSequence);
-        }, 2000);
-      }
-
-      function createAISequence(prompt) {
-        // AI sequence generation logic based on prompt
-        const sequence = [];
-        const duration = 60; // 60 seconds
-        const events = Math.floor(duration / 4); // Event every 4 seconds
-        
-        for (let i = 0; i < events; i++) {
-          const time = i * 4;
-          const eventType = Math.random() > 0.5 ? 'pattern' : 'image';
-          
-          sequence.push({
-            time: time,
-            type: eventType,
-            action: eventType === 'pattern' ? 'load_pattern' : 'load_image',
-            data: {
-              name: `AI_${eventType.toUpperCase()}_${i + 1}`,
-              prompt: prompt
-            }
-          });
+      function fmtBar(b) { const bar = Math.floor(b), beat = Math.floor((b - bar) * 4) + 1; return `${bar}.${beat}`; }
+      function argsText(a) { return Object.entries(a || {}).map(([k, v]) => `${k}=${typeof v === 'string' && /\s/.test(v) ? JSON.stringify(v) : v}`).join(' '); }
+      function parseArgs(text) {
+        text = String(text || '').trim();
+        if (!text) return {};
+        if (text.startsWith('{')) return JSON.parse(text);
+        const out = {};
+        for (const m of text.matchAll(/(\w+)=("([^"]*)"|\S+)/g)) {
+          const v = m[3] != null ? m[3] : m[2];
+          out[m[1]] = v === 'true' ? true : v === 'false' ? false : (v !== '' && !isNaN(Number(v)) ? Number(v) : v);
         }
-        
-        return sequence;
+        return out;
       }
 
-      function visualizeSequence(sequence) {
-        // Clear existing timeline
-        document.getElementById('patternsTrack').innerHTML = '';
-        document.getElementById('imagesTrack').innerHTML = '';
-        document.getElementById('videosTrack').innerHTML = '';
-        document.getElementById('effectsTrack').innerHTML = '';
-        
-        sequence.forEach(event => {
-          const eventElement = document.createElement('div');
-          eventElement.className = 'timeline-event';
-          eventElement.style.cssText = `
-            position: absolute;
-            left: ${(event.time / 60) * 100}%;
-            width: 20px;
-            height: 20px;
-            background: ${event.type === 'pattern' ? '#ff6b6b' : '#4ecdc4'};
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            cursor: pointer;
-          `;
-          eventElement.title = `${event.time}s: ${event.data.name}`;
-          
-          const trackElement = document.getElementById(
-            event.type === 'pattern' ? 'patternsTrack' : 'imagesTrack'
-          );
-          trackElement.style.position = 'relative';
-          trackElement.appendChild(eventElement);
+      function renderSet() {
+        setSort();
+        const box = setEl('setSteps'), lane = setEl('setLane');
+        const last = set.steps.reduce((m, s) => Math.max(m, s.bar + (s.args && s.args.over || 0)), 8);
+        const span = Math.ceil(last / 8) * 8 + 1;
+        set.span = span;
+        setEl('setLength').textContent = `${set.steps.length} STEPS · ${span - 1} BARS`;
+        setEl('recordingTime').textContent = `${set.steps.length} STEPS`;
+        lane.style.backgroundSize = `${100 / (span - 1) * 4}% 100%`;
+        lane.querySelectorAll('.set-mark').forEach(m => m.remove());
+        box.innerHTML = '';
+        set.steps.forEach((st, i) => {
+          const mark = document.createElement('div');
+          mark.className = 'set-mark' + (st.cmd === 'fade' && st.args && st.args.over ? ' fade' : '') + (set.fired.has(i) ? ' done' : '');
+          mark.style.left = ((st.bar - 1) / (span - 1) * 100) + '%';
+          if (st.cmd === 'fade' && st.args && st.args.over) mark.style.width = (st.args.over / (span - 1) * 100) + '%';
+          mark.title = `${fmtBar(st.bar)} ${st.cmd} ${argsText(st.args)}`;
+          lane.appendChild(mark);
+          const row = document.createElement('div');
+          row.className = 'set-step' + (set.fired.has(i) ? ' done' : '');
+          row.innerHTML = `<span>BAR ${fmtBar(st.bar)}</span><span>${st.cmd.toUpperCase()}</span><code></code>`;
+          row.querySelector('code').textContent = argsText(st.args);
+          const del = document.createElement('button'); del.className = 'close-btn'; del.textContent = '✕';
+          del.addEventListener('click', () => { set.steps.splice(i, 1); setSaveDraft(); renderSet(); });
+          row.appendChild(del);
+          box.appendChild(row);
         });
       }
 
-      function loadSequenceLibrary() {
-        // Load saved sequences from localStorage
-        const saved = localStorage.getItem('v3xv0id-sequences');
-        sequenceLibraryData = saved ? JSON.parse(saved) : [];
-        
-        renderSequenceLibrary();
+      async function fireStep(st) {
+        if (st.cmd === 'fade' && st.args && st.args.over > 0) {
+          set.ramps = set.ramps.filter(r => r.kind !== 'fade');
+          set.ramps.push({ kind: 'fade', from: Number(crossfader.value), to: Number(st.args.value), start: st.bar, len: Number(st.args.over) });
+          return;
+        }
+        try { await window.vxCommand(st.cmd, st.args); }
+        catch (e) { setEl('setNote').textContent = `Bar ${fmtBar(st.bar)} ${st.cmd}: ${e.message}`; }
+      }
+      function setTick() {
+        const pos = setPosition();
+        setEl('setPos').textContent = 'BAR ' + fmtBar(pos);
+        setEl('setHead').style.left = Math.min(100, (pos - 1) / ((set.span || 9) - 1) * 100) + '%';
+        if (!set.playing) return;
+        set.steps.forEach((st, i) => { if (!set.fired.has(i) && st.bar <= pos) { set.fired.add(i); fireStep(st); renderSet(); } });
+        set.ramps = set.ramps.filter(r => {
+          const k = Math.min(1, (pos - r.start) / r.len);
+          setFader(Math.round(r.from + (r.to - r.from) * k));
+          return k < 1;
+        });
+        if (set.fired.size === set.steps.length && !set.ramps.length) { set.playing = false; setEl('composerStatus').textContent = 'SET DONE'; }
+      }
+      function setPlay() {
+        if (!set.steps.length) { setEl('composerStatus').textContent = 'NOTHING TO PLAY'; return; }
+        set.fired = new Set(); set.ramps = [];
+        set.t0 = performance.now();
+        VXGEN.signals.beat0 = set.t0; // the sketches' bars line up with the set's
+        set.playing = true;
+        setEl('composerStatus').textContent = 'PLAYING';
+        renderSet();
+      }
+      function setStop() {
+        set.playing = false; set.ramps = [];
+        if (set.recording) toggleRecord();
+        setEl('composerStatus').textContent = 'STOPPED';
+      }
+      function toggleRecord() {
+        set.recording = !set.recording;
+        setEl('startRecordingBtn').classList.toggle('active', set.recording);
+        if (set.recording) {
+          if (!set.playing) { set.t0 = performance.now(); VXGEN.signals.beat0 = set.t0; }
+          setEl('composerStatus').textContent = 'RECORDING';
+        } else setEl('composerStatus').textContent = 'RECORDED ' + set.steps.length + ' STEPS';
+      }
+      // Recording hook: every command (UI, MIDI, CLI, MCP) passes here. Fader and knob moves are thinned out.
+      let setLastRec = {};
+      function setRecord(cmd, args) {
+        if (!set.recording || SET_SKIP.has(cmd)) return;
+        const bar = Math.round(setPosition() * 16) / 16;
+        const prev = setLastRec[cmd];
+        if ((cmd === 'fade' || cmd === 'knobs') && prev && bar - prev.bar < 0.25) { prev.args = { ...prev.args, ...args }; setSaveDraft(); return; }
+        const st = { bar, cmd, args: { ...args } };
+        set.steps.push(st); setLastRec[cmd] = st;
+        setSaveDraft(); renderSet();
       }
 
-      function renderSequenceLibrary() {
-        sequenceList.innerHTML = '';
-        
-        sequenceLibraryData.forEach((sequence, index) => {
-          const sequenceItem = document.createElement('div');
-          sequenceItem.className = 'sequence-item';
-          sequenceItem.innerHTML = `
-            <div class="sequence-name">${sequence.name}</div>
-            <div class="sequence-meta">${sequence.duration}s • ${sequence.events} events</div>
-            <button onclick="loadSequence(${index})">LOAD</button>
-            <button onclick="deleteSequence(${index})">DELETE</button>
-          `;
-          
-          sequenceList.appendChild(sequenceItem);
-        });
+      function initializeComposerTab() {
+        if (setReady) { renderSet(); return; }
+        setReady = true;
+        setLoadDraft();
+        const sel = setEl('setAddCmd');
+        Object.keys(VXCMD).filter(k => !SET_SKIP.has(k)).forEach(k => { const o = document.createElement('option'); o.value = k; o.textContent = k.toUpperCase(); sel.appendChild(o); });
+        // record through the one command path, plus the UI controls that don't use it
+        const run = window.vxCommand;
+        window.vxCommand = async (cmd, args) => { const r = await run(cmd, args); setRecord(cmd, args || {}); return r; };
+        crossfader.addEventListener('input', () => setRecord('fade', { value: Number(crossfader.value) }));
+        genEl('genKnobs').addEventListener('input', () => setRecord('knobs', { ...gen.params }));
+        genEl('genSendBtn').addEventListener('click', () => setRecord('sketch', { name: gen.name.replace(/ \*$/, ''), deck: genEl('genDeck').value }));
+        genEl('genMutateBtn').addEventListener('click', () => setRecord('mutate', {}));
+        document.getElementById('vxNext').addEventListener('click', () => setRecord('vx-next', {}));
+        document.getElementById('vxClean').addEventListener('click', () => setRecord('vx-clean', {}));
+        document.getElementById('vxBlackout').addEventListener('click', () => setRecord('blackout', {}));
+        window.vxRecord = setRecord;
+        renderSet();
+        set.timer = setInterval(setTick, 25);
       }
+
+      setEl('startRecordingBtn').addEventListener('click', toggleRecord);
+      setEl('playSequenceBtn').addEventListener('click', setPlay);
+      setEl('stopRecordingBtn').addEventListener('click', setStop);
+      setEl('setClearBtn').addEventListener('click', () => { setStop(); set.steps = []; set.fired = new Set(); setSaveDraft(); renderSet(); });
+      setEl('setAddBtn').addEventListener('click', () => {
+        try {
+          set.steps.push({ bar: Math.max(1, Number(setEl('setAddBar').value) || 1), cmd: setEl('setAddCmd').value, args: parseArgs(setEl('setAddArgs').value) });
+          setSaveDraft(); renderSet(); setEl('setNote').textContent = '';
+        } catch (e) { setEl('setNote').textContent = 'Args: ' + e.message; }
+      });
+      ['setAddArgs', 'setAddBar', 'aiPrompt', 'setBars'].forEach(id => setEl(id).addEventListener('keydown', e => e.stopPropagation()));
+      setEl('saveSequenceBtn').addEventListener('click', async () => {
+        const res = await dialog.showSaveDialog({ defaultPath: 'v3xv0id-set.json', filters: [{ name: 'V3XV0ID set', extensions: ['json'] }] });
+        if (res.canceled || !res.filePath) return;
+        require('fs').writeFileSync(res.filePath, JSON.stringify({ type: 'v3xv0id-set', version: 1, bpm: VXGEN.signals.bpm, steps: set.steps }, null, 2));
+        setEl('composerStatus').textContent = 'SAVED';
+      });
+      setEl('setLoadBtn').addEventListener('click', async () => {
+        const res = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'V3XV0ID set', extensions: ['json'] }] });
+        if (res.canceled || !res.filePaths[0]) return;
+        try {
+          const d = JSON.parse(require('fs').readFileSync(res.filePaths[0], 'utf8'));
+          set.steps = (d.steps || []).filter(s => s && s.cmd && VXCMD[s.cmd]);
+          if (d.bpm) VXGEN.signals.bpm = d.bpm;
+          set.fired = new Set(); setSaveDraft(); renderSet(); setEl('composerStatus').textContent = 'LOADED ' + set.steps.length + ' STEPS';
+        } catch (e) { setEl('setNote').textContent = 'Could not read that file: ' + e.message; }
+      });
+
+      // Claude writes a set from a description
+      setEl('generateSequenceBtn').addEventListener('click', async () => {
+        const prompt = setEl('aiPrompt').value.trim(), note = setEl('setNote');
+        if (!prompt) { note.textContent = 'Describe the set first.'; return; }
+        const key = anthropicKey();
+        if (!key) { note.textContent = 'Needs an Anthropic key: add one in PATTERNS → PROMPT → SKETCH first.'; return; }
+        const bars = Math.max(4, Math.min(512, Number(setEl('setBars').value) || 64));
+        const cmds = Object.entries(VXCMD).filter(([k]) => !SET_SKIP.has(k)).map(([k, c]) => `- ${k} ${c.args || ''}: ${c.doc}`).join('\n');
+        const sketches = (window.VXGEN_LIBRARY || []).map(x => `- ${x.name} (${x.tags}; knobs a-d: ${x.knobs.join(', ')})`).join('\n');
+        const clips = catalogue().clips.map(c => c.name).join(', ');
+        const system = `You program live visual sets for V3XV0ID, a monochrome VJ mixer with two decks (A and B) and a crossfader (0 = deck A, 100 = deck B).
+A set is a JSON array of steps {"bar": number, "cmd": string, "args": object}. Bars start at 1 and are 4 beats long; fractions are allowed (2.5 = halfway through bar 2).
+Commands:
+${cmds}
+For fade you may add "over": BARS to move smoothly. Knob values are 0-1.
+Sketches:
+${sketches}
+Clips: ${clips}
+Good sets build and release: keep the deck on air steady while you cue the other one (sketch with deck set to the hidden deck, or cue), then fade or cut across on phrase boundaries (bars 1, 9, 17, 33...). Use knobs and mutate for motion within a section. Don't change something every bar.
+Reply with only the JSON array in one \`\`\`json code block.`;
+        const btn = setEl('generateSequenceBtn');
+        btn.disabled = true; btn.textContent = 'WRITING…'; note.textContent = '';
+        try {
+          const res = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2026-10-21', 'anthropic-beta': 'server-side-fallback-2026-07-01' },
+            body: JSON.stringify({ model: 'claude-opus-5-5', max_tokens: 16000, output_config: { effort: 'medium' }, fallbacks: 'default', system,
+              messages: [{ role: 'user', content: `${bars} bars at ${VXGEN.signals.bpm} BPM. ${prompt}` }] })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error((data.error && data.error.message) || ('HTTP ' + res.status));
+          if (data.stop_reason === 'refusal') throw new Error('Claude declined this one; try wording it differently.');
+          const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+          const m = text.match(/```(?:json)?\s*\n([\s\S]*?)```/);
+          const steps = JSON.parse(m ? m[1] : text);
+          const good = steps.filter(s => s && VXCMD[s.cmd] && !SET_SKIP.has(s.cmd) && Number(s.bar) >= 1).map(s => ({ bar: Number(s.bar), cmd: s.cmd, args: s.args || {} }));
+          set.steps = good; set.fired = new Set(); setSaveDraft(); renderSet();
+          note.textContent = `Written by Claude: ${good.length} steps${good.length < steps.length ? ` (${steps.length - good.length} unusable dropped)` : ''}. Edit, then PLAY.`;
+        } catch (e) { note.textContent = 'Failed: ' + e.message; }
+        finally { btn.disabled = false; btn.textContent = 'WRITE SET'; }
+      });
 
       // Event Listeners
       if (loadLocalVideosBtn) {
@@ -4684,11 +4707,6 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           });
         });
       }
-
-      // Composer controls
-      if (startRecordingBtn) startRecordingBtn.addEventListener('click', startRecording);
-      if (stopRecordingBtn) stopRecordingBtn.addEventListener('click', stopRecording);
-      if (generateSequenceBtn) generateSequenceBtn.addEventListener('click', generateAISequence);
 
       // Search functionality
       if (videoSearch) videoSearch.addEventListener('input', renderVideoLibrary);
