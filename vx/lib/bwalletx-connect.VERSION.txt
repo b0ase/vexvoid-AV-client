@@ -1,0 +1,1 @@
+@bwalletx/connect 0.5.5 global build, vendored from bitcoin-corp/bwalletx-connect (dist/bwalletx-connect.global.js)

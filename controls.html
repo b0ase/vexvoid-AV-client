@@ -1695,6 +1695,7 @@
     .v3xv0id-header .v3xv0id-subtitle{margin-left:auto}
     .midi-chip{margin-left:14px;background:#000;color:#777;border:1px solid #333;font:10px 'Courier New',monospace;letter-spacing:.2em;padding:5px 9px;cursor:pointer}
     .midi-chip.on{color:#fff;border-color:#fff}
+    .bwx-chip.on{background:#fff;color:#000}
     .midi-panel{position:fixed;right:16px;top:44px;width:560px;max-height:80vh;overflow:auto;background:#000;border:1px solid #555;z-index:1000;padding:12px;font-family:'Courier New',monospace;font-size:11px;letter-spacing:.1em;color:#ddd}
     .midi-head{display:flex;justify-content:space-between;align-items:center;letter-spacing:.3em;margin-bottom:8px}
     .midi-sub{display:flex;justify-content:space-between;color:#999;font-size:10px;margin:6px 0 10px}
@@ -1775,6 +1776,7 @@
   <div class="v3xv0id-header">
     <div class="v3xv0id-brand">V3XV0ID</div>
     <div class="v3xv0id-subtitle">Image Animator Controls</div>
+    <button id="bwxChip" class="midi-chip bwx-chip">CONNECT bWALLETX</button>
     <button id="claudeChip" class="midi-chip" title="Control this mixer from claude.ai">CLAUDE.AI</button>
     <button id="midiChip" class="midi-chip" title="MIDI controller mapping">MIDI · …</button>
   </div>
@@ -4542,6 +4544,8 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       }
       setInterval(pushApiState, 250);
 
+      VXWALLET.init();
+
       // ===== CLAUDE.AI: link this mixer to the relay so claude.ai (web, phone) can play it =====
       async function claudeStatus() {
         try {
@@ -5440,6 +5444,8 @@ Reply with only the JSON array in one \`\`\`json code block.`;
   <script src="./vx/vx-gen.js"></script>
   <script src="./vx/gen-library.js"></script>
   <script src="./vx/chain.js"></script>
+  <script src="./vx/lib/bwalletx-connect.global.js"></script>
+  <script src="./vx/wallet.js"></script>
   <script src="./vx/vx-keys.js"></script>
   <script>
     // ===== VX engine panel: mirrors the output window's engine state and forwards changes over IPC =====
