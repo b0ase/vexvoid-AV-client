@@ -236,6 +236,12 @@
       color: #000000;
       border-color: #ffffff;
     }
+
+    /* The output is the audience's screen: no interface, placeholder or thumbnail strip ever shows here.
+       Everything is driven from the controls window. Nothing loaded = black (or the VX engine). */
+    .frame-controls, #thumbnails-bar, #placeholder { display: none !important; }
+    .layer-image:not([src]), .layer-image[src=""] { visibility: hidden !important; }
+    #defaultBackgroundImage { border: 0 !important; box-shadow: none !important; }
   </style>
 </head>
 <body>
@@ -251,7 +257,7 @@
       </div>
     </div>
     <div id="defaultBackground" style="display:none;">
-      <img id="defaultBackgroundImage" src="./vexvoid-icon.png" alt="Default Background" />
+      <img id="defaultBackgroundImage" alt="" />
     </div>
     <div id="placeholder" style="display:none;">No folders loaded.<br>Add a folder to begin.</div>
   </div>
@@ -1151,10 +1157,8 @@
         const imageElement = document.createElement('img');
         if (imageFiles.length > 0) {
           imageElement.src = 'file://' + encodeURI(imageFiles[layer.imageIndex]);
-        } else {
-          // Show placeholder when no images are loaded
-          imageElement.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMzMzIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzg4OCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlczwvdGV4dD48L3N2Zz4=';
         }
+        // an empty layer shows nothing: this window is the audience's screen
         imageElement.className = 'layer-image';
         imageElement.draggable = false;
         
@@ -1987,7 +1991,7 @@
 
       function updatePlaceholderVisibility() {
         const hasVisibleLayers = layers.some(l => l.visible && (l.gen || (l.imageFiles && l.imageFiles.length > 0)));
-        const hasDefaultBg = defaultBackgroundImage.src && !defaultBackgroundImage.src.endsWith('/');
+        const hasDefaultBg = !!defaultBackgroundImage.getAttribute('src'); // only one the VJ chose
 
         if (hasVisibleLayers) {
           // Layers are active — hide background and placeholder

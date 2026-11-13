@@ -1729,6 +1729,52 @@
     .grok{border:1px solid #222;padding:10px;margin:0 0 10px;box-sizing:border-box;display:flex;flex-direction:column;gap:8px;font-family:'Courier New',monospace}
     .grok-row{display:grid;grid-template-columns:minmax(320px,1fr) auto;gap:8px}
     .grok-opts{display:grid;grid-template-columns:repeat(5,auto);gap:6px;align-items:start}
+
+    /* Type: IBM Plex Mono for the interface, Michroma for the wordmark, tabs and titles (vx/fonts, offline) */
+    body, button, input, select, textarea, code, .gen-code { font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace !important; }
+    .v3xv0id-brand, .tab-button, .gen-title, .cyber-text, .midi-head, .vx-head > span:first-child { font-family: 'Michroma', 'IBM Plex Mono', sans-serif !important; font-weight: 400 !important; }
+    .tab-button { letter-spacing: .14em !important; font-size: 10px !important; }
+    .v3xv0id-brand { letter-spacing: .32em !important; }
+
+    /* layer cards: words, monochrome (no emoji icons, no purple) */
+    .layer-btn, .inverse-btn { font-family: 'IBM Plex Mono', monospace !important; font-size: 9px !important; letter-spacing: .12em; min-width: 34px; padding: 5px 6px !important; background: #000 !important; color: #aaa !important; border: 1px solid #333 !important; }
+    .layer-btn.active, .inverse-btn.active { background: #fff !important; color: #000 !important; border-color: #fff !important; }
+    .layer-btn:hover, .inverse-btn:hover { border-color: #fff !important; color: #fff !important; }
+    .layer-btn.active:hover, .inverse-btn.active:hover { color: #000 !important; }
+    #outputLive { grid-area: monOut; align-self: start; width: 100%; aspect-ratio: 16 / 9; object-fit: contain; display: none; z-index: 3; pointer-events: none; border: 1px solid rgba(255,255,255,.7); box-sizing: border-box; background: #000; }
+    /* ===== LAYERS desk: monitors on top (DECK A | OUTPUT | DECK B, 16:9), crossfader across, deck lists under
+       their monitors, VX engine + selected-layer controls in the middle. The old columns flatten into one grid. ===== */
+    #layersTab.active {
+      display: grid !important; gap: 8px; min-height: 0; height: 100%;
+      grid-template-columns: minmax(250px, 1fr) minmax(0, 1.65fr) minmax(250px, 1fr);
+      grid-template-rows: auto auto minmax(0, 1fr);
+      grid-template-areas: "monA monOut monB" "xfade xfade xfade" "deckA mid deckB";
+    }
+    #layersTab .layers-column, #layersTab .preview-column, #layersTab .preview-screen { display: contents; }
+    #layersTab .preview-header { display: none; }
+    #layersTab #preview2 { grid-area: monA; }
+    #layersTab #outputPreview { grid-area: monOut; }
+    #layersTab #preview3 { grid-area: monB; }
+    #layersTab .preview-row { aspect-ratio: 16 / 9; min-height: 0; height: auto; flex: none; align-self: start; background: #000; border: 1px solid var(--white-15); }
+    #layersTab .output-preview { border-color: rgba(255,255,255,.7); }
+    #layersTab .preview-row img, #layersTab .preview-row canvas, #layersTab .preview-row video { width: 100%; height: 100%; object-fit: contain; }
+    #layersTab .preview-row-label { z-index: 2; }
+    #layersTab .palette-section { min-height: 0; overflow: hidden; }
+    #layersTab .palette-section:first-of-type { grid-area: deckA; }
+    #layersTab .palette-section:last-of-type { grid-area: deckB; }
+    #layersTab .crossfader-section { grid-area: xfade; padding: 8px 14px; }
+    #layersTab .crossfader-container input[type=range], #layersTab #crossfader { width: 100%; }
+    /* the middle: VX engine on the left, the selected layer's controls on the right, both scroll */
+    #layersTab .controls-column {
+      grid-area: mid; min-height: 0; overflow-y: auto; flex: none; padding: 12px;
+      display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 14px; align-content: start;
+    }
+    #layersTab .controls-column > #vxPanel { grid-column: 1; grid-row: 1 / span 40; align-self: start; }
+    #layersTab .controls-column > :not(#vxPanel) { grid-column: 2; }
+    @media (max-width: 1280px) {
+      #layersTab .controls-column { grid-template-columns: 1fr; }
+      #layersTab .controls-column > #vxPanel, #layersTab .controls-column > :not(#vxPanel) { grid-column: 1; grid-row: auto; }
+    }
     /* VX GEN (patterns tab) */
     .gen{flex:1;min-width:0;width:100%;display:flex;flex-direction:column;height:calc(100vh - 90px);padding:10px 12px;gap:10px;font-family:'Courier New',monospace;color:#e8e8e6}
     .gen-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border:1px solid #222;padding:8px 10px}
@@ -1770,18 +1816,19 @@
     .gen-targets{max-height:140px;overflow:auto;font-size:11px}
     .gen-targets .target-layer-item{display:flex;gap:6px;align-items:center;padding:3px 0}
 </style>
+  <link rel="stylesheet" href="./vx/fonts/fonts.css">
 </head>
 <body>
   <!-- V3XV0ID Header -->
   <div class="v3xv0id-header">
     <div class="v3xv0id-brand">V3XV0ID</div>
-    <div class="v3xv0id-subtitle">Image Animator Controls</div>
+    <div class="v3xv0id-subtitle">AV MIXER</div>
     <button id="bwxChip" class="midi-chip bwx-chip">CONNECT bWALLETX</button>
     <button id="claudeChip" class="midi-chip" title="Control this mixer from claude.ai">CLAUDE.AI</button>
     <button id="midiChip" class="midi-chip" title="MIDI controller mapping">MIDI · …</button>
   </div>
   <div id="claudePanel" class="midi-panel" style="display:none">
-    <div class="midi-head"><span>PLAY THIS MIXER FROM CLAUDE.AI</span><button id="claudeClose" class="close-btn">✕</button></div>
+    <div class="midi-head"><span>PLAY THIS MIXER FROM CLAUDE.AI</span><button id="claudeClose" class="close-btn"></button></div>
     <div class="midi-sub"><span id="claudeState">…</span></div>
     <ol class="claude-steps">
       <li>In claude.ai open <b>Settings → Connectors → Add custom connector</b> and paste this URL:
@@ -1796,7 +1843,7 @@
     <button id="claudeOff" class="gen-btn">DISCONNECT CLAUDE.AI</button>
   </div>
   <div id="midiPanel" class="midi-panel" style="display:none">
-    <div class="midi-head"><span>MIDI MAPPING</span><button id="midiClose" class="close-btn">✕</button></div>
+    <div class="midi-head"><span>MIDI MAPPING</span><button id="midiClose" class="close-btn"></button></div>
     <div class="midi-sub"><span id="midiDevices"></span><span>LAST: <b id="midiLast">—</b></span></div>
     <div id="midiRows"></div>
     <div class="midi-sub dim">Press LEARN, then move a knob or hit a pad on your controller.</div>
@@ -1804,13 +1851,13 @@
 
   <!-- Tab Navigation -->
   <div class="tab-navigation">
-    <button class="tab-button active" data-tab="layers">🎛️ LAYERS</button>
-    <button class="tab-button" data-tab="patterns">🎨 PATTERNS</button>
-    <button class="tab-button" data-tab="music">🎵 MUSIC</button>
-    <button class="tab-button" data-tab="videos">🎬 VIDEOS</button>
-    <button class="tab-button" data-tab="images">🖼️ IMAGES</button>
-    <button class="tab-button" data-tab="composer">🎭 COMPOSER</button>
-    <button class="tab-button vexvoid-tab" data-tab="vexvoid">⚡ VEXVOID</button>
+    <button class="tab-button active" data-tab="layers">LAYERS</button>
+    <button class="tab-button" data-tab="patterns">PATTERNS</button>
+    <button class="tab-button" data-tab="music">MUSIC</button>
+    <button class="tab-button" data-tab="videos">VIDEOS</button>
+    <button class="tab-button" data-tab="images">IMAGES</button>
+    <button class="tab-button" data-tab="composer">COMPOSER</button>
+    <button class="tab-button vexvoid-tab" data-tab="vexvoid">VEXVOID</button>
   </div>
   
       <div class="main-container">
@@ -1819,26 +1866,26 @@
       <!-- V3XV0ID Cloud Performance Section -->
       <div class="v3xv0id-performance-section" style="position: fixed; top: 70px; right: 15px; width: 300px; background: rgba(0, 0, 0, 0.95); border: 2px solid rgba(255, 255, 255, 0.3); padding: 15px; z-index: 998; display: none;">
         <div class="performance-header" style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.2);">
-          <h3 style="margin: 0; font-size: 14px; font-family: var(--font-sans); font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em; color: #ffffff; text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);">🎭 V3XV0ID CLOUD</h3>
+          <h3 style="margin: 0; font-size: 14px; font-family: var(--font-sans); font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em; color: #ffffff; text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);">V3XV0ID CLOUD</h3>
           <div style="font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 5px;">PERFORMANCE SYSTEM</div>
         </div>
         
         <div class="performance-status" style="margin-bottom: 15px; padding: 10px; background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 255, 255, 0.2);">
-          <div id="cloudStatus" style="font-size: 11px; font-family: var(--font-sans); color: #888; text-transform: uppercase;">🌐 CONNECTING...</div>
-          <div id="performanceStatus" style="font-size: 11px; font-family: var(--font-sans); color: #888; text-transform: uppercase; margin-top: 5px;">⏹️ READY</div>
+          <div id="cloudStatus" style="font-size: 11px; font-family: var(--font-sans); color: #888; text-transform: uppercase;">CONNECTING...</div>
+          <div id="performanceStatus" style="font-size: 11px; font-family: var(--font-sans); color: #888; text-transform: uppercase; margin-top: 5px;">READY</div>
         </div>
         
         <div class="performance-controls" style="display: flex; flex-direction: column; gap: 10px;">
           <button id="initCloudBtn" class="performance-btn" style="background: #ffffff; color: #000000; border: 1px solid #ffffff; padding: 10px; cursor: pointer; font-family: var(--font-sans); font-weight: bold; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s;">
-            🌐 CONNECT TO CLOUD
+            CONNECT TO CLOUD
           </button>
           
           <button id="startPerformanceBtn" class="performance-btn" style="background: rgba(0, 0, 0, 0.8); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.3); padding: 10px; cursor: pointer; font-family: var(--font-sans); font-weight: bold; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s;" disabled>
-            🎭 START PERFORMANCE
+            START PERFORMANCE
           </button>
           
           <button id="stopPerformanceBtn" class="performance-btn" style="background: rgba(0, 0, 0, 0.8); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.3); padding: 10px; cursor: pointer; font-family: var(--font-sans); font-weight: bold; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s;" disabled>
-            🛑 STOP PERFORMANCE
+            STOP PERFORMANCE
           </button>
         </div>
         
@@ -1850,12 +1897,12 @@
           <div id="performanceTime" style="font-size: 10px; font-family: var(--font-sans); color: #888; text-transform: uppercase;">00:00 / 00:00</div>
         </div>
         
-        <button id="togglePerformancePanel" style="position: absolute; top: -15px; right: -15px; width: 30px; height: 30px; background: rgba(0, 0, 0, 0.95); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.3); cursor: pointer; font-family: var(--font-sans); font-size: 12px;">✕</button>
+        <button id="togglePerformancePanel" style="position: absolute; top: -15px; right: -15px; width: 30px; height: 30px; background: rgba(0, 0, 0, 0.95); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.3); cursor: pointer; font-family: var(--font-sans); font-size: 12px;"></button>
       </div>
       
       <!-- V3XV0ID Cloud Toggle Button -->
-      <button id="showPerformanceBtn" style="position: fixed; top: 80px; right: 15px; background: rgba(0, 0, 0, 0.95); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.3); padding: 8px 12px; cursor: pointer; font-family: var(--font-sans); font-weight: bold; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; z-index: 997; transition: all 0.2s;">
-        🎭 V3XV0ID
+      <button id="showPerformanceBtn" style="display:none !important; position: fixed; top: 80px; right: 15px; background: rgba(0, 0, 0, 0.95); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.3); padding: 8px 12px; cursor: pointer; font-family: var(--font-sans); font-weight: bold; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; z-index: 997; transition: all 0.2s;">
+        V3XV0ID
       </button>
 
       <!-- Left Column - Dual Layer Palettes -->
@@ -1863,7 +1910,7 @@
       <!-- Top Palette (A) -->
       <div class="palette-section">
         <div class="palette-header">
-          <h3>PALETTE A</h3>
+          <h3>DECK A</h3>
           <button class="add-layer-btn" id="addLayerABtn">+ ADD</button>
         </div>
         <div class="layers-list" id="layersListA">
@@ -1886,7 +1933,7 @@
       <!-- Bottom Palette (B) -->
       <div class="palette-section">
         <div class="palette-header">
-          <h3>PALETTE B</h3>
+          <h3>DECK B</h3>
           <button class="add-layer-btn" id="addLayerBBtn">+ ADD</button>
         </div>
         <div class="layers-list" id="layersListB">
@@ -2020,7 +2067,7 @@
             <span class="control-value" id="videoDurationDisplay">0:00</span>
           </div>
           <div style="display: flex; gap: 6px; margin-bottom: 12px;">
-            <button class="global-btn" id="videoPlayPauseBtn" style="flex:1; padding: 8px; margin: 0;">⏸ PAUSE</button>
+            <button class="global-btn" id="videoPlayPauseBtn" style="flex:1; padding: 8px; margin: 0;">PAUSE</button>
           </div>
           <div class="control-label">
             <span>Seek</span>
@@ -2041,7 +2088,7 @@
       </div>
 
       <div class="global-controls">
-        <button class="global-btn resume" id="playPauseBtn">⏸ PAUSE ALL</button>
+        <button class="global-btn resume" id="playPauseBtn">PAUSE ALL</button>
         <button class="global-btn" id="setBackgroundBtn">SET BACKGROUND</button>
         <button class="global-btn" id="recordBtn" style="border-color: var(--white-30);">● REC</button>
         <div id="recordStatus" style="font-size:9px;color:var(--white-30);text-align:center;margin-top:2px;letter-spacing:0.1em;display:none;"></div>
@@ -2055,7 +2102,7 @@
       </div>
       <div class="preview-screen" id="previewScreen">
         <div class="preview-row" id="preview2">
-          <div class="preview-row-label">PALETTE A</div>
+          <div class="preview-row-label">DECK A</div>
           <div class="preview-placeholder">NO CONTENT</div>
         </div>
         <div class="preview-row output-preview" id="outputPreview">
@@ -2063,7 +2110,7 @@
           <div class="preview-placeholder">NO OUTPUT CONTENT</div>
         </div>
         <div class="preview-row" id="preview3">
-          <div class="preview-row-label">PALETTE B</div>
+          <div class="preview-row-label">DECK B</div>
           <div class="preview-placeholder">NO CONTENT</div>
         </div>
       </div>
@@ -2134,11 +2181,11 @@
       <div class="music-player-container">
         <!-- Music Player Header -->
         <div class="music-player-header">
-          <h2 class="cyber-text">🎵 MUSIC PLAYER</h2>
-          <div class="cloud-status" id="musicCloudStatus">🌐 CONNECTING...</div>
+          <h2 class="cyber-text">MUSIC PLAYER</h2>
+          <div class="cloud-status" id="musicCloudStatus">CONNECTING...</div>
           <div class="music-controls">
-            <button id="loadLocalMusicBtn" class="browser-btn">📁 LOAD LOCAL</button>
-            <button id="refreshMusicBtn" class="browser-btn">🔄 REFRESH</button>
+            <button id="loadLocalMusicBtn" class="browser-btn">LOAD LOCAL</button>
+            <button id="refreshMusicBtn" class="browser-btn">REFRESH</button>
             <input type="text" id="musicSearch" class="search-input" placeholder="SEARCH MUSIC...">
           </div>
         </div>
@@ -2154,7 +2201,7 @@
         <div class="audio-player">
           <div class="player-info">
             <div class="track-artwork">
-              <div class="artwork-placeholder">🎵</div>
+              <div class="artwork-placeholder"></div>
             </div>
             <div class="track-details">
               <div class="track-title" id="currentTrackTitle">NO TRACK</div>
@@ -2164,11 +2211,11 @@
           </div>
 
           <div class="player-controls">
-            <button id="prevTrackBtn" class="player-btn">⏮️</button>
-            <button id="playPauseTrackBtn" class="player-btn play-pause">▶️</button>
-            <button id="nextTrackBtn" class="player-btn">⏭️</button>
-            <button id="shuffleBtn" class="player-btn toggle">🔀</button>
-            <button id="repeatBtn" class="player-btn toggle">🔁</button>
+            <button id="prevTrackBtn" class="player-btn">PREV</button>
+            <button id="playPauseTrackBtn" class="player-btn play-pause">PLAY</button>
+            <button id="nextTrackBtn" class="player-btn">NEXT</button>
+            <button id="shuffleBtn" class="player-btn toggle">SHUFFLE</button>
+            <button id="repeatBtn" class="player-btn toggle">REPEAT</button>
           </div>
 
           <div class="player-progress">
@@ -2178,7 +2225,7 @@
           </div>
 
           <div class="player-volume">
-            <span>🔊</span>
+            <span></span>
             <input type="range" id="volumeSlider" class="volume-slider" min="0" max="100" value="50">
             <span id="volumeValue">50%</span>
           </div>
@@ -2200,11 +2247,11 @@
       <div class="video-browser-container">
         <!-- Video Browser Header -->
         <div class="video-browser-header">
-          <h2 class="cyber-text">🎬 VIDEO BROWSER</h2>
-          <div class="cloud-status" id="videoCloudStatus">🌐 CONNECTING...</div>
+          <h2 class="cyber-text">VIDEO BROWSER</h2>
+          <div class="cloud-status" id="videoCloudStatus">CONNECTING...</div>
           <div class="video-browser-controls">
-            <button id="loadLocalVideosBtn" class="browser-btn">📁 LOAD LOCAL</button>
-            <button id="refreshVideosBtn" class="browser-btn">🔄 REFRESH</button>
+            <button id="loadLocalVideosBtn" class="browser-btn">LOAD LOCAL</button>
+            <button id="refreshVideosBtn" class="browser-btn">REFRESH</button>
             <input type="text" id="videoSearch" class="search-input" placeholder="SEARCH VIDEOS...">
           </div>
         </div>
@@ -2220,7 +2267,7 @@
         <div class="video-preview-panel" id="videoPreviewPanel" style="display: none;">
           <div class="video-preview-header">
             <h3 id="videoPreviewTitle">VIDEO PREVIEW</h3>
-            <button id="closeVideoPreview" class="close-btn">✕</button>
+            <button id="closeVideoPreview" class="close-btn"></button>
           </div>
           <div class="video-preview-content">
             <video id="videoPreviewPlayer" controls muted loop>
@@ -2229,8 +2276,8 @@
             <div class="video-preview-info">
               <div id="videoPreviewDetails"></div>
               <div class="video-preview-actions">
-                <button id="loadToLayerBtn" class="action-btn">📥 LOAD TO LAYER</button>
-                <button id="loadToBackgroundBtn" class="action-btn">🖼️ SET AS BACKGROUND</button>
+                <button id="loadToLayerBtn" class="action-btn">LOAD TO LAYER</button>
+                <button id="loadToBackgroundBtn" class="action-btn">SET AS BACKGROUND</button>
               </div>
             </div>
           </div>
@@ -2262,11 +2309,11 @@
       <div class="image-browser-container">
         <!-- Image Browser Header -->
         <div class="image-browser-header">
-          <h2 class="cyber-text">🖼️ IMAGE BROWSER</h2>
-          <div class="cloud-status" id="imageCloudStatus">🌐 CONNECTING...</div>
+          <h2 class="cyber-text">IMAGE BROWSER</h2>
+          <div class="cloud-status" id="imageCloudStatus">CONNECTING...</div>
           <div class="image-browser-controls">
-            <button id="loadLocalImagesBtn" class="browser-btn">📁 LOAD LOCAL</button>
-            <button id="refreshImagesBtn" class="browser-btn">🔄 REFRESH</button>
+            <button id="loadLocalImagesBtn" class="browser-btn">LOAD LOCAL</button>
+            <button id="refreshImagesBtn" class="browser-btn">REFRESH</button>
             <input type="text" id="imageSearch" class="search-input" placeholder="SEARCH IMAGES...">
           </div>
         </div>
@@ -2282,15 +2329,15 @@
         <div class="image-preview-panel" id="imagePreviewPanel" style="display: none;">
           <div class="image-preview-header">
             <h3 id="imagePreviewTitle">IMAGE PREVIEW</h3>
-            <button id="closeImagePreview" class="close-btn">✕</button>
+            <button id="closeImagePreview" class="close-btn"></button>
           </div>
           <div class="image-preview-content">
             <img id="imagePreviewImg" src="" alt="Preview">
             <div class="image-preview-info">
               <div id="imagePreviewDetails"></div>
               <div class="image-preview-actions">
-                <button id="loadImageToLayerBtn" class="action-btn">📥 LOAD TO LAYER</button>
-                <button id="loadImageToBackgroundBtn" class="action-btn">🖼️ SET AS BACKGROUND</button>
+                <button id="loadImageToLayerBtn" class="action-btn">LOAD TO LAYER</button>
+                <button id="loadImageToBackgroundBtn" class="action-btn">SET AS BACKGROUND</button>
               </div>
             </div>
           </div>
@@ -2366,8 +2413,8 @@
         <!-- VEXVOID Controls -->
         <div class="vexvoid-controls">
                      <div class="vexvoid-control-group">
-             <button id="vexvoidStart" class="vexvoid-btn primary">⚡ START</button>
-             <button id="vexvoidStop" class="vexvoid-btn">⏹ STOP</button>
+             <button id="vexvoidStart" class="vexvoid-btn primary">START</button>
+             <button id="vexvoidStop" class="vexvoid-btn">STOP</button>
              <button id="vexvoidReset" class="vexvoid-btn">↻ RESET</button>
            </div>
 
@@ -2577,11 +2624,11 @@
               ${layer.name}${badge}
             </div>
             <div class="layer-buttons">
-              <button class="layer-btn ${layer.visible ? 'active' : ''}" onclick="toggleVisibility(${layer.id})" title="Toggle Visibility">👁</button>
-              <button class="layer-btn" onclick="loadImages(${layer.id})" title="Load Images">📁</button>
-              <button class="layer-btn" onclick="duplicateLayer(${layer.id})" title="Duplicate">⧉</button>
-              <button class="layer-btn" onclick="removeLayer(${layer.id})" title="Delete">✕</button>
-              <button class="inverse-btn ${layer.inverse ? 'active' : ''}" onclick="toggleInverse(${layer.id})" title="Inverse Colors">⚫⚪</button>
+              <button class="layer-btn ${layer.visible ? 'active' : ''}" onclick="toggleVisibility(${layer.id})" title="Show / hide on the output">${layer.visible ? 'ON' : 'OFF'}</button>
+              <button class="layer-btn" onclick="loadImages(${layer.id})" title="Load images or video">LOAD</button>
+              <button class="layer-btn" onclick="duplicateLayer(${layer.id})" title="Duplicate">DUP</button>
+              <button class="layer-btn" onclick="removeLayer(${layer.id})" title="Remove">DEL</button>
+              <button class="inverse-btn ${layer.inverse ? 'active' : ''}" onclick="toggleInverse(${layer.id})" title="Invert">INV</button>
             </div>
           `;
           
@@ -4299,8 +4346,8 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         });
         currentAudio.addEventListener('loadedmetadata', () => { musicEl('totalTime').textContent = mmss(currentAudio.duration); });
         currentAudio.addEventListener('ended', () => (musicRepeat ? playTrack(currentTrackIndex) : nextTrack()));
-        currentAudio.addEventListener('play', () => { musicEl('playPauseTrackBtn').textContent = '⏸️'; musicEl('playerStatus').textContent = 'PLAYING'; });
-        currentAudio.addEventListener('pause', () => { musicEl('playPauseTrackBtn').textContent = '▶️'; musicEl('playerStatus').textContent = 'PAUSED'; });
+        currentAudio.addEventListener('play', () => { musicEl('playPauseTrackBtn').textContent = 'PAUSE'; musicEl('playerStatus').textContent = 'PLAYING'; });
+        currentAudio.addEventListener('pause', () => { musicEl('playPauseTrackBtn').textContent = 'PLAY'; musicEl('playerStatus').textContent = 'PAUSED'; });
         currentAudio.addEventListener('waiting', () => { musicEl('playerStatus').textContent = 'BUFFERING'; });
         currentAudio.addEventListener('playing', () => { musicEl('playerStatus').textContent = 'PLAYING'; });
         currentAudio.addEventListener('error', () => { musicEl('playerStatus').textContent = 'COULD NOT LOAD TRACK'; });
@@ -4545,6 +4592,26 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       setInterval(pushApiState, 250);
 
       VXWALLET.init();
+
+      // OUTPUT monitor shows the real output (all layers, decks, blend and the VX engine), ~10 fps while visible
+      (function liveOutputMonitor() {
+        // its own grid item over the OUTPUT cell: the preview updater rewrites #outputPreview's contents
+        const box = document.getElementById('outputPreview');
+        const img = document.createElement('img');
+        img.id = 'outputLive'; img.alt = '';
+        document.getElementById('previewScreen').appendChild(img);
+        let busy = false;
+        setInterval(async () => {
+          if (busy || document.hidden || !document.getElementById('layersTab').classList.contains('active')) return;
+          busy = true;
+          try {
+            const w = Math.round(box.clientWidth * (window.devicePixelRatio || 1));
+            const b64 = await ipcRenderer.invoke('output-frame', w);
+            if (b64) { img.src = 'data:image/jpeg;base64,' + b64; img.style.display = 'block'; }
+          } catch (e) {}
+          busy = false;
+        }, 100);
+      })();
 
       // ===== CLAUDE.AI: link this mixer to the relay so claude.ai (web, phone) can play it =====
       async function claudeStatus() {

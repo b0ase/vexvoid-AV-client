@@ -89,6 +89,14 @@ function createControlWindow() {
   });
 }
 
+// Live monitor for the controls window: a small JPEG of the real output (no screen-recording permission needed)
+ipcMain.handle('output-frame', async (event, width) => {
+  if (!outputWindow || outputWindow.isDestroyed()) return null;
+  const img = await outputWindow.webContents.capturePage();
+  if (img.isEmpty()) return null;
+  return img.resize({ width: Math.max(160, Math.min(1280, width || 854)) }).toJPEG(72).toString('base64');
+});
+
 // IPC Communication between windows
 ipcMain.on('control-to-output', (event, message) => {
   if (outputWindow && outputWindow.webContents) {
