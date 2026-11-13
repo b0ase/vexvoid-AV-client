@@ -4925,7 +4925,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         box.querySelector('.key').addEventListener('click', () => { navigator.clipboard.writeText(key); box.querySelector('.key').textContent = 'IDENTITY KEY COPIED'; });
         box.querySelector('.via').textContent = via;
         wbEl('wbOpenWallet').addEventListener('click', () => require('electron').shell.openExternal('https://web.bwalletx.com'));
-        if (earnedSats) usdRate().then(r => { const e = wbEl('wbEarned'); if (e) const usd = r ? earnedSats / 1e8 * r : null; e.textContent = usd == null ? (earnedSats / 1e8).toFixed(6) + ' BSV' : '$' + usd.toFixed(usd >= 0.01 ? 2 : 4); });
+        if (earnedSats) usdRate().then(r => { const e = wbEl('wbEarned'); if (!e) return; const usd = r ? earnedSats / 1e8 * r : null; e.textContent = usd == null ? (earnedSats / 1e8).toFixed(6) + ' BSV' : '$' + usd.toFixed(usd >= 0.01 ? 2 : 4); });
         const feed = wbEl('wbFeed');
         feed.innerHTML = acts.length ? '' : '<div style="cursor:default"><span></span><span></span><i>No mixer activity in this wallet yet.</i><span></span></div>';
         acts.slice(0, 30).forEach(a => {
