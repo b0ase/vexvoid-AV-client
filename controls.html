@@ -2414,9 +2414,11 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
         crossfaderValue = parseInt(crossfader.value);
         
         // Apply crossfader logic to output window
-        // 0 = full A, 100 = full B, 50 = mix
-        const aOpacity = crossfaderValue <= 50 ? 1 : (100 - crossfaderValue) / 50;
-        const bOpacity = crossfaderValue >= 50 ? 1 : crossfaderValue / 50;
+        // 0 = full A, 100 = full B, 50 = an even mix. Deck B always sits on top of deck A in the output,
+        // so B fades in across the whole travel over a full A; A only drops out over the last 10%,
+        // where anything see-through in B would otherwise still show A.
+        const bOpacity = crossfaderValue / 100;
+        const aOpacity = crossfaderValue < 90 ? 1 : (100 - crossfaderValue) / 10;
         
         // Send crossfader values to output window
         sendToOutput('crossfader-update', { 

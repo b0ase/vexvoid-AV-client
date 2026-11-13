@@ -512,9 +512,11 @@
       }
 
       function applyCrossfaderOpacities() {
-        layers.forEach(layer => {
+        layers.forEach((layer, index) => {
           if (!layer.element) return;
           const isALayer = (layer.palette || 'A') === 'A';
+          // Deck B stacks above deck A (the crossfade relies on it); layer order holds within each deck
+          layer.element.style.zIndex = (isALayer ? 100 : 300) + index;
           const targetOpacity = isALayer ? currentCrossfader.aOpacity : currentCrossfader.bOpacity;
           const finalOpacity = (layer.opacity / 100) * targetOpacity;
           layer.element.style.opacity = finalOpacity;
@@ -1935,13 +1937,8 @@
         // Update the layers array
         layers = newLayers;
         
-        // Update z-index of layer elements based on new order
-        layers.forEach((layer, index) => {
-          if (layer.element) {
-            // Higher index = higher z-index (layers on top)
-            layer.element.style.zIndex = 100 + index;
-          }
-        });
+        // Restack: later layers on top within each deck, deck B above deck A
+        applyCrossfaderOpacities();
         
         // Send updated layer data back to control window
         sendLayersUpdate();
