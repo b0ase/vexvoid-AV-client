@@ -6,7 +6,7 @@ const path = require('path');
 const { app, ipcMain } = require('electron');
 const { REMOTE_COMMANDS } = require('./mcp/tools');
 
-const RELAY = (process.env.VX_RELAY_URL || 'https://mixer.bwalletx.com').replace(/\/$/, '');
+const RELAY = (process.env.VX_RELAY_URL || 'https://mixer.vexvoid.com').replace(/\/$/, '');
 
 function start({ run, getOutputWindow }) {
   const file = path.join(app.getPath('userData'), 'relay.json');

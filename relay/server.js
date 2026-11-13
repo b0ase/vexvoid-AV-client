@@ -14,7 +14,7 @@
 //          registration at /register, /authorize (the performer types the code their mixer shows), /token (PKCE).
 //
 // No dependencies. State lives in DATA_DIR/state.json; secrets and tokens are stored only as SHA-256 hashes.
-//   PUBLIC_URL=https://mixer.bwalletx.com PORT=8787 DATA_DIR=./data node relay/server.js
+//   PUBLIC_URL=https://mixer.vexvoid.com PORT=8787 DATA_DIR=./data node relay/server.js
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
