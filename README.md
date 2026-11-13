@@ -1,8 +1,48 @@
-# V3XV0ID AV Client 3.0
+# V3XV0ID AV Client 3.1
 
 Site and downloads: https://b0ase.github.io/vexvoid-AV-client/
 
-## 3.0: the VX engine
+## 3.1: generative sketches, real libraries, remote control
+
+**PATTERNS → VX GEN.** Generative p5.js sketches you can play live (`vx/vx-gen.js`, p5 1.11.3 vendored in `vx/lib`).
+Fifteen monochrome sketches ship in `vx/gen-library.js` (V3X TRACE, FLOW FIELD, RIDGES, GLYPH GRID, WIRE TUNNEL, TERRAIN, ORBIT HUD, ATTRACTOR, SCAN BARS, DATA RAIN, MOIRE, HARMONOGRAPH, AUTOMATA, PULSE RINGS, WIRE GLOBE); each holds ~70 fps on the output.
+Every sketch reads a live `vx` object: `vx.t`, `vx.beat`, `vx.bar`, `vx.bpm`, `vx.level`/`bass`/`mid`/`high`, `vx.kick`, `vx.pulse`, `vx.seed` and four knobs `vx.a`-`vx.d`.
+Edit code live (Cmd+Enter runs it and updates the output), MUTATE for a new seed, EVOLVE to drift every 4 bars, TAP the tempo, listen to the Music tab or the line in.
+SEND TO OUTPUT puts the sketch on deck A or B as a layer (crossfader, opacity and blend apply; BLEND: SCREEN lays the lines over footage).
+PROMPT → SKETCH has Claude write a new sketch from a sentence (needs an Anthropic key).
+
+**MUSIC / VIDEOS / IMAGES** now use the real catalogue (`vx/catalogue.json`, rebuilt by `pnpm sync-catalogue` from vexvoid.com's data): 70 tracks, 36 clips, 81 images, all public URLs. Media is cached to disk before it goes to the output, so a set keeps running offline. Playing a track makes the sketches follow it.
+
+**GROK IMAGINE** (Images tab): text→image, text→video and image→video through the xAI API, with the VexVoid look lines and the no-faces rule added to the prompt. Results land at the top of the Images/Videos grids; the real cost of each run is shown. Billed to your xAI key, so it is not exposed to the API, CLI or MCP.
+
+**COMPOSER → set composer.** A set is a list of mixer commands on bars. PLAY runs it against the tempo or the playing track; `fade` steps take `over=BARS`; REC captures what you do from the UI, MIDI, the CLI and MCP; SAVE/LOAD as JSON; WRITE SET has Claude write one from a description.
+
+**MIDI.** Click the MIDI chip in the header, press LEARN on a target, move a knob or hit a pad. Continuous targets: crossfader, knobs A-D, BPM, VX chaos, VX void chance. Pads: cut A/B, cue next/prev sketch, mutate, evolve, tap, VX next/clean/blackout, music play/pause/next.
+
+**Local API.** While the app runs it listens on `http://127.0.0.1:4747` (`VX_API_PORT` to change). The token is in `~/.v3xv0id/api.json` (written 0600 at start); requests from web pages are refused.
+`POST /api/cmd {"cmd": "...", "args": {...}}`, `GET /api/state`, `GET /api/events` (server-sent events), `GET /api/help`, `GET /api/snapshot?width=960` (JPEG of the output).
+
+**CLI.**
+
+```bash
+pnpm mix help                      # every command
+pnpm mix sketch "flow field" deck=b blend=screen
+pnpm mix cue                       # next sketch onto the deck nobody is watching
+pnpm mix fade 50                   # crossfader
+pnpm mix load clip="jam 05" deck=a
+pnpm mix play "four ton"
+pnpm mix watch                     # follow the mixer live
+```
+
+**MCP.** `bin/vexvoid-mcp.js` is a dependency-free stdio MCP server (15 tools, including `mixer_snapshot` so an assistant can see the output):
+
+```bash
+claude mcp add vexvoid -- node /path/to/vexvoid-AV-client-vx/bin/vexvoid-mcp.js
+```
+
+**Keys** (only for the paid features): `ANTHROPIC_API_KEY` and `XAI_API_KEY` in the environment, or paste them into the app when it asks; they are saved in the app's own settings file on this computer (`vx-settings.json` in the app's data folder), never in the repo.
+
+## 3.0: the VX engine (still underneath everything)
 
 The output window now runs a layered generative engine (`vx/vx-engine.js`) underneath your own image/video layers:
 
