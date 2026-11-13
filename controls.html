@@ -4862,7 +4862,9 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           .catch(e => { walletScan = null; status.textContent = 'COULD NOT READ: ' + String(e.message || e).slice(0, 60); renderWalletTab(); document.getElementById('wbStatus').textContent = status.textContent; });
         return walletScan;
       }
-      document.addEventListener('bwalletx:connected', () => scanWalletLibrary());
+      // a click (or REFRESH) reads the wallet; the quiet reconnect at start-up shows what was read last time without
+      // asking the phone, which may not be open
+      document.addEventListener('bwalletx:connected', e => (e.detail && e.detail.quiet) ? refreshWalletMedia() : scanWalletLibrary());
       document.addEventListener('bwalletx:disconnected', () => { if (midiPlayback) { midiPlayback.stop(); midiPlayback = null; } refreshWalletMedia(); });
       document.getElementById('walletLibRefresh').addEventListener('click', () => scanWalletLibrary());
       renderWalletLib();

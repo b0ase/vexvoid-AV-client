@@ -36,32 +36,48 @@
     } catch (e) {}
   }
 
-  // interactive: the performer clicked (QR if nothing local answers). Otherwise only a remembered pairing or a
-  // local wallet is tried, quietly, so a reload reconnects without a prompt.
+  // A saved phone pairing is only a claim that the phone is still there: the connector waits up to 2 minutes for an
+  // answer, and a closed bWalletX never answers. So on start-up the stored identity key is shown without asking the
+  // phone (it is asked when something needs it), and a click gives a saved pairing PHONE_MS to answer before showing a
+  // fresh QR instead.
+  var PHONE_MS = 15000;
+  function within(p, ms, msg) { return Promise.race([p, new Promise(function (_, rej) { setTimeout(function () { rej(new Error(msg)); }, ms); })]); }
+
+  // interactive: the performer clicked (QR if nothing answers). Otherwise only a local wallet or a remembered pairing
+  // is picked up, quietly and without a prompt, so a reload reconnects.
   async function connect(interactive) {
     if (!C) throw new Error('bWalletX connector is missing');
     if (st.key && st.wallet) return st.key;
     var modal = null;
     st.busy = !!interactive; st.label = 'OPENING YOUR WALLET…'; draw();
-    var onStatus = function (s) { st.label = s === 'pairing' ? 'SCAN THE QR WITH bWALLETX…' : s === 'finding' ? 'OPENING YOUR WALLET…' : 'APPROVE IN bWALLETX…'; draw(); };
+    var onStatus = function (s) { st.label = s === 'pairing' ? 'SCAN THE QR WITH bWALLETX…' : s === 'finding' ? 'OPENING YOUR WALLET…' : s === 'phone' ? 'OPEN bWALLETX ON YOUR PHONE…' : 'APPROVE IN bWALLETX…'; draw(); };
     try {
-      var wallet = null;
+      var wallet = null, key = null;
       var local = await C.discoverWallets({ probeLocal: true, ms: 300 }).catch(function () { return []; });
       var found = (local || []).find(function (o) { return o && o.kind !== 'pairing' && o.wallet; });
       if (found) wallet = found.wallet;
       if (!wallet) {
-        var pairing = { origin: ORIGIN };
-        if (interactive) { modal = C.pairingModal({ title: 'Connect bWalletX to V3XV0ID' }); pairing = Object.assign(modal, { origin: ORIGIN }); }
-        var restored = await C.restorePairing(pairing).catch(function () { return null; });
-        if (restored) wallet = restored;
-        else if (interactive) { onStatus('pairing'); wallet = await C.pairBwalletX(pairing); }
-        else return null;
+        var restored = await C.restorePairing({ origin: ORIGIN }).catch(function () { return null; });
+        if (restored && !interactive) {
+          if (!get()) return null; // a pairing but no remembered identity: wait for a click
+          wallet = restored; key = get();
+        } else if (restored) {
+          onStatus('phone');
+          try { key = (await within(restored.getPublicKey({ identityKey: true }), PHONE_MS, 'phone did not answer')).publicKey; wallet = restored; }
+          catch (e) { try { await C.clearPairing({ origin: ORIGIN }); } catch (e2) {} } // stale: pair again below
+        }
+        if (!wallet) {
+          if (!interactive) return null;
+          modal = C.pairingModal({ title: 'Connect bWalletX to V3XV0ID' });
+          onStatus('pairing');
+          wallet = await C.pairBwalletX(Object.assign(modal, { origin: ORIGIN }));
+        }
       }
-      onStatus('opening');
-      var pk = await wallet.getPublicKey({ identityKey: true });
-      st.wallet = wallet; st.key = pk.publicKey; st.handle = null; set(st.key);
+      if (!key) { onStatus('opening'); key = (await wallet.getPublicKey({ identityKey: true })).publicKey; }
+      var quiet = !interactive;
+      st.wallet = wallet; st.key = key; st.handle = null; set(st.key);
       lookup(st.key);
-      document.dispatchEvent(new CustomEvent('bwalletx:connected', { detail: { identityKey: st.key } }));
+      document.dispatchEvent(new CustomEvent('bwalletx:connected', { detail: { identityKey: st.key, quiet: quiet } }));
       return st.key;
     } catch (e) {
       if (interactive && !(e && e.name === 'AbortError')) throw e;
