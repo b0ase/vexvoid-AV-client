@@ -1708,6 +1708,9 @@
     .claude-code{display:flex;gap:10px;align-items:center;margin-top:6px}
     .claude-code span{font-size:30px;letter-spacing:.35em;color:#fff;border:1px solid #555;padding:6px 12px;min-width:220px;text-align:center}
 
+    .minted-list{max-height:220px;overflow:auto;font-size:10px;border:1px solid #1c1c1c}
+    .minted-row{display:grid;grid-template-columns:52px 1fr auto auto;gap:6px;align-items:center;padding:5px 6px;border-bottom:1px solid #141414}
+    .minted-row code{color:#888;text-transform:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     /* Set composer */
     .set-grid{flex:1;display:grid;grid-template-columns:1fr 380px;gap:10px;min-height:0}
     .set-lane{position:relative;height:46px;border:1px solid #333;background:repeating-linear-gradient(90deg,#111 0 1px,transparent 1px 100%);overflow:hidden}
@@ -2135,6 +2138,8 @@
             <span class="gen-sep"></span>
             <button id="exportPatternBtn" class="gen-btn">EXPORT</button>
             <button id="importPatternBtn" class="gen-btn">IMPORT</button>
+            <span class="gen-sep"></span>
+            <button id="genMintBtn" class="gen-btn hot" title="Inscribe this sketch (code, seed, knobs) on BSV with bWalletX">MINT</button>
           </div>
         </div>
 
@@ -2361,6 +2366,8 @@
             <button id="setClearBtn" class="gen-btn">CLEAR</button>
             <button id="saveSequenceBtn" class="gen-btn">SAVE</button>
             <button id="setLoadBtn" class="gen-btn">LOAD</button>
+            <span class="gen-sep"></span>
+            <button id="setMintBtn" class="gen-btn hot" title="Inscribe this set on BSV with bWalletX so anyone can replay it">MINT SET</button>
           </div>
         </div>
         <div class="gen-row">
@@ -2386,6 +2393,8 @@
             <textarea id="aiPrompt" class="gen-prompt" rows="6" placeholder="e.g. 64 bars for Four Ton Shadow: start sparse on RIDGES, build with FLOW FIELD on B by bar 16, cut on the drop at 33 to WIRE TUNNEL, slow fade out over the last 8"></textarea>
             <div class="gen-row"><label class="dim" style="font-size:10px;letter-spacing:.2em">BARS</label><input id="setBars" class="gen-select" type="number" min="4" max="512" value="64" style="width:80px"><button id="generateSequenceBtn" class="gen-btn wide" style="flex:1">WRITE SET</button></div>
             <div id="setNote" class="gen-note"></div>
+            <div class="gen-h">MINTED <span class="dim">ON CHAIN</span></div>
+            <div id="mintedList" class="minted-list"></div>
             <div class="gen-h">HOW IT WORKS</div>
             <div class="gen-note">A set is a list of mixer commands on bars (4 beats each). PLAY runs it against the tempo, or against the playing track's position with SYNC: MUSIC TRACK. fade steps take over=BARS for a smooth move. REC captures what you do from the UI, MIDI, the CLI and MCP.</div>
           </div>
@@ -4660,6 +4669,46 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       claudeStatus();
       setInterval(claudeStatus, 8000);
 
+
+      // ===== MINT: sketches (PATTERNS) and sets (COMPOSER) as 1Sat inscriptions through bWalletX =====
+      async function mintWallet(statusFn) {
+        if (VXWALLET.wallet()) return VXWALLET.wallet();
+        statusFn('CONNECT bWALLETX…');
+        await VXWALLET.connect();
+        if (!VXWALLET.wallet()) throw new Error('bWalletX not connected');
+        return VXWALLET.wallet();
+      }
+      function renderMinted() {
+        const box = document.getElementById('mintedList'); if (!box) return;
+        const list = VXMINT.minted();
+        box.innerHTML = list.length ? '' : '<div class="dim" style="padding:6px">Nothing minted yet.</div>';
+        list.forEach(m => {
+          const row = document.createElement('div'); row.className = 'minted-row';
+          row.innerHTML = `<span>${m.kind.toUpperCase()}</span><span></span><button class="gen-btn" title="Copy the inscription id">COPY</button><button class="gen-btn">OPEN</button>`;
+          row.children[1].innerHTML = '<b></b><br><code></code>';
+          row.children[1].querySelector('b').textContent = m.name;
+          row.children[1].querySelector('code').textContent = m.origin;
+          row.children[2].addEventListener('click', () => navigator.clipboard.writeText(m.origin));
+          row.children[3].addEventListener('click', () => { document.getElementById('chainOrigin').value = m.origin; document.getElementById('chainOpenBtn').click(); });
+          box.appendChild(row);
+        });
+      }
+      document.getElementById('genMintBtn').addEventListener('click', async () => {
+        const btn = document.getElementById('genMintBtn');
+        const err = VXGEN.check(patternCodeEditor.value);
+        if (err) { genStatus('CODE ERROR', true); genShowError(err); return; }
+        const doc = VXCHAIN.sketchDoc({ name: gen.name, code: patternCodeEditor.value, knobs: gen.knobs, params: gen.params, seed: gen.seed });
+        btn.disabled = true;
+        try {
+          const wallet = await mintWallet(t => genStatus(t));
+          genStatus(`APPROVE IN bWALLETX · ${VXCHAIN.bytes(doc)} BYTES`);
+          const rec = await VXMINT.mint(wallet, { kind: 'sketch', name: doc.name, contentType: VXCHAIN.TYPES.sketch, data: JSON.stringify(doc) });
+          genStatus('MINTED ' + rec.origin.slice(0, 10) + '…');
+          genEl('genAskNote').textContent = `Minted on BSV: ${rec.origin} (COMPOSER → MINTED lists it; anyone can open it from the chain).`;
+          renderMinted();
+        } catch (e) { genStatus(/cancel|denied|reject/i.test(e.message) ? 'MINT CANCELLED' : 'MINT FAILED', true); genShowError(e.message); }
+        finally { btn.disabled = false; }
+      });
       // ===== MIDI: any controller; LEARN binds a knob/fader/pad to a target. Mappings live in vx-settings.json. =====
       const MIDI_TARGETS = [
         { id: 'fader', rec: v => ['fade', { value: Math.round(v * 100) }],  label: 'CROSSFADER', kind: 'range', run: v => VXCMD.fade.run({ value: v * 100 }) },
@@ -4917,6 +4966,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         document.getElementById('vxClean').addEventListener('click', () => setRecord('vx-clean', {}));
         document.getElementById('vxBlackout').addEventListener('click', () => setRecord('blackout', {}));
         window.vxRecord = setRecord;
+        renderMinted();
         renderSet();
         set.timer = setInterval(setTick, 25);
       }
@@ -4953,6 +5003,22 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         } catch (e) { setEl('setNote').textContent = 'Args: ' + e.message; }
       });
       ['setAddArgs', 'setAddBar', 'aiPrompt', 'setBars'].forEach(id => setEl(id).addEventListener('keydown', e => e.stopPropagation()));
+      setEl('setMintBtn').addEventListener('click', async () => {
+        const btn = setEl('setMintBtn'), note = setEl('setNote');
+        if (!set.steps.length) { note.textContent = 'Nothing to mint: the set is empty.'; return; }
+        const doc = setAsDoc();
+        btn.disabled = true;
+        try {
+          const wallet = await mintWallet(t => { setEl('composerStatus').textContent = t; });
+          setEl('composerStatus').textContent = 'APPROVE IN bWALLETX';
+          note.textContent = `Minting "${doc.title}": ${doc.steps.length} steps, ${Object.keys(doc.assets).length} assets, ${VXCHAIN.bytes(doc)} bytes.`;
+          const rec = await VXMINT.mint(wallet, { kind: 'set', name: doc.title, contentType: VXCHAIN.TYPES.set, data: JSON.stringify(doc) });
+          setEl('composerStatus').textContent = 'SET MINTED';
+          note.textContent = `Minted on BSV: ${rec.origin}. Anyone with the mixer can OPEN FROM CHAIN and replay it.`;
+          renderMinted();
+        } catch (e) { setEl('composerStatus').textContent = 'MINT FAILED'; note.textContent = 'Mint failed: ' + e.message; }
+        finally { btn.disabled = false; }
+      });
       setEl('saveSequenceBtn').addEventListener('click', async () => {
         const res = await dialog.showSaveDialog({ defaultPath: 'v3xv0id-set.json', filters: [{ name: 'V3XV0ID set', extensions: ['json'] }] });
         if (res.canceled || !res.filePath) return;
@@ -5513,6 +5579,7 @@ Reply with only the JSON array in one \`\`\`json code block.`;
   <script src="./vx/chain.js"></script>
   <script src="./vx/lib/bwalletx-connect.global.js"></script>
   <script src="./vx/wallet.js"></script>
+  <script src="./vx/mint.js"></script>
   <script src="./vx/vx-keys.js"></script>
   <script>
     // ===== VX engine panel: mirrors the output window's engine state and forwards changes over IPC =====
