@@ -1676,6 +1676,27 @@
     .vx-foot { color: #9a9a98; font-size: 9px; letter-spacing: .08em; }
   
 
+    /* WALLET tab */
+    .wb{display:flex;flex-direction:column;gap:12px;width:100%;height:100%;min-height:0}
+    .wb-filters{display:flex;flex-wrap:wrap;gap:6px}
+    .wb-filters button{font:inherit;font-size:10px;letter-spacing:.2em;background:transparent;color:#9a9a98;border:1px solid rgba(255,255,255,.25);padding:6px 10px;cursor:pointer}
+    .wb-filters button.on{background:#fff;color:#000;border-color:#fff}
+    .wb-body{flex:1;min-height:0;display:grid;grid-template-columns:1fr 360px;gap:12px}
+    .wb-lib{overflow-y:auto;border:1px solid rgba(255,255,255,.2);padding:15px;background:rgba(0,0,0,.6);min-height:0}
+    .wb-detail{overflow-y:auto;border:1px solid rgba(255,255,255,.2);padding:14px;background:rgba(0,0,0,.6);min-height:0;display:flex;flex-direction:column;gap:10px;font-size:11px}
+    .wb-item.sel{border-color:#fff}
+    .wb-tile{width:100%;aspect-ratio:16/9;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:#0c0c0c;border:1px solid #1d1d1d;box-sizing:border-box;font-size:10px;letter-spacing:.25em;color:#bbb}
+    .wb-tile small{color:#666;letter-spacing:.12em;font-size:9px}
+    .wb-kind{font-size:8px;letter-spacing:.2em;color:#888;margin-top:4px}
+    .wb-detail h3{margin:0;font-family:'Michroma','IBM Plex Mono',sans-serif;font-weight:400;font-size:13px;letter-spacing:.12em;word-break:break-word}
+    .wb-detail .wb-prev{width:100%;aspect-ratio:16/9;background:#000;border:1px solid #222;object-fit:contain}
+    .wb-detail audio{width:100%}
+    .wb-meta{display:grid;grid-template-columns:90px 1fr;gap:4px 8px;color:#888}
+    .wb-meta b{font-weight:400;color:#ddd;word-break:break-all;text-transform:none}
+    .wb-acts{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+    .wb-acts .gen-btn{padding:9px 6px}
+    .wb-note{color:#888;line-height:1.5}
+    .wb-code{max-height:180px;overflow:auto;background:#050505;border:1px solid #1a1a1a;padding:8px;color:#9a9a98;font-size:10px;white-space:pre;text-transform:none}
     .media-thumb{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#111;filter:grayscale(1)}
     .video-item:hover .media-thumb,.image-item:hover .media-thumb{filter:none}
 
@@ -1881,6 +1902,7 @@
     <button class="tab-button" data-tab="videos">VIDEOS</button>
     <button class="tab-button" data-tab="images">IMAGES</button>
     <button class="tab-button" data-tab="composer">COMPOSER</button>
+    <button class="tab-button" data-tab="wallet">WALLET</button>
     <button class="tab-button vexvoid-tab" data-tab="vexvoid">VEXVOID</button>
   </div>
   
@@ -2429,6 +2451,25 @@
     </div>
 
     <!-- VEXVOID Tab Content -->
+    <!-- Wallet Tab: everything the connected bWalletX holds that the mixer can use -->
+    <div class="tab-content" id="walletTab">
+      <div class="wb">
+        <div class="video-browser-header">
+          <h2 class="cyber-text">YOUR WALLET</h2>
+          <div class="cloud-status" id="wbStatus">CONNECT bWALLETX</div>
+          <div class="video-browser-controls">
+            <button id="wbRefresh" class="browser-btn">REFRESH</button>
+            <input type="text" id="wbSearch" class="search-input" placeholder="SEARCH YOUR WALLET...">
+          </div>
+        </div>
+        <div class="wb-filters" id="wbFilters"></div>
+        <div class="wb-body">
+          <div class="wb-lib"><div class="video-grid" id="wbGrid"></div></div>
+          <div class="wb-detail" id="wbDetail"></div>
+        </div>
+      </div>
+    </div>
+
     <div class="tab-content" id="vexvoidTab">
       <div class="vexvoid-container">
                  <!-- VEXVOID Header -->
@@ -4773,6 +4814,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         initializeVideosTab(); initializeImagesTab();
         if (musicLibraryTracks.length) { mergeWalletTracks(); renderMusicLibrary(); }
         renderWalletLib();
+        if (typeof renderWalletTab === 'function') renderWalletTab();
       }
       function renderWalletLib() {
         const box = document.getElementById('walletLibList'), status = document.getElementById('walletLibStatus');
@@ -4814,15 +4856,97 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         if (!w || !key) { renderWalletLib(); return; }
         if (walletScan) return walletScan;
         status.textContent = 'READING YOUR WALLET…';
-        walletScan = VXLIB.scan(w, key, (done, total) => { status.textContent = `READING YOUR WALLET · ${done}/${total}`; })
+        renderWalletTab();
+        walletScan = VXLIB.scan(w, key, (done, total) => { status.textContent = `READING YOUR WALLET · ${done}/${total}`; const t = document.getElementById('wbStatus'); if (t) t.textContent = status.textContent; })
           .then(() => { walletScan = null; refreshWalletMedia(); })
-          .catch(e => { walletScan = null; status.textContent = 'COULD NOT READ: ' + String(e.message || e).slice(0, 60); });
+          .catch(e => { walletScan = null; status.textContent = 'COULD NOT READ: ' + String(e.message || e).slice(0, 60); renderWalletTab(); document.getElementById('wbStatus').textContent = status.textContent; });
         return walletScan;
       }
       document.addEventListener('bwalletx:connected', () => scanWalletLibrary());
       document.addEventListener('bwalletx:disconnected', () => { if (midiPlayback) { midiPlayback.stop(); midiPlayback = null; } refreshWalletMedia(); });
-      document.getElementById('walletLibRefresh').addEventListener('click', () => VXWALLET.wallet() ? scanWalletLibrary() : VXWALLET.connect().catch(() => {}));
+      document.getElementById('walletLibRefresh').addEventListener('click', () => scanWalletLibrary());
       renderWalletLib();
+
+      // ----- WALLET tab: browse everything the wallet holds, preview it, and put it to work -----
+      const WB_KINDS = [['all', 'ALL'], ['clip', 'CLIPS'], ['image', 'IMAGES'], ['audio', 'AUDIO'], ['set', 'SETS'], ['setlog', 'LIVE SETS'], ['sketch', 'SKETCHES'], ['midi', 'MIDI'], ['other', 'OTHER']];
+      const wb = { filter: 'all', sel: null };
+      const wbEl = id => document.getElementById(id);
+      const kb = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : n >= 1024 ? Math.round(n / 1024) + ' KB' : n + ' B';
+      function renderWalletTab() {
+        const grid = wbEl('wbGrid'); if (!grid) return;
+        const all = walletMedia(), q = (wbEl('wbSearch').value || '').toLowerCase();
+        wbEl('wbStatus').textContent = walletScan ? wbEl('walletLibStatus').textContent
+          : walletKey() ? `● ${VXWALLET.handle() || 'bWalletX'} · ${walletSummary()}` : 'CONNECT bWALLETX (TOP RIGHT) TO BROWSE YOUR WALLET';
+        wbEl('wbFilters').innerHTML = '';
+        WB_KINDS.forEach(([k, label]) => {
+          const n = k === 'all' ? all.length : all.filter(i => i.kind === k).length;
+          if (k !== 'all' && !n) return;
+          const b = document.createElement('button'); b.textContent = `${label} ${n}`; b.classList.toggle('on', wb.filter === k);
+          b.addEventListener('click', () => { wb.filter = k; renderWalletTab(); });
+          wbEl('wbFilters').appendChild(b);
+        });
+        if (wb.filter !== 'all' && !all.some(i => i.kind === wb.filter)) wb.filter = 'all';
+        const shown = all.filter(i => (wb.filter === 'all' || i.kind === wb.filter) && (i.name.toLowerCase().includes(q) || i.kind.includes(q) || i.origin.includes(q)));
+        grid.innerHTML = '';
+        if (!shown.length) grid.innerHTML = `<div class="wb-note" style="grid-column:1/-1;padding:8px">${!walletKey() ? 'Connect bWalletX with the button at the top right. Your clips, images, audio, sets, sketches and MIDI files show here.' : walletScan ? 'Reading your wallet…' : all.length ? 'Nothing matches.' : 'Nothing in this wallet yet. Things you mint in PATTERNS and COMPOSER, and inscriptions you receive, show here.'}</div>`;
+        shown.forEach(it => {
+          const card = document.createElement('div'); card.className = 'video-item wb-item'; card.classList.toggle('sel', wb.sel === it.origin);
+          let tile;
+          if (it.kind === 'clip') { tile = document.createElement('video'); tile.className = 'media-thumb'; tile.muted = true; tile.preload = 'metadata'; tile.playsInline = true; tile.src = it.url + '#t=1';
+            card.addEventListener('mouseenter', () => tile.play().catch(() => {})); card.addEventListener('mouseleave', () => tile.pause()); }
+          else if (it.kind === 'image') { tile = document.createElement('img'); tile.className = 'media-thumb'; tile.loading = 'lazy'; tile.src = it.url; }
+          else { tile = document.createElement('div'); tile.className = 'wb-tile'; tile.innerHTML = '<span></span><small></small>';
+            tile.firstChild.textContent = { audio: 'AUDIO', set: 'SET', setlog: 'LIVE SET', sketch: 'SKETCH', midi: 'MIDI' }[it.kind] || 'FILE';
+            tile.lastChild.textContent = (it.contentType.split('/')[1] || '').replace(/^vnd\.v3xv0id\./, '').replace(/\+json$/, '').toUpperCase() + (it.bytes ? ' · ' + kb(it.bytes) : ''); }
+          const name = document.createElement('div'); name.className = 'video-name'; name.textContent = it.name;
+          const kind = document.createElement('div'); kind.className = 'wb-kind'; kind.textContent = it.kind === 'setlog' ? 'LIVE SET' : it.kind.toUpperCase();
+          card.append(tile, name, kind);
+          card.addEventListener('click', () => { wb.sel = it.origin; renderWalletTab(); });
+          grid.appendChild(card);
+        });
+        renderWalletDetail(all.find(i => i.origin === wb.sel) || null);
+      }
+      function renderWalletDetail(it) {
+        const box = wbEl('wbDetail');
+        if (!it) { box.innerHTML = '<div class="wb-note">Pick something to preview it and put it to work: load clips and images onto a deck, play audio, open sets and sketches, run MIDI files through your MIDI LEARN mappings.</div>'; return; }
+        box.innerHTML = '';
+        const h = document.createElement('h3'); h.textContent = it.name; box.appendChild(h);
+        if (it.kind === 'clip') { const v = document.createElement('video'); v.className = 'wb-prev'; v.src = it.url; v.controls = true; v.muted = true; v.loop = true; v.autoplay = true; box.appendChild(v); }
+        else if (it.kind === 'image') { const i = document.createElement('img'); i.className = 'wb-prev'; i.src = it.url; box.appendChild(i); }
+        else if (it.kind === 'audio') { const a = document.createElement('audio'); a.src = it.url; a.controls = true; a.preload = 'none'; box.appendChild(a); }
+        else if (it.kind === 'sketch' || it.kind === 'set' || it.kind === 'setlog') {
+          const pre = document.createElement('div'); pre.className = 'wb-code'; pre.textContent = 'Reading…'; box.appendChild(pre);
+          VXCHAIN.fetchDoc(it.origin).then(d => { pre.textContent = d.type === 'v3x-sketch' ? d.code : `${d.title || ''}  ·  ${d.bpm || '?'} BPM  ·  ${(d.steps || []).length} steps\n\n` + (d.steps || []).slice(0, 40).map(s => `bar ${s.bar}  ${s.cmd}  ${JSON.stringify(s.args || {})}`).join('\n'); })
+            .catch(e => { pre.textContent = 'Could not read it: ' + e.message; });
+        }
+        const meta = document.createElement('div'); meta.className = 'wb-meta';
+        [['KIND', it.kind === 'setlog' ? 'LIVE SET' : it.kind.toUpperCase()], ['TYPE', it.contentType || '?'], ['SIZE', it.bytes ? kb(it.bytes) : '?'], ['APP', it.app || '—'], ['ID', it.origin]]
+          .forEach(([k, v]) => { const a = document.createElement('span'); a.textContent = k; const b = document.createElement('b'); b.textContent = v; meta.append(a, b); });
+        box.appendChild(meta);
+        const acts = document.createElement('div'); acts.className = 'wb-acts';
+        const note = document.createElement('div'); note.className = 'wb-note';
+        const btn = (label, fn, title) => { const b = document.createElement('button'); b.className = 'gen-btn'; b.textContent = label; if (title) b.title = title; b.addEventListener('click', fn); acts.appendChild(b); return b; };
+        const media = { name: it.name, url: it.url, source: 'wallet' };
+        if (it.kind === 'clip' || it.kind === 'image') { btn('LOAD TO DECK A', () => loadMediaItem(media, 'A', note)); btn('LOAD TO DECK B', () => loadMediaItem(media, 'B', note)); }
+        else if (it.kind === 'audio') btn('PLAY IN MUSIC', async () => {
+          box.querySelectorAll('audio').forEach(a => a.pause());
+          await initializeMusicTab(); const t = musicLibraryTracks.find(x => x.origin === it.origin);
+          if (t) { playTrack(t.id); note.textContent = 'Playing in MUSIC; the sketches follow it.'; } });
+        else if (it.kind === 'midi') btn(midiPlayback && midiPlayback.origin === it.origin ? 'STOP' : 'PLAY', async () => { await toggleMidiFile(it); note.textContent = setEl('setNote').textContent; renderWalletTab(); }, 'Plays the file through your MIDI LEARN mappings');
+        else if (it.kind !== 'other') btn(it.kind === 'sketch' ? 'OPEN IN PATTERNS' : 'OPEN IN COMPOSER', () => { setEl('chainOrigin').value = it.origin; setEl('chainOpenBtn').click(); if (it.kind !== 'sketch') document.querySelector('[data-tab="composer"]').click(); });
+        btn('COPY ID', () => { navigator.clipboard.writeText(it.origin); note.textContent = 'Inscription id copied.'; });
+        btn('OPEN ON ORDFS', () => require('electron').shell.openExternal(it.url));
+        box.appendChild(acts);
+        if (it.kind === 'other') note.textContent = 'The mixer can\'t use this kind of file.';
+        box.appendChild(note);
+        const sell = document.createElement('div'); sell.className = 'wb-note'; sell.style.borderTop = '1px solid #1a1a1a'; sell.style.paddingTop = '8px';
+        sell.textContent = 'Selling: listing opens in bWalletX when its new listing contract ships. Listings will show in the bWalletX Market, the VexVoid shop on bmarketx.com and here.';
+        box.appendChild(sell);
+      }
+      wbEl('wbRefresh').addEventListener('click', () => scanWalletLibrary());
+      wbEl('wbSearch').addEventListener('input', renderWalletTab);
+      wbEl('wbSearch').addEventListener('keydown', e => e.stopPropagation());
+      renderWalletTab();
 
       // ===== MINT: sketches (PATTERNS) and sets (COMPOSER) as 1Sat inscriptions through bWalletX =====
       async function mintWallet(statusFn) {
@@ -5442,6 +5566,8 @@ Reply with only the JSON array in one \`\`\`json code block.`;
             initializeComposerTab();
           } else if (targetTab === 'vexvoid') {
             initializeVexvoidTab();
+          } else if (targetTab === 'wallet') {
+            renderWalletTab();
           }
         });
       });
