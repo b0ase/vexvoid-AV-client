@@ -3677,7 +3677,8 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
         if (item.source === 'local') return item.url;
         const fs = require('fs'), path = require('path');
         const ext = (item.url.split('?')[0].match(/\.[a-z0-9]+$/i) || ['.bin'])[0].toLowerCase();
-        const file = path.join(mediaCacheDir, require('crypto').createHash('sha1').update(item.url).digest('hex').slice(0, 16) + ext);
+        const slug = String(item.name || 'media').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'media';
+        const file = path.join(mediaCacheDir, slug + '-' + require('crypto').createHash('sha1').update(item.url).digest('hex').slice(0, 8) + ext);
         if (fs.existsSync(file) && fs.statSync(file).size > 0) return file;
         fs.mkdirSync(mediaCacheDir, { recursive: true });
         const res = await fetch(item.url);
@@ -4232,6 +4233,118 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           } else ctx.fillRect(0, canvas.height - 1, canvas.width, 1);
         })();
       }
+
+      // ===== Remote control: commands from the local API (api-server.js), the CLI, the MCP server and MIDI =====
+      const VXCMD = {
+        help: { doc: 'List every command', run: () => Object.keys(VXCMD).map(k => `${k}${VXCMD[k].args ? ' ' + VXCMD[k].args : ''}: ${VXCMD[k].doc}`) },
+        state: { doc: 'Snapshot of the mixer', run: () => vxSnapshot() },
+        fade: { args: '{value 0-100}', doc: 'Move the A/B crossfader (0 = deck A, 100 = deck B)', run: a => setFader(num(a.value, 0, 100)) },
+        cut: { args: '{deck A|B}', doc: 'Cut straight to a deck', run: a => setFader(deckOf(a.deck) === 'B' ? 100 : 0) },
+        layers: { doc: 'List output layers', run: () => [...layersA, ...layersB].map(layerInfo) },
+        layer: { args: '{id, opacity?, visible?, blend?, speed?, size?}', doc: 'Change a layer', run: a => {
+          const l = [...layersA, ...layersB].find(x => x.id === Number(a.id)); if (!l) throw new Error('no layer ' + a.id);
+          if (a.opacity != null) sendToOutput('update-layer-property', { layerId: l.id, property: 'opacity', value: num(a.opacity, 0, 100) });
+          if (a.blend) sendToOutput('update-layer-property', { layerId: l.id, property: 'blendMode', value: String(a.blend) });
+          if (a.speed != null) sendToOutput('update-layer-property', { layerId: l.id, property: 'speed', value: num(a.speed, 1, 100) });
+          if (a.size != null) sendToOutput('update-layer-property', { layerId: l.id, property: 'size', value: num(a.size, 10, 300) });
+          if (a.visible != null && Boolean(a.visible) !== Boolean(l.visible)) sendToOutput('toggle-visibility', { layerId: l.id });
+          return layerInfo(l);
+        } },
+        remove: { args: '{id}', doc: 'Remove a layer', run: a => { sendToOutput('remove-layer', { layerId: Number(a.id) }); return 'removed ' + a.id; } },
+        clear: { args: '{deck?}', doc: 'Remove every layer (or one deck\'s)', run: a => {
+          const d = a.deck ? deckOf(a.deck) : null;
+          const ids = [...layersA, ...layersB].filter(l => !d || (l.palette || 'A') === d).map(l => l.id);
+          ids.forEach(id => sendToOutput('remove-layer', { layerId: id })); return `removed ${ids.length}`;
+        } },
+        sketches: { doc: 'List the generative sketches', run: () => (window.VXGEN_LIBRARY || []).map(x => ({ name: x.name, tags: x.tags, knobs: x.knobs })) },
+        sketch: { args: '{name | code, deck?, send?=true}', doc: 'Load a sketch into the preview and (by default) send it to a deck', run: a => {
+          let item = a.code ? { name: a.name || 'REMOTE', code: String(a.code), knobs: a.knobs } : (window.VXGEN_LIBRARY || []).find(x => x.name.toLowerCase() === String(a.name || '').toLowerCase());
+          if (!item) throw new Error('no sketch "' + a.name + '"; see the sketches command');
+          const err = VXGEN.check(item.code); if (err) throw new Error('sketch does not compile: ' + err);
+          if (!gen.ready) initializePatternsTab();
+          loadSketch(item);
+          if (a.send !== false) { genEl('genDeck').value = deckOf(a.deck || activePalette); sendToDeck(); }
+          return { name: gen.name, seed: gen.seed, key: gen.key };
+        } },
+        knobs: { args: '{a?, b?, c?, d?} 0-1', doc: 'Turn the sketch knobs (preview and the last sketch sent)', run: a => {
+          const q = {}; ['a', 'b', 'c', 'd'].forEach(k => { if (a[k] != null) q[k] = num(a[k], 0, 1); });
+          setKnobs(q, true); return gen.params;
+        } },
+        mutate: { doc: 'New seed for the current sketch', run: () => { mutate(); return gen.seed; } },
+        evolve: { args: '{on}', doc: 'Mutate and drift the knobs every 4 bars', run: a => { gen.evolve = a.on !== false && a.on !== 'off'; genEl('genEvolveBtn').classList.toggle('active', gen.evolve); return gen.evolve; } },
+        write: { args: '{prompt}', doc: 'Ask Claude to write a sketch (uses the Anthropic key; costs a little)', run: async a => {
+          if (!gen.ready) initializePatternsTab();
+          genEl('genPrompt').value = String(a.prompt || ''); await askClaude();
+          return { name: gen.name, note: genEl('genAskNote').textContent };
+        } },
+        clips: { doc: 'List catalogue clips', run: () => catalogue().clips.map(c => c.name) },
+        images: { doc: 'List catalogue images', run: () => catalogue().images.map(c => c.set + '/' + c.name) },
+        load: { args: '{clip | image | path | url, deck?}', doc: 'Open media as a new layer on a deck', run: async a => {
+          const cat = catalogue(); let item;
+          if (a.clip) item = cat.clips.find(c => c.name.toLowerCase() === String(a.clip).toLowerCase());
+          else if (a.image) item = cat.images.find(c => (c.set + '/' + c.name).toLowerCase().endsWith(String(a.image).toLowerCase()));
+          else if (a.path) item = { name: require('path').basename(String(a.path)), url: String(a.path), source: 'local' };
+          else if (a.url) item = { name: String(a.url).split('/').pop(), url: String(a.url) };
+          if (!item) throw new Error('nothing to load (give clip, image, path or url)');
+          const note = { textContent: '' };
+          await loadMediaItem(item, deckOf(a.deck || activePalette), note);
+          if (/^FAILED/.test(note.textContent)) throw new Error(note.textContent);
+          return note.textContent;
+        } },
+        tracks: { doc: 'List music tracks', run: () => { if (!musicLibraryTracks.length) initializeMusicTab(); return musicLibraryTracks.map(t => `${t.id}: ${t.name}`); } },
+        play: { args: '{track? (number or words)}', doc: 'Play music', run: async a => {
+          if (!musicLibraryTracks.length) await initializeMusicTab();
+          if (a.track == null) { togglePlay(); return musicNow(); }
+          const n = Number(a.track);
+          const t = Number.isInteger(n) ? musicLibraryTracks[n] : musicLibraryTracks.find(x => x.name.toLowerCase().includes(String(a.track).toLowerCase()));
+          if (!t) throw new Error('no track ' + a.track);
+          playTrack(t.id); return musicNow();
+        } },
+        pause: { doc: 'Pause music', run: () => { if (currentAudio) currentAudio.pause(); return musicNow(); } },
+        next: { doc: 'Next track', run: () => { nextTrack(); return musicNow(); } },
+        prev: { doc: 'Previous track', run: () => { prevTrack(); return musicNow(); } },
+        bpm: { args: '{value}', doc: 'Set the tempo the sketches follow', run: a => { VXGEN.signals.bpm = num(a.value, 40, 220); VXGEN.signals.beat0 = performance.now(); return VXGEN.signals.bpm; } },
+        tap: { doc: 'Tap the tempo', run: () => VXGEN.tap() },
+        audio: { args: '{source clock|music|input}', doc: 'What the sketches listen to', run: async a => {
+          const sel = genEl('genAudio'); sel.value = a.source === 'clock' ? '' : String(a.source || ''); sel.dispatchEvent(new Event('change')); return sel.value || 'clock';
+        } },
+        vx: { args: '{key, value}', doc: 'Set a VX engine setting (video, mercury, field, formula, flecks, grain, decals, chaos, title, voidChance, cleanChance, audio, bpm, volume)', run: a => { window.vxProxy.set(String(a.key), a.value); return window.vxState(); } },
+        'vx-next': { doc: 'VX engine: next clip', run: () => { window.vxProxy.nextClip(); return 'ok'; } },
+        'vx-clean': { doc: 'VX engine: clean now', run: () => { window.vxProxy.cleanNow(); return 'ok'; } },
+        blackout: { doc: 'VX engine: toggle blackout', run: () => { window.vxProxy.blackout(); return !!window.vxState().blackout; } },
+        'vx-reset': { doc: 'VX engine: reset every layer', run: () => { window.vxProxy.reset(); return 'ok'; } }
+      };
+      function num(v, lo, hi) { const n = Number(v); if (!isFinite(n)) throw new Error('not a number: ' + v); return Math.min(hi, Math.max(lo, n)); }
+      function deckOf(d) { return String(d || 'A').toUpperCase() === 'B' ? 'B' : 'A'; }
+      function setFader(v) { crossfader.value = v; updateCrossfader(); return { crossfader: v }; }
+      function layerInfo(l) { return { id: l.id, name: l.name, deck: l.palette || 'A', visible: l.visible, opacity: l.opacity, blend: l.blendMode || 'normal' }; }
+      function musicNow() {
+        const t = musicLibraryTracks[currentTrackIndex];
+        return { track: t ? t.name : null, playing: !!(currentAudio && !currentAudio.paused), time: currentAudio ? Math.round(currentAudio.currentTime) : 0 };
+      }
+      function vxSnapshot() {
+        return {
+          crossfader: Number(crossfader.value), deck: activePalette, layers: [...layersA, ...layersB].map(layerInfo),
+          sketch: { name: gen.name, seed: gen.seed, knobs: gen.knobs, params: gen.params, evolve: gen.evolve, running: !!gen.inst, sentKey: gen.key },
+          tempo: { bpm: VXGEN.signals.bpm, listening: genEl('genAudio').value || 'clock', level: +VXGEN.signals.level.toFixed(2) },
+          music: musicNow(), vx: window.vxState ? window.vxState() : {}
+        };
+      }
+      window.vxCommand = async (cmd, args) => {
+        const c = VXCMD[cmd]; if (!c) throw new Error(`unknown command "${cmd}"; try help`);
+        return c.run(args || {});
+      };
+      ipcRenderer.on('api-command', async (event, { id, cmd, args }) => {
+        try { ipcRenderer.send('api-result', { id, ok: true, result: await window.vxCommand(cmd, args) }); }
+        catch (e) { ipcRenderer.send('api-result', { id, ok: false, error: e.message }); }
+        pushApiState();
+      });
+      let lastApiState = '';
+      function pushApiState() {
+        const s = JSON.stringify(vxSnapshot());
+        if (s !== lastApiState) { lastApiState = s; ipcRenderer.send('api-state', JSON.parse(s)); }
+      }
+      setInterval(pushApiState, 250);
 
       // Composer Tab Functionality
       let isRecording = false;
@@ -4929,6 +5042,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         reset: () => send({ action: 'reset' })
       };
       window.vxProxy = proxy;
+      window.vxState = () => Object.assign({}, st);
       function fmt(k, v) { if (k === 'bpm') return String(v); if (k === 'chaos' || k === 'volume' || /Chance$/.test(k)) return Math.round(v * 100) + '%'; return String(v); }
       function render() {
         panel.querySelectorAll('[data-vx]').forEach((el) => {

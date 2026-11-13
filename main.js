@@ -118,6 +118,9 @@ ipcMain.handle('show-save-dialog', async (event, options) => {
 app.whenReady().then(() => {
   createOutputWindow();
   createControlWindow();
+
+  // Local control API for the CLI, MCP server and other tools (127.0.0.1, token in ~/.v3xv0id/api.json)
+  require('./api-server').start({ getControlWindow: () => controlWindow, getOutputWindow: () => outputWindow });
   
   // Register global shortcuts for fullscreen control
   const { globalShortcut } = require('electron');

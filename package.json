@@ -12,7 +12,9 @@
     "build-win": "electron-builder --win --publish=never",
     "build-linux": "electron-builder --linux --publish=never",
     "dist": "electron-builder --mac --win --linux --publish=never",
-    "sync-docs": "cp vx/vx-engine.js vx/vx-keys.js docs/"
+    "sync-docs": "cp vx/vx-engine.js vx/vx-keys.js docs/",
+    "mix": "node bin/vexvoid-mix.js",
+    "sync-catalogue": "node scripts/sync-catalogue.js"
   },
   "keywords": [
     "animation",
@@ -46,6 +48,7 @@
     },
     "files": [
       "main.js",
+      "api-server.js",
       "index.html",
       "controls.html",
       "control-window.html",
@@ -131,5 +134,9 @@
     "portable": {
       "artifactName": "V3XV0ID-AV-Client-${version}-win-${arch}-portable.${ext}"
     }
+  },
+  "bin": {
+    "vexvoid-mix": "bin/vexvoid-mix.js",
+    "vexvoid-mcp": "bin/vexvoid-mcp.js"
   }
 }
