@@ -1698,6 +1698,10 @@
     .midi-chip.on{color:#fff;border-color:#fff}
     .bwx-chip.on{background:#fff;color:#000}
     .bwx-chip.err{border-color:#ff5a4f;color:#ff5a4f}
+    /* the pairing QR is dense (origin, channel, key); draw it big with crisp modules so a phone's in-app scanner reads it
+       off a monitor (bWalletX session, 13 Nov 2026) */
+    .bwx-box{width:min(92vw,620px)!important;max-width:none!important}
+    .bwx-qr svg{max-width:560px!important;shape-rendering:crispEdges}
     .midi-panel{position:fixed;right:16px;top:44px;width:560px;max-height:80vh;overflow:auto;background:#000;border:1px solid #555;z-index:1000;padding:12px;font-family:'Courier New',monospace;font-size:11px;letter-spacing:.1em;color:#ddd}
     .midi-head{display:flex;justify-content:space-between;align-items:center;letter-spacing:.3em;margin-bottom:8px}
     .midi-sub{display:flex;justify-content:space-between;color:#999;font-size:10px;margin:6px 0 10px}
@@ -1712,6 +1716,9 @@
 
     .minted-list{max-height:220px;overflow:auto;font-size:10px;border:1px solid #1c1c1c}
     .minted-row{display:grid;grid-template-columns:52px 1fr auto auto;gap:6px;align-items:center;padding:5px 6px;border-bottom:1px solid #141414}
+    .minted-row > span:nth-child(2){min-width:0;overflow:hidden}
+    .minted-row b, .minted-row code{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .minted-row br{display:none}
     .minted-row code{color:#888;text-transform:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     /* Set composer */
     .set-grid{flex:1;display:grid;grid-template-columns:1fr 380px;gap:10px;min-height:0}
@@ -2409,6 +2416,9 @@
             <textarea id="aiPrompt" class="gen-prompt" rows="6" placeholder="e.g. 64 bars for Four Ton Shadow: start sparse on RIDGES, build with FLOW FIELD on B by bar 16, cut on the drop at 33 to WIRE TUNNEL, slow fade out over the last 8"></textarea>
             <div class="gen-row"><label class="dim" style="font-size:10px;letter-spacing:.2em">BARS</label><input id="setBars" class="gen-select" type="number" min="4" max="512" value="64" style="width:80px"><button id="generateSequenceBtn" class="gen-btn wide" style="flex:1">WRITE SET</button></div>
             <div id="setNote" class="gen-note"></div>
+            <div class="gen-h">YOUR WALLET <button id="walletLibRefresh" class="gen-btn" style="padding:2px 8px">REFRESH</button></div>
+            <div class="gen-note" id="walletLibStatus">CONNECT bWALLETX</div>
+            <div id="walletLibList" class="minted-list"></div>
             <div class="gen-h">MINTED <span class="dim">ON CHAIN</span></div>
             <div id="mintedList" class="minted-list"></div>
             <div class="gen-h">HOW IT WORKS</div>
@@ -3878,9 +3888,10 @@
 
       async function initializeVideosTab() {
         const local = videoLibrary.filter(v => v.source === 'local' && !/^GROK · /.test(v.name));
-        videoLibrary = grokFiles('video').concat(catalogue().clips.map(c => ({ name: c.name, url: c.url, format: 'MP4', source: c.set === 'rough' ? 'rough' : 'smooth' })), local);
+        const mine = walletMedia('clip').map(i => ({ name: 'WALLET · ' + i.name, url: i.url, format: (i.contentType.split('/')[1] || 'VIDEO').toUpperCase(), source: 'wallet', origin: i.origin }));
+        videoLibrary = mine.concat(grokFiles('video'), catalogue().clips.map(c => ({ name: c.name, url: c.url, format: 'MP4', source: c.set === 'rough' ? 'rough' : 'smooth' })), local);
         videoLibrary.forEach((v, i) => { v.id = i; });
-        document.getElementById('videoCloudStatus').textContent = `● V3XV0ID CLIPS · ${videoLibrary.length}`;
+        document.getElementById('videoCloudStatus').textContent = `● V3XV0ID CLIPS · ${videoLibrary.length - mine.length}` + (mine.length ? ` · YOUR WALLET · ${mine.length}` : '');
         renderVideoLibrary();
       }
       function renderVideoLibrary() {
@@ -3954,9 +3965,10 @@
 
       async function initializeImagesTab() {
         const local = imageLibrary.filter(v => v.source === 'local' && !/^GROK · /.test(v.name));
-        imageLibrary = grokFiles('image').concat(catalogue().images.map(im => ({ name: im.name, url: im.url, format: (im.url.match(/\.([a-z]+)$/i) || [, 'IMG'])[1].toUpperCase(), source: im.set })), local);
+        const mine = walletMedia('image').map(i => ({ name: 'WALLET · ' + i.name, url: i.url, format: (i.contentType.split('/')[1] || 'IMG').toUpperCase(), source: 'wallet', origin: i.origin }));
+        imageLibrary = mine.concat(grokFiles('image'), catalogue().images.map(im => ({ name: im.name, url: im.url, format: (im.url.match(/\.([a-z]+)$/i) || [, 'IMG'])[1].toUpperCase(), source: im.set })), local);
         imageLibrary.forEach((v, i) => { v.id = i; });
-        document.getElementById('imageCloudStatus').textContent = `● V3XV0ID IMAGES · ${imageLibrary.length}`;
+        document.getElementById('imageCloudStatus').textContent = `● V3XV0ID IMAGES · ${imageLibrary.length - mine.length}` + (mine.length ? ` · YOUR WALLET · ${mine.length}` : '');
         renderImageLibrary();
       }
       function renderImageLibrary() {
@@ -4428,8 +4440,18 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         return currentAudio;
       }
 
+      // audio inscriptions held in the connected wallet go first in the list (ORDFS sends CORS, so they drive the visuals too)
+      function mergeWalletTracks() {
+        const rest = musicLibraryTracks.filter(t => t.source !== 'wallet');
+        const mine = walletMedia('audio').map(i => ({ name: i.name, artist: 'YOUR WALLET', format: (i.contentType.split('/')[1] || 'AUDIO').replace(/^mpeg$/, 'mp3').toUpperCase(),
+          duration: '--:--', url: i.url, source: 'wallet', origin: i.origin }));
+        const playing = musicLibraryTracks[currentTrackIndex];
+        musicLibraryTracks = mine.concat(rest);
+        musicLibraryTracks.forEach((t, i) => { t.id = i; });
+        if (playing) currentTrackIndex = musicLibraryTracks.indexOf(playing);
+      }
       async function initializeMusicTab() {
-        if (musicLibraryTracks.length) { renderMusicLibrary(); return; }
+        if (musicLibraryTracks.some(t => t.source !== 'wallet')) { mergeWalletTracks(); renderMusicLibrary(); return; }
         try {
           const cat = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, 'vx', 'catalogue.json'), 'utf8'));
           musicLibraryTracks = cat.tracks.map((t, i) => ({
@@ -4440,6 +4462,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         } catch (e) {
           musicEl('musicCloudStatus').textContent = 'CATALOGUE MISSING · LOAD LOCAL FILES';
         }
+        mergeWalletTracks();
         renderMusicLibrary();
         initializeAudioVisualizer();
       }
@@ -4734,6 +4757,72 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       claudeStatus();
       setInterval(claudeStatus, 8000);
 
+
+      // ===== YOUR WALLET: the performer's own clips, images, audio, sets, sketches and MIDI, read from bWalletX =====
+      // (vx/wallet-library.js). Media joins the VIDEOS / IMAGES / MUSIC tabs; programs are listed here to open or play.
+      function walletKey() { return VXWALLET.identityKey() || (() => { try { return localStorage.getItem('bwx:connected'); } catch (e) { return null; } })(); }
+      function walletMedia(kind) { const k = walletKey(); return k ? VXLIB.items(kind, k) : []; }
+      let walletScan = null, midiPlayback = null;
+      function walletSummary() {
+        const all = walletMedia(), n = k => all.filter(i => i.kind === k).length;
+        const parts = [['clip', 'CLIP'], ['image', 'IMAGE'], ['audio', 'TRACK'], ['set', 'SET'], ['setlog', 'LIVE SET'], ['sketch', 'SKETCH'], ['midi', 'MIDI FILE']]
+          .filter(([k]) => n(k)).map(([k, w]) => n(k) + ' ' + w + (n(k) > 1 ? (w === 'SKETCH' ? 'ES' : 'S') : ''));
+        return all.length ? parts.join(' · ') || 'NOTHING THE MIXER CAN USE' : 'NOTHING HELD YET';
+      }
+      function refreshWalletMedia() {
+        initializeVideosTab(); initializeImagesTab();
+        if (musicLibraryTracks.length) { mergeWalletTracks(); renderMusicLibrary(); }
+        renderWalletLib();
+      }
+      function renderWalletLib() {
+        const box = document.getElementById('walletLibList'), status = document.getElementById('walletLibStatus');
+        if (!box) return;
+        if (!walletScan) status.textContent = walletKey() ? walletSummary() : 'CONNECT bWALLETX';
+        const progs = walletMedia().filter(i => /^(set|setlog|sketch|midi)$/.test(i.kind));
+        box.innerHTML = progs.length ? '' : `<div class="dim" style="padding:6px">${walletKey() ? 'No sets, sketches or MIDI files in this wallet. Clips, images and audio show in their tabs.' : 'Connect bWalletX to see your clips, audio, sets and MIDI files.'}</div>`;
+        progs.forEach(m => {
+          const row = document.createElement('div'); row.className = 'minted-row';
+          const isMidi = m.kind === 'midi', playing = isMidi && midiPlayback && midiPlayback.origin === m.origin;
+          row.innerHTML = `<span>${m.kind === 'setlog' ? 'LIVE' : m.kind.toUpperCase()}</span><span><b></b><br><code></code></span><button class="gen-btn" title="Copy the inscription id">COPY</button><button class="gen-btn"></button>`;
+          row.querySelector('b').textContent = m.name;
+          row.querySelector('code').textContent = m.origin;
+          row.children[2].addEventListener('click', () => navigator.clipboard.writeText(m.origin));
+          const act = row.children[3];
+          act.textContent = isMidi ? (playing ? 'STOP' : 'PLAY') : 'OPEN';
+          if (isMidi) act.title = 'Plays the file through your MIDI LEARN mappings';
+          act.addEventListener('click', () => isMidi ? toggleMidiFile(m) : (setEl('chainOrigin').value = m.origin, setEl('chainOpenBtn').click()));
+          box.appendChild(row);
+        });
+      }
+      // a MIDI file is a program: its messages run through the same mappings as a hardware controller (MIDI LEARN)
+      async function toggleMidiFile(m) {
+        const note = setEl('setNote');
+        if (midiPlayback) { const was = midiPlayback.origin; midiPlayback.stop(); midiPlayback = null; renderWalletLib(); if (was === m.origin) { note.textContent = 'MIDI file stopped.'; return; } }
+        try {
+          note.textContent = 'Reading ' + m.name + '…';
+          const res = await fetch(m.url); if (!res.ok) throw new Error('ORDFS ' + res.status);
+          const parsed = VXMIDIFILE.parse(new Uint8Array(await res.arrayBuffer()));
+          if (!Object.keys(midi.map).length) note.textContent = 'Nothing is mapped yet: use MIDI LEARN (top right) so the notes and knobs in this file move something.';
+          else note.textContent = `Playing ${m.name}: ${parsed.events.length} messages over ${mmss(parsed.ms / 1000)} through your MIDI LEARN mappings.`;
+          const p = VXMIDIFILE.play(parsed, data => midiOnMessage({ data }), () => { if (midiPlayback === p) { midiPlayback = null; renderWalletLib(); note.textContent = m.name + ' finished.'; } });
+          midiPlayback = Object.assign(p, { origin: m.origin });
+          renderWalletLib();
+        } catch (e) { note.textContent = 'Could not play ' + m.name + ': ' + e.message; }
+      }
+      async function scanWalletLibrary() {
+        const w = VXWALLET.wallet(), key = VXWALLET.identityKey(), status = document.getElementById('walletLibStatus');
+        if (!w || !key) { renderWalletLib(); return; }
+        if (walletScan) return walletScan;
+        status.textContent = 'READING YOUR WALLET…';
+        walletScan = VXLIB.scan(w, key, (done, total) => { status.textContent = `READING YOUR WALLET · ${done}/${total}`; })
+          .then(() => { walletScan = null; refreshWalletMedia(); })
+          .catch(e => { walletScan = null; status.textContent = 'COULD NOT READ: ' + String(e.message || e).slice(0, 60); });
+        return walletScan;
+      }
+      document.addEventListener('bwalletx:connected', () => scanWalletLibrary());
+      document.addEventListener('bwalletx:disconnected', () => { if (midiPlayback) { midiPlayback.stop(); midiPlayback = null; } refreshWalletMedia(); });
+      document.getElementById('walletLibRefresh').addEventListener('click', () => VXWALLET.wallet() ? scanWalletLibrary() : VXWALLET.connect().catch(() => {}));
+      renderWalletLib();
 
       // ===== MINT: sketches (PATTERNS) and sets (COMPOSER) as 1Sat inscriptions through bWalletX =====
       async function mintWallet(statusFn) {
@@ -5771,6 +5860,8 @@ Reply with only the JSON array in one \`\`\`json code block.`;
   <script src="./vx/chain.js"></script>
   <script src="./vx/lib/bwalletx-connect.global.js"></script>
   <script src="./vx/wallet.js"></script>
+  <script src="./vx/wallet-library.js"></script>
+  <script src="./vx/midi-file.js"></script>
   <script src="./vx/mint.js"></script>
   <script src="./vx/vx-keys.js"></script>
   <script>
