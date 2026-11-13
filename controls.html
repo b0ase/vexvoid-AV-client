@@ -1661,6 +1661,7 @@
     .vx-panel { border: 1px solid rgba(255,255,255,.55); padding: 10px; margin-bottom: 12px; display: grid; gap: 8px; font-family: 'IBM Plex Mono', 'Courier New', monospace; font-size: 11px; }
     .vx-head { display: flex; justify-content: space-between; letter-spacing: .24em; font-size: 11px; border-bottom: 1px solid rgba(255,255,255,.3); padding-bottom: 6px; }
     .vx-status { color: #9a9a98; letter-spacing: .14em; }
+    .vx-note { color: #9a9a98; font-size: 10px; letter-spacing: .06em; line-height: 1.5; }
     .vx-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
     .vx-btn { font: inherit; letter-spacing: .14em; background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.6); padding: 8px 4px; cursor: pointer; }
     .vx-btn:hover { background: rgba(255,255,255,.1); }
@@ -1762,6 +1763,8 @@
     #layersTab .output-preview { border-color: rgba(255,255,255,.7); }
     #layersTab .preview-row img, #layersTab .preview-row canvas, #layersTab .preview-row video { width: 100%; height: 100%; object-fit: contain; }
     #layersTab .preview-row-label { z-index: 2; }
+    /* the OUTPUT label names what the audience sees; it sits over the live frame (#outputLive, z-index 3) */
+    #layersTab #outputPreview .preview-row-label { z-index: 4; color: #fff; font-size: 9px; }
     #layersTab .palette-section { min-height: 0; overflow: hidden; }
     #layersTab .palette-section:first-of-type { grid-area: deckA; }
     #layersTab .palette-section:last-of-type { grid-area: deckB; }
@@ -1960,6 +1963,7 @@
       <!-- ===== VX ENGINE: the generative layers under the image/video layers ===== -->
       <div class="vx-panel" id="vxPanel">
         <div class="vx-head"><span>VX ENGINE</span><span class="vx-status" id="vxStatus">connecting</span></div>
+        <div class="vx-note">Runs behind both decks: it shows wherever the live deck is empty. BLACKOUT stops it.</div>
         <div class="vx-actions">
           <button type="button" class="vx-btn vx-danger" id="vxBlackout" title="B">BLACKOUT</button>
           <button type="button" class="vx-btn" id="vxClean" title="C">CLEAN NOW</button>
@@ -2116,7 +2120,7 @@
       <div class="preview-screen" id="previewScreen">
         <div class="preview-row" id="preview2">
           <div class="preview-row-label">DECK A</div>
-          <div class="preview-placeholder">NO CONTENT</div>
+          <div class="preview-placeholder">EMPTY</div>
         </div>
         <div class="preview-row output-preview" id="outputPreview">
           <div class="preview-row-label">OUTPUT</div>
@@ -2124,7 +2128,7 @@
         </div>
         <div class="preview-row" id="preview3">
           <div class="preview-row-label">DECK B</div>
-          <div class="preview-placeholder">NO CONTENT</div>
+          <div class="preview-placeholder">EMPTY</div>
         </div>
       </div>
     </div>
@@ -2579,6 +2583,7 @@
           case 'preview-update':
             updateOutputPreview(data);
             updatePalettePreview(data);
+            updateSourceLabels();
             break;
         }
       });
@@ -2619,8 +2624,30 @@
         
         // Update which palette is considered "active" for new layers
         activePalette = crossfaderValue < 50 ? 'A' : 'B';
+        updateSourceLabels();
       }
       
+      // Say what the audience is seeing. The VX engine plays under both decks, so an empty deck on the live side of
+      // the crossfader shows the engine, which otherwise looks like that deck is playing generative visuals.
+      function updateSourceLabels() {
+        const aW = crossfaderValue < 90 ? 1 : (100 - crossfaderValue) / 10, bW = crossfaderValue / 100;
+        const aOn = layersA.some(l => l.visible !== false), bOn = layersB.some(l => l.visible !== false);
+        const vx = window.vxState ? window.vxState() : {};
+        const seen = [];
+        if (vx.blackout) seen.push('BLACKOUT');
+        else {
+          if (aOn && aW > 0.05) seen.push('DECK A');
+          if (bOn && bW > 0.05) seen.push('DECK B');
+          if (!(aOn && aW > 0.95) && !(bOn && bW > 0.95)) seen.push('VX ENGINE');
+        }
+        const outLabel = outputPreview.querySelector('.preview-row-label');
+        if (outLabel) outLabel.textContent = 'OUTPUT · ' + seen.join(' + ');
+        [[preview2, aOn, aW], [preview3, bOn, bW]].forEach(([box, on, w]) => {
+          const ph = box.querySelector('.preview-placeholder');
+          if (ph && !on) ph.textContent = !vx.blackout && w > 0.5 && seen.includes('VX ENGINE') ? 'EMPTY · VX ENGINE SHOWS THROUGH' : 'EMPTY';
+        });
+      }
+
       function updateLayersList() {
         updatePaletteList(layersListA, layersA, 'A');
         updatePaletteList(layersListB, layersB, 'B');
@@ -2803,8 +2830,7 @@
             if (label) container.appendChild(label);
             const ph = document.createElement('div');
             ph.className = 'preview-placeholder';
-            ph.textContent = container === outputPreview ? 'NO OUTPUT CONTENT' :
-                             container === preview2 ? 'PALETTE A' : 'PALETTE B';
+            ph.textContent = container === outputPreview ? 'NO OUTPUT CONTENT' : 'EMPTY';
             container.appendChild(ph);
             cache.src = null;
             cache.element = null;
