@@ -2368,6 +2368,7 @@
             <button id="setLoadBtn" class="gen-btn">LOAD</button>
             <span class="gen-sep"></span>
             <button id="setMintBtn" class="gen-btn hot" title="Inscribe this set on BSV with bWalletX so anyone can replay it">MINT SET</button>
+            <button id="setLiveBtn" class="gen-btn" title="While recording, inscribe the performance every 16 bars (each chunk links to the last)">LIVE TO CHAIN</button>
           </div>
         </div>
         <div class="gen-row">
@@ -4990,6 +4991,10 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
             if (doc.seed != null) { gen.seed = doc.seed; runPattern(); }
             document.querySelector('[data-tab="patterns"]').click();
             note.textContent = 'Sketch ' + doc.name + ' opened in PATTERNS.';
+          } else if (doc.type === 'v3x-setlog') {
+            const joined = await VXCHAIN.joinSetLog(origin);
+            setFromDoc(await VXCHAIN.resolveSet(joined));
+            note.textContent = `Live set "${joined.title}" from ${joined.chunks} chunk${joined.chunks > 1 ? 's' : ''}${joined.complete ? '' : ' (not finished yet)'}: ${set.steps.length} steps. Press PLAY.`;
           } else {
             setFromDoc(await VXCHAIN.resolveSet(doc));
             note.textContent = `Set "${doc.title}" from the chain: ${set.steps.length} steps. Press PLAY.`;
@@ -5003,6 +5008,41 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         } catch (e) { setEl('setNote').textContent = 'Args: ' + e.message; }
       });
       ['setAddArgs', 'setAddBar', 'aiPrompt', 'setBars'].forEach(id => setEl(id).addEventListener('keydown', e => e.stopPropagation()));
+      // LIVE TO CHAIN: while recording, every 16 bars the new steps are inscribed as a chunk linked to the last one
+      const live = { on: false, session: null, seq: 0, prev: null, sent: 0, busy: false, lastBar: 1 };
+      function liveChunk(final) {
+        if (live.busy || !live.session) return;
+        const fresh = set.steps.slice(live.sent);
+        if (!fresh.length && !final) return;
+        const doc = setAsDoc();
+        const chunk = { v: 1, type: 'v3x-setlog', session: live.session, seq: live.seq, prev: live.prev, final: !!final,
+          title: doc.title, bpm: doc.bpm, steps: doc.steps.slice(live.sent), assets: doc.assets, at: new Date().toISOString() };
+        const upTo = set.steps.length;
+        live.busy = true;
+        setEl('setNote').textContent = `Live chunk ${live.seq + 1}: approve in bWalletX (${chunk.steps.length} steps)…`;
+        mintWallet(t => { setEl('composerStatus').textContent = t; })
+          .then(w => VXMINT.mint(w, { kind: 'setlog', name: `${doc.title} #${live.seq + 1}`, contentType: VXCHAIN.TYPES.setlog, data: JSON.stringify(chunk) }))
+          .then(rec => { live.prev = rec.origin; live.seq++; live.sent = upTo; renderMinted();
+            setEl('setNote').textContent = `Live chunk ${live.seq} on chain: ${rec.origin}${final ? ' (final). OPEN FROM CHAIN with this id replays the whole performance.' : ''}`; })
+          .catch(e => { setEl('setNote').textContent = 'Live chunk not written (' + e.message + '); its steps go in the next one.'; })
+          .finally(() => { live.busy = false; });
+      }
+      setEl('setLiveBtn').addEventListener('click', () => {
+        live.on = !live.on;
+        setEl('setLiveBtn').classList.toggle('active', live.on);
+        if (live.on && !VXWALLET.wallet()) setEl('setNote').textContent = 'LIVE TO CHAIN needs bWalletX: you will be asked to connect when the first chunk is due.';
+      });
+      setInterval(() => {
+        if (!live.on || !set.recording) return;
+        if (!live.session) { live.session = 'vx' + Date.now().toString(36); live.seq = 0; live.prev = null; live.sent = 0; live.lastBar = 1; }
+        const bar = Math.floor(setPosition());
+        if (bar - live.lastBar >= 16) { live.lastBar = bar; liveChunk(false); }
+      }, 500);
+      // stopping the recording writes the final chunk
+      document.getElementById('startRecordingBtn').addEventListener('click', () => {
+        if (live.on && !set.recording && live.session) { liveChunk(true); live.session = null; }
+      });
+
       setEl('setMintBtn').addEventListener('click', async () => {
         const btn = setEl('setMintBtn'), note = setEl('setNote');
         if (!set.steps.length) { note.textContent = 'Nothing to mint: the set is empty.'; return; }

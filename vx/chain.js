@@ -6,13 +6,15 @@
  *                 | { kind:'sketch', origin:'<txid>_<vout>' }       (a minted sketch)
  *                 | { kind:'clip'|'image', name, url | origin }     (catalogue URL or an inscribed file)
  *           steps that use an asset say so with args.asset = '<id>' instead of a name, path or code.
+ *   setlog  application/vnd.v3xv0id.setlog+json { v, type:'v3x-setlog', session, seq, prev:'<origin>'|null, final, title, bpm,
+ *           steps, assets }  a live performance written in chunks; each links to the one before
  *
  * Everything here is pure data; minting (paying for and writing the inscription) goes through bWalletX.
  */
 (function (root) {
   'use strict';
   var ORDFS = 'https://ordfs.network/';
-  var TYPES = { sketch: 'application/vnd.v3xv0id.sketch+json', set: 'application/vnd.v3xv0id.set+json' };
+  var TYPES = { sketch: 'application/vnd.v3xv0id.sketch+json', set: 'application/vnd.v3xv0id.set+json', setlog: 'application/vnd.v3xv0id.setlog+json' };
   var ORIGIN_RE = /^[0-9a-f]{64}_\d+$/;
 
   function isOrigin(s) { return ORIGIN_RE.test(String(s || '')); }
@@ -26,7 +28,7 @@
   async function fetchDoc(origin) {
     var r = await fetchOrd(origin);
     var doc = await r.res.json();
-    if (!doc || (doc.type !== 'v3x-sketch' && doc.type !== 'v3x-set')) throw new Error('that inscription is not a V3XV0ID sketch or set');
+    if (!doc || !/^v3x-(sketch|set|setlog)$/.test(doc.type)) throw new Error('that inscription is not a V3XV0ID sketch, set or set log');
     return doc;
   }
 
@@ -66,7 +68,7 @@
     for (var id in doc.assets || {}) {
       var a = doc.assets[id];
       if (a.kind === 'sketch' && a.origin && !a.code) {
-        var s = await fetchDoc(a.origin);
+        var s = await root.VXCHAIN.fetchDoc(a.origin);
         out.assets[id] = { kind: 'sketch', name: s.name, code: s.code, knobs: s.knobs, origin: a.origin };
       } else if ((a.kind === 'clip' || a.kind === 'image') && a.origin && !a.url) {
         out.assets[id] = Object.assign({}, a, { url: ordUrl(a.origin) });
@@ -75,7 +77,22 @@
     return out;
   }
 
+  /** Follow a live log back from any chunk to the first and join it into one set document. */
+  async function joinSetLog(origin, maxChunks) {
+    var chunks = [], seen = {}, cur = origin;
+    while (cur && !seen[cur] && chunks.length < (maxChunks || 500)) {
+      seen[cur] = 1;
+      var d = await root.VXCHAIN.fetchDoc(cur); // through the public reader so it can be swapped (cache, tests)
+      if (d.type !== 'v3x-setlog') throw new Error('chunk ' + cur + ' is not a set log');
+      chunks.unshift(d); cur = d.prev;
+    }
+    var assets = {}, steps = [];
+    chunks.forEach(function (c) { Object.assign(assets, c.assets || {}); steps = steps.concat(c.steps || []); });
+    var last = chunks[chunks.length - 1] || {};
+    return { v: 1, type: 'v3x-set', title: last.title || 'LIVE SET', bpm: last.bpm, steps: steps, assets: assets, from: 'setlog', chunks: chunks.length, complete: !!last.final };
+  }
+
   function bytes(doc) { return new TextEncoder().encode(JSON.stringify(doc)).length; }
 
-  root.VXCHAIN = { ORDFS: ORDFS, TYPES: TYPES, isOrigin: isOrigin, ordUrl: ordUrl, fetchOrd: fetchOrd, fetchDoc: fetchDoc, sketchDoc: sketchDoc, setDoc: setDoc, resolveSet: resolveSet, bytes: bytes };
+  root.VXCHAIN = { ORDFS: ORDFS, TYPES: TYPES, isOrigin: isOrigin, ordUrl: ordUrl, fetchOrd: fetchOrd, fetchDoc: fetchDoc, sketchDoc: sketchDoc, setDoc: setDoc, resolveSet: resolveSet, joinSetLog: joinSetLog, bytes: bytes };
 })(typeof window !== 'undefined' ? window : this);
