@@ -131,8 +131,25 @@ ipcMain.handle('show-save-dialog', async (event, options) => {
   return result;
 });
 
+// bWalletX pairing relay: the controls window loads from file://, which the relay refuses (it takes only https
+// origins). A native app declares a fixed origin instead, as the bwalletx CLI does (Origin: https://cli.bwalletx.com).
+// APP_ORIGIN is an app identity, like the CLI's CLI_ORIGIN: fixed, never taken from page content or user input, sent
+// only to relay.bwallet.space, and the same value vx/wallet.js passes to pairBwalletX (agreed with the bWalletX
+// session, 13 Nov 2026). A separate host from the web mixer keeps the phone's per-origin permissions apart.
+const APP_ORIGIN = 'https://desktop.mixer.vexvoid.com';
+const PAIRING_RELAY = 'relay.bwallet.space';
+
 app.whenReady().then(() => {
   if (!firstInstance) return;
+  const { session } = require('electron');
+  session.defaultSession.webRequest.onBeforeSendHeaders({ urls: ['wss://' + PAIRING_RELAY + '/*'] }, (details, done) => {
+    const headers = details.requestHeaders;
+    if (new URL(details.url).hostname === PAIRING_RELAY) {
+      for (const k of Object.keys(headers)) if (k.toLowerCase() === 'origin') delete headers[k];
+      headers.Origin = APP_ORIGIN; // app identity, see APP_ORIGIN
+    }
+    done({ requestHeaders: headers });
+  });
   createOutputWindow();
   createControlWindow();
 

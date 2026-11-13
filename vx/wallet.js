@@ -1,6 +1,7 @@
 /* Connect bWalletX in the AV client (controls window). BRC-100 through @bwalletx/connect (vendored global build).
  * A desktop app has no extension and no web origin, so it pairs with the bWalletX phone app by QR (or uses a
- * local BRC-100 wallet such as `bwalletx serve` on localhost:3321), introducing itself as https://mixer.vexvoid.com.
+ * local BRC-100 wallet such as `bwalletx serve` on localhost:3321), introducing itself as https://desktop.mixer.vexvoid.com
+ * (the app identity main.js also sends as the relay socket's Origin; keep the two equal).
  * It is a connection, not a sign-in: the wallet holds the keys and approves every spend; the mixer only ever sees
  * public keys, signatures and transaction ids.
  *
@@ -10,7 +11,7 @@
 (function (root) {
   'use strict';
   var C = root.bWalletXConnect;
-  var ORIGIN = 'https://mixer.vexvoid.com';
+  var ORIGIN = 'https://desktop.mixer.vexvoid.com'; // = APP_ORIGIN in main.js
   var STORE = 'bwx:connected';
   var st = { wallet: null, key: null, handle: null, busy: false, label: '', error: null };
 
