@@ -1,6 +1,6 @@
 {
   "name": "v3xv0id-av-client",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "V3XV0ID AV Client - live visual performance tool: layered VX engine (clip deck, mercury, point fields, decals, sound) under operator image/video layers",
   "main": "main.js",
   "homepage": "./",
