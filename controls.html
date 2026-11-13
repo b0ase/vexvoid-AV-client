@@ -1674,6 +1674,22 @@
     .vx-panel output { color: #9a9a98; text-align: right; font-variant-numeric: tabular-nums; }
     .vx-foot { color: #9a9a98; font-size: 9px; letter-spacing: .08em; }
   
+
+    .media-thumb{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#111;filter:grayscale(1)}
+    .video-item:hover .media-thumb,.image-item:hover .media-thumb{filter:none}
+
+    /* clip / image preview: a side panel over the grid */
+    .video-preview-panel,.image-preview-panel{position:fixed;right:24px;top:96px;width:min(520px,40vw);max-height:calc(100vh - 120px);overflow:auto;background:#000;border:1px solid #555;z-index:60;padding:12px;box-shadow:0 0 0 100vmax rgba(0,0,0,.35);font-family:'Courier New',monospace}
+    .video-preview-header,.image-preview-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    .video-preview-header h3,.image-preview-header h3{font-size:12px;letter-spacing:.25em;margin:0;color:#fff}
+    .close-btn{background:#000;color:#ccc;border:1px solid #444;width:28px;height:28px;cursor:pointer}
+    .close-btn:hover{border-color:#fff;color:#fff}
+    #videoPreviewPlayer,#imagePreviewImg{width:100%;max-height:52vh;object-fit:contain;background:#050505;display:block}
+    #videoPreviewDetails,#imagePreviewDetails{font-size:10px;letter-spacing:.15em;color:#999;margin:10px 0}
+    .video-preview-actions,.image-preview-actions{display:flex;gap:8px}
+    .action-btn{flex:1;background:#fff;color:#000;border:1px solid #fff;padding:9px 10px;font:11px 'Courier New',monospace;letter-spacing:.15em;cursor:pointer}
+    .action-btn+.action-btn{background:#000;color:#ddd;border-color:#555}
+    .action-btn:hover{filter:brightness(.85)}
     /* VX GEN (patterns tab) */
     .gen{flex:1;min-width:0;width:100%;display:flex;flex-direction:column;height:calc(100vh - 90px);padding:10px 12px;gap:10px;font-family:'Courier New',monospace;color:#e8e8e6}
     .gen-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border:1px solid #222;padding:8px 10px}
@@ -3654,10 +3670,38 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
 
       // ========== TAB CONTENT FUNCTIONALITY ==========
 
-      // Videos Tab Functionality
+      // ===== Videos + Images tabs: the V3XV0ID catalogue (vx/catalogue.json) plus local files =====
+      // Remote media is copied into a local cache before it goes to the output, so a set keeps running offline.
+      const mediaCacheDir = require('path').join(require('@electron/remote').app.getPath('userData'), 'media-cache');
+      async function cacheMedia(item) {
+        if (item.source === 'local') return item.url;
+        const fs = require('fs'), path = require('path');
+        const ext = (item.url.split('?')[0].match(/\.[a-z0-9]+$/i) || ['.bin'])[0].toLowerCase();
+        const file = path.join(mediaCacheDir, require('crypto').createHash('sha1').update(item.url).digest('hex').slice(0, 16) + ext);
+        if (fs.existsSync(file) && fs.statSync(file).size > 0) return file;
+        fs.mkdirSync(mediaCacheDir, { recursive: true });
+        const res = await fetch(item.url);
+        if (!res.ok) throw new Error('download failed (' + res.status + ')');
+        fs.writeFileSync(file + '.part', Buffer.from(await res.arrayBuffer()));
+        fs.renameSync(file + '.part', file);
+        return file;
+      }
+      function catalogue() {
+        try { return JSON.parse(require('fs').readFileSync(require('path').join(__dirname, 'vx', 'catalogue.json'), 'utf8')); }
+        catch (e) { return { clips: [], images: [] }; }
+      }
+      // Load into a new layer on the given deck (the deck showing now if none is given)
+      async function loadMediaItem(item, deck, statusEl) {
+        statusEl.textContent = 'CACHING ' + item.name.toUpperCase() + '…';
+        try {
+          const file = await cacheMedia(item);
+          sendToOutput('add-media-layer', { palette: deck || activePalette, filePaths: [file] });
+          statusEl.textContent = `NEW LAYER ON DECK ${deck || activePalette}`;
+        } catch (e) { statusEl.textContent = 'FAILED: ' + e.message; }
+      }
+
       let videoLibrary = [];
       let selectedVideo = null;
-
       const videoGrid = document.getElementById('videoGrid');
       const videoSearch = document.getElementById('videoSearch');
       const loadLocalVideosBtn = document.getElementById('loadLocalVideosBtn');
@@ -3669,113 +3713,49 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
       const loadToLayerBtn = document.getElementById('loadToLayerBtn');
       const loadToBackgroundBtn = document.getElementById('loadToBackgroundBtn');
 
-      // Initialize Videos Tab
       async function initializeVideosTab() {
-        try {
-          console.log('🎬 Loading V3XV0ID video library from Supabase...');
-          
-          // Load V3XV0ID cloud manager
-          const { V3XV0IDCloudManager } = require('./supabase-config');
-          const cloudManager = new V3XV0IDCloudManager();
-          
-          // Initialize cloud connection
-          await cloudManager.initialize();
-          
-          // Get all files from v3xv0id-videos bucket (including folders like vex_video_jam_01)
-          const allFiles = await cloudManager.listFiles('v3xv0id-videos');
-          const videoFiles = allFiles.filter(file => 
-            file.name.match(/\.(mp4|mov|avi|webm|mkv)$/i) && 
-            !file.name.includes('/.') // Exclude hidden files
-          );
-          
-          console.log(`📹 Found ${videoFiles.length} video files in V3XV0ID cloud`);
-          
-          videoLibrary = videoFiles.map((video, index) => ({
-            id: index,
-            name: video.name.replace(/.*\//, ''), // Remove path, keep filename
-            url: cloudManager.getPublicUrl('v3xv0id-videos', video.name),
-            source: 'cloud',
-            format: video.name.split('.').pop().toUpperCase(),
-            size: video.metadata?.size || 'Unknown',
-            created: video.created_at,
-            path: video.name, // Keep full path for reference
-            folder: video.name.includes('/') ? video.name.split('/')[0] : 'root'
-          }));
-          
-          // Update cloud status
-          const statusEl = document.getElementById('videoCloudStatus');
-          if (statusEl) {
-            statusEl.textContent = `✅ CLOUD (${videoFiles.length} VIDEOS)`;
-            statusEl.className = 'cloud-status connected';
-          }
-          
-        } catch (error) {
-          console.log('⚠️ Cloud videos not available, using demo mode:', error.message);
-          
-          // Update cloud status
-          const statusEl = document.getElementById('videoCloudStatus');
-          if (statusEl) {
-            statusEl.textContent = '🎭 DEMO MODE';
-            statusEl.className = 'cloud-status demo';
-          }
-          // Demo videos
-          videoLibrary = [
-            { id: 0, name: 'DEMO_ABSTRACT_01.mp4', url: null, source: 'demo', format: 'MP4' },
-            { id: 1, name: 'DEMO_TUNNEL_02.mp4', url: null, source: 'demo', format: 'MP4' },
-            { id: 2, name: 'DEMO_FRACTAL_03.mp4', url: null, source: 'demo', format: 'MP4' },
-            { id: 3, name: 'DEMO_CYBER_04.mp4', url: null, source: 'demo', format: 'MP4' },
-            { id: 4, name: 'DEMO_MATRIX_05.mp4', url: null, source: 'demo', format: 'MP4' }
-          ];
-        }
-        
+        const local = videoLibrary.filter(v => v.source === 'local');
+        videoLibrary = catalogue().clips.map(c => ({ name: c.name, url: c.url, format: 'MP4', source: c.set === 'rough' ? 'rough' : 'smooth' }));
+        local.forEach(v => videoLibrary.push(v));
+        videoLibrary.forEach((v, i) => { v.id = i; });
+        document.getElementById('videoCloudStatus').textContent = `● V3XV0ID CLIPS · ${videoLibrary.length}`;
         renderVideoLibrary();
-        console.log(`✅ Video library loaded: ${videoLibrary.length} videos`);
       }
-
       function renderVideoLibrary() {
         videoGrid.innerHTML = '';
-        
-        const filteredVideos = videoLibrary.filter(video => 
-          video.name.toLowerCase().includes(videoSearch.value.toLowerCase())
-        );
-        
-        filteredVideos.forEach(video => {
-          const videoItem = document.createElement('div');
-          videoItem.className = 'video-item';
-          videoItem.innerHTML = `
-            <div class="video-thumbnail">🎬</div>
-            <div class="video-name">${video.name}</div>
-          `;
-          
-          videoItem.addEventListener('click', () => {
-            previewVideo(video);
-          });
-          
-          videoGrid.appendChild(videoItem);
+        const q = (videoSearch.value || '').toLowerCase();
+        videoLibrary.filter(v => v.name.toLowerCase().includes(q) || (v.source || '').includes(q)).forEach(video => {
+          const item = document.createElement('div');
+          item.className = 'video-item';
+          const thumb = document.createElement('video');
+          thumb.className = 'media-thumb'; thumb.muted = true; thumb.preload = 'metadata'; thumb.playsInline = true;
+          thumb.src = (video.source === 'local' ? 'file://' + encodeURI(video.url) : video.url) + '#t=1';
+          item.addEventListener('mouseenter', () => thumb.play().catch(() => {}));
+          item.addEventListener('mouseleave', () => thumb.pause());
+          const name = document.createElement('div');
+          name.className = 'video-name'; name.textContent = video.name;
+          item.append(thumb, name);
+          item.addEventListener('click', () => previewVideo(video));
+          videoGrid.appendChild(item);
         });
       }
-
       function previewVideo(video) {
         selectedVideo = video;
         document.getElementById('videoPreviewTitle').textContent = video.name;
-        document.getElementById('videoPreviewDetails').textContent = 
-          `Format: ${video.format} • Source: ${video.source.toUpperCase()}`;
-        
-        if (video.url) {
-          videoPreviewSource.src = video.url;
-          videoPreviewPlayer.load();
-        } else {
-          videoPreviewSource.src = '';
-          videoPreviewPlayer.load();
-        }
-        
+        document.getElementById('videoPreviewDetails').textContent = `${video.format} · ${String(video.source).toUpperCase()}`;
+        videoPreviewSource.src = video.source === 'local' ? 'file://' + encodeURI(video.url) : video.url;
+        videoPreviewPlayer.load();
+        videoPreviewPlayer.play().catch(() => {});
         videoPreviewPanel.style.display = 'block';
       }
+      loadToLayerBtn.textContent = 'LOAD → DECK A';
+      loadToBackgroundBtn.textContent = 'LOAD → DECK B';
+      loadToLayerBtn.addEventListener('click', () => selectedVideo && loadMediaItem(selectedVideo, 'A', document.getElementById('videoPreviewDetails')));
+      loadToBackgroundBtn.addEventListener('click', () => selectedVideo && loadMediaItem(selectedVideo, 'B', document.getElementById('videoPreviewDetails')));
+      refreshVideosBtn.addEventListener('click', initializeVideosTab);
 
-      // Images Tab Functionality
       let imageLibrary = [];
       let selectedImage = null;
-
       const imageGrid = document.getElementById('imageGrid');
       const imageSearch = document.getElementById('imageSearch');
       const loadLocalImagesBtn = document.getElementById('loadLocalImagesBtn');
@@ -3786,107 +3766,47 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
       const loadImageToLayerBtn = document.getElementById('loadImageToLayerBtn');
       const loadImageToBackgroundBtn = document.getElementById('loadImageToBackgroundBtn');
 
-      // Initialize Images Tab
       async function initializeImagesTab() {
-        try {
-          console.log('🖼️ Loading V3XV0ID image library from Supabase...');
-          
-          // Load V3XV0ID cloud manager
-          const { V3XV0IDCloudManager } = require('./supabase-config');
-          const cloudManager = new V3XV0IDCloudManager();
-          
-          // Initialize cloud connection
-          await cloudManager.initialize();
-          
-          // Get all files from v3xv0id-images bucket (including folders)
-          const allFiles = await cloudManager.listFiles('v3xv0id-images');
-          const imageFiles = allFiles.filter(file => 
-            file.name.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i) && 
-            !file.name.includes('/.') // Exclude hidden files
-          );
-          
-          console.log(`🎨 Found ${imageFiles.length} image files in V3XV0ID cloud`);
-          
-          imageLibrary = imageFiles.map((image, index) => ({
-            id: index,
-            name: image.name.replace(/.*\//, ''), // Remove path, keep filename
-            url: cloudManager.getPublicUrl('v3xv0id-images', image.name),
-            source: 'cloud',
-            format: image.name.split('.').pop().toUpperCase(),
-            size: image.metadata?.size || 'Unknown',
-            created: image.created_at,
-            path: image.name, // Keep full path for reference
-            folder: image.name.includes('/') ? image.name.split('/')[0] : 'root'
-          }));
-          
-          // Update cloud status
-          const statusEl = document.getElementById('imageCloudStatus');
-          if (statusEl) {
-            statusEl.textContent = `✅ CLOUD (${imageFiles.length} IMAGES)`;
-            statusEl.className = 'cloud-status connected';
-          }
-          
-        } catch (error) {
-          console.log('⚠️ Cloud images not available, using demo mode:', error.message);
-          
-          // Update cloud status
-          const statusEl = document.getElementById('imageCloudStatus');
-          if (statusEl) {
-            statusEl.textContent = '🎭 DEMO MODE';
-            statusEl.className = 'cloud-status demo';
-          }
-          // Demo images
-          imageLibrary = [
-            { id: 0, name: 'DEMO_ABSTRACT_01.jpg', url: null, source: 'demo', format: 'JPG' },
-            { id: 1, name: 'DEMO_GEOMETRIC_02.png', url: null, source: 'demo', format: 'PNG' },
-            { id: 2, name: 'DEMO_FRACTAL_03.jpg', url: null, source: 'demo', format: 'JPG' },
-            { id: 3, name: 'DEMO_CYBER_04.jpg', url: null, source: 'demo', format: 'JPG' },
-            { id: 4, name: 'DEMO_NEON_05.png', url: null, source: 'demo', format: 'PNG' },
-            { id: 5, name: 'DEMO_GLITCH_06.jpg', url: null, source: 'demo', format: 'JPG' }
-          ];
-        }
-        
+        const local = imageLibrary.filter(v => v.source === 'local');
+        imageLibrary = catalogue().images.map(im => ({ name: im.name, url: im.url, format: (im.url.match(/\.([a-z]+)$/i) || [, 'IMG'])[1].toUpperCase(), source: im.set }));
+        local.forEach(v => imageLibrary.push(v));
+        imageLibrary.forEach((v, i) => { v.id = i; });
+        document.getElementById('imageCloudStatus').textContent = `● V3XV0ID IMAGES · ${imageLibrary.length}`;
         renderImageLibrary();
-        console.log(`✅ Image library loaded: ${imageLibrary.length} images`);
       }
-
       function renderImageLibrary() {
         imageGrid.innerHTML = '';
-        
-        const filteredImages = imageLibrary.filter(image => 
-          image.name.toLowerCase().includes(imageSearch.value.toLowerCase())
-        );
-        
-        filteredImages.forEach(image => {
-          const imageItem = document.createElement('div');
-          imageItem.className = 'image-item';
-          imageItem.innerHTML = `
-            <div class="image-thumbnail">🖼️</div>
-            <div class="image-name">${image.name}</div>
-          `;
-          
-          imageItem.addEventListener('click', () => {
-            previewImage(image);
-          });
-          
-          imageGrid.appendChild(imageItem);
+        const q = (imageSearch.value || '').toLowerCase();
+        imageLibrary.filter(v => v.name.toLowerCase().includes(q) || String(v.source).toLowerCase().includes(q)).forEach(image => {
+          const item = document.createElement('div');
+          item.className = 'image-item';
+          const img = document.createElement('img');
+          img.className = 'media-thumb'; img.loading = 'lazy';
+          img.src = image.source === 'local' ? 'file://' + encodeURI(image.url) : image.url;
+          const name = document.createElement('div');
+          name.className = 'image-name'; name.textContent = image.name;
+          item.append(img, name);
+          item.addEventListener('click', () => previewImage(image));
+          imageGrid.appendChild(item);
         });
       }
-
       function previewImage(image) {
         selectedImage = image;
         document.getElementById('imagePreviewTitle').textContent = image.name;
-        document.getElementById('imagePreviewDetails').textContent = 
-          `Format: ${image.format} • Source: ${image.source.toUpperCase()}`;
-        
-        if (image.url) {
-          imagePreviewImg.src = image.url;
-        } else {
-          imagePreviewImg.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMzMzIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiNmZmYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5ERU1PPC90ZXh0Pjwvc3ZnPg==';
-        }
-        
+        document.getElementById('imagePreviewDetails').textContent = `${image.format} · ${String(image.source).toUpperCase()}`;
+        imagePreviewImg.src = image.source === 'local' ? 'file://' + encodeURI(image.url) : image.url;
         imagePreviewPanel.style.display = 'block';
       }
+      loadImageToLayerBtn.textContent = 'LOAD TO NEW LAYER';
+      loadImageToBackgroundBtn.textContent = 'SET AS BACKGROUND';
+      loadImageToLayerBtn.addEventListener('click', () => selectedImage && loadMediaItem(selectedImage, null, document.getElementById('imagePreviewDetails')));
+      loadImageToBackgroundBtn.addEventListener('click', async () => {
+        if (!selectedImage) return;
+        const st = document.getElementById('imagePreviewDetails');
+        try { sendToOutput('set-default-background', { imagePath: await cacheMedia(selectedImage) }); st.textContent = 'BACKGROUND SET'; }
+        catch (e) { st.textContent = 'FAILED: ' + e.message; }
+      });
+      refreshImagesBtn.addEventListener('click', initializeImagesTab);
 
       // ===== VX GEN (Patterns tab): generative p5 sketches, previewed here and sent to output layers =====
       const patternCodeEditor = document.getElementById('patternCodeEditor');
@@ -4180,170 +4100,137 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       }
       genEl('genAskBtn').addEventListener('click', askClaude);
 
-      // Music Tab Functionality
+      // ===== Music tab: the V3XV0ID catalogue (vx/catalogue.json, public storage) plus local files =====
       let musicLibraryTracks = [];
       let currentAudio = null;
       let currentTrackIndex = -1;
-      let audioContext = null;
-      let analyser = null;
-      let dataArray = null;
+      let musicShuffle = false, musicRepeat = false;
 
       const musicLibrary = document.getElementById('musicLibrary');
       const musicSearch = document.getElementById('musicSearch');
-      const loadLocalMusicBtn = document.getElementById('loadLocalMusicBtn');
-      const refreshMusicBtn = document.getElementById('refreshMusicBtn');
-      const currentTrackTitle = document.getElementById('currentTrackTitle');
-      const currentTrackArtist = document.getElementById('currentTrackArtist');
-      const trackFormat = document.getElementById('trackFormat');
-      const playPauseTrackBtn = document.getElementById('playPauseTrackBtn');
-      const nextTrackBtn = document.getElementById('nextTrackBtn');
-      const prevTrackBtn = document.getElementById('prevTrackBtn');
-      const shuffleBtn = document.getElementById('shuffleBtn');
-      const repeatBtn = document.getElementById('repeatBtn');
-      const progressSlider = document.getElementById('progressSlider');
-      const currentTime = document.getElementById('currentTime');
-      const totalTime = document.getElementById('totalTime');
-      const volumeSlider = document.getElementById('volumeSlider');
-      const volumeValue = document.getElementById('volumeValue');
-      const playerStatus = document.getElementById('playerStatus');
-      const audioVisualizerCanvas = document.getElementById('audioVisualizerCanvas');
+      const musicEl = id => document.getElementById(id);
+      const mmss = s => (isFinite(s) && s > 0) ? `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}` : '00:00';
 
-      // Initialize Music Tab
+      function musicAudio() {
+        if (currentAudio) return currentAudio;
+        currentAudio = new Audio();
+        currentAudio.crossOrigin = 'anonymous'; // the storage sends CORS headers, so the analyser can read it
+        currentAudio.preload = 'auto';
+        currentAudio.volume = musicEl('volumeSlider').value / 100;
+        currentAudio.addEventListener('timeupdate', () => {
+          musicEl('currentTime').textContent = mmss(currentAudio.currentTime);
+          if (currentAudio.duration) musicEl('progressSlider').value = (currentAudio.currentTime / currentAudio.duration) * 100;
+        });
+        currentAudio.addEventListener('loadedmetadata', () => { musicEl('totalTime').textContent = mmss(currentAudio.duration); });
+        currentAudio.addEventListener('ended', () => (musicRepeat ? playTrack(currentTrackIndex) : nextTrack()));
+        currentAudio.addEventListener('play', () => { musicEl('playPauseTrackBtn').textContent = '⏸️'; musicEl('playerStatus').textContent = 'PLAYING'; });
+        currentAudio.addEventListener('pause', () => { musicEl('playPauseTrackBtn').textContent = '▶️'; musicEl('playerStatus').textContent = 'PAUSED'; });
+        currentAudio.addEventListener('waiting', () => { musicEl('playerStatus').textContent = 'BUFFERING'; });
+        currentAudio.addEventListener('playing', () => { musicEl('playerStatus').textContent = 'PLAYING'; });
+        currentAudio.addEventListener('error', () => { musicEl('playerStatus').textContent = 'COULD NOT LOAD TRACK'; });
+        return currentAudio;
+      }
+
       async function initializeMusicTab() {
+        if (musicLibraryTracks.length) { renderMusicLibrary(); return; }
         try {
-          console.log('🎵 Loading V3XV0ID music library from Supabase...');
-          
-          // Load V3XV0ID cloud manager
-          const { V3XV0IDCloudManager } = require('./supabase-config');
-          const cloudManager = new V3XV0IDCloudManager();
-          
-          // Initialize cloud connection
-          await cloudManager.initialize();
-          
-          // Get music tracks from v3xv0id-music bucket (including folders)
-          const allFiles = await cloudManager.listFiles('v3xv0id-music');
-          const musicFiles = allFiles.filter(file => 
-            file.name.match(/\.(mp3|wav|m4a|flac|ogg)$/i) && 
-            !file.name.includes('/.') // Exclude hidden files
-          );
-          
-          console.log(`🎶 Found ${musicFiles.length} music files in V3XV0ID cloud`);
-          
-          musicLibraryTracks = musicFiles.map((track, index) => ({
-            id: index,
-            name: track.name.replace(/\.[^/.]+$/, '').replace(/.*\//, ''), // Remove path and extension
-            artist: 'V3XV0ID',
-            format: track.name.split('.').pop().toUpperCase(),
-            duration: '00:00', // Will be updated when loaded
-            url: cloudManager.getPublicUrl('v3xv0id-music', track.name),
-            size: track.metadata?.size || 'Unknown',
-            created: track.created_at,
-            path: track.name // Keep full path for reference
+          const cat = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, 'vx', 'catalogue.json'), 'utf8'));
+          musicLibraryTracks = cat.tracks.map((t, i) => ({
+            id: i, name: t.take && t.take !== 'A' ? `${t.title} · ${t.take}` : t.title, artist: 'V3XV0ID',
+            format: 'MP3', duration: mmss(t.seconds), url: t.url, source: 'catalogue'
           }));
-          
-          // Update cloud status
-          const statusEl = document.getElementById('musicCloudStatus');
-          if (statusEl) {
-            statusEl.textContent = `✅ CLOUD (${musicFiles.length} TRACKS)`;
-            statusEl.className = 'cloud-status connected';
-          }
-          
-        } catch (error) {
-          console.log('⚠️ Cloud music not available, using demo mode:', error.message);
-          
-          // Update cloud status
-          const statusEl = document.getElementById('musicCloudStatus');
-          if (statusEl) {
-            statusEl.textContent = '🎭 DEMO MODE';
-            statusEl.className = 'cloud-status demo';
-          }
-          // Demo tracks
-          musicLibraryTracks = [
-            { id: 0, name: 'ECHOES IN THE ABYSS', artist: 'V3XV0ID', format: 'MP3', duration: '03:45', url: null },
-            { id: 1, name: 'DIGITAL SHADOWS', artist: 'V3XV0ID', format: 'MP3', duration: '04:12', url: null },
-            { id: 2, name: 'CYBER DREAMS', artist: 'V3XV0ID', format: 'MP3', duration: '03:28', url: null },
-            { id: 3, name: 'NEON PULSE', artist: 'V3XV0ID', format: 'MP3', duration: '04:56', url: null },
-            { id: 4, name: 'DATA STREAM', artist: 'V3XV0ID', format: 'MP3', duration: '03:15', url: null }
-          ];
+          musicEl('musicCloudStatus').textContent = `● V3XV0ID CATALOGUE · ${musicLibraryTracks.length} TRACKS`;
+        } catch (e) {
+          musicEl('musicCloudStatus').textContent = 'CATALOGUE MISSING · LOAD LOCAL FILES';
         }
-        
         renderMusicLibrary();
         initializeAudioVisualizer();
-        console.log(`✅ Music library loaded: ${musicLibraryTracks.length} tracks`);
       }
 
       function renderMusicLibrary() {
         musicLibrary.innerHTML = '';
-        
-        const filteredTracks = musicLibraryTracks.filter(track => 
-          track.name.toLowerCase().includes(musicSearch.value.toLowerCase()) ||
-          track.artist.toLowerCase().includes(musicSearch.value.toLowerCase())
-        );
-        
-        filteredTracks.forEach(track => {
-          const trackItem = document.createElement('div');
-          trackItem.className = 'music-track-item';
-          if (currentTrackIndex === track.id) {
-            trackItem.classList.add('playing');
-          }
-          
-          trackItem.innerHTML = `
-            <div class="track-number">${track.id + 1}</div>
-            <div class="track-details">
-              <div class="track-name">${track.name}</div>
-              <div class="track-meta">${track.artist} • ${track.format}</div>
-            </div>
-            <div class="track-duration">${track.duration}</div>
-          `;
-          
-          trackItem.addEventListener('click', () => {
-            playTrack(track.id);
-          });
-          
-          musicLibrary.appendChild(trackItem);
+        const q = (musicSearch.value || '').toLowerCase();
+        musicLibraryTracks.filter(t => t.name.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q)).forEach(track => {
+          const row = document.createElement('div');
+          row.className = 'music-track-item' + (currentTrackIndex === track.id ? ' playing' : '');
+          row.innerHTML = `<div class="track-number">${track.id + 1}</div><div class="track-details"><div class="track-name"></div><div class="track-meta">${track.artist} • ${track.format}</div></div><div class="track-duration">${track.duration}</div>`;
+          row.querySelector('.track-name').textContent = track.name;
+          row.addEventListener('click', () => playTrack(track.id));
+          musicLibrary.appendChild(row);
         });
       }
 
+      function playTrack(id) {
+        const track = musicLibraryTracks[id];
+        if (!track) return;
+        const a = musicAudio();
+        currentTrackIndex = id;
+        a.src = track.source === 'local' ? 'file://' + encodeURI(track.url) : track.url;
+        a.play().catch(err => { musicEl('playerStatus').textContent = 'PLAY FAILED: ' + err.message; });
+        musicEl('currentTrackTitle').textContent = track.name.toUpperCase();
+        musicEl('currentTrackArtist').textContent = track.artist;
+        musicEl('trackFormat').textContent = track.format + ' · ' + track.duration;
+        renderMusicLibrary();
+        // the sketches follow the music unless the VJ picked another source
+        const sel = document.getElementById('genAudio');
+        if (sel && sel.value !== 'input') { sel.value = 'music'; VXGEN.listen(a); }
+      }
+      function nextTrack() {
+        if (!musicLibraryTracks.length) return;
+        const n = musicShuffle ? Math.floor(Math.random() * musicLibraryTracks.length) : (currentTrackIndex + 1) % musicLibraryTracks.length;
+        playTrack(n);
+      }
+      function prevTrack() {
+        if (currentAudio && currentAudio.currentTime > 3) { currentAudio.currentTime = 0; return; }
+        playTrack((currentTrackIndex - 1 + musicLibraryTracks.length) % musicLibraryTracks.length);
+      }
+      function togglePlay() {
+        if (currentTrackIndex < 0) { playTrack(0); return; }
+        const a = musicAudio();
+        if (a.paused) a.play().catch(() => {}); else a.pause();
+      }
+
+      musicEl('playPauseTrackBtn').addEventListener('click', togglePlay);
+      musicEl('nextTrackBtn').addEventListener('click', nextTrack);
+      musicEl('prevTrackBtn').addEventListener('click', prevTrack);
+      musicEl('shuffleBtn').addEventListener('click', e => { musicShuffle = !musicShuffle; e.currentTarget.classList.toggle('active', musicShuffle); });
+      musicEl('repeatBtn').addEventListener('click', e => { musicRepeat = !musicRepeat; e.currentTarget.classList.toggle('active', musicRepeat); });
+      musicEl('progressSlider').addEventListener('input', e => { if (currentAudio && currentAudio.duration) currentAudio.currentTime = (e.target.value / 100) * currentAudio.duration; });
+      musicEl('volumeSlider').addEventListener('input', e => { musicEl('volumeValue').textContent = e.target.value + '%'; if (currentAudio) currentAudio.volume = e.target.value / 100; });
+      musicEl('refreshMusicBtn').addEventListener('click', () => { musicLibraryTracks = musicLibraryTracks.filter(t => t.source === 'local'); const local = musicLibraryTracks; musicLibraryTracks = []; initializeMusicTab().then(() => { local.forEach(t => musicLibraryTracks.push({ ...t, id: musicLibraryTracks.length })); renderMusicLibrary(); }); });
+      musicEl('loadLocalMusicBtn').addEventListener('click', async () => {
+        const res = await dialog.showOpenDialog({ properties: ['openFile', 'multiSelections'], filters: [{ name: 'Audio', extensions: ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aiff'] }] });
+        if (res.canceled) return;
+        res.filePaths.forEach(fp => {
+          const f = require('path').basename(fp);
+          musicLibraryTracks.push({ id: musicLibraryTracks.length, name: f.replace(/\.[^/.]+$/, ''), artist: 'LOCAL', format: f.split('.').pop().toUpperCase(), duration: '--:--', url: fp, source: 'local' });
+        });
+        renderMusicLibrary();
+      });
+
+      // Monochrome spectrum from the shared analyser (VXGEN), flat line when nothing is playing
+      let musicVisualizerOn = false;
       function initializeAudioVisualizer() {
-        const canvas = audioVisualizerCanvas;
-        const ctx = canvas.getContext('2d');
-        
-        function animate() {
-          requestAnimationFrame(animate);
-          
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+        if (musicVisualizerOn) return;
+        musicVisualizerOn = true;
+        const canvas = document.getElementById('audioVisualizerCanvas'), ctx = canvas.getContext('2d');
+        let bins = null;
+        (function frame() {
+          requestAnimationFrame(frame);
+          ctx.fillStyle = 'rgba(0,0,0,0.35)';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
-          
-          if (analyser && dataArray) {
-            analyser.getByteFrequencyData(dataArray);
-            
-            const barWidth = canvas.width / dataArray.length;
-            let x = 0;
-            
-            for (let i = 0; i < dataArray.length; i++) {
-              const barHeight = (dataArray[i] / 255) * canvas.height;
-              
-              const hue = (i / dataArray.length) * 360;
-              ctx.fillStyle = `hsl(${hue}, 80%, 60%)`;
-              ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
-              
-              x += barWidth;
+          const an = VXGEN.analyser && VXGEN.analyser();
+          ctx.fillStyle = '#fff';
+          if (an) {
+            if (!bins || bins.length !== an.frequencyBinCount) bins = new Uint8Array(an.frequencyBinCount);
+            an.getByteFrequencyData(bins);
+            const n = 64, w = canvas.width / n;
+            for (let i = 0; i < n; i++) {
+              const v = bins[Math.floor(Math.pow(i / n, 1.8) * bins.length * 0.7)] / 255;
+              ctx.fillRect(i * w + 1, canvas.height - v * canvas.height, w - 2, v * canvas.height);
             }
-          } else {
-            // Placeholder animation when no audio
-            const time = Date.now() * 0.001;
-            for (let i = 0; i < 32; i++) {
-              const barHeight = (Math.sin(time + i * 0.5) + 1) * 20 + 10;
-              const x = (i / 32) * canvas.width;
-              const hue = (i / 32) * 360;
-              
-              ctx.fillStyle = `hsl(${hue}, 50%, 30%)`;
-              ctx.fillRect(x, canvas.height - barHeight, canvas.width / 32, barHeight);
-            }
-          }
-        }
-        
-        animate();
+          } else ctx.fillRect(0, canvas.height - 1, canvas.width, 1);
+        })();
       }
 
       // Composer Tab Functionality
@@ -4571,34 +4458,6 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         });
       }
 
-      if (loadLocalMusicBtn) {
-        loadLocalMusicBtn.addEventListener('click', () => {
-          // File dialog for local music
-          dialog.showOpenDialog({
-            properties: ['openFile', 'multiSelections'],
-            filters: [
-              { name: 'Audio', extensions: ['mp3', 'wav', 'ogg', 'flac', 'm4a'] }
-            ]
-          }).then(result => {
-            if (!result.canceled) {
-              result.filePaths.forEach((filePath, index) => {
-                const fileName = path.basename(filePath);
-                musicLibraryTracks.push({
-                  id: musicLibraryTracks.length,
-                  name: fileName.replace(/\.[^/.]+$/, ''),
-                  artist: 'LOCAL',
-                  format: fileName.split('.').pop().toUpperCase(),
-                  duration: '00:00',
-                  url: filePath
-                });
-              });
-              renderMusicLibrary();
-            }
-          });
-        });
-      }
-
-      
       // Composer controls
       if (startRecordingBtn) startRecordingBtn.addEventListener('click', startRecording);
       if (stopRecordingBtn) stopRecordingBtn.addEventListener('click', stopRecording);
@@ -4624,13 +4483,13 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           const targetTab = button.getAttribute('data-tab');
           
           // Initialize tab content when first opened
-          if (targetTab === 'videos' && videoLibrary.length === 0) {
+          if (targetTab === 'videos' && !videoLibrary.some(v => v.source !== 'local')) {
             initializeVideosTab();
-          } else if (targetTab === 'images' && imageLibrary.length === 0) {
+          } else if (targetTab === 'images' && !imageLibrary.some(v => v.source !== 'local')) {
             initializeImagesTab();
           } else if (targetTab === 'patterns') {
             initializePatternsTab();
-          } else if (targetTab === 'music' && musicLibraryTracks.length === 0) {
+          } else if (targetTab === 'music') {
             initializeMusicTab();
           } else if (targetTab === 'composer') {
             initializeComposerTab();

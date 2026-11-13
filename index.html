@@ -457,6 +457,11 @@
           case 'crossfader-update':
             handleCrossfaderUpdate(data);
             break;
+          case 'add-media-layer':
+            createLayer(data.palette || 'A');
+            loadImagesFromPaths(layers[layers.length - 1].id, data.filePaths);
+            applyCrossfaderOpacities();
+            break;
           case 'add-gen-layer':
             createLayer(data.palette || 'A');
             applyGen(layers[layers.length - 1], data);

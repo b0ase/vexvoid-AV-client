@@ -157,7 +157,11 @@
   }
   function unlisten() {
     cancelAnimationFrame(audio.raf);
-    if (audio.src) { try { audio.src.disconnect(); } catch (e) {} }
+    if (audio.src) {
+      try { audio.src.disconnect(); } catch (e) {}
+      // a media element routed into Web Audio only sounds through the graph, so keep it audible
+      if (audio.src instanceof MediaElementAudioSourceNode) audio.src.connect(audio.ctx.destination);
+    }
     if (audio.stream) audio.stream.getTracks().forEach(function (t) { t.stop(); });
     audio.src = audio.stream = null; audio.an = null;
     signals.external = false; signals.level = signals.bass = signals.mid = signals.high = 0;
@@ -189,5 +193,6 @@
   root.VXGEN = { mount: mount, check: check, compile: compile, signals: signals, listen: listen, unlisten: unlisten,
     tap: function () { var now = performance.now(), t = root.VXGEN._taps = (root.VXGEN._taps || []).filter(function (x) { return now - x < 3000; }); t.push(now);
       if (t.length > 1) { var dt = (t[t.length - 1] - t[0]) / (t.length - 1); signals.bpm = Math.round(60000 / dt); } signals.beat0 = now; return signals.bpm; },
+    analyser: function () { return audio.an; },
     ready: !!P5 };
 })(typeof window !== 'undefined' ? window : this);
