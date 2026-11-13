@@ -260,6 +260,7 @@
   </div>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Michroma&family=IBM+Plex+Mono:wght@400;500&display=swap">
   <script src="./vx/vx-engine.js"></script>
+  <script src="./vx/vx-gen.js"></script>
   <script>
     // ===== VX engine: mounted once, driven from the controls window over IPC ('vx' command) =====
     window.addEventListener('DOMContentLoaded', function() {
@@ -358,8 +359,8 @@
               return layerZ > topZ ? layer : top;
             });
             
-            if (topLayer.imageElement && topLayer.imageElement.src) {
-              previewData.imageSrc = topLayer.imageElement.src;
+            if (layerSrc(topLayer)) {
+              previewData.imageSrc = layerSrc(topLayer);
               previewData.opacity = (topLayer.opacity || 100) / 100;
               previewData.scale = (topLayer.size || 100) / 100;
               previewData.inverse = topLayer.inverse || false;
@@ -372,7 +373,7 @@
           id: layer.id,
           name: layer.name,
           visible: layer.visible,
-          imageSrc: layer.imageElement ? layer.imageElement.src : null,
+          imageSrc: layerSrc(layer),
           opacity: (layer.opacity || 100) / 100,
           scale: (layer.size || 100) / 100,
           inverse: layer.inverse || false,
@@ -386,14 +387,14 @@
         const paletteBLayers = layers.filter(l => (l.palette || 'A') === 'B' && l.visible);
         
         previewData.paletteA = paletteALayers.length > 0 ? {
-          imageSrc: paletteALayers[paletteALayers.length - 1].imageElement?.src || null,
+          imageSrc: layerSrc(paletteALayers[paletteALayers.length - 1]),
           opacity: (paletteALayers[paletteALayers.length - 1].opacity || 100) / 100,
           scale: (paletteALayers[paletteALayers.length - 1].size || 100) / 100,
           inverse: paletteALayers[paletteALayers.length - 1].inverse || false
         } : null;
         
         previewData.paletteB = paletteBLayers.length > 0 ? {
-          imageSrc: paletteBLayers[paletteBLayers.length - 1].imageElement?.src || null,
+          imageSrc: layerSrc(paletteBLayers[paletteBLayers.length - 1]),
           opacity: (paletteBLayers[paletteBLayers.length - 1].opacity || 100) / 100,
           scale: (paletteBLayers[paletteBLayers.length - 1].size || 100) / 100,
           inverse: paletteBLayers[paletteBLayers.length - 1].inverse || false
@@ -455,6 +456,30 @@
             break;
           case 'crossfader-update':
             handleCrossfaderUpdate(data);
+            break;
+          case 'add-gen-layer':
+            createLayer(data.palette || 'A');
+            applyGen(layers[layers.length - 1], data);
+            applyCrossfaderOpacities();
+            sendLayersUpdate();
+            break;
+          case 'apply-gen':
+            data.layerIds.forEach(id => { const l = layers.find(x => x.id === id); if (l) applyGen(l, data); });
+            sendLayersUpdate();
+            break;
+          case 'gen-params':
+            genLayers(data.key).forEach(l => { l.gen.setParams(data.params); Object.assign(l.genSpec.params, data.params); });
+            break;
+          case 'gen-seed':
+            genLayers(data.key).forEach(l => { l.gen.reseed(data.seed); l.genSpec.seed = data.seed; });
+            break;
+          case 'gen-scale':
+          case 'gen-code':
+            genLayers(data.key).forEach(l => applyGen(l, { ...l.genSpec, ...data, key: data.key }));
+            sendLayersUpdate();
+            break;
+          case 'gen-signals':
+            handleGenSignals(data);
             break;
           case 'apply-pattern':
             applyPatternToLayers(data);
@@ -560,6 +585,7 @@
         if (layerImages.length > 0) {
           const layer = layers.find(l => l.id === layerId);
           if (layer) {
+            stopGen(layer); // loading media into a sketch layer replaces the sketch
             // Update layer name to include layer number and content name
             if (layerName) {
               layer.name = `Layer ${layer.id}: ${layerName}`;
@@ -789,6 +815,60 @@
       // The layer list lives in the controls window now (fed by sendLayersUpdate), so the output has
       // nothing to redraw. Kept so the frame loop and loaders that still call it don't throw.
       function updateLayersList() {}
+
+      // ===== VX GEN layers: a layer whose content is a running generative sketch (vx/vx-gen.js) =====
+      function applyGen(layer, g) {
+        stopGen(layer);
+        stopLayerAnimation(layer);
+        layer.imageFiles = [];
+        if (layer.imageElement) layer.imageElement.style.display = 'none';
+        const host = document.createElement('div');
+        host.className = 'gen-host';
+        host.style.cssText = 'position:absolute;inset:0;pointer-events:none';
+        layer.element.appendChild(host);
+        layer.genHost = host;
+        layer.genKey = g.key;
+        layer.genSpec = { code: g.code, name: g.name, seed: g.seed, params: { ...g.params }, scale: g.scale || 0.75 };
+        layer.name = `Layer ${layer.id}: ${g.name || 'GEN'} (GEN)`;
+        try {
+          layer.gen = VXGEN.mount(host, g.code, { seed: g.seed, params: g.params, scale: layer.genSpec.scale,
+            onError: msg => sendToControl('gen-error', { layerId: layer.id, error: msg }) });
+        } catch (e) { sendToControl('gen-error', { layerId: layer.id, error: e.message }); }
+        updatePlaceholderVisibility();
+      }
+      function stopGen(layer) {
+        if (layer.gen) { layer.gen.stop(); layer.gen = null; }
+        if (layer.genHost) { layer.genHost.remove(); layer.genHost = null; }
+        if (layer.imageElement) layer.imageElement.style.display = '';
+        layer.genKey = null; layer.genThumb = null;
+      }
+      function genLayers(key) { return layers.filter(l => l.gen && l.genKey === key); }
+      // small JPEG of a gen layer for the controls-window previews, refreshed a few times a second
+      const genThumbCanvas = document.createElement('canvas');
+      genThumbCanvas.width = 320; genThumbCanvas.height = 180;
+      function layerSrc(layer) {
+        if (!layer) return null;
+        if (!layer.gen) return layer.imageElement ? layer.imageElement.src : null;
+        const now = performance.now();
+        if (!layer.genThumb || now - layer.genThumbAt > 150) {
+          const c = layer.gen.canvas();
+          if (c) {
+            try {
+              genThumbCanvas.getContext('2d').drawImage(c, 0, 0, 320, 180);
+              layer.genThumb = genThumbCanvas.toDataURL('image/jpeg', 0.6);
+              layer.genThumbAt = now;
+            } catch (e) {}
+          }
+        }
+        return layer.genThumb || null;
+      }
+      let genKicksSeen = 0;
+      function handleGenSignals(d) {
+        const s = VXGEN.signals, now = performance.now();
+        s.bpm = d.bpm; s.level = d.level; s.bass = d.bass; s.mid = d.mid; s.high = d.high; s.external = d.external;
+        if (d.kicks !== genKicksSeen) { genKicksSeen = d.kicks; s.kickAt = now; }
+        s.beat0 = now - d.phase * 60000 / (d.bpm || 120);
+      }
 
       // P5.js Pattern Application System
       function applyPatternToLayers(data) {
@@ -1635,6 +1715,7 @@
         const layerIndex = layers.findIndex(l => l.id === layerId);
         if (layerIndex !== -1) {
           const layer = layers[layerIndex];
+          stopGen(layer);
           stopLayerAnimation(layer);
           stopLayerJitter(layer);
           stopLayerStrobe(layer);
@@ -1898,7 +1979,7 @@
       // Removed layers palette toggle logic
 
       function updatePlaceholderVisibility() {
-        const hasVisibleLayers = layers.some(l => l.visible && l.imageFiles && l.imageFiles.length > 0);
+        const hasVisibleLayers = layers.some(l => l.visible && (l.gen || (l.imageFiles && l.imageFiles.length > 0)));
         const hasDefaultBg = defaultBackgroundImage.src && !defaultBackgroundImage.src.endsWith('/');
 
         if (hasVisibleLayers) {

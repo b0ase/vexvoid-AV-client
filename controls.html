@@ -1673,7 +1673,48 @@
     .vx-panel kbd { font: inherit; font-size: 9px; color: #9a9a98; border: 1px solid rgba(255,255,255,.3); padding: 0 4px; }
     .vx-panel output { color: #9a9a98; text-align: right; font-variant-numeric: tabular-nums; }
     .vx-foot { color: #9a9a98; font-size: 9px; letter-spacing: .08em; }
-  </style>
+  
+    /* VX GEN (patterns tab) */
+    .gen{flex:1;min-width:0;width:100%;display:flex;flex-direction:column;height:calc(100vh - 90px);padding:10px 12px;gap:10px;font-family:'Courier New',monospace;color:#e8e8e6}
+    .gen-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border:1px solid #222;padding:8px 10px}
+    .gen-title{font-weight:700;letter-spacing:.3em;font-size:13px;display:flex;gap:8px;align-items:center}
+    .gen-badge{font-size:10px;letter-spacing:.15em;border:1px solid #444;padding:2px 6px;font-weight:400}
+    .gen-badge.err{border-color:#fff;background:#fff;color:#000}
+    .dim{color:#777;font-weight:400}
+    .gen-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+    .gen-btn{background:#000;color:#ddd;border:1px solid #444;padding:6px 10px;font:11px 'Courier New',monospace;letter-spacing:.15em;cursor:pointer}
+    .gen-btn:hover{border-color:#fff;color:#fff}
+    .gen-btn.on{border-color:#bbb}
+    .gen-btn.hot{background:#fff;color:#000;border-color:#fff}
+    .gen-btn.active{background:#fff;color:#000}
+    .gen-btn.wide{width:100%}
+    .gen-btn:disabled{opacity:.4;cursor:default}
+    .gen-sep{width:1px;height:20px;background:#333}
+    .gen-select{background:#000;color:#ddd;border:1px solid #444;padding:5px 6px;font:11px 'Courier New',monospace;letter-spacing:.1em}
+    .gen-grid{flex:1;display:grid;grid-template-columns:260px 1fr 420px;gap:10px;min-height:0}
+    .gen-col{display:flex;flex-direction:column;gap:8px;min-height:0;border:1px solid #222;padding:10px}
+    .gen-h{font-size:10px;letter-spacing:.3em;color:#aaa;display:flex;justify-content:space-between}
+    .gen-lib{display:grid;grid-template-columns:1fr;gap:4px;overflow:auto;flex:1;min-height:120px}
+    .gen-lib button{text-align:left;background:#050505;border:1px solid #222;color:#ccc;padding:7px 8px;font:11px 'Courier New',monospace;letter-spacing:.12em;cursor:pointer}
+    .gen-lib button small{display:block;color:#666;font-size:9px;letter-spacing:.1em;margin-top:2px}
+    .gen-lib button:hover{border-color:#888}
+    .gen-lib button.active{border-color:#fff;color:#fff;background:#111}
+    .gen-prompt{background:#050505;color:#ddd;border:1px solid #333;font:11px 'Courier New',monospace;padding:8px;resize:vertical}
+    .gen-note{font-size:10px;color:#888;letter-spacing:.05em;min-height:14px;line-height:1.4}
+    .gen-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+    .gen-preview{width:100%;aspect-ratio:16/9;max-height:62vh;flex:none;background:#000;border:1px solid #333;position:relative;overflow:hidden}
+    .gen-preview canvas{position:absolute;inset:0}
+    .gen-knobs{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+    .gen-knob{display:flex;flex-direction:column;gap:3px;font-size:9px;letter-spacing:.2em;color:#999}
+    .gen-knob input{width:100%;accent-color:#fff}
+    .gen-meter{display:flex;gap:2px;align-items:flex-end;height:18px;width:30px}
+    .gen-meter i{flex:1;background:#fff;height:2px;transition:height .05s}
+    .gen-code{flex:1;min-height:160px;background:#030303;color:#e6e6e6;border:1px solid #333;font:12px/1.45 Menlo,'Courier New',monospace;padding:10px;resize:none;tab-size:2;white-space:pre}
+    .gen-error{font-size:11px;color:#000;background:#fff;padding:0 8px;white-space:pre-wrap;display:none}
+    .gen-error.show{display:block;padding:6px 8px}
+    .gen-targets{max-height:140px;overflow:auto;font-size:11px}
+    .gen-targets .target-layer-item{display:flex;gap:6px;align-items:center;padding:3px 0}
+</style>
 </head>
 <body>
   <!-- V3XV0ID Header -->
@@ -1952,58 +1993,57 @@
 
     <!-- Patterns Tab Content -->
     <div class="tab-content" id="patternsTab">
-      <div class="patterns-container-compact">
-        <!-- Compact Header -->
-        <div class="patterns-header-compact">
-          <div class="header-left">
-            <h2 class="cyber-text">🎨 PATTERN GENERATOR</h2>
-            <div class="status-indicators">
-              <span id="patternStatus" class="status-badge">READY</span>
-              <span id="patternFPS" class="fps-badge">0 FPS</span>
-            </div>
-          </div>
-          <div class="header-controls">
-            <button id="runPatternBtn" class="pattern-btn run">▶️ RUN</button>
-            <button id="stopPatternBtn" class="pattern-btn stop">⏹️ STOP</button>
-            <button id="exportPatternBtn" class="pattern-btn export">💾 EXPORT</button>
-            <button id="applyToLayersBtn" class="pattern-btn apply">🎭 APPLY TO LAYERS</button>
+      <div class="gen">
+        <div class="gen-bar">
+          <div class="gen-title">VX GEN <span id="patternStatus" class="gen-badge">READY</span><span id="patternFPS" class="gen-badge dim">0 FPS</span></div>
+          <div class="gen-actions">
+            <button id="runPatternBtn" class="gen-btn on" title="Cmd/Ctrl+Enter">RUN</button>
+            <button id="stopPatternBtn" class="gen-btn">STOP</button>
+            <button id="genMutateBtn" class="gen-btn" title="New seed, same sketch">MUTATE</button>
+            <button id="genEvolveBtn" class="gen-btn" title="Mutate and drift the knobs every 4 bars">EVOLVE</button>
+            <span class="gen-sep"></span>
+            <select id="genDeck" class="gen-select" title="Deck for SEND"><option value="A">DECK A</option><option value="B">DECK B</option></select>
+            <button id="genSendBtn" class="gen-btn hot" title="New layer on the deck, running this sketch">SEND TO OUTPUT</button>
+            <button id="applyToLayersBtn" class="gen-btn">APPLY TO TICKED</button>
+            <span class="gen-sep"></span>
+            <button id="exportPatternBtn" class="gen-btn">EXPORT</button>
+            <button id="importPatternBtn" class="gen-btn">IMPORT</button>
           </div>
         </div>
 
-        <!-- Compact 3-Column Layout -->
-        <div class="patterns-grid-compact">
-          <!-- Left: Code Editor + Presets -->
-          <div class="patterns-left">
-            <div class="code-section">
-              <h3 class="section-header">CODE EDITOR</h3>
-              <textarea id="patternCodeEditor" class="code-editor-compact" placeholder="// Write your P5.js pattern code here...
-function setup() {
-  createCanvas(300, 300);
-  colorMode(HSB, 360, 100, 100);
-}
+        <div class="gen-grid">
+          <div class="gen-col">
+            <div class="gen-h">LIBRARY <span class="dim" id="genLibCount"></span></div>
+            <div id="patternPresets" class="gen-lib"></div>
+            <div class="gen-h">PROMPT → SKETCH <span class="dim">CLAUDE</span></div>
+            <textarea id="genPrompt" class="gen-prompt" rows="3" placeholder="e.g. a slow monochrome lattice that folds on every kick, thin lines, lots of black"></textarea>
+            <div class="gen-row"><button id="genAskBtn" class="gen-btn wide">WRITE SKETCH</button></div>
+            <div id="genAskNote" class="gen-note"></div>
+          </div>
 
-function draw() {
-  background(0);
-  fill((frameCount * 2) % 360, 80, 90);
-  ellipse(mouseX, mouseY, 50, 50);
-}"></textarea>
-            </div>
-            <div class="presets-section">
-              <h3 class="section-header">PRESETS</h3>
-              <div id="patternPresets" class="presets-grid"></div>
+          <div class="gen-col mid">
+            <div class="gen-h">PREVIEW <span class="dim" id="genSeed"></span></div>
+            <div id="patternPreviewContainer" class="gen-preview"></div>
+            <div class="gen-knobs" id="genKnobs"></div>
+            <div class="gen-row gen-audio">
+              <select id="genAudio" class="gen-select" title="What the sketches listen to">
+                <option value="">AUDIO: CLOCK ONLY</option><option value="music">AUDIO: MUSIC TAB</option><option value="input">AUDIO: LINE IN / MIC</option>
+              </select>
+              <div class="gen-meter"><i id="genMeterBass"></i><i id="genMeterMid"></i><i id="genMeterHigh"></i></div>
+              <button id="genTapBtn" class="gen-btn" title="Tap the tempo">TAP</button>
+              <span id="genBpm" class="gen-badge">120 BPM</span>
+              <select id="genScale" class="gen-select" title="Render resolution on the output">
+                <option value="1">RES 100%</option><option value="0.75" selected>RES 75%</option><option value="0.5">RES 50%</option>
+              </select>
             </div>
           </div>
 
-          <!-- Center: Live Preview -->
-          <div class="patterns-center">
-            <h3 class="section-header">LIVE PREVIEW</h3>
-            <div id="patternPreviewContainer" class="preview-container-compact"></div>
-          </div>
-
-          <!-- Right: Target Layers -->
-          <div class="patterns-right">
-            <h3 class="section-header">TARGET LAYERS (<span id="activeTargetsCount">0</span>)</h3>
-            <div id="targetLayersList" class="target-layers-compact"></div>
+          <div class="gen-col">
+            <div class="gen-h">CODE <span class="dim">p5.js + vx</span></div>
+            <textarea id="patternCodeEditor" class="gen-code" spellcheck="false"></textarea>
+            <div id="genError" class="gen-error"></div>
+            <div class="gen-h">TICK LAYERS (<span id="activeTargetsCount">0</span>)</div>
+            <div id="targetLayersList" class="gen-targets"></div>
           </div>
         </div>
       </div>
@@ -2368,10 +2408,15 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
         }
 
         switch (command) {
+          case 'gen-error':
+            genStatus('OUTPUT LAYER ' + data.layerId + ' ERROR', true);
+            genShowError('Output layer ' + data.layerId + ': ' + data.error);
+            break;
           case 'layers-updated':
             updateLayersFromOutput(data.layers);
             updateLayersList();
             updatePreview();
+            updateTargetLayers();
             break;
           case 'layer-selected':
             if (data.layer) {
@@ -3843,397 +3888,297 @@ Example: 'Create a psychedelic sequence with swirling patterns, neon colors, and
         imagePreviewPanel.style.display = 'block';
       }
 
-      // Patterns Tab Functionality
-      let p5Lib = null; // Loaded lazily when patterns tab is used
-      let currentP5Instance = null;
-      let patternRunning = false;
-      let patternFPS = 0;
-      let fpsMonitorInterval = null;
-
+      // ===== VX GEN (Patterns tab): generative p5 sketches, previewed here and sent to output layers =====
       const patternCodeEditor = document.getElementById('patternCodeEditor');
       const patternPreviewContainer = document.getElementById('patternPreviewContainer');
       const runPatternBtn = document.getElementById('runPatternBtn');
       const stopPatternBtn = document.getElementById('stopPatternBtn');
       const exportPatternBtn = document.getElementById('exportPatternBtn');
+      const importPatternBtn = document.getElementById('importPatternBtn');
       const applyToLayersBtn = document.getElementById('applyToLayersBtn');
       const patternStatus = document.getElementById('patternStatus');
       const patternFPSDisplay = document.getElementById('patternFPS');
       const patternPresets = document.getElementById('patternPresets');
       const targetLayersList = document.getElementById('targetLayersList');
       const activeTargetsCount = document.getElementById('activeTargetsCount');
+      const genEl = id => document.getElementById(id);
 
-      // Pattern presets
-      const patterns = {
-        'Plasma Waves': `function setup() {
-  createCanvas(400, 400);
-  colorMode(HSB, 360, 100, 100);
-}
-
-function draw() {
-  for (let x = 0; x < width; x += 4) {
-    for (let y = 0; y < height; y += 4) {
-      let hue = (sin(x * 0.01 + millis() * 0.002) + 
-                 sin(y * 0.01 + millis() * 0.003)) * 180 + 180;
-      fill(hue, 80, 90);
-      noStroke();
-      rect(x, y, 4, 4);
-    }
-  }
-}`,
-        'Tunnel Vision': `function setup() {
-  createCanvas(400, 400);
-  colorMode(HSB, 360, 100, 100);
-}
-
-function draw() {
-  background(0);
-  translate(width/2, height/2);
-  
-  for (let i = 0; i < 50; i++) {
-    let size = i * 10 + sin(millis() * 0.01 + i) * 20;
-    let hue = (millis() * 0.1 + i * 10) % 360;
-    
-    stroke(hue, 80, 90);
-    strokeWeight(2);
-    noFill();
-    ellipse(0, 0, size, size);
-  }
-}`,
-        'Matrix Rain': `let drops = [];
-
-function setup() {
-  createCanvas(400, 400);
-  
-  for (let i = 0; i < 50; i++) {
-    drops.push({
-      x: random(width),
-      y: random(-height, 0),
-      speed: random(2, 8),
-      char: String.fromCharCode(random(65, 90))
-    });
-  }
-}
-
-function draw() {
-  background(0, 20);
-  fill(0, 255, 0);
-  textSize(16);
-  
-  for (let drop of drops) {
-    text(drop.char, drop.x, drop.y);
-    drop.y += drop.speed;
-    
-    if (drop.y > height) {
-      drop.y = random(-50, 0);
-      drop.x = random(width);
-      drop.char = String.fromCharCode(random(65, 90));
-    }
-  }
-}`
+      const gen = {
+        inst: null, name: 'CUSTOM', knobs: ['A', 'B', 'C', 'D'], params: { a: 0.5, b: 0.5, c: 0.5, d: 0.5 },
+        seed: Math.floor(Math.random() * 1e9), key: null, evolve: false, lastBar: -1, ready: false
       };
+      const GEN_DRAFT = 'vxgen.draft';
 
-      // Initialize Patterns Tab
-      function initializePatternsTab() {
-        // Populate pattern presets
-        patternPresets.innerHTML = '';
-        Object.keys(patterns).forEach(patternName => {
-          const presetBtn = document.createElement('button');
-          presetBtn.className = 'preset-btn';
-          presetBtn.textContent = patternName;
-          presetBtn.addEventListener('click', () => {
-            patternCodeEditor.value = patterns[patternName];
-          });
-          patternPresets.appendChild(presetBtn);
-        });
-        
-        updateTargetLayers();
+      function genStatus(text, err) {
+        patternStatus.textContent = text;
+        patternStatus.classList.toggle('err', !!err);
+      }
+      function genShowError(msg) {
+        const box = genEl('genError');
+        box.textContent = msg || '';
+        box.classList.toggle('show', !!msg);
       }
 
-      // Pattern Control Event Listeners
-      runPatternBtn.addEventListener('click', runPattern);
-      stopPatternBtn.addEventListener('click', stopPattern);
+      function initializePatternsTab() {
+        updateTargetLayers();
+        if (gen.ready) { if (!gen.inst) runPattern(); return; }
+        gen.ready = true;
+        if (!window.VXGEN || !VXGEN.ready) { genStatus('P5 MISSING', true); return; }
+        const lib = window.VXGEN_LIBRARY || [];
+        genEl('genLibCount').textContent = lib.length + ' SKETCHES';
+        patternPresets.innerHTML = '';
+        lib.forEach(item => {
+          const b = document.createElement('button');
+          b.innerHTML = `${item.name}<small>${item.tags}</small>`;
+          b.addEventListener('click', () => loadSketch(item));
+          patternPresets.appendChild(b);
+        });
+        let draft = null;
+        try { draft = JSON.parse(localStorage.getItem(GEN_DRAFT) || 'null'); } catch (e) {}
+        if (draft && draft.code) { patternCodeEditor.value = draft.code; gen.name = draft.name || 'CUSTOM'; gen.knobs = draft.knobs || gen.knobs; }
+        else if (lib[0]) { loadSketch(lib[0], true); return; }
+        buildKnobs();
+        runPattern();
+      }
+
+      function loadSketch(item, quiet) {
+        patternCodeEditor.value = item.code;
+        gen.name = item.name; gen.knobs = item.knobs || ['A', 'B', 'C', 'D'];
+        gen.key = null;
+        [...patternPresets.children].forEach(b => b.classList.toggle('active', b.firstChild.textContent === item.name));
+        buildKnobs();
+        saveDraft();
+        runPattern();
+      }
+
+      function buildKnobs() {
+        const box = genEl('genKnobs');
+        box.innerHTML = '';
+        ['a', 'b', 'c', 'd'].forEach((k, i) => {
+          const lab = document.createElement('label');
+          lab.className = 'gen-knob';
+          lab.innerHTML = `<span>${gen.knobs[i] || k.toUpperCase()}</span><input type="range" min="0" max="1" step="0.01" value="${gen.params[k]}" data-k="${k}">`;
+          lab.querySelector('input').addEventListener('input', e => setKnobs({ [k]: parseFloat(e.target.value) }));
+          box.appendChild(lab);
+        });
+      }
+      function setKnobs(q, fromEvolve) {
+        Object.assign(gen.params, q);
+        if (gen.inst) gen.inst.setParams(q);
+        if (fromEvolve) genEl('genKnobs').querySelectorAll('input').forEach(inp => { inp.value = gen.params[inp.dataset.k]; });
+        if (gen.key) sendToOutput('gen-params', { key: gen.key, params: gen.params });
+      }
+
+      function saveDraft() {
+        try { localStorage.setItem(GEN_DRAFT, JSON.stringify({ code: patternCodeEditor.value, name: gen.name, knobs: gen.knobs })); } catch (e) {}
+      }
 
       function runPattern() {
-        if (patternRunning) return;
-        
+        if (!window.VXGEN || !VXGEN.ready) { genStatus('P5 MISSING', true); return; }
+        const code = patternCodeEditor.value;
+        const syntax = VXGEN.check(code);
+        if (syntax) { genStatus('CODE ERROR', true); genShowError(syntax); return; }
+        stopPattern(true);
+        genShowError('');
         try {
-          const code = patternCodeEditor.value.trim();
-          if (!code) {
-            patternStatus.textContent = 'NO CODE';
-            return;
-          }
-          
-          // Clear previous instance
-          if (currentP5Instance) {
-            currentP5Instance.remove();
-            currentP5Instance = null;
-          }
-          
-          // Clear preview container
-          patternPreviewContainer.innerHTML = '';
-          
-          // Create P5 sketch function
-          const sketchFunction = function(p) {
-            // Inject the user code into the p5 instance
-            try {
-              eval(`
-                (function() {
-                  ${code}
-                  
-                  // Bind functions to p5 instance
-                  if (typeof setup === 'function') {
-                    p.setup = setup;
-                  }
-                  if (typeof draw === 'function') {
-                    p.draw = draw;
-                  }
-                  
-                  // Add other common p5 functions if they exist
-                  if (typeof mousePressed === 'function') p.mousePressed = mousePressed;
-                  if (typeof mouseReleased === 'function') p.mouseReleased = mouseReleased;
-                  if (typeof keyPressed === 'function') p.keyPressed = keyPressed;
-                  if (typeof keyReleased === 'function') p.keyReleased = keyReleased;
-                })();
-              `);
-            } catch (error) {
-              console.error('Pattern code error:', error);
-              patternStatus.textContent = 'CODE ERROR';
-              return;
-            }
-          };
-          
-          // Lazy-load p5 (v2 uses ESM, can't require at top level in Electron)
-          if (!p5Lib) {
-            try {
-              p5Lib = require('p5');
-            } catch (e) {
-              console.warn('P5.js not available:', e.message);
-              patternStatus.textContent = 'P5 NOT INSTALLED';
-              return;
-            }
-          }
-          currentP5Instance = new p5Lib(sketchFunction, patternPreviewContainer);
-          patternRunning = true;
-          patternStatus.textContent = 'RUNNING';
-          
-          // FPS monitoring
-          fpsMonitorInterval = setInterval(() => {
-            if (currentP5Instance && patternRunning) {
-              try {
-                patternFPS = Math.round(currentP5Instance.frameRate()) || 0;
-                patternFPSDisplay.textContent = patternFPS + ' FPS';
-              } catch (e) {
-                // Ignore FPS errors
-              }
-            } else {
-              clearInterval(fpsMonitorInterval);
-            }
-          }, 1000);
-          
-          console.log('✅ Pattern started successfully');
-          
-        } catch (error) {
-          console.error('Pattern execution error:', error);
-          patternStatus.textContent = 'ERROR: ' + error.message;
-        }
+          gen.inst = VXGEN.mount(patternPreviewContainer, code, {
+            seed: gen.seed, params: gen.params,
+            onError: msg => { genStatus('RUNTIME ERROR', true); genShowError(msg); },
+            onFps: fps => { patternFPSDisplay.textContent = fps + ' FPS'; }
+          });
+          genStatus('RUNNING ' + gen.name);
+          genEl('genSeed').textContent = 'SEED ' + gen.seed;
+          saveDraft();
+        } catch (e) { genStatus('ERROR', true); genShowError(e.message); }
       }
 
-      function stopPattern() {
-        if (currentP5Instance) {
-          currentP5Instance.remove();
-          currentP5Instance = null;
-        }
-        if (fpsMonitorInterval) {
-          clearInterval(fpsMonitorInterval);
-          fpsMonitorInterval = null;
-        }
-        patternRunning = false;
-        patternStatus.textContent = 'STOPPED';
-        patternFPSDisplay.textContent = '0 FPS';
+      function stopPattern(quiet) {
+        if (gen.inst) { gen.inst.stop(); gen.inst = null; }
         patternPreviewContainer.innerHTML = '';
-        console.log('⏹️ Pattern stopped');
+        if (quiet !== true) { genStatus('STOPPED'); patternFPSDisplay.textContent = '0 FPS'; }
       }
 
+      function mutate() {
+        gen.seed = Math.floor(Math.random() * 1e9);
+        runPattern();
+        if (gen.key) sendToOutput('gen-seed', { key: gen.key, seed: gen.seed });
+      }
+
+      function genPayload() {
+        return { code: patternCodeEditor.value, name: gen.name, seed: gen.seed, params: { ...gen.params }, scale: parseFloat(genEl('genScale').value) };
+      }
+
+      function sendToDeck() {
+        const syntax = VXGEN.check(patternCodeEditor.value);
+        if (syntax) { genStatus('CODE ERROR', true); genShowError(syntax); return; }
+        gen.key = 'g' + Date.now();
+        sendToOutput('add-gen-layer', { ...genPayload(), key: gen.key, palette: genEl('genDeck').value });
+        genStatus('SENT TO DECK ' + genEl('genDeck').value);
+      }
+
+      // Patterns tab buttons
+      runPatternBtn.addEventListener('click', runPattern);
+      stopPatternBtn.addEventListener('click', () => stopPattern());
+      genEl('genMutateBtn').addEventListener('click', mutate);
+      genEl('genSendBtn').addEventListener('click', sendToDeck);
+      genEl('genEvolveBtn').addEventListener('click', e => { gen.evolve = !gen.evolve; e.target.classList.toggle('active', gen.evolve); });
+      genEl('genScale').addEventListener('change', () => { if (gen.key) sendToOutput('gen-scale', { key: gen.key, scale: parseFloat(genEl('genScale').value) }); });
+      patternCodeEditor.addEventListener('keydown', e => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); runPattern(); if (gen.key) sendToOutput('gen-code', { key: gen.key, ...genPayload() }); return; }
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          const s = patternCodeEditor.selectionStart;
+          patternCodeEditor.setRangeText('  ', s, patternCodeEditor.selectionEnd, 'end');
+        }
+        e.stopPropagation(); // typing code must not fire the VX hotkeys
+      });
+      patternCodeEditor.addEventListener('input', () => { gen.name = gen.name.replace(/ \*$/, '') + ' *'; saveDraft(); });
+      genEl('genPrompt').addEventListener('keydown', e => e.stopPropagation());
+
+      // Evolve: every 4 bars a new seed and a small random walk on the knobs (preview and linked output layers)
+      setInterval(() => {
+        const s = VXGEN && VXGEN.signals; if (!s) return;
+        const beats = (performance.now() - s.beat0) / 60000 * s.bpm, bar = Math.floor(beats / 4);
+        if (bar === gen.lastBar) return;
+        const fresh = gen.lastBar >= 0; gen.lastBar = bar;
+        if (!gen.evolve || !gen.inst || !fresh || bar % 4) return;
+        const q = {};
+        ['a', 'b', 'c', 'd'].forEach(k => { q[k] = Math.min(1, Math.max(0, gen.params[k] + (Math.random() - 0.5) * 0.35)); });
+        setKnobs(q, true);
+        mutate();
+      }, 50);
+
+      // Audio: the sketches listen to the music tab or the line in; bands go to the output 30 times a second
+      let genKicks = 0, genLastKick = 0;
+      genEl('genAudio').addEventListener('change', async e => {
+        const v = e.target.value;
+        try {
+          if (v === 'music') {
+            if (!currentAudio) { genStatus('PLAY A TRACK IN MUSIC FIRST', true); e.target.value = ''; return; }
+            await VXGEN.listen(currentAudio);
+          } else if (v === 'input') await VXGEN.listen('input');
+          else VXGEN.unlisten();
+        } catch (err) { genStatus('AUDIO: ' + err.message, true); e.target.value = ''; }
+      });
+      genEl('genTapBtn').addEventListener('click', () => { genEl('genBpm').textContent = VXGEN.tap() + ' BPM'; });
+      setInterval(() => {
+        const s = VXGEN && VXGEN.signals; if (!s) return;
+        if (s.kickAt !== genLastKick) { genLastKick = s.kickAt; genKicks++; }
+        const beats = (performance.now() - s.beat0) / 60000 * s.bpm;
+        sendToOutput('gen-signals', { bpm: s.bpm, level: s.level, bass: s.bass, mid: s.mid, high: s.high, kicks: genKicks, external: s.external, phase: beats - Math.floor(beats) });
+        genEl('genMeterBass').style.height = (2 + s.bass * 16) + 'px';
+        genEl('genMeterMid').style.height = (2 + s.mid * 16) + 'px';
+        genEl('genMeterHigh').style.height = (2 + s.high * 16) + 'px';
+        genEl('genBpm').textContent = s.bpm + ' BPM';
+      }, 33);
+
+      // Target layers (tick to APPLY TO TICKED)
       function updateTargetLayers() {
+        const ticked = new Set([...targetLayersList.querySelectorAll('input:checked')].map(c => c.dataset.layerId));
         targetLayersList.innerHTML = '';
-        let activeCount = 0;
-        
         [...layersA, ...layersB].forEach(layer => {
-          const layerCheckbox = document.createElement('div');
-          layerCheckbox.className = 'target-layer-item';
-          layerCheckbox.innerHTML = `
-            <input type="checkbox" id="target-${layer.id}" data-layer-id="${layer.id}">
-            <label for="target-${layer.id}">${layer.name}</label>
-          `;
-          
-          const checkbox = layerCheckbox.querySelector('input');
-          checkbox.addEventListener('change', () => {
-            updateActiveTargetsCount();
-          });
-          
-          targetLayersList.appendChild(layerCheckbox);
+          const row = document.createElement('div');
+          row.className = 'target-layer-item';
+          row.innerHTML = `<input type="checkbox" id="target-${layer.id}" data-layer-id="${layer.id}"><label for="target-${layer.id}">${layer.palette || 'A'} · ${layer.name}</label>`;
+          const cb = row.querySelector('input');
+          cb.checked = ticked.has(String(layer.id));
+          cb.addEventListener('change', updateActiveTargetsCount);
+          targetLayersList.appendChild(row);
         });
-        
-        activeTargetsCount.textContent = activeCount;
+        updateActiveTargetsCount();
       }
-
       function updateActiveTargetsCount() {
-        const checkedBoxes = targetLayersList.querySelectorAll('input:checked');
-        activeTargetsCount.textContent = checkedBoxes.length;
+        activeTargetsCount.textContent = targetLayersList.querySelectorAll('input:checked').length;
       }
-
-      // Pattern Export/Import Functionality
-      exportPatternBtn.addEventListener('click', () => {
-        const code = patternCodeEditor.value.trim();
-        if (!code) {
-          alert('No pattern code to export!');
-          return;
-        }
-        
-        // Get pattern name from current preset or create default
-        let patternName = 'Custom Pattern';
-        const activePreset = document.querySelector('.preset-btn.active');
-        if (activePreset) {
-          patternName = activePreset.textContent;
-        }
-        
-        const patternData = {
-          type: 'v3xv0id-composition',
-          version: '1.0',
-          name: patternName,
-          code: code,
-          timestamp: Date.now(),
-          author: 'V3XV0ID',
-          description: `P5.js pattern composition: ${patternName}`,
-          metadata: {
-            fps: 60,
-            resolution: { width: 400, height: 400 },
-            blendMode: 'normal',
-            opacity: 100,
-            patternType: 'p5js'
-          }
-        };
-        
-        // Create downloadable .comp file
-        const blob = new Blob([JSON.stringify(patternData, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${patternName.replace(/\s+/g, '_')}.comp`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        
-        console.log('✅ Pattern exported as .comp file:', patternName);
-        
-        // Show success message
-        patternStatus.textContent = '✅ EXPORTED AS .COMP';
-        setTimeout(() => {
-          patternStatus.textContent = patternRunning ? 'RUNNING' : 'STOPPED';
-        }, 2000);
-      });
-
-      // Add Import .comp file functionality
-      function importCompositionFile() {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.comp,.json';
-        input.addEventListener('change', async (e) => {
-          const file = e.target.files[0];
-          if (!file) return;
-          
-          try {
-            const text = await file.text();
-            const compData = JSON.parse(text);
-            
-            if (compData.type === 'v3xv0id-composition' && compData.metadata?.patternType === 'p5js') {
-              // Load the pattern code
-              patternCodeEditor.value = compData.code;
-              
-              // Show success message
-              patternStatus.textContent = '✅ COMPOSITION LOADED';
-              setTimeout(() => {
-                patternStatus.textContent = patternRunning ? 'RUNNING' : 'STOPPED';
-              }, 2000);
-              
-              console.log('✅ Composition loaded:', compData.name);
-            } else {
-              alert('Invalid .comp file format!');
-            }
-          } catch (error) {
-            console.error('Error loading composition:', error);
-            alert('Error loading composition file!');
-          }
-        });
-        input.click();
-      }
-
-      // Add import button to patterns tab
-      const importPatternBtn = document.createElement('button');
-      importPatternBtn.className = 'pattern-btn import';
-      importPatternBtn.innerHTML = '📁 IMPORT .COMP';
-      importPatternBtn.addEventListener('click', importCompositionFile);
-      
-      // Insert import button after export button
-      if (exportPatternBtn && exportPatternBtn.parentNode) {
-        exportPatternBtn.parentNode.insertBefore(importPatternBtn, exportPatternBtn.nextSibling);
-      }
-
-      // Apply Pattern to Selected Layers
       applyToLayersBtn.addEventListener('click', () => {
-        const code = patternCodeEditor.value.trim();
-        if (!code) {
-          alert('No pattern code to apply!');
-          return;
-        }
-        
-        // Get selected target layers
-        const checkedBoxes = targetLayersList.querySelectorAll('input:checked');
-        if (checkedBoxes.length === 0) {
-          alert('Please select at least one target layer!');
-          return;
-        }
-        
-        // Get pattern name
-        let patternName = 'Custom Pattern';
-        const activePreset = document.querySelector('.preset-btn.active');
-        if (activePreset) {
-          patternName = activePreset.textContent;
-        }
-        
-        // Apply pattern to each selected layer
-        checkedBoxes.forEach(checkbox => {
-          const layerId = parseInt(checkbox.dataset.layerId);
-          
-          const compositionData = {
-            name: `${patternName} (PATTERN)`,
-            code: code,
-            metadata: {
-              fps: 60,
-              resolution: { width: 400, height: 400 },
-              blendMode: 'normal',
-              opacity: 100,
-              patternType: 'p5js'
-            },
-            type: 'pattern'
-          };
-          
-          // Send to output window
-          sendToOutput('apply-pattern-to-layer', { 
-            layerId, 
-            composition: compositionData
-          });
-        });
-        
-        console.log(`✅ Pattern applied to ${checkedBoxes.length} layers`);
-        
-        // Show success message
-        patternStatus.textContent = `✅ APPLIED TO ${checkedBoxes.length} LAYERS`;
-        setTimeout(() => {
-          patternStatus.textContent = patternRunning ? 'RUNNING' : 'STOPPED';
-        }, 2000);
+        const ids = [...targetLayersList.querySelectorAll('input:checked')].map(c => parseInt(c.dataset.layerId));
+        if (!ids.length) { genStatus('TICK A LAYER FIRST', true); return; }
+        const syntax = VXGEN.check(patternCodeEditor.value);
+        if (syntax) { genStatus('CODE ERROR', true); genShowError(syntax); return; }
+        gen.key = 'g' + Date.now();
+        sendToOutput('apply-gen', { ...genPayload(), key: gen.key, layerIds: ids });
+        genStatus('APPLIED TO ' + ids.length + ' LAYER' + (ids.length > 1 ? 'S' : ''));
       });
+
+      // Export / import a sketch as a .comp file
+      exportPatternBtn.addEventListener('click', () => {
+        const data = { type: 'v3xv0id-composition', version: '3.1', name: gen.name.replace(/ \*$/, ''), code: patternCodeEditor.value,
+          knobs: gen.knobs, params: gen.params, seed: gen.seed, metadata: { patternType: 'p5js', engine: 'vxgen' }, created: new Date().toISOString() };
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+        a.download = data.name.replace(/\W+/g, '_') + '.comp';
+        a.click();
+        URL.revokeObjectURL(a.href);
+        genStatus('EXPORTED ' + data.name);
+      });
+      importPatternBtn.addEventListener('click', async () => {
+        const res = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'V3XV0ID composition', extensions: ['comp', 'json', 'js'] }] });
+        if (res.canceled || !res.filePaths[0]) return;
+        const raw = require('fs').readFileSync(res.filePaths[0], 'utf8');
+        let item;
+        try { const d = JSON.parse(raw); item = { name: d.name || 'IMPORTED', code: d.code, knobs: d.knobs }; if (d.params) Object.assign(gen.params, d.params); if (d.seed) gen.seed = d.seed; }
+        catch (e) { item = { name: require('path').basename(res.filePaths[0]).toUpperCase(), code: raw }; }
+        if (item.code) loadSketch(item);
+      });
+
+      // Prompt → sketch, written by Claude. Key: ANTHROPIC_API_KEY in the environment, or one saved in this app's settings.
+      const genSettingsPath = require('path').join(require('@electron/remote').app.getPath('userData'), 'vx-settings.json');
+      function genSettings() { try { return JSON.parse(require('fs').readFileSync(genSettingsPath, 'utf8')); } catch (e) { return {}; } }
+      function genSaveSettings(q) { require('fs').writeFileSync(genSettingsPath, JSON.stringify({ ...genSettings(), ...q }, null, 2), { mode: 0o600 }); }
+      function anthropicKey() { return process.env.ANTHROPIC_API_KEY || genSettings().anthropicKey || ''; }
+
+      const GEN_SYSTEM = `You write generative p5.js sketches for V3XV0ID, a live VJ tool. The sketch runs on a projector behind music.
+
+Rules for the code:
+- Plain p5.js global-mode code: define setup() and draw(); call p5 functions directly (background, stroke, noise, ...). No imports, no DOM, no loadImage/loadFont/loadSound, no external files.
+- In setup() call createCanvas(windowWidth, windowHeight) or createCanvas(windowWidth, windowHeight, WEBGL). The host sizes the canvas; use width/height everywhere.
+- A global object vx is updated every frame: vx.t (seconds), vx.beat and vx.bar (0..1 phase), vx.bpm, vx.level / vx.bass / vx.mid / vx.high (0..1 audio), vx.kick (true on the frame a beat lands), vx.pulse (1 on a kick, decaying), vx.a vx.b vx.c vx.d (four 0..1 knobs the VJ controls live), vx.seed.
+- React to the music: tie motion and brightness to vx.bass / vx.level / vx.pulse, and make something happen on vx.kick. Map all four knobs to meaningful parameters.
+- Look: monochrome only, white on black (stroke/fill 255 with alpha, background 0). Precise, technical, After Effects-style motion graphics: thin lines, grids, geometry, type made of strokes. No colour, no grunge, no shards, no dirty glitch effects.
+- It must hold 60 fps at 1920x1080 on a laptop: avoid per-pixel loops over the full canvas and keep particle counts sane.
+- random() and noise() are already seeded per run; don't call randomSeed/noiseSeed.
+
+Reply with the sketch in one \`\`\`js code block, then one line starting with KNOBS: naming the four knobs in order, e.g. KNOBS: DENSITY, SPEED, SIZE, TRAIL. Nothing else.`;
+
+      async function askClaude() {
+        const prompt = genEl('genPrompt').value.trim();
+        const note = genEl('genAskNote');
+        if (!prompt) { note.textContent = 'Describe the animation first.'; return; }
+        const key = anthropicKey();
+        if (!key) {
+          note.innerHTML = 'Needs an Anthropic API key (or set ANTHROPIC_API_KEY before starting the app):<input id="genKeyInput" type="password" class="gen-prompt" style="width:100%;margin-top:4px" placeholder="paste key, press Enter"><span class="dim">Saved only in this app\'s settings on this computer.</span>';
+          const inp = genEl('genKeyInput');
+          inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter' && inp.value.trim()) { genSaveSettings({ anthropicKey: inp.value.trim() }); note.textContent = 'Key saved.'; askClaude(); } });
+          inp.focus();
+          return;
+        }
+        const btn = genEl('genAskBtn');
+        btn.disabled = true; btn.textContent = 'WRITING…'; note.textContent = '';
+        const current = patternCodeEditor.value.trim();
+        const user = current && /\b(this|it|current|variation|vary|change|more|less|faster|slower)\b/i.test(prompt)
+          ? `Here is the current sketch:\n\`\`\`js\n${current}\n\`\`\`\n\nChange it: ${prompt}`
+          : prompt;
+        try {
+          const res = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2026-10-21', 'anthropic-beta': 'server-side-fallback-2026-07-01' },
+            body: JSON.stringify({ model: 'claude-opus-5-5', max_tokens: 16000, output_config: { effort: 'medium' }, fallbacks: 'default',
+              system: GEN_SYSTEM, messages: [{ role: 'user', content: user }] })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error((data.error && data.error.message) || ('HTTP ' + res.status));
+          if (data.stop_reason === 'refusal') throw new Error('Claude declined this one; try wording it differently.');
+          const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+          const m = text.match(/```(?:js|javascript)?\s*\n([\s\S]*?)```/);
+          if (!m) throw new Error('No code came back.');
+          const knobs = (text.match(/KNOBS:\s*(.+)/) || [])[1];
+          loadSketch({ name: prompt.slice(0, 28).toUpperCase(), code: m[1].trim(), knobs: knobs ? knobs.split(',').map(s => s.trim().toUpperCase().slice(0, 10)).slice(0, 4) : null });
+          note.textContent = data.stop_reason === 'max_tokens' ? 'Reply was cut short; the sketch may be incomplete.' : 'Written by Claude. Edit it, or ask for a change ("make it faster").';
+        } catch (e) {
+          note.textContent = 'Failed: ' + e.message;
+        } finally { btn.disabled = false; btn.textContent = 'WRITE SKETCH'; }
+      }
+      genEl('genAskBtn').addEventListener('click', askClaude);
 
       // Music Tab Functionality
       let musicLibraryTracks = [];
@@ -4653,9 +4598,6 @@ function draw() {
         });
       }
 
-      // Pattern controls
-      if (runPatternBtn) runPatternBtn.addEventListener('click', runPattern);
-      if (stopPatternBtn) stopPatternBtn.addEventListener('click', stopPattern);
       
       // Composer controls
       if (startRecordingBtn) startRecordingBtn.addEventListener('click', startRecording);
@@ -5107,6 +5049,8 @@ function draw() {
       console.log('🎛️ All V3XV0ID Tab Content Systems initialized');
     });
   </script>
+  <script src="./vx/vx-gen.js"></script>
+  <script src="./vx/gen-library.js"></script>
   <script src="./vx/vx-keys.js"></script>
   <script>
     // ===== VX engine panel: mirrors the output window's engine state and forwards changes over IPC =====
