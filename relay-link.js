@@ -19,12 +19,20 @@ function start({ run, getOutputWindow }) {
   const saveConf = () => fs.writeFileSync(file, JSON.stringify({ ...conf, relay: RELAY }, null, 2), { mode: 0o600 });
   const auth = () => ({ authorization: 'Bearer ' + conf.secret, 'x-device-id': conf.deviceId });
 
-  async function register() {
-    if (conf.deviceId && conf.secret) return;
-    const r = await fetch(RELAY + '/device/register', { method: 'POST' });
-    if (!r.ok) throw new Error('relay registration failed (' + r.status + ')');
-    Object.assign(conf, await r.json());
-    saveConf();
+  // One registration at a time: the link loop and a pairing request both call this on first use, and two
+  // registrations would pair one device id while the link runs as the other.
+  let registering = null;
+  function register() {
+    if (conf.deviceId && conf.secret) return Promise.resolve();
+    if (!registering) {
+      registering = (async () => {
+        const r = await fetch(RELAY + '/device/register', { method: 'POST' });
+        if (!r.ok) throw new Error('relay registration failed (' + r.status + ')');
+        Object.assign(conf, await r.json());
+        saveConf();
+      })().finally(() => { registering = null; });
+    }
+    return registering;
   }
 
   async function execute(cmd, args) {
