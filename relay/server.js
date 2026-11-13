@@ -284,11 +284,25 @@ load().catch(e=>{$('state').textContent='UNKNOWN SHOW'});
 }
 const STATIC = { 'livekit-client.umd.js': 'application/javascript', 'bwalletx-connect.global.js': 'application/javascript', 'michroma-400.woff2': 'font/woff2', 'plexmono-400.woff2': 'font/woff2' };
 
+// Replay: /replay/<inscription id> plays a V3XV0ID set, live recording or sketch from the chain in the browser
+// (relay/static/replay.html). It needs the mixer's sketch engine, p5, the chain reader, the sketch library and the
+// catalogue (music tracks and named clips), served from the mixer's own vx/ folder (deploy.sh copies it).
+const VX_STATIC = { 'p5.min.js': ['lib/p5.min.js', 'application/javascript'], 'vx-gen.js': ['vx-gen.js', 'application/javascript'],
+  'gen-library.js': ['gen-library.js', 'application/javascript'], 'chain.js': ['chain.js', 'application/javascript'], 'catalogue.json': ['catalogue.json', 'application/json'] };
+
 async function handleLive(req, res, url, p) {
   let m;
   if ((m = p.match(/^\/static\/([\w.-]+)$/)) && STATIC[m[1]]) {
     res.writeHead(200, { 'content-type': STATIC[m[1]], 'cache-control': 'public, max-age=86400' });
     fs.createReadStream(path.join(__dirname, 'static', m[1])).pipe(res); return true;
+  }
+  if ((m = p.match(/^\/vx\/([\w.-]+)$/)) && VX_STATIC[m[1]]) {
+    res.writeHead(200, { 'content-type': VX_STATIC[m[1]][1], 'cache-control': 'public, max-age=3600' });
+    fs.createReadStream(path.join(__dirname, '..', 'vx', VX_STATIC[m[1]][0])).on('error', () => res.end()).pipe(res); return true;
+  }
+  if (req.method === 'GET' && /^\/replay(\/[0-9a-f]{64}_\d+)?\/?$/.test(p)) {
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache' });
+    fs.createReadStream(path.join(__dirname, 'static', 'replay.html')).pipe(res); return true;
   }
   if (!(m = p.match(/^\/live\/([\w-]{6,40})(\/info|\/claim|\/rejoin)?$/))) return false;
   const show = state.shows[m[1]], sub = m[2] || '';

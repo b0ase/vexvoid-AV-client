@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>V3XV0ID Replay</title>
+<meta name="description" content="A V3XV0ID set played back from the chain: the same sketches, clips and moves, rendered live in your browser.">
+<style>
+@font-face{font-family:Michroma;src:url(/static/michroma-400.woff2)}
+@font-face{font-family:Plex;src:url(/static/plexmono-400.woff2)}
+:root{--fg:#f2f2f0;--dim:#8a8a88;--line:rgba(255,255,255,.22)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#000;color:var(--fg);font-family:Plex,ui-monospace,monospace;text-transform:uppercase;letter-spacing:.08em;overflow:hidden}
+#stage{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(100vw,177.78vh);height:min(56.25vw,100vh);background:#000;overflow:hidden}
+.deck{position:absolute;inset:0}
+#deckA{z-index:1}#deckB{z-index:2}
+.layer{position:absolute;inset:0}
+.layer video,.layer img{width:100%;height:100%;object-fit:cover;display:block}
+.layer canvas{width:100%!important;height:100%!important;display:block}
+#black{position:absolute;inset:0;background:#000;z-index:5;display:none}
+#hud{position:fixed;left:0;right:0;bottom:0;padding:14px 16px;display:flex;gap:12px;align-items:center;background:linear-gradient(transparent,rgba(0,0,0,.85));z-index:10;transition:opacity .4s;font-size:11px}
+body.idle #hud{opacity:0}
+#hud .t{font-family:Michroma,sans-serif;letter-spacing:.14em;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+#hud .t small{display:block;font-family:Plex,monospace;color:var(--dim);font-size:10px;letter-spacing:.12em;margin-top:3px}
+button{font:inherit;letter-spacing:.16em;background:transparent;color:var(--fg);border:1px solid var(--line);padding:9px 12px;cursor:pointer;text-transform:uppercase}
+button:hover{background:rgba(255,255,255,.1)}
+#bar{color:var(--dim);white-space:nowrap}
+#gate{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:#000;padding:16px;text-align:center}
+#gate h1{font-family:Michroma,sans-serif;font-weight:400;letter-spacing:.3em;font-size:clamp(18px,4vw,34px);margin:0}
+#gate p{color:var(--dim);font-size:11px;max-width:560px;line-height:1.7;margin:0}
+#gate .big{font-size:14px;padding:14px 34px;border-color:#fff}
+#gate input{font:inherit;background:#000;color:var(--fg);border:1px solid var(--line);padding:10px;width:min(560px,100%);text-transform:none}
+#msg{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:30;font-size:10px;color:var(--dim);max-width:92vw;text-align:center}
+</style>
+</head>
+<body>
+<div id="stage"><div class="deck" id="deckA"></div><div class="deck" id="deckB"></div><div id="black"></div></div>
+<div id="hud"><div class="t"><span id="title">V3XV0ID</span><small id="sub"></small></div><span id="bar">BAR 1</span>
+  <button id="play">PAUSE</button><button id="restart">RESTART</button><button id="fs">FULL SCREEN</button></div>
+<div id="gate"><h1>V3XV0ID</h1><p id="gateText">Reading the set from the chain…</p><div id="gateAct"></div></div>
+<div id="msg"></div>
+<script src="/vx/p5.min.js"></script>
+<script src="/vx/vx-gen.js"></script>
+<script src="/vx/gen-library.js"></script>
+<script src="/vx/chain.js"></script>
+<script>
+// Plays a V3XV0ID set (v3x-set) or a live recording (v3x-setlog chunks) from the chain, the way the mixer would:
+// two decks under a crossfader, sketch and media layers, the set's moves fired on their bars at the set's tempo.
+(function () {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const ORIGIN = decodeURIComponent(location.pathname.split('/').pop() || '');
+  const say = t => { $('msg').textContent = t || ''; };
+  let doc = null, catalogue = { tracks: [], clips: [], images: [] };
+  const S = { fader: 0, layers: [], nextId: 1, lastGen: null, params: { a: .5, b: .5, c: .5, d: .5 }, evolve: false,
+    steps: [], fired: new Set(), ramps: [], t0: 0, pausedAt: 0, playing: false, audio: null, tracks: [], track: -1, black: false };
+
+  // ---------- the stage: the mixer's crossfade and layer rules ----------
+  function deckEl(d) { return $(d === 'B' ? 'deckB' : 'deckA'); }
+  function active() { return S.fader < 50 ? 'A' : 'B'; }
+  function applyFader() {
+    const aOp = S.fader < 90 ? 1 : (100 - S.fader) / 10, bOp = S.fader / 100; // deck B over a full A, A drops out last
+    $('deckA').style.opacity = aOp; $('deckB').style.opacity = bOp;
+  }
+  function addLayer(deck, el, extra) {
+    const l = Object.assign({ id: S.nextId++, deck, el, opacity: 100, visible: true }, extra || {});
+    el.classList.add('layer'); deckEl(deck).appendChild(el); S.layers.push(l); return l;
+  }
+  function removeLayer(l) {
+    if (l.gen) try { l.gen.stop(); } catch (e) {}
+    if (l.video) { l.video.pause(); l.video.removeAttribute('src'); l.video.load(); }
+    l.el.remove(); S.layers = S.layers.filter(x => x !== l); if (S.lastGen === l) S.lastGen = null;
+  }
+  function addSketch(item, deck, blend) {
+    const err = VXGEN.check(item.code); if (err) throw new Error('sketch ' + (item.name || '') + ' does not compile: ' + err);
+    const host = document.createElement('div');
+    const l = addLayer(deck, host, { kind: 'gen', name: item.name });
+    if (blend) host.style.mixBlendMode = blend;
+    l.gen = VXGEN.mount(host, item.code, { params: S.params, scale: .75, onError: m => say('Sketch ' + item.name + ': ' + m) });
+    S.lastGen = l; return l;
+  }
+  function addMedia(url, deck) {
+    const el = document.createElement('div');
+    const isImg = /\.(png|jpe?g|gif|webp)(\?|$)/i.test(url);
+    if (isImg) { const i = document.createElement('img'); i.src = url; el.appendChild(i); return addLayer(deck, el, { kind: 'media' }); }
+    const v = document.createElement('video'); v.src = url; v.muted = true; v.loop = true; v.playsInline = true; v.autoplay = true;
+    // an inscription has no extension: if it turns out to be an image, swap the element
+    v.addEventListener('error', () => { const i = document.createElement('img'); i.src = url; v.replaceWith(i); });
+    el.appendChild(v); const l = addLayer(deck, el, { kind: 'media', video: v }); v.play().catch(() => {}); return l;
+  }
+
+  // ---------- music ----------
+  function playTrack(t) {
+    if (!t) return;
+    if (!S.audio) { S.audio = new Audio(); S.audio.crossOrigin = 'anonymous'; S.audio.addEventListener('ended', () => playTrack(S.tracks[(S.track + 1) % S.tracks.length])); }
+    S.track = S.tracks.indexOf(t); S.audio.src = t.url; S.audio.play().catch(() => {}); VXGEN.listen(S.audio).catch(() => {});
+  }
+
+  // ---------- the set's commands (the subset that changes what the audience sees and hears) ----------
+  const lib = () => window.VXGEN_LIBRARY || [];
+  const findSketch = n => lib().find(x => x.name.toLowerCase() === String(n || '').toLowerCase());
+  const deckOf = d => String(d || active()).toUpperCase() === 'B' ? 'B' : 'A';
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, Number(v)));
+  const CMD = {
+    fade: a => { S.fader = clamp(a.value, 0, 100); applyFader(); },
+    cut: a => { S.fader = deckOf(a.deck) === 'B' ? 100 : 0; applyFader(); },
+    sketch: a => {
+      if (a.send === false) return;
+      const item = a.code ? { name: a.name || 'SKETCH', code: String(a.code) } : findSketch(a.name);
+      if (!item) throw new Error('no sketch "' + a.name + '"');
+      addSketch(item, deckOf(a.deck), a.blend);
+    },
+    cue: a => {
+      let item = a.name ? findSketch(a.name) : null;
+      if (!item) { const L = lib(), i = S.lastGen ? L.findIndex(x => x.name === S.lastGen.name) : -1; item = L[((i < 0 ? -1 : i) + (Number(a.step) || 1) + L.length) % L.length]; }
+      const hidden = active() === 'A' ? 'B' : 'A';
+      S.layers.filter(l => l.deck === hidden && l.kind === 'gen').forEach(removeLayer);
+      if (item) addSketch(item, hidden);
+    },
+    knobs: a => { ['a', 'b', 'c', 'd'].forEach(k => { if (a[k] != null) S.params[k] = clamp(a[k], 0, 1); }); if (S.lastGen) S.lastGen.gen.setParams(S.params); },
+    mutate: () => { if (S.lastGen) S.lastGen.gen.reseed(Math.floor(Math.random() * 1e9)); },
+    evolve: a => { S.evolve = a.on !== false && a.on !== 'off'; },
+    load: a => {
+      let url = a.url;
+      if (!url && a.clip) { const c = catalogue.clips.find(x => x.name.toLowerCase() === String(a.clip).toLowerCase()); url = c && c.url; }
+      if (!url && a.image) { const c = catalogue.images.find(x => (x.set + '/' + x.name).toLowerCase().endsWith(String(a.image).toLowerCase())); url = c && c.url; }
+      if (!url) throw new Error('media not found');
+      addMedia(url, deckOf(a.deck));
+    },
+    layer: a => {
+      const l = S.layers.find(x => x.id === Number(a.id)); if (!l) return;
+      if (a.opacity != null) { l.opacity = clamp(a.opacity, 0, 100); l.el.style.opacity = l.opacity / 100; }
+      if (a.blend) l.el.style.mixBlendMode = a.blend;
+      if (a.visible != null) { l.visible = !!a.visible; l.el.style.display = l.visible ? '' : 'none'; }
+      if (a.size != null) l.el.style.transform = 'scale(' + clamp(a.size, 10, 300) / 100 + ')';
+    },
+    remove: a => { const l = S.layers.find(x => x.id === Number(a.id)); if (l) removeLayer(l); },
+    clear: a => { const d = a.deck ? deckOf(a.deck) : null; S.layers.filter(l => !d || l.deck === d).forEach(removeLayer); },
+    bpm: a => { VXGEN.signals.bpm = clamp(a.value, 40, 220); },
+    play: a => {
+      if (a.track == null) { if (S.audio) S.audio.play().catch(() => {}); return; }
+      const n = Number(a.track);
+      playTrack(Number.isInteger(n) ? S.tracks[n] : S.tracks.find(t => t.name.toLowerCase().includes(String(a.track).toLowerCase())));
+    },
+    pause: () => { if (S.audio) S.audio.pause(); },
+    next: () => playTrack(S.tracks[(S.track + 1) % S.tracks.length]),
+    prev: () => playTrack(S.tracks[(S.track - 1 + S.tracks.length) % S.tracks.length]),
+    blackout: () => { S.black = !S.black; $('black').style.display = S.black ? 'block' : 'none'; }
+  };
+  function argsOf(st) {
+    const args = Object.assign({}, st.args || {}), a = args.asset && doc.assets && doc.assets[args.asset];
+    if (!a) return args;
+    delete args.asset;
+    if (a.kind === 'sketch') return Object.assign(args, { name: a.name, code: a.code });
+    return Object.assign(args, { url: a.url || (a.origin && VXCHAIN.ordUrl(a.origin)) });
+  }
+  function fire(st) {
+    if (st.cmd === 'fade' && st.args && st.args.over > 0) {
+      S.ramps = S.ramps.filter(r => r.kind !== 'fade');
+      S.ramps.push({ kind: 'fade', from: S.fader, to: clamp(st.args.value, 0, 100), start: st.bar, len: Number(st.args.over) });
+      return;
+    }
+    const f = CMD[st.cmd]; if (!f) return; // mixer-only commands (VX engine, lists, tools) have nothing to show here
+    try { f(argsOf(st)); } catch (e) { say('Bar ' + st.bar + ' ' + st.cmd + ': ' + e.message); }
+  }
+
+  // ---------- the clock: bars at the set's tempo, like the composer's PLAY ----------
+  const barMs = () => 4 * 60000 / (VXGEN.signals.bpm || 120);
+  const pos = () => 1 + ((S.playing ? performance.now() : S.pausedAt) - S.t0) / barMs();
+  let lastEvolve = 0;
+  function tick() {
+    const p = pos();
+    $('bar').textContent = 'BAR ' + Math.floor(p) + ' / ' + S.span;
+    if (S.playing) {
+      S.steps.forEach((st, i) => { if (!S.fired.has(i) && st.bar <= p) { S.fired.add(i); fire(st); } });
+      S.ramps = S.ramps.filter(r => { const k = Math.min(1, (p - r.start) / r.len); S.fader = r.from + (r.to - r.from) * k; applyFader(); return k < 1; });
+      if (S.evolve && S.lastGen && Math.floor((p - 1) / 4) > lastEvolve) {
+        lastEvolve = Math.floor((p - 1) / 4); S.lastGen.gen.reseed(Math.floor(Math.random() * 1e9));
+        ['a', 'b', 'c', 'd'].forEach(k => { S.params[k] = clamp(S.params[k] + (Math.random() - .5) * .2, 0, 1); }); S.lastGen.gen.setParams(S.params);
+      }
+      if (S.fired.size === S.steps.length && !S.ramps.length && p > S.span + 4) { S.playing = false; $('play').textContent = 'PLAY'; say('End of the set. RESTART plays it again.'); }
+    }
+    requestAnimationFrame(tick);
+  }
+  function start() {
+    S.layers.slice().forEach(removeLayer); S.nextId = 1; S.lastGen = null; S.fader = 0; applyFader();
+    S.params = { a: .5, b: .5, c: .5, d: .5 }; S.evolve = false; S.black = false; $('black').style.display = 'none'; lastEvolve = 0;
+    if (S.audio) S.audio.pause();
+    VXGEN.signals.bpm = doc.bpm || 120;
+    S.fired = new Set(); S.ramps = []; S.t0 = performance.now(); VXGEN.signals.beat0 = S.t0; S.playing = true;
+    $('play').textContent = 'PAUSE'; say('');
+  }
+  function togglePlay() {
+    if (S.playing) { S.playing = false; S.pausedAt = performance.now(); if (S.audio) S.audio.pause(); $('play').textContent = 'PLAY'; }
+    else if (S.fired.size === S.steps.length && pos() > S.span) start();
+    else { S.t0 += performance.now() - S.pausedAt; S.playing = true; if (S.audio && S.track >= 0) S.audio.play().catch(() => {}); $('play').textContent = 'PAUSE'; }
+  }
+
+  // ---------- load ----------
+  async function load() {
+    if (!VXCHAIN.isOrigin(ORIGIN)) {
+      $('gateText').textContent = 'Paste the inscription id of a V3XV0ID set or live set (txid_vout) to play it.';
+      $('gateAct').innerHTML = '<input id="oid" placeholder="txid_vout"> <button class="big" id="go">PLAY</button>';
+      const go = () => { const v = $('oid').value.trim(); if (VXCHAIN.isOrigin(v)) location.href = '/replay/' + v; else say('That is not an inscription id.'); };
+      $('go').onclick = go; $('oid').onkeydown = e => { if (e.key === 'Enter') go(); };
+      return;
+    }
+    try {
+      catalogue = await fetch('/vx/catalogue.json').then(r => r.json()).catch(() => catalogue);
+      S.tracks = (catalogue.tracks || []).map(t => ({ name: t.take && t.take !== 'A' ? t.title + ' · ' + t.take : t.title, url: t.url }));
+      let d = await VXCHAIN.fetchDoc(ORIGIN), sub;
+      if (d.type === 'v3x-sketch') {
+        d = { type: 'v3x-set', title: d.name, bpm: 120, steps: [{ bar: 1, cmd: 'sketch', args: { asset: 's', deck: 'A' } }, { bar: 1, cmd: 'evolve', args: { on: true } }],
+          assets: { s: { kind: 'sketch', name: d.name, code: d.code } }, bars: 64 };
+        sub = 'Sketch from the chain, evolving';
+      } else if (d.type === 'v3x-setlog') {
+        $('gateText').textContent = 'Following the live recording back to its first chunk…';
+        d = await VXCHAIN.joinSetLog(ORIGIN);
+        sub = `Recorded live · ${d.chunks} chunk${d.chunks === 1 ? '' : 's'}${d.complete ? '' : ' · still recording'}`;
+      } else sub = 'Set from the chain';
+      doc = await VXCHAIN.resolveSet(d);
+      S.steps = (doc.steps || []).map(s => ({ bar: Number(s.bar) || 1, cmd: s.cmd, args: s.args || {} })).sort((a, b) => a.bar - b.bar);
+      S.span = Math.max(doc.bars || 0, Math.ceil(S.steps.reduce((m, s) => Math.max(m, s.bar + ((s.args && Number(s.args.over)) || 0)), 1)));
+      $('title').textContent = doc.title || 'V3XV0ID'; document.title = (doc.title || 'V3XV0ID') + ' · V3XV0ID Replay';
+      $('sub').textContent = `${sub} · ${doc.bpm || 120} BPM · ${S.span} bars · ${ORIGIN.slice(0, 10)}…`;
+      $('gateText').textContent = `${doc.title || 'Untitled set'} · ${S.steps.length} moves over ${S.span} bars. It plays in your browser from the chain, the way it was performed.`;
+      $('gateAct').innerHTML = '<button class="big" id="go">PLAY</button>';
+      $('go').onclick = () => { $('gate').style.display = 'none'; start(); requestAnimationFrame(tick); };
+    } catch (e) {
+      $('gateText').textContent = 'Could not play ' + ORIGIN.slice(0, 16) + '…: ' + e.message;
+    }
+  }
+  $('play').onclick = togglePlay;
+  $('restart').onclick = () => start();
+  $('fs').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {});
+  document.addEventListener('keydown', e => { if (e.key === ' ') { e.preventDefault(); togglePlay(); } if (e.key === 'f') $('fs').click(); });
+  let idle; document.addEventListener('mousemove', () => { document.body.classList.remove('idle'); clearTimeout(idle); idle = setTimeout(() => document.body.classList.add('idle'), 2500); });
+  applyFader(); load();
+})();
+</script>
+</body>
+</html>

@@ -6,7 +6,7 @@
   "homepage": "./",
   "scripts": {
     "test": "pnpm check",
-    "check": "node scripts/check-scripts.js controls.html index.html && node -e \"for (const f of ['main.js','relay-link.js','api-server.js',...require('fs').readdirSync('vx').filter(f=>f.endsWith('.js')).map(f=>'vx/'+f)]) require('child_process').execFileSync(process.execPath,['--check',f],{stdio:'inherit'})\"",
+    "check": "node scripts/check-scripts.js controls.html index.html relay/static/replay.html && node --check relay/server.js && node -e \"for (const f of ['main.js','relay-link.js','api-server.js',...require('fs').readdirSync('vx').filter(f=>f.endsWith('.js')).map(f=>'vx/'+f)]) require('child_process').execFileSync(process.execPath,['--check',f],{stdio:'inherit'})\"",
     "start": "electron ./main.js",
     "build": "electron-builder",
     "build-mac": "electron-builder --mac --publish=never",

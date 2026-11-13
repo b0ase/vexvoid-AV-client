@@ -5032,6 +5032,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           if (t) { playTrack(t.id); note.textContent = 'Playing in MUSIC; the sketches follow it.'; } });
         else if (it.kind === 'midi') btn(midiPlayback && midiPlayback.origin === it.origin ? 'STOP' : 'PLAY', async () => { await toggleMidiFile(it); note.textContent = setEl('setNote').textContent; renderWalletTab(); }, 'Plays the file through your MIDI LEARN mappings');
         else if (it.kind !== 'other') btn(it.kind === 'sketch' ? 'OPEN IN PATTERNS' : 'OPEN IN COMPOSER', () => { setEl('chainOrigin').value = it.origin; setEl('chainOpenBtn').click(); if (it.kind !== 'sketch') document.querySelector('[data-tab="composer"]').click(); });
+        if (/^(set|setlog|sketch)$/.test(it.kind)) btn('WEB REPLAY', () => require('electron').shell.openExternal('https://mixer.vexvoid.com/replay/' + it.origin), 'Plays it in any browser from the chain: a link you can share');
         btn('COPY ID', () => { navigator.clipboard.writeText(it.origin); note.textContent = 'Inscription id copied.'; });
         btn('OPEN ON ORDFS', () => require('electron').shell.openExternal(it.url));
         box.appendChild(acts);
