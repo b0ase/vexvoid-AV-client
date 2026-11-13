@@ -50,11 +50,16 @@ function save() {
     fs.renameSync(STATE_FILE + '.tmp', STATE_FILE);
   }, 200);
 }
-setInterval(() => { // drop expired tokens
+function prune() { // expired tokens; client registrations never used within a day; devices idle 60 days with no grants
   let n = 0;
   for (const [h, t] of Object.entries(state.tokens)) if (t.exp < now()) { delete state.tokens[h]; n++; }
+  const live = Object.values(state.tokens);
+  for (const [id, c] of Object.entries(state.clients)) if (c.created < now() - 864e5 && !live.some(t => t.clientId === id)) { delete state.clients[id]; n++; }
+  for (const [id, d] of Object.entries(state.devices)) if ((d.lastSeen || d.created) < now() - 60 * 864e5 && !live.some(t => t.deviceId === id)) { delete state.devices[id]; n++; }
   if (n) save();
-}, 10 * 60 * 1000).unref();
+}
+prune();
+setInterval(prune, 10 * 60 * 1000).unref();
 
 // ---- short-lived, in memory ----
 const links = new Map();    // deviceId -> { res, pending: Map(id -> {resolve, timer}) }
@@ -63,7 +68,8 @@ const authCodes = new Map(); // code -> { clientId, deviceId, redirectUri, chall
 const buckets = new Map();   // ip:route -> { n, reset }
 
 function limited(req, route, max, perMs) {
-  const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+  // behind our proxy the last X-Forwarded-For entry is the one it added; earlier entries are whatever the client sent
+  const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',').pop().trim();
   const k = ip + ':' + route, b = buckets.get(k);
   if (!b || b.reset < now()) { buckets.set(k, { n: 1, reset: now() + perMs }); return false; }
   b.n++;
