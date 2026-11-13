@@ -1,0 +1,1 @@
+livekit-client 2.24.0 (Apache-2.0), npm sha512-Bp3TcqPaSZUrBGx2xAba8us73NV7go5anATqidZUOtWZaCv7pdUrH2fQAAs5wHF0g0yG2rGidaBRmiOQcrwwgQ==

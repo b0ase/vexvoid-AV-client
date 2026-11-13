@@ -18,6 +18,7 @@ ssh hetzner "mkdir -p ~/$DIR/relay ~/$DIR/mcp"
 rsync -a relay/server.js relay/ecosystem.config.js relay/.gitignore hetzner:$DIR/relay/
 rsync -a mcp/tools.js hetzner:$DIR/mcp/
 rsync -a relay/nginx-mixer.vexvoid.com.conf hetzner:$DIR/relay/
+rsync -a relay/static/ hetzner:$DIR/relay/static/
 ssh hetzner "cd ~/$DIR && pm2 startOrReload relay/ecosystem.config.js --update-env && pm2 save >/dev/null && sleep 1 && curl -s http://127.0.0.1:8101/healthz && echo"
 
 # nginx site: only installed the first time, so certbot's TLS edits are never overwritten
