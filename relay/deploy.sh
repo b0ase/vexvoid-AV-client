@@ -18,8 +18,8 @@ ssh hetzner "mkdir -p ~/$DIR/relay ~/$DIR/mcp"
 rsync -a relay/server.js relay/ecosystem.config.js relay/.gitignore hetzner:$DIR/relay/
 rsync -a mcp/tools.js hetzner:$DIR/mcp/
 rsync -a relay/nginx-mixer.vexvoid.com.conf hetzner:$DIR/relay/
-ssh hetzner "cd ~/$DIR && pm2 startOrReload relay/ecosystem.config.js && pm2 save >/dev/null && sleep 1 && curl -s http://127.0.0.1:8101/healthz && echo"
+ssh hetzner "cd ~/$DIR && pm2 startOrReload relay/ecosystem.config.js --update-env && pm2 save >/dev/null && sleep 1 && curl -s http://127.0.0.1:8101/healthz && echo"
 
 # nginx site: only installed the first time, so certbot's TLS edits are never overwritten
 ssh -t hetzner "test -e /etc/nginx/sites-enabled/mixer.vexvoid.com || (sudo cp ~/$DIR/relay/nginx-mixer.vexvoid.com.conf /etc/nginx/sites-available/mixer.vexvoid.com && sudo ln -s /etc/nginx/sites-available/mixer.vexvoid.com /etc/nginx/sites-enabled/mixer.vexvoid.com && sudo nginx -t && sudo systemctl reload nginx && echo 'nginx site added')"
-echo "Next: point mixer.vexvoid.com (A) at 135.181.103.181, then: bash relay/deploy.sh tls"
+echo "First deploy? Once mixer.vexvoid.com points at 135.181.103.181: bash relay/deploy.sh tls"
