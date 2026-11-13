@@ -1826,9 +1826,19 @@
   <div class="v3xv0id-header">
     <div class="v3xv0id-brand">V3XV0ID</div>
     <div class="v3xv0id-subtitle">AV MIXER</div>
+    <button id="liveChip" class="midi-chip" title="Stream the output, pay per view">GO LIVE</button>
     <button id="bwxChip" class="midi-chip bwx-chip">CONNECT bWALLETX</button>
     <button id="claudeChip" class="midi-chip" title="Control this mixer from claude.ai">CLAUDE.AI</button>
     <button id="midiChip" class="midi-chip" title="MIDI controller mapping">MIDI · …</button>
+  </div>
+  <div id="livePanel" class="midi-panel" style="display:none">
+    <div class="midi-head"><span>LIVESTREAM · PAY PER VIEW</span><button id="liveClose" class="close-btn">✕</button></div>
+    <div class="gen-row"><input id="liveTitle" class="gen-select" placeholder="Show title" style="flex:1;text-transform:none"><span>$</span><input id="livePrice" class="gen-select" type="number" min="0.01" max="100" step="0.01" value="1.00" style="width:90px"></div>
+    <div class="gen-row" style="margin-top:8px"><button id="liveGo" class="gen-btn hot">GO LIVE</button><button id="liveEnd" class="gen-btn" disabled>END SHOW</button></div>
+    <div class="midi-sub"><span id="liveState">Off air.</span></div>
+    <div class="claude-url"><code id="liveUrl"></code><button id="liveCopy" class="gen-btn">COPY</button></div>
+    <div class="midi-sub"><span id="liveTally">0 tickets</span></div>
+    <div class="midi-sub dim">Viewers pay your price from bWalletX straight to your wallet; the relay checks each payment on the network before letting them in. The stream is the OUTPUT window plus the Music tab's audio.</div>
   </div>
   <div id="claudePanel" class="midi-panel" style="display:none">
     <div class="midi-head"><span>PLAY THIS MIXER FROM CLAUDE.AI</span><button id="claudeClose" class="close-btn"></button></div>
@@ -4737,6 +4747,92 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         } catch (e) { genStatus(/cancel|denied|reject/i.test(e.message) ? 'MINT CANCELLED' : 'MINT FAILED', true); genShowError(e.message); }
         finally { btn.disabled = false; }
       });
+      // ===== GO LIVE: stream the output to mixer.vexvoid.com/live/<show>; viewers pay per view, straight to this wallet =====
+      // The payout address is a BRC-29 key the wallet derives for this show with the "anyone" sender key, so each payment
+      // can be recorded in the wallet with internalizeAction ('wallet payment').
+      const ANYONE = '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798';
+      const BRC29 = [2, '3241645161d8'];
+      const stream = { room: null, tracks: [], show: null, tickets: 0, sats: 0, seen: new Set() };
+      const liveEl = id => document.getElementById(id);
+      function b58check(bytes) {
+        const c = require('crypto'), A = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+        const full = Buffer.concat([Buffer.from(bytes), c.createHash('sha256').update(c.createHash('sha256').update(Buffer.from(bytes)).digest()).digest().subarray(0, 4)]);
+        let n = BigInt('0x' + full.toString('hex')), out = '';
+        while (n > 0n) { out = A[Number(n % 58n)] + out; n /= 58n; }
+        for (const b of full) { if (b === 0) out = '1' + out; else break; }
+        return out;
+      }
+      function addressFor(pubHex) {
+        const c = require('crypto');
+        const h = c.createHash('ripemd160').update(c.createHash('sha256').update(Buffer.from(pubHex, 'hex')).digest()).digest();
+        return b58check(Buffer.concat([Buffer.from([0]), h]));
+      }
+      function liveTally() { liveEl('liveTally').textContent = `${stream.tickets} ticket${stream.tickets === 1 ? '' : 's'} · ${(stream.sats / 1e8).toFixed(8)} BSV`; }
+      async function recordPayment(p) {
+        if (stream.seen.has(p.txid)) return;
+        stream.seen.add(p.txid); stream.tickets++; stream.sats += p.sats; liveTally();
+        const wallet = VXWALLET.wallet();
+        if (!wallet || !p.beef) { liveEl('liveState').textContent = `Ticket ${p.txid.slice(0, 10)}… paid; reconnect bWalletX to record it.`; stream.seen.delete(p.txid); return; }
+        try {
+          await wallet.internalizeAction({ tx: Array.from(Buffer.from(p.beef, 'hex')), description: 'V3XV0ID live ticket',
+            outputs: [{ outputIndex: p.vout, protocol: 'wallet payment', paymentRemittance: { derivationPrefix: p.remittance.derivationPrefix, derivationSuffix: p.remittance.derivationSuffix, senderIdentityKey: ANYONE } }],
+            labels: ['v3xv0id', 'ticket'] });
+          await ipcRenderer.invoke('relay-live-ack', p.txid);
+        } catch (e) { liveEl('liveState').textContent = 'A ticket payment could not be recorded yet: ' + e.message; stream.seen.delete(p.txid); }
+      }
+      ipcRenderer.on('relay-ticket', (e, p) => recordPayment(p));
+      async function goLive() {
+        const btn = liveEl('liveGo'); btn.disabled = true;
+        const say = t => { liveEl('liveState').textContent = t; };
+        try {
+          const price = Number(liveEl('livePrice').value), title = liveEl('liveTitle').value.trim() || 'V3XV0ID LIVE';
+          if (!(price >= 0.01 && price <= 100)) throw new Error('price must be $0.01 to $100');
+          const wallet = await mintWallet(say);
+          const showId = 'vx' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+          const prefix = require('crypto').randomBytes(12).toString('base64'), suffix = Buffer.from(showId).toString('base64');
+          say('Approve the payout key in bWalletX…');
+          const pk = await wallet.getPublicKey({ protocolID: BRC29, keyID: prefix + ' ' + suffix, counterparty: ANYONE, forSelf: true });
+          const show = await ipcRenderer.invoke('relay-live-start', { showId, title, priceUsd: price, address: addressFor(pk.publicKey), remittance: { derivationPrefix: prefix, derivationSuffix: suffix } });
+          stream.show = { ...show, title, price }; // from here a failure must also close the show on the relay
+          say('Capturing the output…');
+          const sourceId = await ipcRenderer.invoke('get-output-source-id');
+          if (!sourceId) throw new Error('output window not found');
+          const video = await navigator.mediaDevices.getUserMedia({ audio: false, video: { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: sourceId, maxWidth: 1280, maxHeight: 720, maxFrameRate: 30 } } });
+          stream.tracks = video.getTracks();
+          if (currentAudio && currentAudio.captureStream) stream.tracks.push(...currentAudio.captureStream().getAudioTracks());
+          const LK = window.LivekitClient || require(require('path').join(__dirname, 'vx', 'lib', 'livekit-client.umd.js'));
+          stream.room = new LK.Room();
+          say('Connecting to the stream server…');
+          await stream.room.connect(show.livekitUrl, show.token);
+          for (const t of stream.tracks) await stream.room.localParticipant.publishTrack(t, t.kind === 'video' ? { name: 'output', videoEncoding: { maxBitrate: 3000000, maxFramerate: 30 } } : { name: 'music' });
+          stream.tickets = 0; stream.sats = 0; liveTally();
+          liveEl('liveUrl').textContent = show.viewerUrl; liveEl('liveEnd').disabled = false;
+          liveEl('liveChip').textContent = '● LIVE'; liveEl('liveChip').classList.add('on');
+          say(`LIVE: "${title}" at $${price.toFixed(2)} a ticket.`);
+          const pending = await ipcRenderer.invoke('relay-live-payments');
+          (pending.payments || []).forEach(recordPayment);
+        } catch (e) {
+          const why = 'Not live: ' + String(e.message).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+          await endLive(true);
+          say(why);
+        } finally { btn.disabled = !!stream.room; }
+      }
+      async function endLive(quiet) {
+        try { if (stream.room) await stream.room.disconnect(); } catch (e) {}
+        stream.tracks.forEach(t => t.stop()); stream.tracks = []; stream.room = null;
+        if (stream.show) { try { await ipcRenderer.invoke('relay-live-stop', stream.show.showId); } catch (e) {} }
+        if (!quiet) liveEl('liveState').textContent = stream.show ? `Show ended: ${stream.tickets} tickets.` : 'Off air.';
+        stream.show = null;
+        liveEl('liveEnd').disabled = true; liveEl('liveGo').disabled = false;
+        liveEl('liveChip').textContent = 'GO LIVE'; liveEl('liveChip').classList.remove('on');
+      }
+      liveEl('liveChip').addEventListener('click', () => { const p = liveEl('livePanel'); p.style.display = p.style.display === 'none' ? 'block' : 'none'; });
+      liveEl('liveClose').addEventListener('click', () => { liveEl('livePanel').style.display = 'none'; });
+      liveEl('liveGo').addEventListener('click', goLive);
+      liveEl('liveEnd').addEventListener('click', () => endLive(false));
+      liveEl('liveCopy').addEventListener('click', () => navigator.clipboard.writeText(liveEl('liveUrl').textContent));
+      ['liveTitle', 'livePrice'].forEach(id => liveEl(id).addEventListener('keydown', e => e.stopPropagation()));
+
       // ===== MIDI: any controller; LEARN binds a knob/fader/pad to a target. Mappings live in vx-settings.json. =====
       const MIDI_TARGETS = [
         { id: 'fader', rec: v => ['fade', { value: Math.round(v * 100) }],  label: 'CROSSFADER', kind: 'range', run: v => VXCMD.fade.run({ value: v * 100 }) },

@@ -8,7 +8,7 @@ const { REMOTE_COMMANDS } = require('./mcp/tools');
 
 const RELAY = (process.env.VX_RELAY_URL || 'https://mixer.vexvoid.com').replace(/\/$/, '');
 
-function start({ run, getOutputWindow }) {
+function start({ run, getOutputWindow, getControlWindow }) {
   const file = path.join(app.getPath('userData'), 'relay.json');
   let conf = {};
   try { conf = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) {}
@@ -73,6 +73,10 @@ function start({ run, getOutputWindow }) {
           while ((i = buf.indexOf('\n\n')) >= 0) {
             const block = buf.slice(0, i); buf = buf.slice(i + 2);
             const ev = (block.match(/^event: (.*)$/m) || [])[1], data = (block.match(/^data: (.*)$/m) || [])[1];
+            if (ev === 'ticket' && data) { // a viewer paid for a show: the controls window records it in the wallet
+              const w = getControlWindow && getControlWindow();
+              if (w && !w.isDestroyed()) w.webContents.send('relay-ticket', JSON.parse(data));
+            }
             if (ev === 'cmd' && data) {
               const m = JSON.parse(data);
               execute(m.cmd, m.args || {}).then(res => answer(m.id, res), e => answer(m.id, { ok: false, error: e.message }));
@@ -105,6 +109,21 @@ function start({ run, getOutputWindow }) {
     }
     return out;
   });
+  // Livestreams (pay per view): the performer's mixer starts and stops shows and collects ticket payments
+  async function deviceCall(route, body) {
+    conf.enabled = true; saveConf();
+    if (stopped) { stopped = false; link(); }
+    await register();
+    const r = await fetch(RELAY + route, { method: body ? 'POST' : 'GET', headers: { ...auth(), 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || ('relay ' + r.status));
+    return j;
+  }
+  ipcMain.handle('relay-live-start', (e, show) => deviceCall('/device/live/start', show));
+  ipcMain.handle('relay-live-stop', (e, showId) => deviceCall('/device/live/stop', { showId }));
+  ipcMain.handle('relay-live-payments', () => deviceCall('/device/live/payments'));
+  ipcMain.handle('relay-live-ack', (e, txid) => deviceCall('/device/live/ack', { txid }));
+
   ipcMain.handle('relay-disconnect', async () => {
     try { if (conf.deviceId) await fetch(RELAY + '/device/unpair', { method: 'POST', headers: auth() }); } catch (e) {}
     conf.enabled = false; saveConf();
