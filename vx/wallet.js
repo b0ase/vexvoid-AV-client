@@ -12,7 +12,7 @@
   var C = root.bWalletXConnect;
   var ORIGIN = 'https://mixer.vexvoid.com';
   var STORE = 'bwx:connected';
-  var st = { wallet: null, key: null, handle: null, busy: false, label: '' };
+  var st = { wallet: null, key: null, handle: null, busy: false, label: '', error: null };
 
   function get() { try { return localStorage.getItem(STORE); } catch (e) { return null; } }
   function set(v) { try { v ? localStorage.setItem(STORE, v) : localStorage.removeItem(STORE); } catch (e) {} }
@@ -23,8 +23,9 @@
     if (!b) return;
     b.classList.toggle('on', !!st.key);
     b.disabled = st.busy;
-    b.textContent = st.key ? '● ' + (st.handle || short(st.key)) : st.busy ? st.label : 'CONNECT bWALLETX';
-    b.title = st.key ? 'Connected to bWalletX. Click to disconnect.' : 'Connect your bWalletX to mint and sell';
+    b.classList.toggle('err', !!st.error && !st.key && !st.busy);
+    b.textContent = st.key ? '● ' + (st.handle || short(st.key)) : st.busy ? st.label : st.error ? 'NOT CONNECTED · RETRY' : 'CONNECT bWALLETX';
+    b.title = st.key ? 'Connected to bWalletX. Click to disconnect.' : st.error ? st.error : 'Connect your bWalletX to mint and sell';
   }
   async function lookup(k) {
     try {
@@ -85,7 +86,12 @@
     init: function () {
       var b = document.getElementById('bwxChip');
       if (b) {
-        b.addEventListener('click', function () { if (st.key) disconnect(); else connect(true).catch(function (e) { st.label = 'NOT CONNECTED'; draw(); console.warn('bWalletX', e); }); });
+        // a failed connect stays on the chip (hover for the reason) instead of the QR just vanishing
+        b.addEventListener('click', function () {
+          if (st.key) return disconnect();
+          st.error = null;
+          connect(true).catch(function (e) { st.error = 'bWalletX: ' + ((e && e.message) || e); draw(); console.warn('bWalletX', e); });
+        });
         if (C && C.bindPrewarm) C.bindPrewarm(b);
       }
       draw();
