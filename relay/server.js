@@ -192,6 +192,12 @@ const server = http.createServer(async (req, res) => {
 
     if (p === '/' && req.method === 'GET') return html(res, 200, `<!doctype html><meta charset="utf-8"><title>V3XV0ID mixer relay</title><body style="background:#000;color:#ddd;font:14px 'Courier New',monospace;padding:40px"><h1 style="letter-spacing:.3em;font-size:15px">V3XV0ID MIXER RELAY</h1><p>Add <b>${esc(BASE)}/mcp</b> as a custom connector in claude.ai to control your mixer.</p>`);
     if (p === '/healthz') return json(res, 200, { ok: true, devicesOnline: links.size });
+    // bWalletX wears the connected app's theme; the mixer pairs as this origin
+    if (p === '/.well-known/bwalletx-theme.json') return json(res, 200, { v: 2, name: 'V3XV0ID', mode: 'dark', accent: '#FFFFFF', accentHi: '#FFFFFF', bg: '#000000', surface: '#0B0B0B', text: '#F4F4F2', logo: '/logo.svg' }, { 'access-control-allow-origin': '*', 'cache-control': 'public, max-age=3600' });
+    if (p === '/logo.svg') {
+      res.writeHead(200, { 'content-type': 'image/svg+xml', 'access-control-allow-origin': '*', 'cache-control': 'public, max-age=86400' });
+      return res.end('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 48"><rect width="120" height="48" fill="#000"/><g fill="none" stroke="#fff" stroke-width="5" stroke-linecap="square" stroke-linejoin="miter"><path d="M10 10 L22 38 L34 10"/><path d="M46 10 H66 L54 23 H66 V38 H46"/><path d="M78 10 L102 38 M102 10 L78 38"/></g></svg>');
+    }
 
     // discovery
     if (p === '/.well-known/oauth-protected-resource' || p === '/.well-known/oauth-protected-resource/mcp') return json(res, 200, prMetadata(), { 'access-control-allow-origin': '*' });
