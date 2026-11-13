@@ -784,6 +784,10 @@
         sendToControl('layers-updated', { layers: layerData });
       }
 
+      // The layer list lives in the controls window now (fed by sendLayersUpdate), so the output has
+      // nothing to redraw. Kept so the frame loop and loaders that still call it don't throw.
+      function updateLayersList() {}
+
       // P5.js Pattern Application System
       function applyPatternToLayers(data) {
         const { code, targetLayers } = data;
