@@ -3071,7 +3071,14 @@
         }
       }
 
+      // the layer each deck monitor is showing, with its position, for dragging it around on the monitor
+      const monitorLayer = { A: null, B: null };
+      function placeOnMonitor(container, d) {
+        const el = container.querySelector('.preview-image'); if (!el || !d) return;
+        el.style.transform = `translate(${(d.fx || 0) * container.clientWidth}px, ${(d.fy || 0) * container.clientHeight}px) scale(${d.scale || 1})`;
+      }
       function updatePalettePreview(data) {
+        monitorLayer.A = data.paletteA || null; monitorLayer.B = data.paletteB || null;
         if (data.paletteA && data.paletteA.imageSrc) {
           updatePreviewSlot(preview2, previewCache.paletteA,
             data.paletteA.imageSrc, data.paletteA.opacity,
@@ -3087,7 +3094,33 @@
         } else {
           updatePreviewSlot(preview3, previewCache.paletteB, null);
         }
+        // the slot update resets the transform; put each layer back where it sits (mid-drag: where the pointer has it)
+        placeOnMonitor(preview2, monitorDrag && monitorDrag.deck === 'A' ? monitorDrag.d : data.paletteA);
+        placeOnMonitor(preview3, monitorDrag && monitorDrag.deck === 'B' ? monitorDrag.d : data.paletteB);
       }
+      // Drag on a deck monitor moves the selected layer (it must be on that deck); double-click puts it back in the middle
+      let monitorDrag = null;
+      [[preview2, 'A'], [preview3, 'B']].forEach(([box, deck]) => {
+        box.style.cursor = 'move';
+        box.title = 'Select a layer on this deck, then drag here to move it. Double-click to centre it.';
+        box.addEventListener('pointerdown', e => {
+          const d = monitorLayer[deck];
+          const sel = selectedLayer && (deck === 'A' ? layersA : layersB).some(l => l.id === selectedLayer.id) ? selectedLayer.id : null;
+          if (!d || !sel || d.layerId !== sel) return;
+          monitorDrag = { box, deck, id: sel, x: e.clientX, y: e.clientY, fx: d.fx || 0, fy: d.fy || 0, d, raf: 0 };
+          box.setPointerCapture(e.pointerId); e.preventDefault();
+        });
+        box.addEventListener('pointermove', e => {
+          const m = monitorDrag; if (!m || m.box !== box) return;
+          m.d.fx = Math.max(-0.5, Math.min(0.5, m.fx + (e.clientX - m.x) / box.clientWidth));
+          m.d.fy = Math.max(-0.5, Math.min(0.5, m.fy + (e.clientY - m.y) / box.clientHeight));
+          placeOnMonitor(box, m.d);
+          if (!m.raf) m.raf = requestAnimationFrame(() => { m.raf = 0; sendToOutput('move-layer', { layerId: m.id, fx: m.d.fx, fy: m.d.fy }); });
+        });
+        const end = () => { if (monitorDrag && monitorDrag.box === box) { sendToOutput('move-layer', { layerId: monitorDrag.id, fx: monitorDrag.d.fx, fy: monitorDrag.d.fy }); monitorDrag = null; } };
+        box.addEventListener('pointerup', end); box.addEventListener('pointercancel', end);
+        box.addEventListener('dblclick', () => { const d = monitorLayer[deck]; if (d && d.layerId) sendToOutput('move-layer', { layerId: d.layerId, fx: 0, fy: 0 }); });
+      });
       
       function sliderToMs(x) {
         x = Number(x);
