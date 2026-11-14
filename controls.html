@@ -1745,6 +1745,10 @@
     .ai-in .gen-btn{width:82px}
     /* layer LOAD picker */
     .layer-btn:disabled{opacity:.25;cursor:default}
+    .seq-strip{display:flex;gap:3px;overflow-x:auto;margin-top:6px;padding-bottom:3px;align-items:center}
+    .seq-thumb{flex:none;width:56px;height:32px;object-fit:cover;background:#111;border:1px solid #222;cursor:pointer;filter:grayscale(1) brightness(.75)}
+    .seq-thumb:hover{filter:none}.seq-thumb.on{border-color:#fff;filter:none;outline:1px solid #fff}
+    .seq-count{flex:none;font-size:9px;color:#888;padding:0 6px;letter-spacing:.1em}
     .mp-overlay{position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;padding:24px}
     .mp{width:min(1100px,100%);height:min(720px,100%);display:flex;flex-direction:column;gap:10px;background:#050505;border:1px solid rgba(255,255,255,.35);padding:14px}
     .mp-head{display:flex;gap:8px;align-items:center}.mp-head b{flex:1;font-family:'Michroma','IBM Plex Mono',sans-serif;font-weight:400;letter-spacing:.2em;font-size:12px}
@@ -2722,6 +2726,7 @@
           case 'preview-update':
             updateOutputPreview(data);
             updatePalettePreview(data);
+            (data.layers || []).forEach(l => { if (l.totalImages > 1) seqMark(l.id, l.imageIndex || 0); });
             updateSourceLabels();
             break;
         }
@@ -2820,6 +2825,8 @@
             </div>
           `;
           
+          if (layer.files && layer.files.length > 1) layerItem.appendChild(seqStrip(layer));
+
           // Make layer item draggable
           layerItem.draggable = true;
           layerItem.dataset.layerId = layer.id;
@@ -2843,6 +2850,42 @@
         });
       }
       
+      // Thumbnails of a layer's sequence (images or clips). Elements are cached per file so a card re-render doesn't reload
+      // them; the playing one is lit (kept current from the preview stream), and a click jumps the layer there.
+      const seqThumbs = new Map();
+      function seqThumb(file) {
+        let el = seqThumbs.get(file);
+        if (el) return el;
+        const src = 'file://' + encodeURI(file);
+        if (/\.(mp4|mov|avi|webm|mkv|m4v)$/i.test(file)) {
+          el = document.createElement('video'); el.muted = true; el.preload = 'metadata'; el.src = src + '#t=0.5';
+          el.addEventListener('mouseenter', () => { el.loop = true; el.play().catch(() => {}); });
+          el.addEventListener('mouseleave', () => el.pause());
+        } else { el = document.createElement('img'); el.loading = 'lazy'; el.src = src; }
+        el.className = 'seq-thumb'; el.title = file.split('/').pop();
+        seqThumbs.set(file, el); return el;
+      }
+      function seqStrip(layer) {
+        const strip = document.createElement('div'); strip.className = 'seq-strip'; strip.dataset.layerId = layer.id;
+        layer.files.forEach((f, i) => {
+          const t = seqThumb(f); t.dataset.index = i; t.draggable = false; t.classList.toggle('on', i === layer.imageIndex);
+          t.onclick = e => { e.stopPropagation(); sendToOutput('set-layer-index', { layerId: layer.id, index: i }); };
+          strip.appendChild(t);
+        });
+        const n = document.createElement('span'); n.className = 'seq-count'; n.textContent = `${(layer.imageIndex || 0) + 1}/${layer.imageCount || layer.files.length}`;
+        strip.appendChild(n);
+        return strip;
+      }
+      function seqMark(id, index) {
+        const strip = document.querySelector(`.seq-strip[data-layer-id="${id}"]`); if (!strip) return;
+        const cur = strip.querySelector('.seq-thumb.on');
+        if (cur && Number(cur.dataset.index) === index) return;
+        if (cur) cur.classList.remove('on');
+        const t = strip.querySelector(`.seq-thumb[data-index="${index}"]`);
+        if (t) { t.classList.add('on'); if (t.offsetLeft < strip.scrollLeft || t.offsetLeft > strip.scrollLeft + strip.clientWidth - 40) strip.scrollLeft = t.offsetLeft - 40; }
+        const c = strip.querySelector('.seq-count'); if (c) c.textContent = `${index + 1}/${c.textContent.split('/')[1]}`;
+      }
+
       function updateSelectedLayer() {
         if (selectedLayer) {
           selectedLayerInfo.textContent = `Controlling: ${selectedLayer.name}`;

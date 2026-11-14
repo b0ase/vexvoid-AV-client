@@ -437,6 +437,15 @@
           case 'load-images':
             loadImagesFromPaths(data.layerId, data.filePaths);
             break;
+          case 'set-layer-index': { // jump a sequence to one of its files (thumbnail clicked)
+            const l = layers.find(x => x.id === data.layerId);
+            if (!l || !l.imageFiles || !l.imageFiles.length) break;
+            const i = Math.max(0, Math.min(l.imageFiles.length - 1, Number(data.index) || 0));
+            if (l.isVideo) loadVideoAtIndex(l, l.imageFiles, i);
+            else { l.imageIndex = i; if (l.imageElement) l.imageElement.src = 'file://' + encodeURI(l.imageFiles[i]); }
+            sendLayersUpdate();
+            break;
+          }
           case 'update-layer-property':
             updateLayerProperty(data.layerId, data.property, data.value);
             break;
@@ -522,7 +531,9 @@
           videoPaused: layer.videoPaused || false,
           videoDuration: layer.videoDuration || 0,
           videoPosition: layer.videoPosition || 0,
-          imageCount: layer.imageFiles ? layer.imageFiles.length : 0
+          imageCount: layer.imageFiles ? layer.imageFiles.length : 0,
+          // a sequence's files, so its card can show thumbnails (a single file needs none)
+          files: layer.imageFiles && layer.imageFiles.length > 1 ? layer.imageFiles.slice(0, 200) : undefined
         }));
         
         sendToControl('layers-updated', { layers: layerData });
@@ -812,7 +823,9 @@
           videoPaused: layer.videoPaused || false,
           videoDuration: layer.videoDuration || 0,
           videoPosition: layer.videoPosition || 0,
-          imageCount: layer.imageFiles ? layer.imageFiles.length : 0
+          imageCount: layer.imageFiles ? layer.imageFiles.length : 0,
+          // a sequence's files, so its card can show thumbnails (a single file needs none)
+          files: layer.imageFiles && layer.imageFiles.length > 1 ? layer.imageFiles.slice(0, 200) : undefined
         }));
         
         sendToControl('layers-updated', { layers: layerData });
