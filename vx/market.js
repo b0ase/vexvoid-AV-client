@@ -1,6 +1,8 @@
-/* The 1Sat market, read for the mixer's MARKET tab: active OrdLock listings from the 1Sat overlay
- * (api.1sat.app/1sat/market/listings), one department at a time by content type. Read only; buying goes through
- * bWalletX, and listing (selling) waits for bWalletX's replacement listing contract.
+/* The VexVoid market for the mixer's MARKET tab: active 1Sat OrdLock listings (api.1sat.app/1sat/market/listings) of
+ * VexVoid music, video, sets, sketches and MIDI, meaning inscriptions whose MAP says app=v3xv0id (made with this deck)
+ * or whose content type is a V3XV0ID one. The 1Sat market has no app filter, so a department scans its newest
+ * listings and keeps the VexVoid ones (owner, 14 Nov: this deck's market is VexVoid only, not the whole 1Sat market).
+ * Read only; buying goes through bWalletX, and listing (selling) waits for bWalletX's replacement listing contract.
  *
  *   VXMARKET.DEPTS                                   departments and the content types each one asks for
  *   VXMARKET.search(dept, { q, more }) -> listings   newest first; more:true continues from the last page
@@ -20,8 +22,8 @@
   // about 24 listings a page per department: there are no thumbnails, so every image tile is the full file
   var PAGE = 24;
   var DEPTS = [
+    { id: 'audio', label: 'MUSIC', types: ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/ogg', 'audio/flac', 'audio/aac', 'audio/mp4'] },
     { id: 'video', label: 'VIDEO', types: ['video/mp4', 'video/webm', 'video/quicktime'] },
-    { id: 'audio', label: 'AUDIO', types: ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/ogg', 'audio/flac', 'audio/aac', 'audio/mp4'] },
     { id: 'image', label: 'IMAGES', types: ['image/png', 'image/jpeg', 'image/gif', 'image/webp'] },
     { id: 'v3x', label: 'V3XV0ID SETS + SKETCHES', types: ['application/vnd.v3xv0id.set+json', 'application/vnd.v3xv0id.setlog+json', 'application/vnd.v3xv0id.sketch+json'] },
     { id: 'midi', label: 'MIDI', types: ['audio/midi', 'audio/x-midi'] }
@@ -82,5 +84,28 @@
     return r && (r.spend || (r.data && r.data.ordlock && r.data.ordlock.status && r.data.ordlock.status !== 'active')) ? 'gone' : 'active';
   }
 
-  root.VXMARKET = { DEPTS: DEPTS, search: search, isVexvoid: isVexvoid, buyLink: buyLink, status: status, API: API };
+  /** VexVoid listings in a department: scans up to `pages` pages of the newest listings and keeps the VexVoid ones.
+   *  more:true continues the scan. -> { listings, scanned, more } */
+  var vexScan = {};
+  async function vexvoid(deptId, opts) {
+    opts = opts || {};
+    var k = deptId + '|' + (opts.q || '');
+    if (!opts.more || !vexScan[k]) vexScan[k] = { found: [], scanned: 0 };
+    var st = vexScan[k], more = true;
+    for (var i = 0; i < (opts.pages || 4) && more; i++) {
+      var r = await search(deptId, { q: opts.q, more: i > 0 || !!opts.more });
+      more = r.more; st.scanned += r.listings.length;
+      var checks = [], queue = r.listings.slice();
+      // ORDFS metadata for each listing, eight at a time
+      await Promise.all(Array.from({ length: 8 }, async function () {
+        while (queue.length) { var l = queue.shift(); if (await isVexvoid(l)) checks.push(l); }
+      }));
+      checks.forEach(function (l) { if (!st.found.some(function (x) { return x.outpoint === l.outpoint; })) st.found.push(l); });
+      if (opts.onProgress) opts.onProgress(st.scanned, st.found.length);
+    }
+    st.found.sort(function (a, b) { return b.score - a.score; });
+    return { listings: st.found.slice(), scanned: st.scanned, more: more };
+  }
+
+  root.VXMARKET = { DEPTS: DEPTS, search: search, vexvoid: vexvoid, isVexvoid: isVexvoid, buyLink: buyLink, status: status, API: API };
 })(typeof window !== 'undefined' ? window : this);

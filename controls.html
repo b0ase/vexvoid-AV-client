@@ -2496,8 +2496,8 @@
     <div class="tab-content" id="marketTab">
       <div class="wb">
         <div class="video-browser-header">
-          <h2 class="cyber-text">MARKET</h2>
-          <div class="cloud-status" id="mkStatus">1SAT MARKET</div>
+          <h2 class="cyber-text">VEXVOID MARKET</h2>
+          <div class="cloud-status" id="mkStatus">VEXVOID ON 1SAT</div>
           <div class="video-browser-controls">
             <button id="mkRefresh" class="browser-btn">REFRESH</button>
             <input type="text" id="mkSearch" class="search-input" placeholder="NAME STARTS WITH...">
@@ -2505,7 +2505,7 @@
         </div>
         <div class="wb-filters" id="mkDepts"></div>
         <div class="wb-body">
-          <div class="wb-lib"><div class="video-grid" id="mkGrid"></div><div style="text-align:center;padding:12px"><button id="mkMore" class="gen-btn" style="display:none">MORE</button></div></div>
+          <div class="wb-lib"><div class="video-grid" id="mkGrid"></div><div style="text-align:center;padding:12px"><button id="mkMore" class="gen-btn" style="display:none">SCAN FURTHER</button></div></div>
           <div class="wb-detail" id="mkDetail"></div>
         </div>
       </div>
@@ -5051,36 +5051,31 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       // listing waits for bWalletX's replacement listing contract (1Sat turned new single-ordinal OrdLock listings off).
       // BUY hands the listing to bWalletX by link; off until the wallet's buy sheet ships (bWalletX session will say)
       const BUY_LINK_LIVE = false;
-      const mk = { dept: 'video', listings: [], more: false, sel: null, vexOnly: false, vex: {}, busy: false, loaded: false };
+      const mk = { dept: 'audio', listings: [], more: false, sel: null, scanned: 0, busy: false, loaded: false };
       const mkEl = id => document.getElementById(id);
       const usd = sats => bsvUsd ? '$' + (sats / 1e8 * bsvUsd).toFixed(sats / 1e8 * bsvUsd >= 0.01 ? 2 : 4) : (sats / 1e8).toFixed(8) + ' BSV';
       async function loadMarket(more) {
         if (mk.busy) return;
-        mk.busy = true; mkEl('mkStatus').textContent = 'READING THE 1SAT MARKET…';
+        mk.busy = true; mkEl('mkStatus').textContent = 'LOOKING FOR VEXVOID LISTINGS…';
+        if (!more) { mk.listings = []; mk.sel = null; renderMarket(); }
         try {
           await usdRate();
-          const r = await VXMARKET.search(mk.dept, { q: mkEl('mkSearch').value, more: !!more });
-          mk.listings = more ? mk.listings.concat(r.listings.filter(l => !mk.listings.some(x => x.outpoint === l.outpoint))) : r.listings;
-          mk.more = r.more; mk.loaded = true;
-          if (!more) mk.sel = null;
+          const r = await VXMARKET.vexvoid(mk.dept, { q: mkEl('mkSearch').value, more: !!more,
+            onProgress: (n, f) => { mkEl('mkStatus').textContent = `CHECKED ${n} LISTINGS · ${f} VEXVOID`; } });
+          mk.listings = r.listings; mk.more = r.more; mk.scanned = r.scanned; mk.loaded = true;
         } catch (e) { mkEl('mkStatus').textContent = 'COULD NOT READ THE MARKET: ' + e.message; mk.busy = false; return; }
         mk.busy = false;
         renderMarket();
-        // which listings are V3XV0ID's own (MAP app=v3xv0id), for the VEXVOID ONLY filter and the badge
-        mk.listings.forEach(l => VXMARKET.isVexvoid(l).then(v => { if (v && !mk.vex[l.origin]) { mk.vex[l.origin] = true; renderMarket(); } }));
       }
       function renderMarket() {
         const dept = VXMARKET.DEPTS.find(d => d.id === mk.dept);
-        const shown = mk.listings.filter(l => !mk.vexOnly || mk.vex[l.origin]);
-        mkEl('mkStatus').textContent = `${dept.label} · ${shown.length} LISTING${shown.length === 1 ? '' : 'S'}` + (bsvUsd ? ` · BSV $${bsvUsd.toFixed(2)}` : '');
+        const shown = mk.listings;
+        if (!mk.busy) mkEl('mkStatus').textContent = `VEXVOID ${dept.label} · ${shown.length} FOR SALE · ${mk.scanned} LISTINGS CHECKED` + (bsvUsd ? ` · BSV $${bsvUsd.toFixed(2)}` : '');
         const f = mkEl('mkDepts'); f.innerHTML = '';
         VXMARKET.DEPTS.forEach(d => { const b = document.createElement('button'); b.textContent = d.label; b.classList.toggle('on', d.id === mk.dept);
           b.addEventListener('click', () => { mk.dept = d.id; loadMarket(); }); f.appendChild(b); });
-        const t = document.createElement('button'); t.className = 'mk-tog'; t.textContent = 'VEXVOID ONLY'; t.classList.toggle('on', mk.vexOnly);
-        t.title = 'Only inscriptions made with V3XV0ID (MAP app=v3xv0id)';
-        t.addEventListener('click', () => { mk.vexOnly = !mk.vexOnly; renderMarket(); }); f.appendChild(t);
         const grid = mkEl('mkGrid'); grid.innerHTML = '';
-        if (!shown.length) grid.innerHTML = `<div class="wb-note" style="grid-column:1/-1;padding:8px">${mk.busy ? 'Reading…' : mk.vexOnly ? 'No V3XV0ID listings in this department yet. Things minted in the mixer will show here once bWalletX can list them.' : 'No listings here.'}</div>`;
+        if (!shown.length) grid.innerHTML = `<div class="wb-note" style="grid-column:1/-1;padding:8px">${mk.busy ? 'Looking through the newest 1Sat listings for VexVoid ones…' : 'No VexVoid ' + dept.label.toLowerCase() + ' for sale yet. This market shows VexVoid music and video, and the sets, sketches and MIDI files made on this deck. Your own mints appear here once bWalletX can list them.' + (mk.more ? ' SCAN FURTHER looks through older listings.' : '')}</div>`;
         shown.forEach(l => {
           const card = document.createElement('div'); card.className = 'video-item wb-item'; card.classList.toggle('sel', mk.sel === l.outpoint);
           let tile;
@@ -5093,16 +5088,16 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
             tile.lastChild.textContent = (l.contentType.split('/')[1] || '').toUpperCase(); }
           const name = document.createElement('div'); name.className = 'video-name'; name.textContent = l.name;
           const price = document.createElement('div'); price.className = 'mk-price'; price.textContent = usd(l.sats);
-          if (mk.vex[l.origin]) { const v = document.createElement('div'); v.className = 'wb-kind'; v.textContent = 'V3XV0ID'; card.append(tile, name, price, v); } else card.append(tile, name, price);
+          card.append(tile, name, price);
           card.addEventListener('click', () => { mk.sel = l.outpoint; renderMarket(); });
           grid.appendChild(card);
         });
-        mkEl('mkMore').style.display = mk.more && !mk.vexOnly ? '' : 'none';
+        mkEl('mkMore').style.display = mk.more && !mk.busy ? '' : 'none';
         renderMarketDetail(mk.listings.find(l => l.outpoint === mk.sel) || null);
       }
       function renderMarketDetail(l) {
         const box = mkEl('mkDetail');
-        if (!l) { box.innerHTML = '<div class="wb-note">Live listings on the 1Sat market, newest first. Pick one to preview it.<br><br>Buying happens in bWalletX: you approve the price there, and the file lands in your wallet, ready in the WALLET tab.<br><br>Selling your own clips, sets and sketches opens when bWalletX ships its new listing contract. Listings then show here, in the bWalletX Market and in the VexVoid shop on bmarketx.com.</div>'; return; }
+        if (!l) { box.innerHTML = '<div class="wb-note">VexVoid music and video, and sets, sketches and MIDI made on this deck, for sale on the 1Sat market. Pick one to preview it.<br><br>Buying happens in bWalletX: you approve the price there, and the file lands in your wallet, ready in the WALLET tab.<br><br>Selling your own clips, sets and sketches opens when bWalletX ships its new listing contract. Listings then show here, in the bWalletX Market and in the VexVoid shop on bmarketx.com.</div>'; return; }
         box.innerHTML = '';
         const h = document.createElement('h3'); h.textContent = l.name; box.appendChild(h);
         if (/^video\//.test(l.contentType)) { const v = document.createElement('video'); v.className = 'wb-prev'; v.src = l.url; v.controls = true; v.muted = true; v.loop = true; v.autoplay = true; box.appendChild(v); }
@@ -5110,7 +5105,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         else if (/^audio\//.test(l.contentType) && !/midi/.test(l.contentType)) { const a = document.createElement('audio'); a.src = l.url; a.controls = true; a.preload = 'none'; box.appendChild(a); }
         const price = document.createElement('div'); price.className = 'mk-big'; price.textContent = usd(l.sats); box.appendChild(price);
         const meta = document.createElement('div'); meta.className = 'wb-meta';
-        [['PRICE', (l.sats / 1e8).toFixed(8) + ' BSV'], ['TYPE', l.contentType || '?'], ['MADE WITH', mk.vex[l.origin] ? 'V3XV0ID' : '—'], ['SELLER', l.seller || '?'], ['LISTING', l.outpoint], ['ID', l.origin]]
+        [['PRICE', (l.sats / 1e8).toFixed(8) + ' BSV'], ['TYPE', l.contentType || '?'], ['SELLER', l.seller || '?'], ['LISTING', l.outpoint], ['ID', l.origin]]
           .forEach(([k, v]) => { const a = document.createElement('span'); a.textContent = k; const b = document.createElement('b'); b.textContent = v; meta.append(a, b); });
         box.appendChild(meta);
         const acts = document.createElement('div'); acts.className = 'wb-acts';
