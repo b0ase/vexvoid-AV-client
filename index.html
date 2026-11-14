@@ -400,7 +400,9 @@
         const shown = list => list.find(l => selectedLayer && l.id === selectedLayer.id) || list[list.length - 1];
         const deckPreview = list => { const l = list.length ? shown(list) : null; return l ? {
           imageSrc: layerSrc(l), opacity: (l.opacity || 100) / 100, scale: (l.size || 100) / 100, inverse: l.inverse || false, layerId: l.id,
-          fx: l.fx || 0, fy: l.fy || 0
+          fx: l.fx || 0, fy: l.fy || 0,
+          // where the output's video is, so the monitor's copy can stay on the same frame
+          ...(l.imageElement && l.imageElement.tagName === 'VIDEO' ? { time: l.imageElement.currentTime, rate: l.imageElement.playbackRate, paused: l.imageElement.paused, at: Date.now() } : {})
         } : null; };
         previewData.paletteA = deckPreview(paletteALayers);
         previewData.paletteB = deckPreview(paletteBLayers);

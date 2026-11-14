@@ -3048,7 +3048,16 @@
 
       // the layer each deck monitor is showing, with its position, for dragging it around on the monitor
       const monitorLayer = { A: null, B: null };
+      // a deck monitor plays its own copy of a clip; keep it on the output's frame (an AV performer needs them in sync)
+      function syncMonitorVideo(container, d) {
+        const v = container.querySelector('video.preview-image'); if (!v || !d || d.time == null) return;
+        const target = d.time + (d.paused ? 0 : Math.max(0, Date.now() - d.at) / 1000 * (d.rate || 1));
+        if (v.playbackRate !== (d.rate || 1)) v.playbackRate = d.rate || 1;
+        if (d.paused && !v.paused) v.pause(); else if (!d.paused && v.paused) v.play().catch(() => {});
+        if (v.readyState >= 1 && Math.abs(v.currentTime - target) > 0.08 && (!v.duration || target < v.duration)) v.currentTime = target;
+      }
       function placeOnMonitor(container, d) {
+        syncMonitorVideo(container, d);
         const el = container.querySelector('.preview-image'); if (!el || !d) return;
         el.style.transform = `translate(${(d.fx || 0) * container.clientWidth}px, ${(d.fy || 0) * container.clientHeight}px) scale(${d.scale || 1})`;
       }
