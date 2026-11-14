@@ -1976,14 +1976,14 @@
     <!-- AI Tab: chat to the agent; it plays the mixer. Every other tab still works by hand. -->
     <div class="tab-content active" id="aiTab">
       <div class="ai">
-        <div class="ai-rail"><div class="ai-rail-h">VEXVOID · GIGS</div><div id="aiGigs"></div><button id="aiNew" class="ai-newgig">+ NEW GIG</button></div>
+        <div class="ai-rail"><div class="ai-rail-h">VEXVOID</div><div id="aiGigs"></div><button id="aiNew" class="ai-newgig">+ NEW</button></div>
         <div class="ai-room">
           <div class="ai-head">
-            <div><div class="ai-gig-title" id="aiGigTitle" contenteditable="true" spellcheck="false">NEW GIG</div><div class="ai-gig-when" id="aiGigWhen" title="Set the date and venue">DATE · VENUE</div></div>
+            <div><div class="ai-gig-title" id="aiGigTitle" contenteditable="true" spellcheck="false">NEW GIG</div><div class="ai-gig-when" id="aiGigWhen"></div></div>
             <div class="ai-head-r"><span class="ai-status" id="aiStatus"></span><div class="ai-mini" id="aiMini" title="What the audience sees. Click to hide."><img id="aiMonitor" alt=""></div></div>
           </div>
           <div class="ai-log" id="aiLog"></div>
-          <div class="ai-in"><textarea id="aiInput" rows="1" placeholder="Talk to VexVoid about this gig..."></textarea><button id="aiSend">SEND</button></div>
+          <div class="ai-in"><textarea id="aiInput" rows="1" placeholder="What are we making?"></textarea><button id="aiSend">SEND</button></div>
         </div>
       </div>
     </div>
@@ -5374,7 +5374,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       const aiCommands = () => Object.keys(VXCMD).filter(k => !AI_SKIP.has(k));
       const AI_SYSTEM = () => `You are VEXVOID: VJ, music-video director and the intelligence inside the V3XV0ID AV Client (written V3XV0ID on screen). You have directed a lot of music videos and you know the VexVoid look cold. You talk like a director on a shoot: short, sure, specific about shots, light and timing; no hype, no emoji, no exclamation marks. The person you're working with is a VJ or artist; they tell you what they want, and you make it happen on the output screen with your tools, or prepare it ahead of the show. They may also be moving controls by hand at the same time.
 
-How VexVoid directs (house rules):
+How VexVoid directs by default (the VexVoid house look; when the person asks for another look, for another artist or brand, follow them):
 - Night city, hard single light sources, haze, deep blacks, high-contrast black and white. Precise and modern, never retro.
 - A figure may appear, always from behind or in silhouette: never a face, not even a lit cheek edge. Avoid famous landmarks.
 - Cut on the music: the most moving shots on the loudest moments, quiet shots on the breakdowns, never the same shot twice in a row.
@@ -5415,7 +5415,7 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
           { name: 'compose_set', description: 'Write a timed set into the composer (bars of 4 beats at the given tempo) and optionally start it. Each step is a mixer command on a bar, e.g. {"bar": 1, "cmd": "sketch", "args": {"name": "TERRAIN", "deck": "A"}}, {"bar": 9, "cmd": "fade", "args": {"value": 100, "over": 8}}, {"bar": 17, "cmd": "cut", "args": {"deck": "A"}}. Steps can use any mixer command; a sketch step may carry "code" instead of a library name.',
             input_schema: { type: 'object', properties: { title: { type: 'string' }, bpm: { type: 'number' }, steps: { type: 'array', items: { type: 'object', properties: { bar: { type: 'number' }, cmd: { type: 'string' }, args: { type: 'object' } }, required: ['bar', 'cmd'] } },
               play: { type: 'boolean', description: 'Start playing it now (default true)' } }, required: ['title', 'bpm', 'steps'], additionalProperties: false } },
-          { name: 'gig', description: 'Update the details of the gig you are working on (only the fields you give change): its title, date (YYYY-MM-DD), venue, and the brief (what the night is, who it is for, the feel, set length, anything agreed). Keep the brief current as the conversation goes.',
+          { name: 'project', description: 'Update this piece of work\'s details (only the fields you give change): a short title, the brief (what it is, for whom, the look, the length, anything agreed), and for a show only, its date (YYYY-MM-DD) and venue.',
             input_schema: { type: 'object', properties: { title: { type: 'string' }, date: { type: 'string' }, venue: { type: 'string' }, brief: { type: 'string' } }, additionalProperties: false } },
           { name: 'generate', description: 'Make a new image or a 6-second video with Grok Imagine (xAI). It costs real money on the performer\'s xAI account, so the performer is shown the prompt and the price and approves each one; if they decline, you get told and carry on without it. An image takes about 10 seconds, a video 1 to 3 minutes. The result is saved to the library; give deck to load it straight onto a deck.',
             input_schema: { type: 'object', properties: { kind: { type: 'string', enum: ['image', 'video'] }, prompt: { type: 'string', description: 'What to show. The VexVoid look is added for you.' },
@@ -5460,7 +5460,7 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
           if (input.play !== false) setPlay();
           return `Set "${input.title}" loaded: ${set.steps.length} steps${input.play !== false ? ', playing from bar 1' : ''}. It is in COMPOSER too.`;
         }
-        if (name === 'gig') {
+        if (name === 'project') {
           if (!gig) throw new Error('no gig open');
           if (input.title) gig.title = String(input.title).toUpperCase().slice(0, 60);
           if (input.date != null) gig.date = String(input.date).slice(0, 10);
@@ -5499,7 +5499,7 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
       function gigSave() { try { localStorage.setItem(GIG_STORE, JSON.stringify(gigs)); } catch (e) { aiLine('err', 'Could not save this gig: ' + e.message); } }
       function gigContext() {
         if (!gig) return '';
-        return `\n\nThe gig you are working on (the performer's, one gig per conversation):\n- Title: ${gig.title || 'untitled'}\n- Date: ${gig.date || 'not set'}\n- Venue: ${gig.venue || 'not set'}\n- Brief: ${gig.brief || 'none yet'}\n- Made for it so far: ${(gig.assets || []).map(a => a.split('/').pop()).join(', ') || 'nothing'}\nYou are the performer's booking agent and creative partner for this gig: keep its details up to date with the gig tool, help plan the set, and prepare visuals ahead of time (sketches, sets, Grok media) so the show is unique to this gig.`;
+        return `\n\nThis conversation is one piece of work (a music video, a set, a show, an idea; whatever the person makes of it):\n- Title: ${gig.title || 'untitled'}${gig.date ? '\n- Date: ' + gig.date : ''}${gig.venue ? '\n- Venue: ' + gig.venue : ''}\n- Brief: ${gig.brief || 'none yet'}\n- Made for it so far: ${(gig.assets || []).map(a => a.split('/').pop()).join(', ') || 'nothing'}\nKeep the title and brief current with the project tool once you know what it is. Only set a date or venue if it's a show.`;
       }
       const aiLog = aiEl('aiLog');
       function aiLine(kind, text) {
@@ -5518,7 +5518,7 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
         if (name === 'compose_set') return `set "${input.title}" · ${(input.steps || []).length} moves`;
         if (name === 'library') return 'looking through ' + input.kind;
         if (name === 'generate') return `Grok ${input.kind}`;
-        if (name === 'gig') return 'updating the gig';
+        if (name === 'project') return 'noting it down';
         return name;
       }
       function aiApprove(input, est) {
@@ -5550,15 +5550,15 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
           restore: gig.messages || (gig.messages = []), save: m => { gig.messages = m; gigSave(); } });
         aiLog.innerHTML = gig.log || '';
         aiLog.querySelectorAll('.ai-card button').forEach(b => { b.disabled = true; });
-        if (!aiLog.children.length) aiLine('bot', 'VexVoid. New gig: where, when, what should it feel like? Or we just start building the set.');
+        if (!aiLog.children.length) aiLine('bot', 'VexVoid. What are we making?');
         aiLog.scrollTop = aiLog.scrollHeight;
         renderGigs();
         try { localStorage.setItem(GIG_STORE + '.open', gig.id); } catch (e) {}
       }
       function newGig() {
-        const g = { id: 'g' + Date.now().toString(36), title: 'NEW GIG', date: '', venue: '', brief: '', created: new Date().toISOString(), messages: [], log: '', assets: [] };
+        const g = { id: 'g' + Date.now().toString(36), title: 'NEW', date: '', venue: '', brief: '', created: new Date().toISOString(), messages: [], log: '', assets: [] };
         gigs.unshift(g); gigSave(); openGig(g);
-        aiEl('aiGigTitle').focus(); document.getSelection().selectAllChildren(aiEl('aiGigTitle'));
+        aiEl('aiInput').focus();
       }
       function renderGigs() {
         const list = aiEl('aiGigs'); list.innerHTML = '';
@@ -5566,13 +5566,13 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
           const b = document.createElement('button'); b.className = 'ai-gig' + (g === gig ? ' on' : '');
           b.innerHTML = '<span></span><small></small>';
           b.firstChild.textContent = g.title || 'UNTITLED GIG';
-          b.lastChild.textContent = [g.date, g.venue].filter(Boolean).join(' · ') || 'no date yet';
+          b.lastChild.textContent = [g.date, g.venue].filter(Boolean).join(' · ');
           b.onclick = () => openGig(g);
           list.appendChild(b);
         });
         if (gig) {
           aiEl('aiGigTitle').textContent = gig.title || 'UNTITLED GIG';
-          aiEl('aiGigWhen').textContent = [gig.date || 'DATE', gig.venue || 'VENUE'].join('  ·  ');
+          aiEl('aiGigWhen').textContent = [gig.date, gig.venue].filter(Boolean).join('  ·  ');
         }
       }
       // the title is edited in place; date and venue by the agent (gig tool) or by clicking them
@@ -5600,6 +5600,7 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
         const text = aiEl('aiInput').value.trim(); if (!text) return;
         if (!anthropicKey()) { aiNeedKey(); return; }
         aiEl('aiInput').value = '';
+        if (gig && /^(NEW|NEW GIG|UNTITLED GIG)$/.test(gig.title || '')) { gig.title = text.replace(/\s+/g, ' ').slice(0, 34).toUpperCase(); gigSave(); renderGigs(); }
         aiLine('me', text);
         await agent.send(text).catch(e => aiLine('err', e.message));
       }
