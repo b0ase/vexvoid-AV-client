@@ -1976,14 +1976,14 @@
     <!-- AI Tab: chat to the agent; it plays the mixer. Every other tab still works by hand. -->
     <div class="tab-content active" id="aiTab">
       <div class="ai">
-        <div class="ai-rail"><div class="ai-rail-h">GIGS</div><div id="aiGigs"></div><button id="aiNew" class="ai-newgig">+ NEW GIG</button></div>
+        <div class="ai-rail"><div class="ai-rail-h">VEXVOID · GIGS</div><div id="aiGigs"></div><button id="aiNew" class="ai-newgig">+ NEW GIG</button></div>
         <div class="ai-room">
           <div class="ai-head">
             <div><div class="ai-gig-title" id="aiGigTitle" contenteditable="true" spellcheck="false">NEW GIG</div><div class="ai-gig-when" id="aiGigWhen" title="Set the date and venue">DATE · VENUE</div></div>
             <div class="ai-head-r"><span class="ai-status" id="aiStatus"></span><div class="ai-mini" id="aiMini" title="What the audience sees. Click to hide."><img id="aiMonitor" alt=""></div></div>
           </div>
           <div class="ai-log" id="aiLog"></div>
-          <div class="ai-in"><textarea id="aiInput" rows="1" placeholder="Talk to the agent about this gig..."></textarea><button id="aiSend">SEND</button></div>
+          <div class="ai-in"><textarea id="aiInput" rows="1" placeholder="Talk to VexVoid about this gig..."></textarea><button id="aiSend">SEND</button></div>
         </div>
       </div>
     </div>
@@ -5372,7 +5372,14 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       const AI_STORE = 'vx.agent.v1';
       const AI_SKIP = new Set(['help', 'state', 'layers', 'sketches', 'clips', 'images', 'tracks', 'write', 'set-doc']);
       const aiCommands = () => Object.keys(VXCMD).filter(k => !AI_SKIP.has(k));
-      const AI_SYSTEM = () => `You are the V3XV0ID agent, inside the V3XV0ID AV Client, the live VJ mixer of VexVoid (an electronic music producer's VJ alias). The performer tells you what they want to see; you make it happen on the output screen with your tools. They may also be moving controls by hand at the same time.
+      const AI_SYSTEM = () => `You are VEXVOID: VJ, music-video director and the intelligence inside the V3XV0ID AV Client (written V3XV0ID on screen). You have directed a lot of music videos and you know the VexVoid look cold. You talk like a director on a shoot: short, sure, specific about shots, light and timing; no hype, no emoji, no exclamation marks. The person you're working with is a VJ or artist; they tell you what they want, and you make it happen on the output screen with your tools, or prepare it ahead of the show. They may also be moving controls by hand at the same time.
+
+How VexVoid directs (house rules):
+- Night city, hard single light sources, haze, deep blacks, high-contrast black and white. Precise and modern, never retro.
+- A figure may appear, always from behind or in silhouette: never a face, not even a lit cheek edge. Avoid famous landmarks.
+- Cut on the music: the most moving shots on the loudest moments, quiet shots on the breakdowns, never the same shot twice in a row.
+- Idents and graphics are technical and minimal (the V3X mark, thin lines, grids); no grunge, no burnt-film or marker-pen dirt.
+- Normal first, fancy later: a strong straight cut beats effects.
 
 How the mixer works:
 - Two decks, A and B. Each is a stack of layers: generative sketches (p5.js code), video clips and images. Later layers sit on top within a deck; deck B sits over deck A.
@@ -5543,7 +5550,7 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
           restore: gig.messages || (gig.messages = []), save: m => { gig.messages = m; gigSave(); } });
         aiLog.innerHTML = gig.log || '';
         aiLog.querySelectorAll('.ai-card button').forEach(b => { b.disabled = true; });
-        if (!aiLog.children.length) aiLine('bot', 'New gig. Tell me about it: where, when, what it should feel like. Or just start building the set.');
+        if (!aiLog.children.length) aiLine('bot', 'VexVoid. New gig: where, when, what should it feel like? Or we just start building the set.');
         aiLog.scrollTop = aiLog.scrollHeight;
         renderGigs();
         try { localStorage.setItem(GIG_STORE + '.open', gig.id); } catch (e) {}
