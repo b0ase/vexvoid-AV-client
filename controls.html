@@ -1750,6 +1750,17 @@
     .ai-in{display:flex;gap:12px;align-items:flex-end;padding:18px 24px 18px 0;border-top:1px solid #161616}
     .ai-in textarea{flex:1;resize:none;background:none;color:#fff;border:0;padding:6px 0;font:inherit;font-size:14px;text-transform:none;letter-spacing:.01em;outline:none;max-height:140px}
     .ai-in button{font:inherit;background:none;border:0;color:#fff;letter-spacing:.24em;font-size:10px;cursor:pointer;padding:8px 0}
+    /* MUSIC release carousel */
+    .mc{display:grid;grid-template-columns:28px 1fr 28px;align-items:center;gap:6px;margin:6px 0 10px}
+    .mc-arrow{font:inherit;font-size:22px;background:none;border:0;color:#777;cursor:pointer;height:100%}.mc-arrow:hover{color:#fff}
+    .mc-strip{display:flex;gap:12px;overflow-x:auto;scroll-behavior:smooth;scroll-snap-type:x mandatory;padding-bottom:4px}
+    .mc-strip::-webkit-scrollbar{height:3px}.mc-strip::-webkit-scrollbar-thumb{background:#333}
+    .mc-card{flex:none;width:150px;scroll-snap-align:start;cursor:pointer;background:none;border:0;padding:0;text-align:left;color:#999;font:inherit}
+    .mc-cover{width:150px;height:150px;background:#0a0a0a center/cover no-repeat;border:1px solid #1d1d1d;position:relative;filter:grayscale(1) brightness(.75)}
+    .mc-cover span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:10px;font-family:'Michroma','IBM Plex Mono',sans-serif;font-size:11px;letter-spacing:.16em;color:#fff;text-shadow:0 1px 6px #000}
+    .mc-card:hover .mc-cover{filter:grayscale(.3)}.mc-card.on .mc-cover{border-color:#fff;filter:none}
+    .mc-t{margin-top:6px;font-size:10px;letter-spacing:.12em;color:#ddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .mc-s{font-size:8px;letter-spacing:.16em;color:#666;margin-top:2px}
     /* VEXVOID preset gallery */
     .pg{display:flex;flex-direction:column;gap:14px;width:100%;height:100%;min-height:0}
     .pg-head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;padding:6px 4px 0}
@@ -2336,11 +2347,15 @@
           <h2 class="cyber-text">MUSIC PLAYER</h2>
           <div class="cloud-status" id="musicCloudStatus">CONNECTING...</div>
           <div class="music-controls">
-            <button id="loadLocalMusicBtn" class="browser-btn">LOAD LOCAL</button>
+            <button id="loadFolderMusicBtn" class="browser-btn">LOAD FOLDER</button>
+            <button id="loadLocalMusicBtn" class="browser-btn">LOAD FILES</button>
             <button id="refreshMusicBtn" class="browser-btn">REFRESH</button>
             <input type="text" id="musicSearch" class="search-input" placeholder="SEARCH MUSIC...">
           </div>
         </div>
+
+        <!-- Releases: swipe through singles and albums (catalogue, your folders, your wallet, the market), pick one -->
+        <div class="mc"><button class="mc-arrow" id="mcPrev" title="Previous">&lsaquo;</button><div class="mc-strip" id="mcStrip"></div><button class="mc-arrow" id="mcNext" title="Next">&rsaquo;</button></div>
 
         <!-- Music Library -->
         <div class="music-library-section">
@@ -4716,7 +4731,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       function mergeWalletTracks() {
         const rest = musicLibraryTracks.filter(t => t.source !== 'wallet');
         const mine = walletMedia('audio').map(i => ({ name: i.name, artist: 'YOUR WALLET', format: (i.contentType.split('/')[1] || 'AUDIO').replace(/^mpeg$/, 'mp3').toUpperCase(),
-          duration: '--:--', url: i.url, source: 'wallet', origin: i.origin }));
+          duration: '--:--', url: i.url, source: 'wallet', origin: i.origin, album: 'wallet', albumTitle: 'YOUR WALLET' }));
         const playing = musicLibraryTracks[currentTrackIndex];
         musicLibraryTracks = mine.concat(rest);
         musicLibraryTracks.forEach((t, i) => { t.id = i; });
@@ -4728,7 +4743,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           const cat = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, 'vx', 'catalogue.json'), 'utf8'));
           musicLibraryTracks = cat.tracks.map((t, i) => ({
             id: i, name: t.take && t.take !== 'A' ? `${t.title} · ${t.take}` : t.title, artist: 'V3XV0ID',
-            format: 'MP3', duration: mmss(t.seconds), url: t.url, source: 'catalogue'
+            format: 'MP3', duration: mmss(t.seconds), url: t.url, source: 'catalogue', album: 'rel:' + t.release, albumTitle: t.title
           }));
           musicEl('musicCloudStatus').textContent = `● V3XV0ID CATALOGUE · ${musicLibraryTracks.length} TRACKS`;
         } catch (e) {
@@ -4739,10 +4754,70 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         initializeAudioVisualizer();
       }
 
+      // ----- the release carousel -----
+      const mc = { sel: 'all', market: null, marketBusy: false };
+      function mcCover(key) {
+        const imgs = catalogue().images || []; if (!imgs.length) return '';
+        let h = 0; for (const c of key) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+        return imgs[h % imgs.length].url;
+      }
+      function mcAlbums() {
+        const seen = new Map();
+        musicLibraryTracks.forEach(t => { const k = t.album || (t.source === 'local' ? 'local:FILES' : 'other'); if (!seen.has(k)) seen.set(k, { id: k, title: t.albumTitle || (t.source === 'local' ? 'YOUR FILES' : 'OTHER'), n: 0, src: t.source }); seen.get(k).n++; });
+        const list = [...seen.values()];
+        return [{ id: 'all', title: 'EVERYTHING', n: musicLibraryTracks.length }, ...list.filter(a => a.src === 'local'), ...list.filter(a => a.id === 'wallet'), { id: 'market', title: 'MARKET', n: mc.market ? mc.market.length : null },
+          ...list.filter(a => a.src !== 'local' && a.id !== 'wallet')];
+      }
+      function renderCarousel() {
+        const strip = musicEl('mcStrip'); if (!strip) return;
+        const keep = strip.scrollLeft; strip.innerHTML = '';
+        mcAlbums().forEach(a => {
+          const b = document.createElement('button'); b.className = 'mc-card' + (mc.sel === a.id ? ' on' : '');
+          b.innerHTML = '<div class="mc-cover"><span></span></div><div class="mc-t"></div><div class="mc-s"></div>';
+          const cover = b.querySelector('.mc-cover');
+          if (a.id !== 'all' && a.id !== 'market') cover.style.backgroundImage = `url("${mcCover(a.id)}")`; else b.querySelector('span').textContent = a.title;
+          b.querySelector('.mc-t').textContent = a.title;
+          b.querySelector('.mc-s').textContent = a.id === 'market' ? 'VEXVOID MUSIC FOR SALE' : a.id === 'all' ? `${a.n} TRACKS` : a.id.startsWith('local:') ? `FOLDER · ${a.n} TRACKS` : a.id === 'wallet' ? `${a.n} OWNED` : a.n > 1 ? `SINGLE · ${a.n} TAKES` : 'SINGLE';
+          b.onclick = () => { mc.sel = a.id; renderMusicLibrary(); if (a.id === 'market') loadMusicMarket(); };
+          strip.appendChild(b);
+        });
+        strip.scrollLeft = keep;
+      }
+      async function loadMusicMarket() {
+        if (mc.marketBusy) return; mc.marketBusy = true;
+        musicLibrary.innerHTML = '<div class="wb-note" style="padding:12px">Looking for VexVoid music for sale on the market…</div>';
+        try { await usdRate(); const r = await VXMARKET.vexvoid('audio', { pages: 3 }); mc.market = r.listings; } catch (e) { mc.market = []; }
+        mc.marketBusy = false; if (mc.sel === 'market') renderMusicLibrary();
+      }
+      function renderMusicMarket() {
+        if (!mc.market) return;
+        if (!mc.market.length) { musicLibrary.innerHTML = '<div class="wb-note" style="padding:12px">No VexVoid music for sale yet. When releases are listed (from bWalletX), they show here to preview and buy straight into your wallet.</div>'; return; }
+        mc.market.forEach(l => {
+          const row = document.createElement('div'); row.className = 'music-track-item';
+          row.innerHTML = `<div class="track-number">$</div><div class="track-details"><div class="track-name"></div><div class="track-meta">MARKET • ${(l.contentType.split('/')[1] || 'AUDIO').toUpperCase()}</div></div><div class="track-duration"></div>`;
+          row.querySelector('.track-name').textContent = l.name; row.querySelector('.track-duration').textContent = usd(l.sats);
+          row.title = 'Click to preview. Buy it in MARKET (BUY goes through bWalletX).';
+          row.addEventListener('click', () => { const a = musicAudio(); a.src = l.url; a.play().catch(() => {}); musicEl('currentTrackTitle').textContent = l.name.toUpperCase(); musicEl('currentTrackArtist').textContent = 'MARKET PREVIEW · ' + usd(l.sats); });
+          musicLibrary.appendChild(row);
+        });
+      }
+      musicEl('mcPrev').addEventListener('click', () => { const s = musicEl('mcStrip'); s.scrollLeft -= s.clientWidth * 0.8; });
+      musicEl('mcNext').addEventListener('click', () => { const s = musicEl('mcStrip'); s.scrollLeft += s.clientWidth * 0.8; });
+      musicEl('loadFolderMusicBtn').addEventListener('click', async () => {
+        const r = await dialog.showOpenDialog({ properties: ['openDirectory'] }); if (r.canceled || !r.filePaths.length) return;
+        const fs = require('fs'), path = require('path'), dir = r.filePaths[0], album = 'local:' + dir;
+        const files = fs.readdirSync(dir).filter(f => /\.(mp3|wav|m4a|aif|aiff|flac|ogg|aac)$/i.test(f)).sort();
+        if (!files.length) { musicEl('playerStatus').textContent = 'NO AUDIO FILES IN THAT FOLDER'; return; }
+        files.forEach(f => { const fp = path.join(dir, f); if (!musicLibraryTracks.some(t => t.url === fp)) musicLibraryTracks.push({ id: musicLibraryTracks.length, name: f.replace(/\.[^.]+$/, ''), artist: path.basename(dir).toUpperCase(), format: f.split('.').pop().toUpperCase(), duration: '--:--', url: fp, source: 'local', album, albumTitle: path.basename(dir).toUpperCase() }); });
+        mc.sel = album; renderMusicLibrary();
+      });
+
       function renderMusicLibrary() {
+        renderCarousel();
         musicLibrary.innerHTML = '';
+        if (mc.sel === 'market') { renderMusicMarket(); return; }
         const q = (musicSearch.value || '').toLowerCase();
-        musicLibraryTracks.filter(t => t.name.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q)).forEach(track => {
+        musicLibraryTracks.filter(t => (mc.sel === 'all' || t.album === mc.sel || (mc.sel === 'local:FILES' && t.source === 'local' && !t.album)) && (t.name.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q))).forEach(track => {
           const row = document.createElement('div');
           row.className = 'music-track-item' + (currentTrackIndex === track.id ? ' playing' : '');
           row.innerHTML = `<div class="track-number">${track.id + 1}</div><div class="track-details"><div class="track-name"></div><div class="track-meta">${track.artist} • ${track.format}</div></div><div class="track-duration">${track.duration}</div>`;
