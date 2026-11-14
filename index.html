@@ -389,8 +389,9 @@
         }));
         
         // Send palette-specific preview data
-        const paletteALayers = layers.filter(l => (l.palette || 'A') === 'A' && l.visible);
-        const paletteBLayers = layers.filter(l => (l.palette || 'A') === 'B' && l.visible);
+        // each deck monitor shows the topmost visible layer that has something in it (an empty layer on top hid the rest)
+        const paletteALayers = layers.filter(l => (l.palette || 'A') === 'A' && l.visible && layerSrc(l));
+        const paletteBLayers = layers.filter(l => (l.palette || 'A') === 'B' && l.visible && layerSrc(l));
         
         previewData.paletteA = paletteALayers.length > 0 ? {
           imageSrc: layerSrc(paletteALayers[paletteALayers.length - 1]),
@@ -861,7 +862,8 @@
       genThumbCanvas.width = 320; genThumbCanvas.height = 180;
       function layerSrc(layer) {
         if (!layer) return null;
-        if (!layer.gen) return layer.imageElement ? layer.imageElement.src : null;
+        // an empty layer's <img src=""> reads back as the page's own URL: only a real src counts
+        if (!layer.gen) return layer.imageElement && layer.imageElement.getAttribute('src') ? layer.imageElement.src : null;
         const now = performance.now();
         if (!layer.genThumb || now - layer.genThumbAt > 150) {
           const c = layer.gen.canvas();
