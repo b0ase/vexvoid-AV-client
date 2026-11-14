@@ -5,7 +5,7 @@ Site and downloads: https://b0ase.github.io/vexvoid-AV-client/
 ## 3.1: generative sketches, real libraries, remote control
 
 **PATTERNS → VX GEN.** Generative p5.js sketches you can play live (`vx/vx-gen.js`, p5 1.11.3 vendored in `vx/lib`).
-Fifteen monochrome sketches ship in `vx/gen-library.js` (V3X TRACE, FLOW FIELD, RIDGES, GLYPH GRID, WIRE TUNNEL, TERRAIN, ORBIT HUD, ATTRACTOR, SCAN BARS, DATA RAIN, MOIRE, HARMONOGRAPH, AUTOMATA, PULSE RINGS, WIRE GLOBE); each holds ~70 fps on the output.
+36 monochrome sketches ship in `vx/gen-library.js`. Eight are GPU fragment shaders (WIRE TUNNEL, TERRAIN, ORBIT HUD, LIQUID CHROME, INK, GYROID, CATHEDRAL, CAUSTICS) and hold 60 fps at 1920x1080; the rest are plain p5.
 Every sketch reads a live `vx` object: `vx.t`, `vx.beat`, `vx.bar`, `vx.bpm`, `vx.level`/`bass`/`mid`/`high`, `vx.kick`, `vx.pulse`, `vx.seed` and four knobs `vx.a`-`vx.d`.
 Edit code live (Cmd+Enter runs it and updates the output), MUTATE for a new seed, EVOLVE to drift every 4 bars, TAP the tempo, listen to the Music tab or the line in.
 SEND TO OUTPUT puts the sketch on deck A or B as a layer (crossfader, opacity and blend apply; BLEND: SCREEN lays the lines over footage).

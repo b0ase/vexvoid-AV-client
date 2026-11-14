@@ -124,83 +124,202 @@ function draw() {
   }
 }`);
 
-  add('WIRE TUNNEL', '3d · speed', ['SIDES', 'TWIST', 'SPEED', 'SWAY'], `
-let z = 0;
-function setup() { createCanvas(windowWidth, windowHeight, WEBGL); }
-function draw() {
-  background(0); noFill();
-  z += 4 + vx.c * 30 + vx.bass * 40;
-  const rings = 44, gap = 120, sides = floor(3 + vx.a * 9);
-  rotateZ(vx.t * (vx.b - 0.5) * 0.8);
-  for (let i = 0; i < rings; i++) {
-    const k = i + floor(z / gap), depth = i * gap - (z % gap);
-    const r = 320 + sin(k * 0.4 + vx.t) * 70 * vx.d + vx.pulse * 90;
-    push();
-    translate(sin(k * 0.15) * 140 * vx.d, cos(k * 0.11) * 90 * vx.d, 300 - depth);
-    rotateZ(k * 0.06 * (vx.b * 2));
-    stroke(255, map(i, 0, rings, 255, 0)); strokeWeight(i < 3 ? 2.5 : 1.4);
-    beginShape();
-    for (let s = 0; s <= sides; s++) { const a = s / sides * TAU; vertex(cos(a) * r, sin(a) * r, 0); }
-    endShape();
-    pop();
+  add('WIRE TUNNEL', '3d · shader · speed', ['SIDES', 'TWIST', 'SPEED', 'SWAY'], `
+// A polygon tunnel on the GPU: lit wire edges and rings rushing past, bending as it flies.
+// The bass pushes the speed, kicks send a ring of light down the tunnel. (A fragment shader.)
+const V = 'precision highp float; attribute vec3 aPosition; void main() { vec4 p = vec4(aPosition, 1.0); p.xy = p.xy * 2.0 - 1.0; gl_Position = p; }';
+const F = \`precision highp float;
+uniform vec2 uRes; uniform float uZ, uRot, uBass, uPulse, uA, uB, uD;
+#define PI 3.14159265
+float hash(float n) { return fract(sin(n * 91.345) * 47453.21); }
+vec2 bend(float z) { return vec2(sin(z * 0.16) + sin(z * 0.067) * 0.7, cos(z * 0.13) * 0.8) * 3.2 * uD; }
+void main() {
+  vec2 uv = (gl_FragCoord.xy * 2.0 - uRes) / uRes.y;
+  float n = floor(3.0 + uA * 9.0), seg = 2.0 * PI / n, inr = cos(PI / n);
+  vec2 cam = bend(uZ);
+  float z = 1.0 / max(length(uv), 0.001), a = 0.0, r = 1.0;
+  vec2 q = uv;
+  for (int i = 0; i < 6; i++) {
+    q = uv * z - (bend(uZ + z) - cam);
+    a = atan(q.y, q.x) + uRot + (uZ + z) * (uB - 0.5) * 0.35;
+    r = inr / cos(mod(a, seg) - seg * 0.5);
+    z = clamp(z * r / max(length(q), 0.0001), 0.05, 80.0);
   }
+  float along = uZ + z, around = a / seg, px = 2.0 / uRes.y;
+  float pa = px * z * z / r * 1.6 + 0.004, pr = px * z * 1.6;
+  float dr = abs(fract(along * 0.75 + 0.5) - 0.5) / 0.75;          // a ring every 1.33 units
+  float de = abs(fract(around + 0.5) - 0.5) * 2.0 * sin(PI / n) * 2.0; // the polygon's corner edges
+  float dp = abs(fract(around * 3.0 + 0.5) - 0.5) / 3.0 * sin(PI / n) * 2.0; // faint panel seams
+  float ring = 1.0 - smoothstep(0.012, 0.012 + pa, dr);
+  float edge = 1.0 - smoothstep(0.008, 0.008 + pr, de);
+  float seam = (1.0 - smoothstep(0.003, 0.003 + pr, dp)) * 0.18;
+  float face = floor(mod(around, n));
+  float lit = exp(-z * 0.22);                                       // a headlight on the walls near us
+  float col = (0.03 + 0.07 * hash(face)) * (0.4 + lit * 2.0) + 0.05 * (1.0 - smoothstep(0.0, 0.4, de));
+  col += ring * (0.5 + uBass * 0.6) + edge * 1.0 + seam;
+  col += exp(-dr / (pa * 3.0 + 0.04)) * 0.12 + exp(-de / (pr * 4.0 + 0.03)) * 0.18; // soft halo
+  float ahead = (1.0 - uPulse) * 34.0;                              // the kick's light ring
+  col += exp(-abs(z - ahead) * 1.4) * uPulse * 1.6;
+  float miss = abs(length(q) - r);                                   // where the bend hides the far end, fade it
+  col *= exp(-z * 0.05) * smoothstep(45.0, 20.0, z) * smoothstep(0.25, 0.02, miss);
+  gl_FragColor = vec4(vec3(col), 1.0);
+}\`;
+let sh, z = 0, rot = 0, bass = 0;
+function setup() { createCanvas(windowWidth, windowHeight, WEBGL); sh = createShader(V, F); noStroke(); }
+function draw() {
+  const dt = min(deltaTime, 50) / 1000;
+  bass += (vx.bass - bass) * 0.2;
+  z += dt * (2 + vx.c * 22 + bass * 10);
+  rot += dt * (vx.b - 0.5) * 0.6;
+  shader(sh);
+  sh.setUniform('uRes', [width, height]); sh.setUniform('uZ', z); sh.setUniform('uRot', rot);
+  sh.setUniform('uBass', bass); sh.setUniform('uPulse', vx.pulse);
+  sh.setUniform('uA', vx.a); sh.setUniform('uB', vx.b); sh.setUniform('uD', vx.d);
+  rect(0, 0, width, height);
 }`);
 
-  add('TERRAIN', '3d · bass', ['HEIGHT', 'DETAIL', 'SPEED', 'TILT'], `
-// A wireframe landscape flown over: the mesh is projected by hand and drawn as 2D lines (fast at 1080p).
-let fly = 0;
-const COLS = 60, ROWS = 46;
-function setup() { createCanvas(windowWidth, windowHeight); }
-function draw() {
-  background(0); noFill();
-  fly += 0.02 + vx.c * 0.12 + vx.bass * 0.08;
-  const amp = 0.25 + vx.a * 0.9 + vx.bass * 0.7, det = 0.08 * (0.4 + vx.b * 1.4);
-  const horizon = height * (0.18 + vx.d * 0.3), cx = width / 2, eye = 1.6;
-  const pts = [];
-  for (let r = 0; r < ROWS; r++) {
-    const z = 1 + (ROWS - 1 - r) * 0.42, row = [];
-    for (let c = 0; c < COLS; c++) {
-      const x = (c / (COLS - 1) - 0.5) * 26;
-      const n = noise(c * det * 3, (r * 0.42 - fly) * det * 3);
-      const h = n * n * amp * 4;
-      row.push([cx + x / z * width * 0.18, horizon + (eye - h) / z * height * 0.55]);
-    }
-    pts.push(row);
-  }
-  for (let r = 0; r < ROWS; r++) {
-    stroke(255, map(r, 0, ROWS, 30, 255)); strokeWeight(r > ROWS - 6 ? 1.4 : 1);
-    beginShape(); for (const p of pts[r]) vertex(p[0], p[1]); endShape();
-  }
-  stroke(255, 70); strokeWeight(1);
-  for (let c = 0; c < COLS; c += 2) { beginShape(); for (let r = 0; r < ROWS; r++) vertex(pts[r][c][0], pts[r][c][1]); endShape(); }
-}`);
-
-  add('ORBIT HUD', 'telemetry', ['SIZE', 'ARC', 'SPIN', '—'], `
-let rings = [];
-function setup() {
-  createCanvas(windowWidth, windowHeight); textFont('monospace');
-  for (let i = 0; i < 14; i++) rings.push({ r: 0.08 + i * 0.055, s: random(-1, 1), a0: random(TAU), len: random(0.3, 1.8), w: random([1, 1, 2, 3, 6]), ticks: random() < 0.3 });
+  add('TERRAIN', '3d · shader · bass', ['HEIGHT', 'DETAIL', 'SPEED', 'TILT'], `
+// Flying low over ridged mountains on the GPU: backlit rock traced with contour lines, a low sun in the haze.
+// The bass lifts the peaks, kicks flash the contours. (A ray-marched fragment shader.)
+const V = 'precision highp float; attribute vec3 aPosition; void main() { vec4 p = vec4(aPosition, 1.0); p.xy = p.xy * 2.0 - 1.0; gl_Position = p; }';
+const F = \`precision highp float;
+uniform vec2 uRes; uniform float uT, uZ, uBass, uPulse, uA, uB, uD;
+float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float noise(vec2 p) {
+  vec2 i = floor(p), f = fract(p), u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
 }
+float amp() { return 0.6 + uA * 1.6 + uBass * 0.5; }
+float height(vec2 p, int oct) {
+  p *= 0.22 * (0.5 + uB * 1.2);
+  float h = 0.0, w = 0.5, s = 1.0;
+  for (int i = 0; i < 7; i++) {
+    if (i >= oct) break;
+    float n = 1.0 - abs(noise(p) * 2.0 - 1.0);   // ridged: sharp crests
+    h += n * n * w;
+    p = mat2(1.6, 1.2, -1.2, 1.6) * p; w *= 0.5;
+  }
+  return h * amp();
+}
+void main() {
+  vec2 uv = (gl_FragCoord.xy * 2.0 - uRes) / uRes.y;
+  vec3 ro = vec3(sin(uZ * 0.05) * 3.0, 0.0, uZ);
+  ro.y = height(ro.xz + vec2(0.0, 2.0), 3) + 0.7 + amp() * 0.35;
+  float pitch = -0.1 - uD * 0.45;
+  vec3 fw = normalize(vec3(cos(uZ * 0.05) * 0.15, pitch, 1.0)), rt = normalize(cross(vec3(0.0, 1.0, 0.0), fw)), up = cross(fw, rt);
+  vec3 rd = normalize(fw * 1.5 + rt * uv.x + up * uv.y);
+  vec3 sun = normalize(vec3(0.35, 0.06, 1.0));
+  float t = 0.05, hit = 0.0;
+  for (int i = 0; i < 110; i++) {
+    vec3 p = ro + rd * t;
+    float d = p.y - height(p.xz, 4);
+    if (d < 0.002 * t) { hit = 1.0; break; }
+    t += d * 0.45;
+    if (t > 60.0) break;
+  }
+  // sky: near black overhead, haze on the horizon, a small hard sun with a wide glow
+  float sd = max(dot(rd, sun), 0.0);
+  float sky = 0.012 + 0.22 * pow(1.0 - max(rd.y, 0.0), 12.0);
+  sky += smoothstep(0.9993, 0.9996, sd) * 1.2 + pow(sd, 60.0) * 0.35 + pow(sd, 6.0) * 0.08;
+  float col = sky;
+  if (hit > 0.5) {
+    vec3 p = ro + rd * t;
+    vec2 e = vec2(0.01, 0.0);
+    vec3 n = normalize(vec3(height(p.xz - e.xy, 5) - height(p.xz + e.xy, 5), 2.0 * e.x, height(p.xz - e.yx, 5) - height(p.xz + e.yx, 5)));
+    float dif = max(dot(n, sun), 0.0), rim = pow(1.0 - max(dot(n, -rd), 0.0), 3.0) * smoothstep(-0.2, 0.6, dot(rd, sun));
+    float rock = 0.03 + dif * 0.32 + rim * 0.45;
+    // contour lines every 0.12 in height, kept a steady width on screen by the slope
+    // (traced on the broad shape of the land, not its grit, so the lines run smooth)
+    float hs = height(p.xz, 3), k = 1.0 / 0.12;
+    vec2 gr = vec2(height(p.xz + e.xy, 3) - hs, height(p.xz + e.yx, 3) - hs) / e.x;
+    float dist = abs(fract(hs * k + 0.5) - 0.5) / (k * max(length(gr), 0.05));
+    float px = t * 2.0 / uRes.y;
+    float contour = (1.0 - smoothstep(px * 0.5, px * 1.3, dist)) * (0.5 + uPulse * 0.8) * exp(-t * 0.035);
+    col = mix(sky, rock + contour, exp(-t * 0.04));
+  }
+  col *= 1.0 - 0.35 * dot(uv * 0.5, uv * 0.5);                    // vignette
+  gl_FragColor = vec4(vec3(col), 1.0);
+}\`;
+let sh, z = 0, bass = 0;
+function setup() { createCanvas(windowWidth, windowHeight, WEBGL); sh = createShader(V, F); noStroke(); }
 function draw() {
-  background(0); translate(width / 2, height / 2); noFill();
-  const R = min(width, height) * (0.45 + vx.a * 0.4);
-  rings.forEach((g, i) => {
-    const rot = g.a0 + vx.t * g.s * (0.2 + vx.c * 1.5) + vx.pulse * g.s * 0.5;
-    const d = g.r * R * 2 * (1 + vx.pulse * 0.05 * (i % 2 ? 1 : -1));
-    stroke(255, 110 + 145 * ((i % 3) / 2));
-    if (g.ticks) {
-      strokeWeight(1);
-      for (let k = 0; k < 120 * g.len / TAU; k++) {
-        const a = rot + k / 60 * TAU, l = k % 5 ? 4 : 11;
-        line(cos(a) * d / 2, sin(a) * d / 2, cos(a) * (d / 2 + l), sin(a) * (d / 2 + l));
-      }
+  const dt = min(deltaTime, 50) / 1000;
+  bass += (vx.bass - bass) * 0.08;
+  z += dt * (0.8 + vx.c * 9 + bass * 2);
+  shader(sh);
+  sh.setUniform('uRes', [width, height]); sh.setUniform('uT', vx.t); sh.setUniform('uZ', z);
+  sh.setUniform('uBass', bass); sh.setUniform('uPulse', vx.pulse);
+  sh.setUniform('uA', vx.a); sh.setUniform('uB', vx.b); sh.setUniform('uD', vx.d);
+  rect(0, 0, width, height);
+}`);
+
+  add('ORBIT HUD', 'telemetry · shader', ['SIZE', 'ARC', 'SPIN', 'TILT'], `
+// Telemetry rings drawn on the GPU: razor arcs, tick scales and dashes with a soft glow, tilted into space.
+// Kicks kick the rings round, the bass thickens them. The readout is drawn on top in 2D.
+const V = 'precision highp float; attribute vec3 aPosition; void main() { vec4 p = vec4(aPosition, 1.0); p.xy = p.xy * 2.0 - 1.0; gl_Position = p; }';
+const F = \`precision highp float;
+uniform vec2 uRes; uniform float uSpin, uPulse, uBass, uLevel, uSeed, uA, uB, uD;
+#define TAU 6.2831853
+float hash(float n) { return fract(sin(n * 12.9898 + uSeed) * 43758.5453); }
+void main() {
+  vec2 uv = (gl_FragCoord.xy * 2.0 - uRes) / uRes.y;
+  // tilt: the rings lie on a plane leaning back from the screen
+  float tl = uD * uD * 1.25, ct = cos(tl), st = sin(tl);
+  vec3 rd = vec3(uv, 2.2), n = vec3(0.0, -st, ct), c = vec3(0.0, 0.0, 2.2);
+  float k = dot(c, n) / dot(rd, n);                              // where the ray meets the plane
+  vec3 h = rd * k - c;
+  vec2 p = vec2(h.x, dot(h, vec3(0.0, ct, st)));
+  float px = 2.0 / uRes.y * k / max(abs(dot(normalize(rd), n)), 0.25);
+  float R = (0.45 + uA * 0.4) * min(uRes.x, uRes.y) / uRes.y * 2.0;
+  float len = length(p), ang = atan(p.y, p.x), col = 0.0, glow = 0.0;
+  for (int i = 0; i < 16; i++) {
+    float fi = float(i), h1 = hash(fi), h2 = hash(fi + 31.7), h3 = hash(fi + 77.1), h4 = hash(fi + 5.3);
+    float rad = (0.06 + fi * 0.052) * R * (1.0 + uPulse * 0.05 * (mod(fi, 2.0) * 2.0 - 1.0));
+    float dr = len - rad;
+    if (abs(dr) > px * 30.0) continue;
+    float spd = h1 * 2.0 - 1.0;
+    float rot = h2 * TAU + uSpin * spd + uPulse * spd * 0.5;
+    float rel = mod(ang - rot, TAU);
+    float bright = 0.45 + 0.55 * mod(fi, 3.0) / 2.0;
+    if (h3 < 0.28) {                                               // a tick scale, long every fifth
+      float span = (0.6 + h4 * 3.0) * (0.4 + uB * 1.2);
+      float f = rel / (TAU / 90.0), idx = floor(f + 0.5);
+      float across = abs(f - idx) * (TAU / 90.0) * rad;
+      float l = mod(idx, 5.0) < 0.5 ? 0.035 : 0.014;
+      float on = step(rel, span) * step(0.0, dr) * step(dr, l * R);
+      col += on * (1.0 - smoothstep(0.0, px * 0.9, across - px * 0.4)) * bright;
     } else {
-      strokeWeight(g.w * (1 + vx.bass * 1.5));
-      arc(0, 0, d, d, rot, rot + g.len * (0.4 + vx.b * 1.2) + vx.level);
+      float wpx = (h4 < 0.4 ? 1.0 : h4 < 0.7 ? 2.0 : h4 < 0.9 ? 3.5 : 7.0) * (1.0 + uBass * 1.5);
+      float span = (0.3 + h1 * 1.5) * (0.4 + uB * 1.2) + uLevel;
+      float dashes = h3 > 0.8 ? step(0.45, fract(rel * rad / (px * 14.0))) : 1.0;
+      float endd = max(rel - span, 0.0) * rad;                        // past the arc's end, in plane units
+      if (rel > span + 0.5 * (TAU - span)) endd = (TAU - rel) * rad;  // ...or before its start
+      float d = max(abs(dr) - wpx * px * 0.5, endd);
+      col += (1.0 - smoothstep(0.0, px, d)) * bright * dashes;
+      glow += exp(-max(d, 0.0) / (px * 9.0)) * bright * 0.06;
     }
-  });
+    col += (1.0 - smoothstep(0.0, px, abs(dr))) * 0.05;             // a faint full guide circle
+  }
+  col += glow * (0.7 + uBass);
+  col *= smoothstep(4.5, 1.5, length(p) / R * 2.0);
+  gl_FragColor = vec4(vec3(min(col, 1.2)), 1.0);
+}\`;
+let g, sh, spin = 0;
+function setup() { createCanvas(windowWidth, windowHeight); textFont('monospace'); }
+function draw() {
+  if (!g || g.width !== width || g.height !== height) {
+    if (g) g.remove();
+    g = createGraphics(width, height, WEBGL); g.pixelDensity(1); g.noStroke(); sh = g.createShader(V, F);
+  }
+  spin += min(deltaTime, 50) / 1000 * (0.2 + vx.c * 1.5);
+  g.shader(sh);
+  sh.setUniform('uRes', [width, height]); sh.setUniform('uSpin', spin); sh.setUniform('uSeed', vx.seed % 1000);
+  sh.setUniform('uPulse', vx.pulse); sh.setUniform('uBass', vx.bass); sh.setUniform('uLevel', vx.level);
+  sh.setUniform('uA', vx.a); sh.setUniform('uB', vx.b); sh.setUniform('uD', vx.d);
+  g.rect(0, 0, width, height);
+  image(g, 0, 0, width, height);
   noStroke(); fill(255); textSize(11);
-  text('V3X / ORBIT  ' + nf(vx.bpm, 3, 0) + ' BPM  LVL ' + nf(floor(vx.level * 100), 2), -width / 2 + 24, height / 2 - 24);
+  text('V3X / ORBIT  ' + nf(vx.bpm, 3, 0) + ' BPM  LVL ' + nf(floor(vx.level * 100), 2), 24, height - 24);
 }`);
 
   add('ATTRACTOR', 'chaos · slow', ['SHAPE A', 'SHAPE B', 'SHAPE C', 'TRAIL'], `
@@ -411,6 +530,194 @@ function draw() {
   shader(sh);
   sh.setUniform('uRes', [width, height]); sh.setUniform('uT', vx.t); sh.setUniform('uBass', bass); sh.setUniform('uPulse', vx.pulse);
   sh.setUniform('uA', vx.a); sh.setUniform('uB', vx.b); sh.setUniform('uC', vx.c); sh.setUniform('uD', vx.d);
+  rect(0, 0, width, height);
+}`);
+
+  add('INK', 'fluid · shader · bass', ['SCALE', 'WARP', 'SPEED', 'CONTRAST'], `
+// Ink in water on the GPU: noise folded through itself three times, so it curls like smoke.
+// The bass stirs it, kicks push a bloom through it. (A fragment shader.)
+const V = 'precision highp float; attribute vec3 aPosition; void main() { vec4 p = vec4(aPosition, 1.0); p.xy = p.xy * 2.0 - 1.0; gl_Position = p; }';
+const F = \`precision highp float;
+uniform vec2 uRes; uniform float uT, uBass, uPulse, uA, uB, uD;
+float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float noise(vec2 p) {
+  vec2 i = floor(p), f = fract(p), u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+float fbm(vec2 p) {
+  float v = 0.0, w = 0.5;
+  for (int i = 0; i < 4; i++) { v += noise(p) * w; p = mat2(1.6, 1.2, -1.2, 1.6) * p + 7.1; w *= 0.5; }
+  return v;
+}
+void main() {
+  vec2 sv = (gl_FragCoord.xy * 2.0 - uRes) / uRes.y, uv = sv * (0.5 + uA * 1.6);
+  float t = uT, warp = 2.0 + uB * 5.0 + uBass * 1.5;
+  vec2 q = vec2(fbm(uv + vec2(0.0, t * 0.12)), fbm(uv + vec2(5.2, 1.3) - t * 0.1));
+  vec2 r = vec2(fbm(uv + warp * q + vec2(1.7, 9.2) + t * 0.15), fbm(uv + warp * q + vec2(8.3, 2.8) - t * 0.13));
+  float f = fbm(uv + warp * r);
+  float c = smoothstep(0.2, 0.9, f * f * 1.6 + length(q) * 0.25 + uPulse * 0.12 * length(r));
+  c = pow(c, 0.6 + uD * 2.4);                                         // CONTRAST: soft wash to hard ink
+  c += smoothstep(0.012, 0.0, abs(f - 0.55)) * 0.25;                  // a fine bright filament
+  gl_FragColor = vec4(vec3(c * (1.0 - 0.18 * dot(sv, sv))), 1.0);
+}\`;
+let sh, t = 0, bass = 0;
+function setup() { createCanvas(windowWidth, windowHeight, WEBGL); sh = createShader(V, F); noStroke(); }
+function draw() {
+  bass += (vx.bass - bass) * 0.1;
+  t += min(deltaTime, 50) / 1000 * (0.1 + vx.c * 1.4 + bass * 0.4);
+  shader(sh);
+  sh.setUniform('uRes', [width, height]); sh.setUniform('uT', t); sh.setUniform('uBass', bass); sh.setUniform('uPulse', vx.pulse);
+  sh.setUniform('uA', vx.a); sh.setUniform('uB', vx.b); sh.setUniform('uD', vx.d);
+  rect(0, 0, width, height);
+}`);
+
+  add('GYROID', '3d · shader · speed', ['SCALE', 'THICK', 'SPEED', 'GLOSS'], `
+// Flying through an endless chrome lattice: a gyroid surface, ray-marched, lit by the light we carry.
+// The camera rides a line the walls never cross, so it never clips.
+// The bass thickens the walls, kicks flash a ring of light through them. (A fragment shader.)
+const V = 'precision highp float; attribute vec3 aPosition; void main() { vec4 p = vec4(aPosition, 1.0); p.xy = p.xy * 2.0 - 1.0; gl_Position = p; }';
+const F = \`precision highp float;
+uniform vec2 uRes; uniform float uZ, uT, uBass, uPulse, uA, uB, uD;
+float sc() { return 1.2 + uA * 2.4; }
+float map(vec3 p) {
+  vec3 q = p * sc();
+  float g = dot(sin(q), cos(q.yzx));
+  return (abs(g) - (0.05 + uB * 0.4 + uBass * 0.2)) / sc() * 0.6;
+}
+vec3 nrm(vec3 p) { vec2 e = vec2(0.002, 0.0); return normalize(vec3(map(p + e.xyy) - map(p - e.xyy), map(p + e.yxy) - map(p - e.yxy), map(p + e.yyx) - map(p - e.yyx))); }
+void main() {
+  vec2 uv = (gl_FragCoord.xy * 2.0 - uRes) / uRes.y;
+  vec3 ro = vec3(1.5707963 / sc(), 0.0, uZ);
+  float a = uT * 0.07, ca = cos(a), sa = sin(a);
+  vec3 rd = normalize(vec3(uv * mat2(ca, -sa, sa, ca), 1.3));
+  float t = 0.0, hit = 0.0, steps = 0.0;
+  for (int i = 0; i < 100; i++) {
+    float d = map(ro + rd * t);
+    if (d < 0.0008 * (1.0 + t)) { hit = 1.0; break; }
+    t += d; steps += 1.0;
+    if (t > 14.0) break;
+  }
+  float col = 0.0;
+  if (hit > 0.5) {
+    vec3 p = ro + rd * t, n = nrm(p), r = reflect(rd, n);
+    float fres = pow(1.0 - max(dot(n, -rd), 0.0), 4.0);
+    float head = pow(max(dot(n, -rd), 0.0), 2.0) / (1.0 + t * t * 0.15); // the light we carry
+    float a = atan(r.y, r.x);                                           // chrome: strip lights wrapped round the flight
+    float env = pow(max(0.0, sin(a * 4.0 + p.z * 0.6)), 40.0) * smoothstep(-0.3, 0.6, r.z) * 1.4 + pow(max(r.z, 0.0), 12.0) * 0.5;
+    col = head * (0.45 - uD * 0.25) + env * (0.2 + uD * 0.8) + fres * 0.25;
+    col *= 1.0 - steps / 140.0;                                       // crevices go dark
+    col += exp(-abs(fract((p.z - uZ) * 0.25 - uPulse) - 0.5) * 30.0) * uPulse * 0.8;
+  }
+  col = mix(col, 0.0, smoothstep(1.5, 9.0, t));
+  gl_FragColor = vec4(vec3(col), 1.0);
+}\`;
+let sh, z = 0, bass = 0;
+function setup() { createCanvas(windowWidth, windowHeight, WEBGL); sh = createShader(V, F); noStroke(); }
+function draw() {
+  bass += (vx.bass - bass) * 0.12;
+  z += min(deltaTime, 50) / 1000 * (0.2 + vx.c * 2.5 + bass * 0.6);
+  shader(sh);
+  sh.setUniform('uRes', [width, height]); sh.setUniform('uZ', z); sh.setUniform('uT', vx.t); sh.setUniform('uBass', bass); sh.setUniform('uPulse', vx.pulse);
+  sh.setUniform('uA', vx.a); sh.setUniform('uB', vx.b); sh.setUniform('uD', vx.d);
+  rect(0, 0, width, height);
+}`);
+
+  add('CATHEDRAL', '3d · shader · slow', ['FOLD', 'SCALE', 'SPEED', 'GLOW'], `
+// Gliding down the nave of a cathedral that folds into itself forever: a Menger fractal, repeated
+// and ray-marched. FOLD twists the deeper stone, the bass breathes it, kicks light the arches.
+const V = 'precision highp float; attribute vec3 aPosition; void main() { vec4 p = vec4(aPosition, 1.0); p.xy = p.xy * 2.0 - 1.0; gl_Position = p; }';
+const F = \`precision highp float;
+uniform vec2 uRes; uniform float uT, uZ, uBass, uPulse, uA, uB, uD;
+mat2 rot(float a) { float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
+float map(vec3 p) {
+  p = mod(p + 1.0, 2.0) - 1.0;                                     // the whole space is tiled with it
+  float k = 2.6 + uB * 0.8, s = 1.0;
+  mat2 tw = rot(uA * 0.5 + uBass * 0.04);
+  for (int i = 0; i < 5; i++) {
+    p = abs(p);
+    if (p.x < p.y) p.xy = p.yx;
+    if (p.x < p.z) p.xz = p.zx;
+    if (p.y < p.z) p.yz = p.zy;
+    p = p * k - (k - 1.0);
+    if (p.z < -0.5 * (k - 1.0)) p.z += k - 1.0;
+    if (i > 1) p.xy *= tw;                                           // twist only the deeper levels: the nave stays open
+    s *= k;
+  }
+  vec3 q = abs(p) - 1.0;
+  return (length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0)) / s;
+}
+void main() {
+  vec2 uv = (gl_FragCoord.xy * 2.0 - uRes) / uRes.y;
+  vec3 ro = vec3(0.0, 0.0, uZ);
+  vec3 rd = normalize(vec3(uv * rot(sin(uT * 0.05) * 0.4), 1.4));
+  rd.xz *= rot(sin(uT * 0.07) * 0.25); rd.yz *= rot(sin(uT * 0.05) * 0.15);
+  float t = 0.0, hit = 0.0, glow = 0.0, steps = 0.0;
+  for (int i = 0; i < 110; i++) {
+    float d = map(ro + rd * t);
+    glow += exp(-d * 60.0) * 0.012;
+    if (d < 0.0004 * (1.0 + t)) { hit = 1.0; break; }
+    t += d; steps += 1.0;
+    if (t > 20.0) break;
+  }
+  float col = glow * (0.2 + uD * 1.2) * (0.6 + uPulse * 0.8);
+  if (hit > 0.5) {
+    vec3 p = ro + rd * t; vec2 e = vec2(0.0005 * (1.0 + t), 0.0);
+    vec3 n = normalize(vec3(map(p + e.xyy) - map(p - e.xyy), map(p + e.yxy) - map(p - e.yxy), map(p + e.yyx) - map(p - e.yyx)));
+    float ao = pow(1.0 - steps / 110.0, 2.0);
+    float key = max(dot(n, normalize(vec3(0.3, 0.8, -0.5))), 0.0), fill = 0.5 + 0.5 * n.y;
+    col += (key * 0.75 + fill * 0.15 + pow(1.0 - max(dot(n, -rd), 0.0), 5.0) * 0.3) * ao;
+    col *= exp(-t * 0.16);
+  }
+  gl_FragColor = vec4(vec3(col), 1.0);
+}\`;
+let sh, z = 0, bass = 0;
+function setup() { createCanvas(windowWidth, windowHeight, WEBGL); sh = createShader(V, F); noStroke(); }
+function draw() {
+  bass += (vx.bass - bass) * 0.06;
+  z += min(deltaTime, 50) / 1000 * (0.03 + vx.c * 0.6);
+  shader(sh);
+  sh.setUniform('uRes', [width, height]); sh.setUniform('uT', vx.t); sh.setUniform('uZ', z); sh.setUniform('uBass', bass); sh.setUniform('uPulse', vx.pulse);
+  sh.setUniform('uA', vx.a); sh.setUniform('uB', vx.b); sh.setUniform('uD', vx.d);
+  rect(0, 0, width, height);
+}`);
+
+  add('CAUSTICS', 'light · shader · mid', ['SCALE', 'SHARP', 'SPEED', 'DEPTH'], `
+// Sunlight through moving water, thrown on the floor of a pool: a net of light that never settles.
+// The mids brighten it, kicks send a ripple out from the centre. (A fragment shader.)
+const V = 'precision highp float; attribute vec3 aPosition; void main() { vec4 p = vec4(aPosition, 1.0); p.xy = p.xy * 2.0 - 1.0; gl_Position = p; }';
+const F = \`precision highp float;
+uniform vec2 uRes; uniform float uT, uMid, uPulse, uA, uB, uD;
+float caustic(vec2 uv, float t) {
+  vec2 p = mod(uv * 6.2831853, 6.2831853) - 250.0, i = p;
+  float c = 1.0, inten = 0.005 * (0.4 + uB * 1.2);
+  for (int n = 0; n < 5; n++) {
+    float tt = t * (1.0 - 3.5 / float(n + 1));
+    i = p + vec2(cos(tt - i.x) + sin(tt + i.y), sin(tt - i.y) + cos(tt + i.x));
+    c += 1.0 / length(vec2(p.x / (sin(i.x + tt) / inten), p.y / (cos(i.y + tt) / inten)));
+  }
+  c /= 5.0;
+  c = 1.17 - pow(c, 1.4);
+  return pow(abs(c), 8.0);
+}
+void main() {
+  vec2 uv = (gl_FragCoord.xy * 2.0 - uRes) / uRes.y;
+  // a floor seen at an angle: DEPTH tips it away from us
+  float tilt = uD * 0.9;
+  vec2 f = vec2(uv.x, uv.y + 0.9) / (1.0 - uv.y * tilt * 0.6 + 0.0001);
+  float rip = sin(length(uv) * 18.0 - (1.0 - uPulse) * 14.0) * uPulse * 0.015;
+  vec2 q = f * (0.35 + uA * 0.8) + rip;
+  float c = caustic(q, uT) * 0.7 + caustic(q * 1.7 + 3.1, uT * 1.3) * 0.3;
+  c = c * (1.4 + uMid * 1.0) + 0.02;
+  c *= smoothstep(1.0, -0.3, uv.y * tilt) * (1.0 - 0.25 * dot(uv, uv));
+  gl_FragColor = vec4(vec3(min(c, 1.0)), 1.0);
+}\`;
+let sh, t = 0;
+function setup() { createCanvas(windowWidth, windowHeight, WEBGL); sh = createShader(V, F); noStroke(); }
+function draw() {
+  t += min(deltaTime, 50) / 1000 * (0.15 + vx.c * 1.2);
+  shader(sh);
+  sh.setUniform('uRes', [width, height]); sh.setUniform('uT', t + 23.0); sh.setUniform('uMid', vx.mid); sh.setUniform('uPulse', vx.pulse);
+  sh.setUniform('uA', vx.a); sh.setUniform('uB', vx.b); sh.setUniform('uD', vx.d);
   rect(0, 0, width, height);
 }`);
 

@@ -5457,7 +5457,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       try { pg.thumbs = JSON.parse(localStorage.getItem('vx.presetThumbs.v1') || '{}'); } catch (e) {}
       const pgEl = id => document.getElementById(id);
       // a handful of families, from each preset's tags
-      const PG_FAMILIES = { '3D': ['3d', 'shader'], LINES: ['lines', 'waves', 'curves', 'bars', 'optical'], TYPE: ['type'], PARTICLES: ['particles', 'nodes', 'chaos', 'noise'],
+      const PG_FAMILIES = { SHADER: ['shader'], '3D': ['3d'], LINES: ['lines', 'waves', 'curves', 'bars', 'optical'], TYPE: ['type'], PARTICLES: ['particles', 'nodes', 'chaos', 'noise'],
         GRID: ['grid', 'cells', 'symmetry', 'shapes'], AUDIO: ['audio'], HUD: ['telemetry', 'stage'] };
       const pgTags = x => String(x.tags || '').toLowerCase().split('·').map(t => t.trim());
       const pgIn = (x, fam) => fam === 'ALL' || PG_FAMILIES[fam].some(t => pgTags(x).includes(t));
