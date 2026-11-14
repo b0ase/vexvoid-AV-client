@@ -46,6 +46,75 @@ function draw() {
   if (vx.pulse > 0.85) { noStroke(); fill(255, 30); rect(0, 0, width, height); }
 }`);
 
+  add('V3X CONSTRUCTION', 'type · grid · bar', ['SIZE', 'GRID', 'PACE', 'FILL'], `
+// The V3X mark drawn up like a type specimen: each letter built from modular blocks on a hairline grid, one per
+// bar (PACE stretches it), then the whole mark. Outlines trace in, panels fill, guides run off the edges, a spec
+// sheet sits beside it. Kicks pulse the registration cross. Dark greys, not pure white.
+// Letters on a 4 x 6 module grid, y down: rect [x, y, w, h] or polygon [[x, y], ...]
+const L = {
+  V: [[0, 0, 1, 1], [3, 0, 1, 1], [[0, 1], [1, 1], [2, 4.4], [3, 1], [4, 1], [2.55, 6], [1.45, 6]]],
+  '3': [[0, 0, 4, 1], [[2.7, 1], [4, 1], [2.9, 2.5], [1.6, 2.5]], [1.6, 2.5, 2.4, 1], [3, 3.5, 1, 1.5], [0, 5, 4, 1]],
+  X: [[[0, 0], [1.15, 0], [4, 6], [2.85, 6]], [[2.85, 0], [4, 0], [1.15, 6], [0, 6]]]
+};
+const SEQ = ['V', '3', 'X', 'MARK'];
+let bars = 0, lastBar = 0, reg;
+function setup() { createCanvas(windowWidth, windowHeight); reg = 'V3X-' + nf(vx.seed % 10000, 4) + '-' + nf(floor(vx.seed / 7) % 10000, 4); }
+function pts(b) { return Array.isArray(b[0]) ? b : [[b[0], b[1]], [b[0] + b[2], b[1]], [b[0] + b[2], b[1] + b[3]], [b[0], b[1] + b[3]]]; }
+function ease(x) { x = constrain(x, 0, 1); return x < 0.5 ? 4 * x * x * x : 1 - pow(-2 * x + 2, 3) / 2; }
+// an outline traced to fraction f of its perimeter
+function trace(P, f) {
+  let total = 0; const seg = [];
+  for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length], l = dist(a[0], a[1], b[0], b[1]); seg.push(l); total += l; }
+  let rem = total * f; beginShape(); vertex(P[0][0], P[0][1]);
+  for (let i = 0; i < P.length && rem > 0; i++) { const a = P[i], b = P[(i + 1) % P.length], k = min(1, rem / seg[i]); vertex(lerp(a[0], b[0], k), lerp(a[1], b[1], k)); rem -= seg[i]; }
+  endShape();
+}
+function letter(ch, x0, y0, m, u, fillA) {
+  const blocks = L[ch], n = blocks.length;
+  blocks.forEach((b, i) => {
+    const P = pts(b).map(p => [x0 + p[0] * m, y0 + p[1] * m]);
+    const s = i / n * 0.45, out = ease((u - s) / 0.22), fil = ease((u - s - 0.18) / 0.25);
+    if (out <= 0) return;
+    // construction guides: every edge extended across the frame, faint
+    stroke(255, 22 * out); strokeWeight(1);
+    P.forEach((p, k) => { const q = P[(k + 1) % P.length], dx = q[0] - p[0], dy = q[1] - p[1], l = max(1, sqrt(dx * dx + dy * dy));
+      line(p[0] - dx / l * 4000, p[1] - dy / l * 4000, q[0] + dx / l * 4000, q[1] + dy / l * 4000); });
+    noStroke(); fill(255, fillA * fil); beginShape(); P.forEach(p => vertex(p[0], p[1])); endShape(CLOSE);
+    noFill(); stroke(235, 200 * out); strokeWeight(1.2); trace(P, out);
+  });
+}
+function draw() {
+  if (vx.bar < lastBar) bars++;
+  lastBar = vx.bar;
+  background(16);
+  const per = [1, 2, 4][min(2, floor(vx.c * 3))], step = floor(bars / per), u = ((bars % per) + vx.bar) / per;
+  const ch = SEQ[step % SEQ.length];
+  // the hairline grid
+  const sub = 6 + floor(vx.b * 12), g = height / sub;
+  stroke(255, 10); strokeWeight(1);
+  for (let x = width % g / 2; x < width; x += g) line(x, 0, x, height);
+  for (let y = 0; y < height; y += g) line(0, y, width, y);
+  // the letter, or the whole mark
+  const fillA = 18 + vx.d * 120 + vx.bass * 25, H = min(height * (0.5 + vx.a * 0.35), width * 0.45);
+  if (ch === 'MARK') {
+    const m = min(H / 6 * 0.55, width * 0.72 / 14), gap = m * 1.1, w = m * 12 + gap * 2;
+    ['V', '3', 'X'].forEach((c, i) => letter(c, width / 2 - w / 2 + i * (m * 4 + gap), height / 2 - m * 3, m, u * 1.3 - i * 0.12, fillA + 40));
+  } else { const m = H / 6; letter(ch, width / 2 - m * 2, height / 2 - m * 3, m, u, fillA); }
+  // registration cross, pulsed by the kick
+  const c = 10 + vx.pulse * 14;
+  stroke(255, 120 + vx.pulse * 135); strokeWeight(1);
+  line(width / 2 - c, height / 2, width / 2 + c, height / 2); line(width / 2, height / 2 - c, width / 2, height / 2 + c);
+  // the spec sheet
+  const t = max(9, height / 80), x = 28, y = 30;
+  noStroke(); fill(230); textFont('Michroma'); textSize(t * 1.9); text('V3X', x, y + t * 1.8);
+  textFont('IBM Plex Mono'); textSize(t * 1.35); text('Construction', x + t * 6.2, y + t * 1.6); textSize(t * 0.85); fill(150);
+  text('[ ' + (ch === 'MARK' ? 'V3X / MARK' : 'GLYPH ' + ch) + ' ]', x + t * 6.2, y + t * 3.2);
+  const rows = [['MODULE', floor(g) + 'PX'], ['SUB-DIVISIONS', sub], ['REG. NO.', reg], ['DIVISION', '03 / SIGNAL'], ['CHANNEL', nf(vx.bpm, 3, 0) + ' BPM'], ['BAR', nf(bars + 1, 4)]];
+  rows.forEach((r, i) => { fill(110); text(r[0], width - t * 30, y + t * 1.2 * (i + 1)); fill(190); text(r[1], width - t * 18, y + t * 1.2 * (i + 1)); });
+  fill(110); text('+V-' + nf(step % 99 + 1, 2), x, height / 2 - 6); textAlign(RIGHT); text('V3XV0ID STUDIO', width - x, height / 2 - 6); textAlign(LEFT);
+  stroke(255, 26); line(0, height / 2, width, height / 2);
+}`);
+
   add('FLOW FIELD', 'particles · noise', ['DENSITY', 'SCALE', 'SPEED', 'TRAIL'], `
 let pts = [], z = 0;
 function count() { return floor(400 + vx.a * 3600); }
