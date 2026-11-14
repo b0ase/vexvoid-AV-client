@@ -1750,6 +1750,28 @@
     .ai-in{display:flex;gap:12px;align-items:flex-end;padding:18px 24px 18px 0;border-top:1px solid #161616}
     .ai-in textarea{flex:1;resize:none;background:none;color:#fff;border:0;padding:6px 0;font:inherit;font-size:14px;text-transform:none;letter-spacing:.01em;outline:none;max-height:140px}
     .ai-in button{font:inherit;background:none;border:0;color:#fff;letter-spacing:.24em;font-size:10px;cursor:pointer;padding:8px 0}
+    /* VEXVOID preset gallery */
+    .pg{display:flex;flex-direction:column;gap:14px;width:100%;height:100%;min-height:0}
+    .pg-head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;padding:6px 4px 0}
+    .pg-title{font-family:'Michroma','IBM Plex Mono',sans-serif;font-size:28px;letter-spacing:.3em}
+    .pg-sub{font-size:9px;letter-spacing:.3em;color:#666;margin-top:6px}
+    .pg-ask{display:grid;grid-template-columns:1fr auto;gap:8px;width:min(560px,50%)}
+    .pg-ask input{background:none;border:0;border-bottom:1px solid #333;color:#fff;font:inherit;font-size:13px;text-transform:none;padding:6px 0;outline:none}
+    .pg-ask button{font:inherit;background:none;border:0;color:#fff;letter-spacing:.24em;font-size:10px;cursor:pointer}
+    .pg-reply{grid-column:1/-1;font-size:11px;color:#9a9a98;text-transform:none;min-height:14px}
+    .pg-grid{flex:1;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;align-content:start;padding:2px 4px 20px}
+    .pg-tile{position:relative;background:#050505;border:1px solid #1c1c1c;display:flex;flex-direction:column}
+    .pg-tile:hover{border-color:#666}
+    .pg-view{position:relative;aspect-ratio:16/9;background:#000;overflow:hidden}
+    .pg-view img,.pg-view .gen-host{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+    .pg-view .pg-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;letter-spacing:.3em;color:#333}
+    .pg-meta{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;gap:8px}
+    .pg-name{font-family:'Michroma','IBM Plex Mono',sans-serif;font-size:10px;letter-spacing:.14em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .pg-tag{font-size:8px;letter-spacing:.16em;color:#555;white-space:nowrap}
+    .pg-acts{position:absolute;left:0;right:0;bottom:0;display:flex;gap:1px;opacity:0;transition:opacity .15s}
+    .pg-tile:hover .pg-acts{opacity:1}
+    .pg-acts button{flex:1;font:inherit;font-size:9px;letter-spacing:.2em;background:rgba(0,0,0,.85);color:#fff;border:0;border-top:1px solid #333;padding:8px 0;cursor:pointer}
+    .pg-acts button:hover{background:#fff;color:#000}
     /* layer LOAD picker */
     .layer-btn:disabled{opacity:.25;cursor:default}
     .seq-strip{display:flex;gap:3px;overflow-x:auto;margin-top:6px;padding-bottom:3px;align-items:center}
@@ -2571,72 +2593,15 @@
       </div>
     </div>
 
+    <!-- VEXVOID: the preset gallery. Every animation, live on hover, onto a deck in one click; or ask VexVoid. -->
     <div class="tab-content" id="vexvoidTab">
-      <div class="vexvoid-container">
-                 <!-- VEXVOID Header -->
-         <div class="vexvoid-header">
-           <h2 class="vexvoid-title">V E X V O I D</h2>
-           <div class="vexvoid-subtitle">URBAN VISUAL ENGINE</div>
-         </div>
-
-        <!-- Main VEXVOID Canvas -->
-        <div class="vexvoid-main">
-          <canvas id="vexvoidCanvas" class="vexvoid-canvas"></canvas>
-          <div class="vexvoid-overlay">
-            <div class="glitch-text" id="glitchText">V3XV0ID</div>
-          </div>
+      <div class="pg">
+        <div class="pg-head">
+          <div><div class="pg-title">VEXVOID</div><div class="pg-sub" id="pgCount">PRESETS</div></div>
+          <div class="pg-ask"><input id="pgAsk" placeholder="Ask VexVoid for a look..."><button id="pgAskGo">ASK</button><div class="pg-reply" id="pgReply"></div></div>
         </div>
-
-        <!-- VEXVOID Controls -->
-        <div class="vexvoid-controls">
-                     <div class="vexvoid-control-group">
-             <button id="vexvoidStart" class="vexvoid-btn primary">START</button>
-             <button id="vexvoidStop" class="vexvoid-btn">STOP</button>
-             <button id="vexvoidReset" class="vexvoid-btn">↻ RESET</button>
-           </div>
-
-          <div class="vexvoid-control-group">
-            <label class="vexvoid-label">INTENSITY</label>
-            <input type="range" id="chaosLevel" class="vexvoid-slider" min="1" max="10" value="5">
-            <span id="chaosValue" class="vexvoid-value">5</span>
-          </div>
-
-          <div class="vexvoid-control-group">
-            <label class="vexvoid-label">DISTORTION</label>
-            <input type="range" id="glitchIntensity" class="vexvoid-slider" min="0" max="100" value="30">
-            <span id="glitchValue" class="vexvoid-value">30</span>
-          </div>
-
-          <div class="vexvoid-control-group">
-            <label class="vexvoid-label">VISUAL MODE</label>
-            <select id="visualMode" class="vexvoid-select">
-              <option value="matrix">CODE RAIN</option>
-              <option value="glitch">STATIC STORM</option>
-              <option value="plasma">WAVE FORM</option>
-              <option value="tunnel">DEPTH FIELD</option>
-              <option value="fractals">NEURAL NET</option>
-              <option value="particles">DATA STREAM</option>
-              <option value="cyberpunk">GRID SYSTEM</option>
-              <option value="all">FULL SPECTRUM</option>
-            </select>
-          </div>
-        </div>
-
-                 <!-- VEXVOID Stats -->
-         <div class="vexvoid-stats">
-           <div class="stat-item">
-             <span class="stat-label">FPS:</span>
-             <span id="vexvoidFPS" class="stat-value">0</span>
-           </div>
-           <div class="stat-item">
-             <span class="stat-label">MODE:</span>
-             <span id="currentMode" class="stat-value">OFFLINE</span>
-           </div>
-           <div class="stat-item">
-             <span class="stat-label">STATUS:</span>
-             <span id="chaosStatus" class="stat-value">READY</span>
-           </div>
-         </div>
+        <div class="wb-filters" id="pgCats"></div>
+        <div class="pg-grid" id="pgGrid"></div>
       </div>
     </div>
   </div>
@@ -5365,6 +5330,71 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       mkEl('mkSearch').addEventListener('keydown', e => e.stopPropagation());
       renderMarketDetail(null);
 
+      // ===== VEXVOID: the preset gallery (every sketch in the library) =====
+      const pg = { cat: 'ALL', live: null, thumbs: {}, queue: [], busy: false, ready: false };
+      try { pg.thumbs = JSON.parse(localStorage.getItem('vx.presetThumbs.v1') || '{}'); } catch (e) {}
+      const pgEl = id => document.getElementById(id);
+      // a handful of families, from each preset's tags
+      const PG_FAMILIES = { '3D': ['3d', 'shader'], LINES: ['lines', 'waves', 'curves', 'bars', 'optical'], TYPE: ['type'], PARTICLES: ['particles', 'nodes', 'chaos', 'noise'],
+        GRID: ['grid', 'cells', 'symmetry', 'shapes'], AUDIO: ['audio'], HUD: ['telemetry', 'stage'] };
+      const pgTags = x => String(x.tags || '').toLowerCase().split('·').map(t => t.trim());
+      const pgIn = (x, fam) => fam === 'ALL' || PG_FAMILIES[fam].some(t => pgTags(x).includes(t));
+      function pgCats() { return ['ALL', ...Object.keys(PG_FAMILIES)]; }
+      // a still of each preset: run it for a moment off to the side and keep one frame
+      function pgThumbNext() {
+        if (pg.busy || !pg.queue.length) return;
+        const item = pg.queue.shift(); if (pg.thumbs[item.name]) return pgThumbNext();
+        pg.busy = true;
+        const host = document.createElement('div'); host.style.cssText = 'position:fixed;left:-2000px;top:0;width:320px;height:180px';
+        document.body.appendChild(host);
+        let g = null;
+        try { g = VXGEN.mount(host, item.code, { seed: 7, params: { a: .5, b: .5, c: .5, d: .5 } }); } catch (e) {}
+        setTimeout(() => {
+          try {
+            const c = g && g.canvas();
+            if (c) { const k = document.createElement('canvas'); k.width = 320; k.height = 180; const x = k.getContext('2d'); x.fillStyle = '#000'; x.fillRect(0, 0, 320, 180); x.drawImage(c, 0, 0, 320, 180);
+              pg.thumbs[item.name] = k.toDataURL('image/jpeg', 0.7);
+              try { localStorage.setItem('vx.presetThumbs.v1', JSON.stringify(pg.thumbs)); } catch (e) {}
+              const img = document.querySelector(`.pg-tile[data-name="${CSS.escape(item.name)}"] img`); if (img) img.src = pg.thumbs[item.name]; }
+          } catch (e) {}
+          try { g && g.stop(); } catch (e) {} host.remove(); pg.busy = false; pgThumbNext();
+        }, 1400);
+      }
+      function renderPresetGallery() {
+        const lib = window.VXGEN_LIBRARY || [];
+        pgEl('pgCount').textContent = lib.length + ' PRESETS · HOVER TO PREVIEW · ADD TO A DECK';
+        const cats = pgEl('pgCats'); cats.innerHTML = '';
+        pgCats().forEach(c => { const b = document.createElement('button'); b.textContent = c; b.classList.toggle('on', c === pg.cat); b.onclick = () => { pg.cat = c; renderPresetGallery(); }; cats.appendChild(b); });
+        const grid = pgEl('pgGrid'); grid.innerHTML = '';
+        lib.filter(x => pgIn(x, pg.cat)).forEach(item => {
+          const t = document.createElement('div'); t.className = 'pg-tile'; t.dataset.name = item.name;
+          t.innerHTML = '<div class="pg-view"><span class="pg-ph">PREVIEW</span><img alt=""><div class="pg-acts"><button data-d="A">ADD TO A</button><button data-d="B">ADD TO B</button><button data-e="1">EDIT</button></div></div><div class="pg-meta"><span class="pg-name"></span><span class="pg-tag"></span></div>';
+          t.querySelector('.pg-name').textContent = item.name; t.querySelector('.pg-tag').textContent = String(item.tags || '').toUpperCase();
+          const img = t.querySelector('img'); if (pg.thumbs[item.name]) img.src = pg.thumbs[item.name]; else { img.removeAttribute('src'); pg.queue.push(item); }
+          const view = t.querySelector('.pg-view');
+          t.addEventListener('mouseenter', () => {
+            if (pg.live) { try { pg.live.g.stop(); } catch (e) {} pg.live.host.remove(); }
+            const host = document.createElement('div'); host.className = 'gen-host'; view.insertBefore(host, view.querySelector('.pg-acts'));
+            try { pg.live = { host, g: VXGEN.mount(host, item.code, { params: { a: .5, b: .5, c: .5, d: .5 } }) }; } catch (e) { host.remove(); }
+          });
+          t.addEventListener('mouseleave', () => { if (pg.live && view.contains(pg.live.host)) { try { pg.live.g.stop(); } catch (e) {} pg.live.host.remove(); pg.live = null; } });
+          t.querySelectorAll('[data-d]').forEach(b => b.onclick = async () => { try { await window.vxCommand('sketch', { name: item.name, deck: b.dataset.d }); pgEl('pgReply').textContent = `${item.name} is on deck ${b.dataset.d}.`; } catch (e) { pgEl('pgReply').textContent = e.message; } });
+          t.querySelector('[data-e]').onclick = () => { document.querySelector('[data-tab="patterns"]').click(); setTimeout(() => window.vxCommand('sketch', { name: item.name, send: false }), 50); };
+          grid.appendChild(t);
+        });
+        pgThumbNext();
+      }
+      window.initializeVexvoidTab = renderPresetGallery;
+      // one line to VexVoid: goes into the open conversation in the AI tab, the answer shows here
+      async function pgAskNow() {
+        const q = pgEl('pgAsk').value.trim(); if (!q) return;
+        pgEl('pgAsk').value = ''; pgEl('pgReply').textContent = 'VexVoid is on it…';
+        aiEl('aiInput').value = q; await aiSendNow();
+        const bots = [...aiEl('aiLog').querySelectorAll('.ai-msg.bot, .ai-msg.err')]; pgEl('pgReply').textContent = bots.length ? bots[bots.length - 1].textContent : '';
+      }
+      pgEl('pgAskGo').addEventListener('click', pgAskNow);
+      pgEl('pgAsk').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') pgAskNow(); });
+
       // ===== RECORD: the output plus the playing music, saved as a video file (a music video rendered live) =====
       // Same capture as GO LIVE (the output window; macOS asks for Screen Recording the first time). WebM from the
       // recorder, then an MP4 for sharing when ffmpeg is on this computer.
@@ -6326,7 +6356,7 @@ Reply with only the JSON array in one \`\`\`json code block.`;
           } else if (targetTab === 'composer') {
             initializeComposerTab();
           } else if (targetTab === 'vexvoid') {
-            initializeVexvoidTab();
+            renderPresetGallery();
           } else if (targetTab === 'wallet') {
             renderWalletTab();
           } else if (targetTab === 'market') {
