@@ -393,19 +393,13 @@
         const paletteALayers = layers.filter(l => (l.palette || 'A') === 'A' && l.visible && layerSrc(l));
         const paletteBLayers = layers.filter(l => (l.palette || 'A') === 'B' && l.visible && layerSrc(l));
         
-        previewData.paletteA = paletteALayers.length > 0 ? {
-          imageSrc: layerSrc(paletteALayers[paletteALayers.length - 1]),
-          opacity: (paletteALayers[paletteALayers.length - 1].opacity || 100) / 100,
-          scale: (paletteALayers[paletteALayers.length - 1].size || 100) / 100,
-          inverse: paletteALayers[paletteALayers.length - 1].inverse || false
-        } : null;
-        
-        previewData.paletteB = paletteBLayers.length > 0 ? {
-          imageSrc: layerSrc(paletteBLayers[paletteBLayers.length - 1]),
-          opacity: (paletteBLayers[paletteBLayers.length - 1].opacity || 100) / 100,
-          scale: (paletteBLayers[paletteBLayers.length - 1].size || 100) / 100,
-          inverse: paletteBLayers[paletteBLayers.length - 1].inverse || false
-        } : null;
+        // the selected layer, when it is on that deck, so the layer controls (size, opacity, invert) show on its monitor
+        const shown = list => list.find(l => selectedLayer && l.id === selectedLayer.id) || list[list.length - 1];
+        const deckPreview = list => { const l = list.length ? shown(list) : null; return l ? {
+          imageSrc: layerSrc(l), opacity: (l.opacity || 100) / 100, scale: (l.size || 100) / 100, inverse: l.inverse || false, layerId: l.id
+        } : null; };
+        previewData.paletteA = deckPreview(paletteALayers);
+        previewData.paletteB = deckPreview(paletteBLayers);
         
         sendToControl('preview-update', previewData);
       }

@@ -2983,7 +2983,7 @@
             max-height: 100%;
             object-fit: contain;
             opacity: ${opacity || 1};
-            transform: scale(${Math.min(scale || 1, 0.9)});
+            transform: scale(${scale || 1});
           `;
           if (inverse) media.element.style.filter = 'invert(1)';
 
@@ -3003,7 +3003,7 @@
         } else if (cache.element) {
           // Same source — just update style properties (no DOM rebuild)
           cache.element.style.opacity = opacity || 1;
-          cache.element.style.transform = `scale(${Math.min(scale || 1, 0.9)})`;
+          cache.element.style.transform = `scale(${scale || 1})`;
           cache.element.style.filter = inverse ? 'invert(1)' : '';
         }
       }
