@@ -1743,6 +1743,11 @@
     .ai-in{display:flex;gap:6px;padding:10px;border-top:1px solid #1d1d1d}
     .ai-in textarea{flex:1;resize:none;background:#050505;color:#fff;border:1px solid #333;padding:8px;font:inherit;font-size:12px;text-transform:none;letter-spacing:.02em}
     .ai-in .gen-btn{width:82px}
+    /* layer LOAD picker */
+    .mp-overlay{position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;padding:24px}
+    .mp{width:min(1100px,100%);height:min(720px,100%);display:flex;flex-direction:column;gap:10px;background:#050505;border:1px solid rgba(255,255,255,.35);padding:14px}
+    .mp-head{display:flex;gap:8px;align-items:center}.mp-head b{flex:1;font-family:'Michroma','IBM Plex Mono',sans-serif;font-weight:400;letter-spacing:.2em;font-size:12px}
+    .mp-head .search-input{width:240px}.mp-grid{flex:1;overflow-y:auto;align-content:start}
     .media-thumb{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#111;filter:grayscale(1)}
     .video-item:hover .media-thumb,.image-item:hover .media-thumb{filter:none}
 
@@ -3056,7 +3061,60 @@
         sendToOutput('toggle-visibility', { layerId });
       };
       
-      window.loadImages = async function(layerId) {
+      // LOAD on a layer: pick from the library (catalogue clips and images, Grok generations), the wallet, or this computer
+      window.loadImages = function(layerId) { openMediaPicker(layerId); };
+      function openMediaPicker(layerId) {
+        document.querySelectorAll('.mp-overlay').forEach(e => e.remove());
+        const ov = document.createElement('div'); ov.className = 'mp-overlay';
+        ov.innerHTML = `<div class="mp"><div class="mp-head"><b>LOAD INTO LAYER ${layerId}</b><input class="search-input mp-q" placeholder="SEARCH..."><button class="gen-btn mp-disk">THIS COMPUTER…</button><button class="gen-btn mp-x">CLOSE</button></div>
+          <div class="wb-filters mp-tabs"></div><div class="mp-grid video-grid"></div><div class="wb-note mp-note"></div></div>`;
+        document.body.appendChild(ov);
+        const q = ov.querySelector('.mp-q'), grid = ov.querySelector('.mp-grid'), note = ov.querySelector('.mp-note');
+        const close = () => ov.remove();
+        ov.querySelector('.mp-x').onclick = close;
+        ov.addEventListener('click', e => { if (e.target === ov) close(); });
+        ov.querySelector('.mp-disk').onclick = () => { close(); loadFromDisk(layerId); };
+        q.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Escape') close(); });
+        const cat = catalogue();
+        const SRC = {
+          CLIPS: () => grokFiles('video').map(f => ({ ...f, video: true })).concat(cat.clips.map(c => ({ name: c.name, url: c.url, video: true, tag: c.set }))),
+          IMAGES: () => grokFiles('image').concat(cat.images.map(c => ({ name: c.name, url: c.url, tag: c.set }))),
+          WALLET: () => (typeof walletMedia === 'function' ? walletMedia('clip').map(i => ({ name: i.name, url: i.url, video: true, tag: 'wallet' })).concat(walletMedia('image').map(i => ({ name: i.name, url: i.url, tag: 'wallet' }))) : []),
+          MARKET: () => []
+        };
+        let tab = 'CLIPS';
+        function render() {
+          const tabs = ov.querySelector('.mp-tabs'); tabs.innerHTML = '';
+          Object.keys(SRC).forEach(k => { const b = document.createElement('button'); b.textContent = k; b.classList.toggle('on', k === tab); b.onclick = () => { tab = k; render(); }; tabs.appendChild(b); });
+          const term = q.value.trim().toLowerCase();
+          const items = SRC[tab]().filter(i => !term || (i.name + ' ' + (i.tag || '')).toLowerCase().includes(term));
+          grid.innerHTML = '';
+          note.textContent = tab === 'MARKET' ? 'Buy VexVoid clips in the MARKET tab: what you buy lands in your wallet and shows under WALLET here.'
+            : tab === 'WALLET' && !items.length ? (typeof walletKey === 'function' && walletKey() ? 'No clips or images in your wallet yet.' : 'Connect bWalletX (top right) to load your own clips.')
+            : `${items.length} ${tab.toLowerCase()}. Click one to load it.`;
+          items.slice(0, 400).forEach(i => {
+            const card = document.createElement('div'); card.className = 'video-item';
+            const local = i.source === 'local', src = local ? 'file://' + encodeURI(i.url) : i.url;
+            let t;
+            if (i.video) { t = document.createElement('video'); t.className = 'media-thumb'; t.muted = true; t.playsInline = true; t.loop = true;
+              // ORDFS sends whole files, so wallet videos load on hover; storage clips can fetch just the first frame
+              if (/ordfs\.network/.test(src)) t.preload = 'none'; else { t.preload = 'metadata'; t.src = src + '#t=1'; }
+              card.addEventListener('mouseenter', () => { if (!t.src) t.src = src; t.play().catch(() => {}); }); card.addEventListener('mouseleave', () => t.pause()); }
+            else { t = document.createElement('img'); t.className = 'media-thumb'; t.loading = 'lazy'; t.src = src; }
+            const n = document.createElement('div'); n.className = 'video-name'; n.textContent = i.name;
+            card.append(t, n);
+            card.onclick = async () => {
+              note.textContent = 'Loading ' + i.name + '…';
+              try { const file = await cacheMedia(i); sendToOutput('load-images', { layerId, filePaths: [file] }); close(); }
+              catch (e) { note.textContent = 'Could not load it: ' + e.message; }
+            };
+            grid.appendChild(card);
+          });
+        }
+        q.addEventListener('input', render);
+        render(); q.focus();
+      }
+      async function loadFromDisk(layerId) {
         const result = await dialog.showOpenDialog({
           properties: ['openFile', 'openDirectory', 'multiSelections'],
           filters: [
