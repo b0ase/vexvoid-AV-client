@@ -1718,13 +1718,15 @@
     .mk-big{font-family:'Michroma','IBM Plex Mono',sans-serif;font-size:22px;color:#fff;letter-spacing:.04em}
     .wb-filters .mk-tog{margin-left:auto}
     /* AI tab: the output and a chat, nothing else */
-    .ai{display:grid;grid-template-columns:1fr minmax(340px,440px);gap:12px;width:100%;height:100%;min-height:0}
-    .ai-stage{position:relative;background:#000;border:1px solid rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;min-height:0;overflow:hidden}
-    .ai-stage img{width:100%;height:100%;object-fit:contain;display:block}
-    .ai-now{position:absolute;top:8px;left:8px;font-size:9px;letter-spacing:.18em;color:#fff;background:rgba(0,0,0,.8);border:1px solid #222;padding:2px 7px}
-    .ai-chat{display:flex;flex-direction:column;min-height:0;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.6)}
-    .ai-head{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #1d1d1d;font-family:'Michroma','IBM Plex Mono',sans-serif;font-size:11px;letter-spacing:.22em}
-    .ai-head .ai-status{flex:1;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.16em;color:#888}
+    .ai{display:flex;justify-content:center;width:100%;height:100%;min-height:0}
+    .ai-chat{display:flex;flex-direction:column;min-height:0;width:min(780px,100%);border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.6)}
+    .ai-head{display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid #1d1d1d}
+    .ai-title{flex:1;display:flex;flex-direction:column;gap:4px;font-family:'Michroma','IBM Plex Mono',sans-serif;font-size:11px;letter-spacing:.22em;min-width:0}
+    .ai-head .ai-status{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.16em;color:#888}
+    .ai-mini{position:relative;width:128px;aspect-ratio:16/9;background:#000;border:1px solid #333;cursor:pointer;flex:none}
+    .ai-mini img{width:100%;height:100%;object-fit:cover;display:block}
+    .ai-mini span{position:absolute;left:3px;bottom:2px;font-size:7px;letter-spacing:.12em;color:#ccc;background:rgba(0,0,0,.7);padding:0 3px;white-space:nowrap;max-width:120px;overflow:hidden}
+    .ai-mini.off{width:60px;aspect-ratio:auto;height:22px}.ai-mini.off img{display:none}.ai-mini.off span{position:static;font-size:8px;line-height:20px;padding:0 6px}
     .ai-head .gen-btn{padding:4px 8px}
     .ai-log{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:9px;font-size:12px;line-height:1.55;text-transform:none;letter-spacing:.02em}
     .ai-msg{white-space:pre-wrap;word-break:break-word}
@@ -1957,9 +1959,10 @@
     <!-- AI Tab: chat to the agent; it plays the mixer. Every other tab still works by hand. -->
     <div class="tab-content active" id="aiTab">
       <div class="ai">
-        <div class="ai-stage"><img id="aiMonitor" alt=""><div class="ai-now" id="aiNow">OUTPUT</div></div>
         <div class="ai-chat">
-          <div class="ai-head"><span>V3XV0ID AGENT</span><span class="ai-status" id="aiStatus">READY</span><button id="aiNew" class="gen-btn">NEW CHAT</button></div>
+          <div class="ai-head"><div class="ai-title"><span>V3XV0ID AGENT</span><span class="ai-status" id="aiStatus">READY</span></div>
+            <div class="ai-mini" id="aiMini" title="What the audience sees. Click to hide."><img id="aiMonitor" alt=""><span id="aiNow">OUTPUT</span></div>
+            <button id="aiNew" class="gen-btn">NEW CHAT</button></div>
           <div class="ai-log" id="aiLog"></div>
           <div class="ai-in"><textarea id="aiInput" rows="3" placeholder="Tell the mixer what you want to see..."></textarea><button id="aiSend" class="gen-btn hot">SEND</button></div>
         </div>
@@ -5385,12 +5388,15 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
       setInterval(async () => {
         if (document.hidden || !aiEl('aiTab').classList.contains('active')) return;
         try {
-          const b64 = await ipcRenderer.invoke('output-frame', Math.round(aiEl('aiMonitor').parentElement.clientWidth * (window.devicePixelRatio || 1)));
+          if (aiEl('aiMini').classList.contains('off')) return;
+          const b64 = await ipcRenderer.invoke('output-frame', 256);
           if (b64) aiEl('aiMonitor').src = 'data:image/jpeg;base64,' + b64;
           const snap = vxSnapshot();
           aiEl('aiNow').textContent = document.querySelector('#outputPreview .preview-row-label')?.textContent || `OUTPUT · DECK ${snap.deck}`;
         } catch (e) {}
-      }, 120);
+      }, 250);
+      aiEl('aiMini').addEventListener('click', () => { const off = aiEl('aiMini').classList.toggle('off'); if (off) aiEl('aiNow').textContent = 'SHOW'; try { localStorage.setItem(AI_STORE + '.mini', off ? 'off' : 'on'); } catch (e) {} });
+      try { if (localStorage.getItem(AI_STORE + '.mini') === 'off') { aiEl('aiMini').classList.add('off'); aiEl('aiNow').textContent = 'SHOW'; } } catch (e) {}
 
       // ===== MINT: sketches (PATTERNS) and sets (COMPOSER) as 1Sat inscriptions through bWalletX =====
       async function mintWallet(statusFn) {
