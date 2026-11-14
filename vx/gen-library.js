@@ -361,47 +361,57 @@ function draw() {
   }
 }`);
 
-  add('LIQUID CHROME', '3d · lit · bass', ['MELT', 'DETAIL', 'FLOW', 'GLOSS'], `
-// A sphere of liquid metal: 3D noise pushes the surface out, the bass swells it, every kick ripples it.
-let rip = 0;
-const det = 60;
-function surf(th, ph, R, t) {
-  const x = sin(th) * cos(ph), y = cos(th), z = sin(th) * sin(ph), k = 0.7 + vx.b * 2.3;
-  const d = (noise(x * k + 10, y * k + 10, z * k + t) - 0.5) * (0.6 + vx.bass * 1.4) + sin(th * 9 - rip * 12) * rip * 0.07;
-  const r = R * (1 + d * (0.35 + vx.a * 1.1));
-  return [x * r, y * r, z * r];
-}
-function setup() { createCanvas(windowWidth, windowHeight, WEBGL); }
-function draw() {
-  background(0);
-  if (vx.kick) rip = 1;
-  rip *= 0.93;
-  const R = min(width, height) * 0.27, t = vx.t * (0.15 + vx.c * 1.2);
-  rotateY(vx.t * 0.2); rotateX(sin(vx.t * 0.13) * 0.4);
-  ambientLight(45);
-  directionalLight(230, 230, 230, 0.4, 0.7, -0.6);   // key, from the top left
-  directionalLight(150, 150, 150, -0.8, -0.2, 0.5);  // rim, from behind
-  pointLight(255, 255, 255, -width * 0.6, -height * 0.8, 600);
-  noStroke(); fill(110); specularMaterial(255); shininess(15 + vx.d * 160);
-  const P = [];
-  for (let i = 0; i <= det; i++) { P.push([]); for (let j = 0; j <= det; j++) P[i].push(surf(PI * (0.0001 + i) / (det + 0.0002), TWO_PI * j / det, R, t)); }
-  // surface normals from the neighbours, so the displaced shape catches the light
-  const N = P.map((row, i) => row.map((q, j) => {
-    const a = P[min(det, i + 1)][j], b = P[max(0, i - 1)][j], c = row[(j + 1) % det], e = row[(j - 1 + det) % det];
-    const u = [a[0] - b[0], a[1] - b[1], a[2] - b[2]], v = [c[0] - e[0], c[1] - e[1], c[2] - e[2]];
-    let n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
-    if (n[0] * q[0] + n[1] * q[1] + n[2] * q[2] < 0) n = n.map(x => -x);
-    return n;
-  }));
-  for (let i = 0; i < det; i++) {
-    beginShape(TRIANGLE_STRIP);
-    for (let j = 0; j <= det; j++) {
-      const a = P[i][j], b = P[i + 1][j], na = N[i][j], nb = N[i + 1][j];
-      normal(na[0], na[1], na[2]); vertex(a[0], a[1], a[2]);
-      normal(nb[0], nb[1], nb[2]); vertex(b[0], b[1], b[2]);
-    }
-    endShape();
+  add('LIQUID CHROME', '3d · shader · bass', ['BLOBS', 'MELT', 'FLOW', 'GLOSS'], `
+// Liquid chrome on the GPU: ray-marched metaballs melting into each other, reflecting a studio of strip lights.
+// The bass swells it, kicks ripple the surface. (A fragment shader: smooth at full resolution.)
+const V = 'precision highp float; attribute vec3 aPosition; void main() { vec4 p = vec4(aPosition, 1.0); p.xy = p.xy * 2.0 - 1.0; gl_Position = p; }';
+const F = \`precision highp float;
+uniform vec2 uRes; uniform float uT, uBass, uPulse, uA, uB, uC, uD;
+float smin(float a, float b, float k) { float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0); return mix(b, a, h) - k * h * (1.0 - h); }
+float map(vec3 p) {
+  float t = uT * (0.25 + uC * 1.1);
+  float d = length(p) - (0.85 + uBass * 0.3 + uPulse * 0.08);
+  for (int i = 0; i < 6; i++) {
+    float fi = float(i);
+    if (fi > 1.0 + uA * 5.0) break;
+    vec3 c = vec3(sin(t * 0.7 + fi * 1.7), cos(t * 0.9 + fi * 2.3), sin(t * 0.5 + fi * 3.1)) * (0.7 + uA * 0.7);
+    d = smin(d, length(p - c) - (0.32 + 0.12 * sin(fi * 1.3 + t)), 0.35 + uB * 0.7);
   }
+  return d + sin(p.x * 7.0 + uT * 3.0) * sin(p.y * 7.0) * sin(p.z * 7.0) * 0.025 * uPulse;
+}
+vec3 nrm(vec3 p) { vec2 e = vec2(0.0015, 0.0); return normalize(vec3(map(p + e.xyy) - map(p - e.xyy), map(p + e.yxy) - map(p - e.yxy), map(p + e.yyx) - map(p - e.yyx))); }
+float env(vec3 r) {
+  float v = 0.07 + 0.75 * smoothstep(-0.25, 1.0, r.y);
+  float a = atan(r.z, r.x);
+  v += pow(max(0.0, sin(a * 3.0 + uT * 0.15)), 60.0) * smoothstep(-0.2, 0.5, r.y) * 1.6;
+  v += smoothstep(0.96, 1.0, r.y) * 1.2;
+  v *= 1.0 - 0.55 * smoothstep(0.0, -0.6, r.y);
+  v += 0.12 * smoothstep(-0.2, -0.05, r.y) * (1.0 - smoothstep(-0.05, 0.1, r.y)); // horizon line
+  return v;
+}
+void main() {
+  vec2 uv = (gl_FragCoord.xy * 2.0 - uRes) / uRes.y;
+  float ca = cos(uT * 0.12), sa = sin(uT * 0.12);
+  vec3 ro = vec3(4.0 * sa, 0.4, 4.0 * ca), fw = normalize(-ro), rt = normalize(cross(vec3(0.0, 1.0, 0.0), fw)), up = cross(fw, rt);
+  vec3 rd = normalize(fw * 1.9 + rt * uv.x + up * uv.y);
+  float t = 0.0, hit = 0.0;
+  for (int i = 0; i < 90; i++) { float d = map(ro + rd * t); if (d < 0.001) { hit = 1.0; break; } t += d * 0.9; if (t > 9.0) break; }
+  float col = 0.0;
+  if (hit > 0.5) {
+    vec3 p = ro + rd * t, n = nrm(p), r = reflect(rd, n);
+    float fres = pow(1.0 - max(dot(n, -rd), 0.0), 3.0);
+    col = env(r) * (0.55 + 0.45 * uD) + fres * 0.35 + max(dot(n, normalize(vec3(-0.5, 0.8, 0.4))), 0.0) * 0.08 * (1.0 - uD);
+  } else col = 0.02 * (1.0 - length(uv) * 0.4);
+  gl_FragColor = vec4(vec3(col), 1.0);
+}\`;
+let sh, bass = 0;
+function setup() { createCanvas(windowWidth, windowHeight, WEBGL); sh = createShader(V, F); noStroke(); }
+function draw() {
+  bass += (vx.bass - bass) * 0.15;
+  shader(sh);
+  sh.setUniform('uRes', [width, height]); sh.setUniform('uT', vx.t); sh.setUniform('uBass', bass); sh.setUniform('uPulse', vx.pulse);
+  sh.setUniform('uA', vx.a); sh.setUniform('uB', vx.b); sh.setUniform('uC', vx.c); sh.setUniform('uD', vx.d);
+  rect(0, 0, width, height);
 }`);
 
   add('SHARD STORM', '3d · lit · kick', ['COUNT', 'SPREAD', 'SPEED', 'ROLL'], `
