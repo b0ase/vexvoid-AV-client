@@ -467,5 +467,260 @@ function draw() {
   }
 }`);
 
+  // ---- preset pack (14 Nov): more variety for the VEXVOID gallery ----
+  add('CODE RAIN', 'type · high', ['DENSITY', 'SIZE', 'SPEED', 'TRAIL'], `
+// Columns of glyphs falling; the hats and the level push the speed, kicks flash a column white.
+let cols = [], last = 0;
+const G = '01アイウエオカキクケコサシスセソ<>/\\\\|=+-*V3X';
+function setup() { createCanvas(windowWidth, windowHeight); textFont('monospace'); }
+function draw() {
+  const s = 10 + vx.b * 22, n = floor(width / s * (0.4 + vx.a * 0.6));
+  if (cols.length !== n) cols = Array.from({ length: n }, () => ({ y: random(-height, 0), v: random(0.5, 1.5), hot: 0 }));
+  background(0, 255 * (0.12 + (1 - vx.d) * 0.6));
+  textSize(s); textAlign(CENTER, TOP); noStroke();
+  cols.forEach((c, i) => {
+    if (vx.kick && random() < 0.08) c.hot = 1;
+    c.y += c.v * s * (0.15 + vx.c * 0.8 + vx.high * 0.8);
+    if (c.y > height + s * 10) { c.y = random(-height * 0.5, 0); c.v = random(0.5, 1.5); }
+    for (let k = 0; k < 12; k++) {
+      fill(255, (k === 0 ? 255 : 160 - k * 12) * (c.hot ? 1 : 0.8));
+      text(G[floor(random(G.length))], (i + 0.5) * width / n, c.y - k * s);
+    }
+    c.hot *= 0.9;
+  });
+}`);
+
+  add('STATIC STORM', 'noise · kick', ['BLOCKS', 'SIZE', 'BANDS', 'DECAY'], `
+// Blocks of static that thicken with the level; a kick tears a band across the screen.
+let band = 0, by = 0;
+function setup() { createCanvas(windowWidth, windowHeight); noStroke(); }
+function draw() {
+  background(0, 60 + vx.d * 195);
+  const n = floor(80 + vx.a * 900 * (0.3 + vx.level)), s = 2 + vx.b * 24;
+  for (let i = 0; i < n; i++) { fill(random(255), random(40, 220)); rect(random(width), random(height), s * random(0.5, 4), s * random(0.3, 1)); }
+  if (vx.kick) { band = 1; by = random(height); }
+  if (band > 0.05) {
+    const h = height * (0.04 + vx.c * 0.3) * band;
+    for (let x = 0; x < width; x += s * 2) { fill(255 * random(0.4, 1)); rect(x, by - h / 2 + random(-4, 4), s * 2, h); }
+    band *= 0.82;
+  }
+}`);
+
+  add('PLASMA LINES', 'waves · bass', ['LINES', 'FOLD', 'SPEED', 'GLOW'], `
+// Stacked contour lines of a moving field; the bass deepens the folds.
+function setup() { createCanvas(windowWidth, windowHeight); noFill(); }
+function draw() {
+  background(0);
+  const rows = floor(20 + vx.a * 60), t = vx.t * (0.2 + vx.c), amp = height * (0.02 + vx.b * 0.12) * (1 + vx.bass * 2);
+  for (let r = 0; r < rows; r++) {
+    const y0 = (r + 0.5) * height / rows;
+    stroke(255, 60 + 195 * vx.d * (r % 4 === 0 ? 1 : 0.4)); strokeWeight(r % 4 === 0 ? 1.6 : 0.8);
+    beginShape();
+    for (let x = 0; x <= width; x += 8) {
+      const v = sin(x * 0.006 + t + r * 0.3) + sin(x * 0.011 - t * 1.3 + r * 0.17) + noise(x * 0.003, r * 0.1, t * 0.3) * 2;
+      vertex(x, y0 + v * amp);
+    }
+    endShape();
+  }
+}`);
+
+  add('NEURAL NET', 'nodes · mid', ['NODES', 'REACH', 'SPEED', 'PULSES'], `
+// Drifting nodes linked by distance; signals run along the links on every kick.
+let N = [], P = [];
+function setup() { createCanvas(windowWidth, windowHeight); }
+function draw() {
+  const n = floor(30 + vx.a * 170);
+  while (N.length < n) N.push({ x: random(width), y: random(height), a: random(TWO_PI) });
+  N.length = n;
+  background(0);
+  const reach = min(width, height) * (0.06 + vx.b * 0.2), sp = 0.3 + vx.c * 2 + vx.mid * 2;
+  N.forEach(p => { p.a += noise(p.x * 0.002, p.y * 0.002, vx.t * 0.1) - 0.5; p.x = (p.x + cos(p.a) * sp + width) % width; p.y = (p.y + sin(p.a) * sp + height) % height; });
+  strokeWeight(1);
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+    const d = dist(N[i].x, N[i].y, N[j].x, N[j].y);
+    if (d < reach) {
+      stroke(255, 160 * (1 - d / reach)); line(N[i].x, N[i].y, N[j].x, N[j].y);
+      if (vx.kick && random() < 0.02 + vx.d * 0.1) P.push({ a: N[i], b: N[j], t: 0 });
+    }
+  }
+  noStroke(); fill(255);
+  N.forEach(p => circle(p.x, p.y, 2.5));
+  P = P.filter(q => (q.t += 0.05) < 1);
+  P.forEach(q => circle(lerp(q.a.x, q.b.x, q.t), lerp(q.a.y, q.b.y, q.t), 6));
+}`);
+
+  add('FLOOR GRID', '3d · speed', ['DENSITY', 'HEIGHT', 'SPEED', 'ROLL'], `
+// An endless technical floor grid rushing under the camera; the bass lifts ridges out of it.
+let z = 0;
+function setup() { createCanvas(windowWidth, windowHeight, WEBGL); }
+function draw() {
+  background(0);
+  const n = floor(16 + vx.a * 40), cell = max(width, height) * 2 / n;
+  z = (z + cell * (0.02 + vx.c * 0.25) * (1 + vx.pulse)) % cell;
+  rotateX(PI / 2.6); rotateZ(sin(vx.t * 0.2) * vx.d * 0.5);
+  translate(0, -cell * n / 2 + z, -height * 0.25);
+  noFill();
+  for (let j = 0; j < n; j++) {
+    stroke(255, 255 * (j / n)); strokeWeight(1);
+    beginShape();
+    for (let i = 0; i <= n; i++) {
+      const x = (i - n / 2) * cell, y = j * cell;
+      const h = noise(i * 0.2, (j - z / cell) * 0.2, vx.t * 0.2) * cell * (vx.b * 3) * (0.4 + vx.bass * 2);
+      vertex(x, y, h);
+    }
+    endShape();
+  }
+}`);
+
+  add('SPECTRUM', 'audio · bars', ['BARS', 'GAIN', 'FALL', 'MIRROR'], `
+// A spectrum analyser look: bars across the floor, low end on the left, peaks that hang and fall.
+let pk = [];
+function setup() { createCanvas(windowWidth, windowHeight); noStroke(); }
+function draw() {
+  background(0);
+  const n = floor(16 + vx.a * 112), w = width / n;
+  if (pk.length !== n) pk = new Array(n).fill(0);
+  for (let i = 0; i < n; i++) {
+    const f = i / n, band = f < 0.33 ? vx.bass : f < 0.66 ? vx.mid : vx.high;
+    const v = constrain(band * (0.6 + vx.b * 2) * (0.7 + noise(i * 0.3, vx.t * 3) * 0.6) + vx.pulse * 0.15, 0, 1);
+    pk[i] = max(pk[i] - (0.005 + vx.c * 0.03), v);
+    const h = v * height * 0.85;
+    fill(255, 220);
+    if (vx.d > 0.5) { rect(i * w + 1, height / 2 - h / 2, w - 2, h); fill(255); rect(i * w + 1, height / 2 - pk[i] * height * 0.425 - 2, w - 2, 2); }
+    else { rect(i * w + 1, height - h, w - 2, h); fill(255); rect(i * w + 1, height - pk[i] * height * 0.85 - 3, w - 2, 2); }
+  }
+}`);
+
+  add('OSCILLOSCOPE', 'audio · lines', ['TRACES', 'GAIN', 'SPEED', 'PERSIST'], `
+// Oscilloscope traces: stacked waves that bite with the level and split apart on the kick.
+function setup() { createCanvas(windowWidth, windowHeight); noFill(); }
+function draw() {
+  background(0, 30 + (1 - vx.d) * 225);
+  const traces = 1 + floor(vx.a * 5), amp = height * (0.05 + vx.b * 0.3) * (0.3 + vx.level * 1.4), t = vx.t * (1 + vx.c * 8);
+  for (let k = 0; k < traces; k++) {
+    stroke(255, 255 - k * 30); strokeWeight(k ? 1 : 2);
+    const off = (k - (traces - 1) / 2) * height * 0.12 * (1 + vx.pulse * 2);
+    beginShape();
+    for (let x = 0; x <= width; x += 3) {
+      const u = x / width * TWO_PI * (2 + k);
+      vertex(x, height / 2 + off + (sin(u + t) * 0.6 + sin(u * 3.1 - t * 1.7) * 0.3 * vx.high + sin(u * 0.5 + t * 0.3) * vx.bass) * amp);
+    }
+    endShape();
+  }
+}`);
+
+  add('RADAR', 'telemetry · kick', ['RINGS', 'SWEEP', 'SPEED', 'BLIPS'], `
+// A radar scope: rings, a sweeping beam with a fading wake, contacts that appear on the kicks.
+let blips = [];
+function setup() { createCanvas(windowWidth, windowHeight); }
+function draw() {
+  background(0);
+  translate(width / 2, height / 2);
+  const R = min(width, height) * 0.46, a = vx.t * (0.5 + vx.c * 3), rings = 2 + floor(vx.a * 8);
+  noFill(); stroke(255, 70); strokeWeight(1);
+  for (let i = 1; i <= rings; i++) circle(0, 0, 2 * R * i / rings);
+  line(-R, 0, R, 0); line(0, -R, 0, R);
+  const wake = 0.3 + vx.b * 1.2;
+  for (let k = 0; k < 40; k++) { stroke(255, 200 * (1 - k / 40)); const b = a - k * wake / 40; line(0, 0, cos(b) * R, sin(b) * R); }
+  if (vx.kick) for (let i = 0; i < 1 + floor(vx.d * 6); i++) blips.push({ a: a - random(0.05), r: random(0.15, 0.95) * R, life: 1 });
+  noStroke();
+  blips = blips.filter(p => (p.life -= 0.006) > 0);
+  blips.forEach(p => { fill(255, 255 * p.life); circle(cos(p.a) * p.r, sin(p.a) * p.r, 8); noFill(); stroke(255, 120 * p.life); circle(cos(p.a) * p.r, sin(p.a) * p.r, 30 * (1 - p.life) + 8); noStroke(); });
+}`);
+
+  add('STARFIELD', '3d · speed', ['STARS', 'STREAK', 'SPEED', 'SPIN'], `
+// Flying through stars; the level is the throttle, kicks jump to light speed for a moment.
+let S = [];
+function setup() { createCanvas(windowWidth, windowHeight); }
+function draw() {
+  const n = floor(200 + vx.a * 2300);
+  while (S.length < n) S.push({ x: random(-1, 1), y: random(-1, 1), z: random(0.05, 1) });
+  S.length = n;
+  background(0, 255 * (0.25 + (1 - vx.b) * 0.75));
+  translate(width / 2, height / 2); rotate(vx.t * (vx.d - 0.5) * 0.4);
+  const sp = 0.002 + vx.c * 0.02 + vx.level * 0.01 + vx.pulse * 0.03, k = max(width, height) * 0.5;
+  S.forEach(s => {
+    const pz = s.z; s.z -= sp;
+    if (s.z <= 0.02) { s.x = random(-1, 1); s.y = random(-1, 1); s.z = 1; return; }
+    stroke(255, 255 * (1 - s.z)); strokeWeight(max(0.5, 2.5 * (1 - s.z)));
+    line(s.x / pz * k, s.y / pz * k, s.x / s.z * k, s.y / s.z * k);
+  });
+}`);
+
+  add('KALEIDO', 'symmetry · mid', ['SEGMENTS', 'ZOOM', 'SPIN', 'DETAIL'], `
+// A kaleidoscope of thin strokes: one wedge drawn from noise, mirrored round the centre.
+function setup() { createCanvas(windowWidth, windowHeight); noFill(); }
+function draw() {
+  background(0);
+  translate(width / 2, height / 2);
+  const seg = 2 * (3 + floor(vx.a * 9)), R = min(width, height) * 0.5 * (0.6 + vx.b * 0.8), lines = 6 + floor(vx.d * 24);
+  rotate(vx.t * (vx.c - 0.5) * 0.6);
+  for (let s = 0; s < seg; s++) {
+    push(); rotate(TWO_PI * s / seg); if (s % 2) scale(1, -1);
+    for (let l = 0; l < lines; l++) {
+      stroke(255, 60 + 195 * (l / lines)); strokeWeight(l % 5 ? 0.8 : 1.8);
+      beginShape();
+      for (let r = 0; r < R; r += R / 40) {
+        const a = (noise(l * 0.3, r * 0.004, vx.t * 0.3) - 0.5) * PI / seg * 2 * (1 + vx.mid);
+        vertex(cos(a) * r, sin(a) * r);
+      }
+      endShape();
+    }
+    pop();
+  }
+}`);
+
+  add('HEX GRID', 'grid · kick', ['CELLS', 'WAVE', 'SPEED', 'FILL'], `
+// A honeycomb that lights in rings from the centre on every kick.
+let waves = [];
+function hex(x, y, r) { beginShape(); for (let i = 0; i < 6; i++) vertex(x + r * cos(PI / 3 * i + PI / 6), y + r * sin(PI / 3 * i + PI / 6)); endShape(CLOSE); }
+function setup() { createCanvas(windowWidth, windowHeight); }
+function draw() {
+  background(0);
+  const r = min(width, height) / (8 + vx.a * 40), w = sqrt(3) * r, h = 1.5 * r;
+  if (vx.kick) waves.push(0);
+  waves = waves.map(v => v + (4 + vx.c * 20)).filter(v => v < max(width, height));
+  for (let y = 0, row = 0; y < height + h; y += h, row++) for (let x = (row % 2) * w / 2; x < width + w; x += w) {
+    const d = dist(x, y, width / 2, height / 2);
+    let g = 0; waves.forEach(v => { g = max(g, 1 - abs(d - v) / (r * (1 + vx.b * 6))); });
+    g = max(g, noise(x * 0.004, y * 0.004, vx.t * 0.2) * vx.level * 0.6);
+    stroke(255, 40 + 200 * g); strokeWeight(1);
+    if (g > 0.3 && vx.d > 0.2) fill(255, 255 * g * vx.d); else noFill();
+    hex(x, y, r * 0.92);
+  }
+}`);
+
+  add('LIGHT BEAMS', 'stage · bass', ['BEAMS', 'WIDTH', 'SWING', 'HAZE'], `
+// Stage beams from the floor cutting through haze, swinging on the music; the kick snaps them up.
+function setup() { createCanvas(windowWidth, windowHeight); noStroke(); blendMode(ADD); }
+function draw() {
+  blendMode(BLEND); background(0); blendMode(ADD);
+  const n = 2 + floor(vx.a * 14), wid = 0.02 + vx.b * 0.12;
+  for (let i = 0; i < n; i++) {
+    const bx = (i + 0.5) * width / n, sw = sin(vx.t * (0.3 + vx.c * 2) + i * 1.3) * 0.6 * (0.5 + vx.bass), a = -HALF_PI + sw + (vx.pulse * (i % 2 ? 0.2 : -0.2));
+    for (let k = 0; k < 6; k++) {
+      fill(255, (12 + vx.d * 18) * (1 - k / 6) * (0.6 + vx.level));
+      const L = height * 1.6, half = wid * (1 + k * 0.6);
+      triangle(bx, height, bx + cos(a - half) * L, height + sin(a - half) * L, bx + cos(a + half) * L, height + sin(a + half) * L);
+    }
+  }
+}`);
+
+  add('TYPE SLAM', 'type · kick', ['SIZE', 'WORDS', 'HOLD', 'SPLIT'], `
+// One word slams onto the screen on each kick and shudders out; the words are the VexVoid vocabulary.
+const W = ['V3XV0ID', 'VOID', 'SIGNAL', 'NOISE', 'NIGHT', 'CONCRETE', 'STATIC', 'NO FACE', 'LIVE', 'OUTPUT'];
+let w = 'V3XV0ID', hit = 0, i = 0;
+function setup() { createCanvas(windowWidth, windowHeight); textAlign(CENTER, CENTER); textStyle(BOLD); }
+function draw() {
+  background(0);
+  if (vx.kick) { hit = 1; i = (i + 1) % max(1, floor(1 + vx.b * (W.length - 1))); w = W[i]; }
+  const s = min(width / max(4, w.length) * 1.5, height * 0.5) * (0.5 + vx.a * 0.6) * (1 + hit * 0.25);
+  textSize(s); noStroke();
+  const split = vx.d * 40 * hit;
+  fill(255, 90); text(w, width / 2 - split, height / 2); text(w, width / 2 + split, height / 2);
+  fill(255, 255 * max(0.15, hit)); text(w, width / 2 + random(-6, 6) * hit, height / 2 + random(-4, 4) * hit);
+  hit *= 0.86 + vx.c * 0.12;
+}`);
+
   root.VXGEN_LIBRARY = L;
 })(typeof window !== 'undefined' ? window : this);
