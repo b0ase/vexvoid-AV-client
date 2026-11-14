@@ -1921,6 +1921,7 @@
   <div class="v3xv0id-header">
     <div class="v3xv0id-brand">V3XV0ID</div>
     <div class="v3xv0id-subtitle">AV MIXER</div>
+    <button id="recChip" class="midi-chip" title="Record the output and the music to a video file">REC</button>
     <button id="liveChip" class="midi-chip" title="Stream the output, pay per view">GO LIVE</button>
     <button id="bwxChip" class="midi-chip bwx-chip">CONNECT bWALLETX</button>
     <button id="claudeChip" class="midi-chip" title="Control this mixer from claude.ai">CLAUDE.AI</button>
@@ -4168,7 +4169,7 @@
       async function initializeVideosTab() {
         const local = videoLibrary.filter(v => v.source === 'local' && !/^GROK · /.test(v.name));
         const mine = walletMedia('clip').map(i => ({ name: 'WALLET · ' + i.name, url: i.url, format: (i.contentType.split('/')[1] || 'VIDEO').toUpperCase(), source: 'wallet', origin: i.origin }));
-        videoLibrary = mine.concat(grokFiles('video'), catalogue().clips.map(c => ({ name: c.name, url: c.url, format: 'MP4', source: c.set || 'smooth' })), local);
+        videoLibrary = mine.concat(typeof recordedFiles === 'function' ? recordedFiles() : [], grokFiles('video'), catalogue().clips.map(c => ({ name: c.name, url: c.url, format: 'MP4', source: c.set || 'smooth' })), local);
         videoLibrary.forEach((v, i) => { v.id = i; });
         document.getElementById('videoCloudStatus').textContent = `● V3XV0ID CLIPS · ${videoLibrary.length - mine.length}` + (mine.length ? ` · YOUR WALLET · ${mine.length}` : '');
         renderVideoLibrary();
@@ -5364,6 +5365,64 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       mkEl('mkSearch').addEventListener('keydown', e => e.stopPropagation());
       renderMarketDetail(null);
 
+      // ===== RECORD: the output plus the playing music, saved as a video file (a music video rendered live) =====
+      // Same capture as GO LIVE (the output window; macOS asks for Screen Recording the first time). WebM from the
+      // recorder, then an MP4 for sharing when ffmpeg is on this computer.
+      const recDir = require('path').join(require('@electron/remote').app.getPath('userData'), 'videos');
+      const rec = { mr: null, chunks: [], title: '', t0: 0, tracks: [], done: null };
+      function recordedFiles() {
+        const fs = require('fs'), path = require('path');
+        if (!fs.existsSync(recDir)) return [];
+        const all = fs.readdirSync(recDir).filter(f => /\.(mp4|webm)$/i.test(f));
+        return all.filter(f => !(f.endsWith('.webm') && all.includes(f.replace(/\.webm$/, '.mp4')))).sort().reverse()
+          .map(f => ({ name: 'RECORDED · ' + f.replace(/^\d{4}-\d\d-\d\dT[\d-]+-/, '').replace(/\.(mp4|webm)$/, '').replace(/-/g, ' ').toUpperCase(), url: path.join(recDir, f), format: f.split('.').pop().toUpperCase(), source: 'local' }));
+      }
+      function recChip() { const c = document.getElementById('recChip'); if (!c) return; c.classList.toggle('on', !!rec.mr); c.textContent = rec.mr ? '● REC ' + mmss((Date.now() - rec.t0) / 1000) : 'REC'; }
+      setInterval(() => { if (rec.mr) recChip(); }, 500);
+      async function startRecording(title) {
+        if (rec.mr) throw new Error('already recording');
+        const sourceId = await ipcRenderer.invoke('get-output-source-id');
+        if (!sourceId) throw new Error('output window not found');
+        const video = await navigator.mediaDevices.getUserMedia({ audio: false, video: { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: sourceId, maxWidth: 1920, maxHeight: 1080, maxFrameRate: 30 } } });
+        const tracks = video.getTracks();
+        if (currentAudio && currentAudio.captureStream && !currentAudio.paused) tracks.push(...currentAudio.captureStream().getAudioTracks());
+        const mime = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find(m => MediaRecorder.isTypeSupported(m));
+        rec.mr = new MediaRecorder(new MediaStream(tracks), { mimeType: mime, videoBitsPerSecond: 12e6, audioBitsPerSecond: 256e3 });
+        rec.chunks = []; rec.title = String(title || 'V3XV0ID').slice(0, 60); rec.t0 = Date.now(); rec.tracks = tracks;
+        rec.mr.ondataavailable = e => { if (e.data && e.data.size) rec.chunks.push(e.data); };
+        rec.done = new Promise(res => { rec.mr.onstop = res; });
+        rec.mr.start(1000); recChip();
+        return { recording: true, audio: tracks.some(t => t.kind === 'audio') };
+      }
+      async function stopRecording() {
+        if (!rec.mr) throw new Error('not recording');
+        const fs = require('fs'), path = require('path');
+        rec.mr.stop(); await rec.done; rec.tracks.forEach(t => t.stop());
+        const seconds = Math.round((Date.now() - rec.t0) / 1000);
+        const buf = Buffer.from(await new Blob(rec.chunks).arrayBuffer());
+        rec.mr = null; rec.chunks = []; recChip();
+        fs.mkdirSync(recDir, { recursive: true });
+        const slug = rec.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'v3xv0id';
+        const base = path.join(recDir, `${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}-${slug}`);
+        fs.writeFileSync(base + '.webm', buf);
+        let file = base + '.webm';
+        const ff = ['/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/usr/bin/ffmpeg'].find(p => fs.existsSync(p));
+        if (ff) {
+          try {
+            await new Promise((res, rej) => require('child_process').execFile(ff, ['-y', '-i', base + '.webm', '-vf', 'scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,setsar=1', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '18', '-preset', 'medium',
+              '-c:a', 'aac', '-b:a', '256k', '-movflags', '+faststart', base + '.mp4'], { maxBuffer: 1 << 24 }, e => e ? rej(e) : res()));
+            file = base + '.mp4';
+          } catch (e) { console.warn('ffmpeg', e.message); }
+        }
+        initializeVideosTab();
+        return { file, seconds, mb: Math.round(fs.statSync(file).size / 1e6) };
+      }
+      document.getElementById('recChip').addEventListener('click', async () => {
+        try { if (rec.mr) { const r = await stopRecording(); alertNote(`Saved ${r.seconds}s to VIDEOS: ${r.file.split('/').pop()}`); } else await startRecording('V3XV0ID ' + new Date().toISOString().slice(0, 10)); }
+        catch (e) { alertNote('REC: ' + e.message); }
+      });
+      function alertNote(t) { const c = document.getElementById('recChip'); c.title = t; if (typeof aiLine === 'function' && document.getElementById('aiTab').classList.contains('active')) aiLine('tool', t); }
+
       // ===== AI: the agent that plays the mixer (vx/agent.js). The performer chats; the agent drives the same commands as
       // every other control (VXCMD), looks at the output to check its work, writes sketches and sets, and makes new images
       // and video with Grok Imagine only after the performer approves each one (xAI bills the performer's key).
@@ -5393,6 +5452,7 @@ How to work:
 - After you change the screen, use look to check it, and fix anything that's wrong (wrong deck live, black screen, a sketch error).
 - Prefer library sketches and clips. Write a new sketch (write_sketch) when nothing in the library fits. Use generate only when the performer asks for new footage or images, or clearly wants something the library can't give: it costs real money and the performer approves every one. If they decline, carry on without it.
 - For a timed show (an intro, a build, a whole track), use compose_set: steps on bars, played against the tempo.
+- To make a music video: load the track (load_track, or one from the catalogue), set the tempo to the track's, prepare the looks (sketches, clips, generated media), compose a set that follows the song's sections, check it with look, then start the track and the set together and record until the track ends. Tell the person what you're about to do and roughly how long it takes before you start recording.
 - Never mint, list, buy, spend or go live. Those stay with the performer and their wallet.
 
 The VexVoid look: monochrome black and white, precise and technical, modern motion graphics. Never retro, never pixel art, never colour unless asked. In generated media, people are seen from behind, faces never shown.
@@ -5415,6 +5475,10 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
           { name: 'compose_set', description: 'Write a timed set into the composer (bars of 4 beats at the given tempo) and optionally start it. Each step is a mixer command on a bar, e.g. {"bar": 1, "cmd": "sketch", "args": {"name": "TERRAIN", "deck": "A"}}, {"bar": 9, "cmd": "fade", "args": {"value": 100, "over": 8}}, {"bar": 17, "cmd": "cut", "args": {"deck": "A"}}. Steps can use any mixer command; a sketch step may carry "code" instead of a library name.',
             input_schema: { type: 'object', properties: { title: { type: 'string' }, bpm: { type: 'number' }, steps: { type: 'array', items: { type: 'object', properties: { bar: { type: 'number' }, cmd: { type: 'string' }, args: { type: 'object' } }, required: ['bar', 'cmd'] } },
               play: { type: 'boolean', description: 'Start playing it now (default true)' } }, required: ['title', 'bpm', 'steps'], additionalProperties: false } },
+          { name: 'load_track', description: 'Load an audio file from this computer into MUSIC, by the path the person gives you (mp3, wav, m4a, aif, flac, ogg), and optionally start it. The sketches follow the playing track.',
+            input_schema: { type: 'object', properties: { path: { type: 'string' }, play: { type: 'boolean' } }, required: ['path'], additionalProperties: false } },
+          { name: 'record', description: 'Make a music video: record the output screen together with the playing music into a video file (MP4). Start the track and your set first, then call record with until="track_end" (it returns when the track finishes and the file is saved) or seconds=N. action="stop" ends a recording early. The file lands in VIDEOS. Takes as long as the music.',
+            input_schema: { type: 'object', properties: { action: { type: 'string', enum: ['record', 'stop'] }, title: { type: 'string' }, until: { type: 'string', enum: ['track_end'] }, seconds: { type: 'number' } }, additionalProperties: false } },
           { name: 'project', description: 'Update this piece of work\'s details (only the fields you give change): a short title, the brief (what it is, for whom, the look, the length, anything agreed), and for a show only, its date (YYYY-MM-DD) and venue.',
             input_schema: { type: 'object', properties: { title: { type: 'string' }, date: { type: 'string' }, venue: { type: 'string' }, brief: { type: 'string' } }, additionalProperties: false } },
           { name: 'generate', description: 'Make a new image or a 6-second video with Grok Imagine (xAI). It costs real money on the performer\'s xAI account, so the performer is shown the prompt and the price and approves each one; if they decline, you get told and carry on without it. An image takes about 10 seconds, a video 1 to 3 minutes. The result is saved to the library; give deck to load it straight onto a deck.',
@@ -5459,6 +5523,32 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
           if (input.bpm) window.vxCommand('bpm', { value: input.bpm });
           if (input.play !== false) setPlay();
           return `Set "${input.title}" loaded: ${set.steps.length} steps${input.play !== false ? ', playing from bar 1' : ''}. It is in COMPOSER too.`;
+        }
+        if (name === 'load_track') {
+          const fs = require('fs'), path = require('path'), p = String(input.path || '').replace(/^~(?=\/)/, require('os').homedir());
+          if (!/\.(mp3|wav|m4a|aif|aiff|flac|ogg|aac)$/i.test(p)) throw new Error('not an audio file: ' + p);
+          if (!fs.existsSync(p)) throw new Error('no such file: ' + p);
+          if (!musicLibraryTracks.length) await initializeMusicTab();
+          let t = musicLibraryTracks.find(x => x.url === p);
+          if (!t) { t = { id: musicLibraryTracks.length, name: path.basename(p).replace(/\.[^.]+$/, ''), artist: 'LOCAL', format: p.split('.').pop().toUpperCase(), duration: '--:--', url: p, source: 'local' }; musicLibraryTracks.push(t); renderMusicLibrary(); }
+          if (input.play !== false) playTrack(t.id);
+          return `Loaded "${t.name}"${input.play !== false ? ' and playing it' : ''} (track ${t.id}).`;
+        }
+        if (name === 'record') {
+          if (input.action === 'stop') { const r = await stopRecording(); return `Saved ${r.seconds}s (${r.mb} MB): ${r.file}`; }
+          const started = await startRecording(input.title || (gig && gig.title) || 'V3XV0ID');
+          if (!started.audio) aiLine('err', 'Recording without sound: start the track first next time.');
+          const ms = input.seconds ? Number(input.seconds) * 1000 : null;
+          await new Promise(res => {
+            if (ms) setTimeout(res, ms);
+            else if (input.until === 'track_end' && currentAudio && !currentAudio.paused) currentAudio.addEventListener('ended', res, { once: true });
+            else setTimeout(res, 60000);
+            const poll = setInterval(() => { if (!rec.mr) { clearInterval(poll); res(); } }, 500); // stopped by hand (REC)
+          });
+          if (!rec.mr) return 'The recording was stopped by hand.';
+          const r = await stopRecording();
+          if (gig) { (gig.assets = gig.assets || []).push(r.file); gigSave(); }
+          return `Music video saved: ${r.file} (${r.seconds}s, ${r.mb} MB). It is in VIDEOS.`;
         }
         if (name === 'project') {
           if (!gig) throw new Error('no gig open');
@@ -5519,6 +5609,8 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
         if (name === 'library') return 'looking through ' + input.kind;
         if (name === 'generate') return `Grok ${input.kind}`;
         if (name === 'project') return 'noting it down';
+        if (name === 'load_track') return 'loading ' + String(input.path || '').split('/').pop();
+        if (name === 'record') return input.action === 'stop' ? 'stopping the recording' : 'recording';
         return name;
       }
       function aiApprove(input, est) {
