@@ -13,6 +13,7 @@ let controlWindow = null;
 // One mixer per profile: a second copy would fight over the API port and the output display
 const firstInstance = app.requestSingleInstanceLock();
 if (!firstInstance) {
+  console.log('V3XV0ID is already running: switched to the open mixer window.');
   app.quit();
 } else {
   app.on('second-instance', () => { if (controlWindow) { if (controlWindow.isMinimized()) controlWindow.restore(); controlWindow.focus(); } });
