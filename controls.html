@@ -5596,7 +5596,8 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       function clipTraits(url, set) {
         const n = clipNotes()[url] || {};
         return { energy: n.energy != null ? n.energy : set === 'fast' ? 0.8 : set === 'slow' ? 0.25 : null,
-          phase: n.phase || (set === 'rough' || set === 'smooth' ? set : null), caution: !!n.caution, face: !!n.face, colour: !!n.colour, desc: n.desc || '', subject: n.subject || null };
+          phase: n.phase || (set === 'rough' || set === 'smooth' ? set : null), caution: !!n.caution, face: !!n.face, colour: !!n.colour, desc: n.desc || '', subject: n.subject || null,
+          favourite: !!n.favourite, peak: !!n.peak, filler: !!n.filler };
       }
       // every clip the mixer knows: recordings, Grok, the catalogue, the wallet
       function edPool(source, filter) {
@@ -5865,7 +5866,7 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
           if (k === 'clips') {
             const notes = clipNotes(), any = Object.keys(notes).length;
             return short(catalogue().clips.map(c => { const n = notes[c.url]; if (!any) return `${c.name} [${c.set}]`;
-              return n ? `${c.name} [${n.phase || c.set}, energy ${Math.round((n.energy || 0) * 9)}${n.caution ? ', CAUTION' : ''}${n.face ? ', FACE: never use' : ''}${n.colour ? ', COLOUR: off-look' : ''}${n.landmark ? ', landmark' : ''}] ${n.desc}` : `${c.name} [${c.set}] (no notes)`; }).join('\n'), 24000);
+              return n ? `${c.name} [${n.phase || c.set}, energy ${Math.round((n.energy || 0) * 9)}${n.caution ? ', CAUTION' : ''}${n.face ? ', FACE: never use' : ''}${n.colour ? ', COLOUR: off-look' : ''}${n.favourite ? ', OWNER FAVOURITE' : ''}${n.peak ? ', OWNER: drop shot' : ''}${n.filler ? ', filler' : ''}${n.landmark ? ', landmark' : ''}] ${n.desc}` : `${c.name} [${c.set}] (no notes)`; }).join('\n'), 24000);
           }
           if (k === 'images') return short(catalogue().images.map(c => c.set + '/' + c.name).join(', '), 6000);
           if (k === 'tracks') { if (!musicLibraryTracks.length) await initializeMusicTab(); return short(musicLibraryTracks.map(t => `${t.id}: ${t.name}`).join('\n'), 6000); }

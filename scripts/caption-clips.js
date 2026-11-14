@@ -16,6 +16,15 @@ const NOTES = path.join(ROOT, 'vx', 'clip-notes.json');
 const args = process.argv.slice(2);
 const LIMIT = args.includes('--limit') ? Number(args[args.indexOf('--limit') + 1]) : Infinity;
 const REDO = args.includes('--redo');
+// the owner's own verdicts (vexvoid.com data/studio/curation.json) overrule the model; ids like r04-tracks-6
+const CURATION = args.includes('--curation') ? args[args.indexOf('--curation') + 1] : path.join(ROOT, '..', 'VexVoid', 'vexvoid.com-website', 'data', 'studio', 'curation.json');
+const studioId = name => name.toLowerCase().replace(/^(fast|slow) /, '').replace(/\s+/g, '-');
+function owner(name) {
+  let cur; try { cur = JSON.parse(fs.readFileSync(CURATION, 'utf8')); } catch (e) { return {}; }
+  const id = studioId(name), o = {};
+  ['exclude', 'caution', 'favourite', 'peak', 'filler'].forEach(k => { if (cur[k] && cur[k][id]) o[k] = cur[k][id]; });
+  return o;
+}
 const MODEL = 'claude-opus-5-5';
 const PRICE = { in: 4 / 1e6, out: 20 / 1e6, cacheRead: 0.2 / 1e6 };
 
@@ -44,15 +53,15 @@ const SYSTEM = `You log footage for VexVoid, a black-and-white VJ and music-vide
 - subject: figure (a person is the subject), nobody, glyph (a logo, emblem or ident on black), crowd.
 - energy 0..1: how much moves and how fast (0 a still glide, 1 frantic handheld or explosive action).
 - phase: rough (raw handheld, harsh flash, gritty), bridge (concrete or darkness opening onto one hard light), smooth (calm, pristine, razor-sharp).
-- face: true if any human face is visible in any frame, even partly, in profile, or a lit cheek edge. Be strict: this is the brand's one hard reject. A face fully covered by a mask, balaclava or gas mask is not a face (say "masked" in desc), but any visible skin of the face is.
+- face: visible if the face of a person in the shot can be seen in any frame (features, a profile, or a lit cheek edge under the hood): the brand's one hard reject, so look closely. masked if the face is fully covered (mask, balaclava, respirator) with no skin showing. crowd if the only faces are small, in a background crowd. none if no face shows: figures from behind, hoods in shadow, silhouettes, people too far away to make out.
 - colour: true if the clip is not black and white (any tint or colour), since the house look is monochrome.
 - landmark: true if a recognisable real landmark or skyline appears.
-- caution: true for dark or distressing imagery (self-harm, a person in danger on rails or a ledge, violence).
+- caution: true only for a person in danger from a train or on rail tracks with a train coming, or imagery suggesting self-harm. Heights, climbing, ledges, rooftops, docks, machinery and demolition are the brand's normal world, not caution.
 - use: the best place for it: opener, build, drop, breakdown, outro or ident.`;
 
 const SCHEMA = { type: 'object', additionalProperties: false, required: ['desc', 'subject', 'energy', 'phase', 'face', 'colour', 'landmark', 'caution', 'use'], properties: {
   desc: { type: 'string' }, subject: { type: 'string', enum: ['figure', 'nobody', 'glyph', 'crowd'] }, energy: { type: 'number' },
-  phase: { type: 'string', enum: ['rough', 'bridge', 'smooth'] }, face: { type: 'boolean' }, colour: { type: 'boolean' }, landmark: { type: 'boolean' }, caution: { type: 'boolean' },
+  phase: { type: 'string', enum: ['rough', 'bridge', 'smooth'] }, face: { type: 'string', enum: ['none', 'masked', 'crowd', 'visible'] }, colour: { type: 'boolean' }, landmark: { type: 'boolean' }, caution: { type: 'boolean' },
   use: { type: 'string', enum: ['opener', 'build', 'drop', 'breakdown', 'outro', 'ident'] } } };
 
 async function caption(key, clip) {
@@ -92,10 +101,16 @@ async function caption(key, clip) {
       const c = q.shift();
       try {
         const r = await caption(key, c);
-        notes[c.url] = { name: c.name, ...r.note };
+        const ov = owner(c.name), n = { name: c.name, ...r.note };
+        // face: a visible face is a reject; faces in a background crowd count as caution (owner on r02-speakers-4)
+        n.face = r.note.face === 'visible'; n.faceKind = r.note.face; if (r.note.face === 'crowd') n.caution = true;
+        if (ov.exclude) { n.face = true; n.owner = 'exclude: ' + ov.exclude; }
+        if (ov.caution) { n.caution = true; n.owner = 'caution: ' + ov.caution; }
+        ['favourite', 'peak', 'filler'].forEach(k => { if (ov[k]) { n[k] = true; n.owner = k + ': ' + ov[k]; } });
+        notes[c.url] = n;
         spent += r.cost; done++;
         fs.writeFileSync(NOTES, JSON.stringify(notes, null, 1));
-        console.log(`${done}/${todo.length} ${c.name}: [${r.note.phase} ${r.note.energy.toFixed(2)}${r.note.face ? ' FACE' : ''}${r.note.caution ? ' CAUTION' : ''}] ${r.note.desc}`);
+        console.log(`${done}/${todo.length} ${c.name}: [${n.phase} ${n.energy.toFixed(2)} face:${n.faceKind}${n.face ? ' REJECT' : ''}${n.caution ? ' CAUTION' : ''}${n.owner ? ' OWNER ' + n.owner.split(':')[0] : ''}] ${n.desc}`);
       } catch (e) { failed++; console.log(`FAILED ${c.name}: ${e.message}`); }
     }
   }));
