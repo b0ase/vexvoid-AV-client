@@ -1717,32 +1717,39 @@
     .mk-price small{color:#666;font-size:9px;margin-left:4px}
     .mk-big{font-family:'Michroma','IBM Plex Mono',sans-serif;font-size:22px;color:#fff;letter-spacing:.04em}
     .wb-filters .mk-tog{margin-left:auto}
-    /* AI tab: the output and a chat, nothing else */
-    .ai{display:flex;justify-content:center;width:100%;height:100%;min-height:0}
-    .ai-chat{display:flex;flex-direction:column;min-height:0;width:min(780px,100%);border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.6)}
-    .ai-head{display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid #1d1d1d}
-    .ai-title{flex:1;display:flex;flex-direction:column;gap:4px;font-family:'Michroma','IBM Plex Mono',sans-serif;font-size:11px;letter-spacing:.22em;min-width:0}
-    .ai-head .ai-status{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.16em;color:#888}
-    .ai-mini{position:relative;width:128px;aspect-ratio:16/9;background:#000;border:1px solid #333;cursor:pointer;flex:none}
+    /* AI tab: gigs on the left, one quiet room for the open gig */
+    .ai{display:grid;grid-template-columns:200px 1fr;width:100%;height:100%;min-height:0}
+    .ai-rail{display:flex;flex-direction:column;gap:2px;border-right:1px solid #161616;padding:18px 14px 14px 4px;min-height:0;overflow-y:auto}
+    .ai-rail-h{font-size:9px;letter-spacing:.3em;color:#555;margin-bottom:10px}
+    .ai-gig{font:inherit;text-align:left;background:none;border:0;border-left:1px solid transparent;color:#777;padding:7px 10px;cursor:pointer;display:flex;flex-direction:column;gap:3px}
+    .ai-gig span{font-family:'Michroma','IBM Plex Mono',sans-serif;font-size:10px;letter-spacing:.14em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .ai-gig small{font-size:8px;letter-spacing:.14em;color:#4a4a4a}
+    .ai-gig:hover{color:#ccc}.ai-gig.on{color:#fff;border-left-color:#fff}.ai-gig.on small{color:#888}
+    .ai-newgig{font:inherit;margin-top:12px;background:none;border:0;color:#666;letter-spacing:.2em;font-size:9px;text-align:left;padding:6px 10px;cursor:pointer}.ai-newgig:hover{color:#fff}
+    .ai-room{display:flex;flex-direction:column;min-height:0;padding:22px 0 0 56px;max-width:900px}
+    .ai-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;padding-bottom:22px}
+    .ai-gig-title{font-family:'Michroma','IBM Plex Mono',sans-serif;font-size:26px;letter-spacing:.14em;color:#fff;outline:none;min-width:120px}
+    .ai-gig-when{margin-top:10px;font-size:10px;letter-spacing:.24em;color:#666;cursor:pointer;display:flex;gap:8px}
+    .ai-gig-when:hover{color:#bbb}.ai-gig-when input{font:inherit;background:#000;color:#fff;border:0;border-bottom:1px solid #444;padding:2px 0;letter-spacing:.14em;color-scheme:dark}
+    .ai-head-r{display:flex;align-items:center;gap:14px}
+    .ai-status{font-size:9px;letter-spacing:.24em;color:#888}
+    .ai-busy .ai-status::after{content:'';display:inline-block;width:6px;height:6px;margin-left:8px;background:#fff;animation:aiPulse 1s infinite}
+    @keyframes aiPulse{50%{opacity:.15}}
+    .ai-mini{width:112px;aspect-ratio:16/9;background:#000;border:1px solid #222;cursor:pointer;opacity:.85}
     .ai-mini img{width:100%;height:100%;object-fit:cover;display:block}
-    .ai-mini span{position:absolute;left:3px;bottom:2px;font-size:7px;letter-spacing:.12em;color:#ccc;background:rgba(0,0,0,.7);padding:0 3px;white-space:nowrap;max-width:120px;overflow:hidden}
-    .ai-mini.off{width:60px;aspect-ratio:auto;height:22px}.ai-mini.off img{display:none}.ai-mini.off span{position:static;font-size:8px;line-height:20px;padding:0 6px}
-    .ai-head .gen-btn{padding:4px 8px}
-    .ai-log{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:9px;font-size:12px;line-height:1.55;text-transform:none;letter-spacing:.02em}
+    .ai-mini.off{width:22px;height:12px;aspect-ratio:auto;border-color:#444}.ai-mini.off img{display:none}
+    .ai-log{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:16px;padding-right:24px;font-size:13px;line-height:1.7;text-transform:none;letter-spacing:.01em}
     .ai-msg{white-space:pre-wrap;word-break:break-word}
-    .ai-msg.me{align-self:flex-end;max-width:85%;background:#141414;border:1px solid #262626;padding:8px 10px;color:#fff}
-    .ai-msg.bot{color:#e6e6e4}
-    .ai-msg.tool{color:#6f6f6d;font-size:10px;font-family:'IBM Plex Mono',monospace;letter-spacing:.04em}
-    .ai-msg.tool.bad{color:#b0645e}
+    .ai-msg.me{color:#8a8a88;padding-left:14px;border-left:1px solid #333}
+    .ai-msg.bot{color:#f0f0ee}
+    .ai-msg.tool{color:#4d4d4b;font-size:10px;letter-spacing:.06em;cursor:default}
+    .ai-msg.tool.bad{color:#9a5550}
     .ai-msg.err{color:#ff5a4f;font-size:11px}
-    .ai-card{border:1px solid #444;padding:10px;display:flex;flex-direction:column;gap:8px;font-size:11px}
-    .ai-card .row{display:flex;gap:6px}.ai-card .gen-btn{flex:1;padding:8px}
-    .ai-chips{display:flex;flex-direction:column;gap:6px}
-    .ai-chips button{font:inherit;text-align:left;text-transform:none;letter-spacing:.02em;background:transparent;color:#bbb;border:1px solid #2a2a2a;padding:8px 10px;cursor:pointer;font-size:11px}
-    .ai-chips button:hover{border-color:#777;color:#fff}
-    .ai-in{display:flex;gap:6px;padding:10px;border-top:1px solid #1d1d1d}
-    .ai-in textarea{flex:1;resize:none;background:#050505;color:#fff;border:1px solid #333;padding:8px;font:inherit;font-size:12px;text-transform:none;letter-spacing:.02em}
-    .ai-in .gen-btn{width:82px}
+    .ai-card{border-left:1px solid #fff;padding:4px 0 4px 14px;display:flex;flex-direction:column;gap:8px;font-size:12px}
+    .ai-card .row{display:flex;gap:8px}.ai-card .gen-btn{padding:7px 14px}
+    .ai-in{display:flex;gap:12px;align-items:flex-end;padding:18px 24px 18px 0;border-top:1px solid #161616}
+    .ai-in textarea{flex:1;resize:none;background:none;color:#fff;border:0;padding:6px 0;font:inherit;font-size:14px;text-transform:none;letter-spacing:.01em;outline:none;max-height:140px}
+    .ai-in button{font:inherit;background:none;border:0;color:#fff;letter-spacing:.24em;font-size:10px;cursor:pointer;padding:8px 0}
     /* layer LOAD picker */
     .layer-btn:disabled{opacity:.25;cursor:default}
     .seq-strip{display:flex;gap:3px;overflow-x:auto;margin-top:6px;padding-bottom:3px;align-items:center}
@@ -1969,12 +1976,14 @@
     <!-- AI Tab: chat to the agent; it plays the mixer. Every other tab still works by hand. -->
     <div class="tab-content active" id="aiTab">
       <div class="ai">
-        <div class="ai-chat">
-          <div class="ai-head"><div class="ai-title"><span>V3XV0ID AGENT</span><span class="ai-status" id="aiStatus">READY</span></div>
-            <div class="ai-mini" id="aiMini" title="What the audience sees. Click to hide."><img id="aiMonitor" alt=""><span id="aiNow">OUTPUT</span></div>
-            <button id="aiNew" class="gen-btn">NEW CHAT</button></div>
+        <div class="ai-rail"><div class="ai-rail-h">GIGS</div><div id="aiGigs"></div><button id="aiNew" class="ai-newgig">+ NEW GIG</button></div>
+        <div class="ai-room">
+          <div class="ai-head">
+            <div><div class="ai-gig-title" id="aiGigTitle" contenteditable="true" spellcheck="false">NEW GIG</div><div class="ai-gig-when" id="aiGigWhen" title="Set the date and venue">DATE · VENUE</div></div>
+            <div class="ai-head-r"><span class="ai-status" id="aiStatus"></span><div class="ai-mini" id="aiMini" title="What the audience sees. Click to hide."><img id="aiMonitor" alt=""></div></div>
+          </div>
           <div class="ai-log" id="aiLog"></div>
-          <div class="ai-in"><textarea id="aiInput" rows="3" placeholder="Tell the mixer what you want to see..."></textarea><button id="aiSend" class="gen-btn hot">SEND</button></div>
+          <div class="ai-in"><textarea id="aiInput" rows="1" placeholder="Talk to the agent about this gig..."></textarea><button id="aiSend">SEND</button></div>
         </div>
       </div>
     </div>
@@ -5399,6 +5408,8 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
           { name: 'compose_set', description: 'Write a timed set into the composer (bars of 4 beats at the given tempo) and optionally start it. Each step is a mixer command on a bar, e.g. {"bar": 1, "cmd": "sketch", "args": {"name": "TERRAIN", "deck": "A"}}, {"bar": 9, "cmd": "fade", "args": {"value": 100, "over": 8}}, {"bar": 17, "cmd": "cut", "args": {"deck": "A"}}. Steps can use any mixer command; a sketch step may carry "code" instead of a library name.',
             input_schema: { type: 'object', properties: { title: { type: 'string' }, bpm: { type: 'number' }, steps: { type: 'array', items: { type: 'object', properties: { bar: { type: 'number' }, cmd: { type: 'string' }, args: { type: 'object' } }, required: ['bar', 'cmd'] } },
               play: { type: 'boolean', description: 'Start playing it now (default true)' } }, required: ['title', 'bpm', 'steps'], additionalProperties: false } },
+          { name: 'gig', description: 'Update the details of the gig you are working on (only the fields you give change): its title, date (YYYY-MM-DD), venue, and the brief (what the night is, who it is for, the feel, set length, anything agreed). Keep the brief current as the conversation goes.',
+            input_schema: { type: 'object', properties: { title: { type: 'string' }, date: { type: 'string' }, venue: { type: 'string' }, brief: { type: 'string' } }, additionalProperties: false } },
           { name: 'generate', description: 'Make a new image or a 6-second video with Grok Imagine (xAI). It costs real money on the performer\'s xAI account, so the performer is shown the prompt and the price and approves each one; if they decline, you get told and carry on without it. An image takes about 10 seconds, a video 1 to 3 minutes. The result is saved to the library; give deck to load it straight onto a deck.',
             input_schema: { type: 'object', properties: { kind: { type: 'string', enum: ['image', 'video'] }, prompt: { type: 'string', description: 'What to show. The VexVoid look is added for you.' },
               look: { type: 'string', enum: Object.keys(GROK_LOOK), description: 'smooth: calm, razor-sharp; rough: flash, grain; bridge: concrete and one hard light; fast; slow; abstract' },
@@ -5442,6 +5453,15 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
           if (input.play !== false) setPlay();
           return `Set "${input.title}" loaded: ${set.steps.length} steps${input.play !== false ? ', playing from bar 1' : ''}. It is in COMPOSER too.`;
         }
+        if (name === 'gig') {
+          if (!gig) throw new Error('no gig open');
+          if (input.title) gig.title = String(input.title).toUpperCase().slice(0, 60);
+          if (input.date != null) gig.date = String(input.date).slice(0, 10);
+          if (input.venue != null) gig.venue = String(input.venue).toUpperCase().slice(0, 60);
+          if (input.brief != null) gig.brief = String(input.brief).slice(0, 4000);
+          gigSave(); renderGigs();
+          return `Gig: ${gig.title} · ${gig.date || 'no date'} · ${gig.venue || 'no venue'}`;
+        }
         if (name === 'generate') {
           if (!xaiKey()) throw new Error('No xAI key. Ask the performer to add one in IMAGES > GROK IMAGINE.');
           const video = input.kind === 'video', est = grokRecentCost(video);
@@ -5449,26 +5469,49 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
           if (!ok) return 'The performer declined this generation. Carry on without it.';
           const line = aiLine('tool', `Grok ${video ? 'video' : 'image'}: starting…`);
           const r = await grokRun({ prompt: String(input.prompt), mode: video ? 'video' : 'image', look: input.look || 'smooth', people: input.people || 'nobody',
-            onTick: s => { line.textContent = `· Grok ${video ? 'video' : 'image'}: ${s}s…`; } });
-          line.textContent = `· Grok ${video ? 'video' : 'image'} done in ${r.seconds}s · $${r.cost.toFixed(3)}`;
+            onTick: s => { line.textContent = `Grok ${video ? 'video' : 'image'}: ${s}s…`; } });
+          line.textContent = `Grok ${video ? 'video' : 'image'} done in ${r.seconds}s · $${r.cost.toFixed(3)}`;
+          if (gig) { (gig.assets = gig.assets || []).push(r.file); gigSave(); }
           if (input.deck) await loadMediaItem({ name: 'GROK · ' + String(input.prompt).slice(0, 30), url: r.file, source: 'local' }, input.deck, { textContent: '' });
           return `Made ${video ? 'a video' : 'an image'} ($${r.cost.toFixed(3)}), saved as ${r.file}${input.deck ? ' and loaded onto deck ' + input.deck : ''}.`;
         }
         throw new Error('unknown tool ' + name);
       }
 
-      // ----- chat UI -----
+      // ----- GIGS: each gig is one ongoing conversation with the agent, from booking to the show itself -----
+      // A gig keeps its details (title, date, venue, brief), the conversation (API messages, append-only), what the
+      // conversation looked like, and the media made for it. The agent works for the gig that's open.
+      const GIG_STORE = 'vx.gigs.v1';
+      let gigs = [], gig = null, agent = null;
+      try { gigs = JSON.parse(localStorage.getItem(GIG_STORE) || '[]'); } catch (e) { gigs = []; }
+      // the earlier single chat becomes the first gig
+      try {
+        const old = JSON.parse(localStorage.getItem(AI_STORE + '.messages') || '[]');
+        if (!gigs.length && old.length) gigs.push({ id: 'g' + Date.now().toString(36), title: 'FIRST GIG', date: '', venue: '', brief: '', created: new Date().toISOString(), messages: old, log: localStorage.getItem(AI_STORE + '.log') || '', assets: [] });
+      } catch (e) {}
+      function gigSave() { try { localStorage.setItem(GIG_STORE, JSON.stringify(gigs)); } catch (e) { aiLine('err', 'Could not save this gig: ' + e.message); } }
+      function gigContext() {
+        if (!gig) return '';
+        return `\n\nThe gig you are working on (the performer's, one gig per conversation):\n- Title: ${gig.title || 'untitled'}\n- Date: ${gig.date || 'not set'}\n- Venue: ${gig.venue || 'not set'}\n- Brief: ${gig.brief || 'none yet'}\n- Made for it so far: ${(gig.assets || []).map(a => a.split('/').pop()).join(', ') || 'nothing'}\nYou are the performer's booking agent and creative partner for this gig: keep its details up to date with the gig tool, help plan the set, and prepare visuals ahead of time (sketches, sets, Grok media) so the show is unique to this gig.`;
+      }
       const aiLog = aiEl('aiLog');
       function aiLine(kind, text) {
-        const d = document.createElement('div'); d.className = 'ai-msg ' + kind; d.textContent = (kind === 'tool' ? '· ' : '') + text;
+        const d = document.createElement('div'); d.className = 'ai-msg ' + kind; d.textContent = text;
+        // consecutive tool steps fold into one quiet line
+        if (kind === 'tool' && aiLog.lastElementChild && aiLog.lastElementChild.classList.contains('tool') && !aiLog.lastElementChild.classList.contains('bad')) {
+          const last = aiLog.lastElementChild, n = Number(last.dataset.n || 1) + 1;
+          last.dataset.n = n; last.title = (last.title ? last.title + '\n' : last.textContent + '\n') + text; last.textContent = text + `  ·  ${n} steps`;
+          aiSaveLog(); return last;
+        }
         aiLog.appendChild(d); aiLog.scrollTop = aiLog.scrollHeight; aiSaveLog(); return d;
       }
       function aiToolText(name, input) {
         if (name === 'mixer') return `${input.command} ${Object.entries(input.args || {}).map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`).join(' ')}`.trim();
-        if (name === 'write_sketch') return `write sketch ${input.name} → deck ${input.deck || ''}`;
-        if (name === 'compose_set') return `compose set "${input.title}" · ${(input.steps || []).length} steps · ${input.bpm} BPM`;
-        if (name === 'library') return 'library ' + input.kind;
-        if (name === 'generate') return `Grok ${input.kind}: ${input.prompt}`;
+        if (name === 'write_sketch') return `writing ${input.name}`;
+        if (name === 'compose_set') return `set "${input.title}" · ${(input.steps || []).length} moves`;
+        if (name === 'library') return 'looking through ' + input.kind;
+        if (name === 'generate') return `Grok ${input.kind}`;
+        if (name === 'gig') return 'updating the gig';
         return name;
       }
       function aiApprove(input, est) {
@@ -5483,33 +5526,60 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
           aiLog.appendChild(c); aiLog.scrollTop = aiLog.scrollHeight;
         });
       }
-      function aiSaveLog() { try { localStorage.setItem(AI_STORE + '.log', aiLog.innerHTML.slice(-200000)); } catch (e) {} }
-      const AI_IDEAS = ['Dark, slow intro: lit monoliths at 90 BPM, barely moving', 'Build for 16 bars, then cut to liquid chrome on the drop',
-        'Write a new sketch: radar sweeps that flash on every kick', 'Play Four Ton Shadow and run a whole set to it', 'Make a Grok clip of a night train in the rain'];
-      function aiChips() {
-        if (aiLog.children.length) return;
-        const box = document.createElement('div'); box.className = 'ai-chips';
-        const hi = document.createElement('div'); hi.className = 'ai-msg bot'; hi.textContent = 'Tell me what you want on the screen. I can load sketches and clips, write new sketches, run whole sets, and make new footage with Grok (you approve each one). Every other tab still works by hand.';
-        aiLog.appendChild(hi);
-        AI_IDEAS.forEach(t => { const b = document.createElement('button'); b.textContent = t; b.onclick = () => { aiEl('aiInput').value = t; aiSendNow(); }; box.appendChild(b); });
-        aiLog.appendChild(box);
-      }
+      function aiSaveLog() { if (gig) { gig.log = aiLog.innerHTML.slice(-200000); gigSave(); } }
       let aiUsage = { in: 0, out: 0 };
-      const agent = VXAGENT.create({
-        key: anthropicKey, system: AI_SYSTEM, tools: aiTools, run: aiRun,
-        restore: (() => { try { return JSON.parse(localStorage.getItem(AI_STORE + '.messages') || '[]'); } catch (e) { return []; } })(),
-        save: m => { try { localStorage.setItem(AI_STORE + '.messages', JSON.stringify(m)); } catch (e) {} },
-        onEvent: e => {
-          if (e.type === 'text') aiLine('bot', e.text);
-          else if (e.type === 'tool') aiLine('tool', aiToolText(e.name, e.input));
-          else if (e.type === 'tool-done' && !e.ok) aiLine('tool bad', e.summary);
-          else if (e.type === 'error') aiLine('err', e.message);
-          else if (e.type === 'usage' && e.usage) { aiUsage.in += (e.usage.input_tokens || 0) + (e.usage.cache_read_input_tokens || 0) + (e.usage.cache_creation_input_tokens || 0); aiUsage.out += e.usage.output_tokens || 0; }
-          else if (e.type === 'busy') {
-            aiEl('aiSend').textContent = e.on ? 'STOP' : 'SEND';
-            aiEl('aiStatus').textContent = e.on ? 'WORKING…' : `READY · ${Math.round(aiUsage.in / 1000)}K IN · ${Math.round(aiUsage.out / 1000)}K OUT THIS SESSION`;
-          }
+      function aiEvent(e) {
+        if (e.type === 'text') aiLine('bot', e.text);
+        else if (e.type === 'tool') aiLine('tool', aiToolText(e.name, e.input));
+        else if (e.type === 'tool-done' && !e.ok) aiLine('tool bad', e.summary);
+        else if (e.type === 'error') aiLine('err', e.message);
+        else if (e.type === 'usage' && e.usage) { aiUsage.in += (e.usage.input_tokens || 0) + (e.usage.cache_read_input_tokens || 0) + (e.usage.cache_creation_input_tokens || 0); aiUsage.out += e.usage.output_tokens || 0; }
+        else if (e.type === 'busy') { aiEl('aiSend').textContent = e.on ? 'STOP' : 'SEND'; aiEl('aiStatus').textContent = e.on ? 'working' : ''; aiEl('aiTab').classList.toggle('ai-busy', e.on); }
+      }
+      function openGig(g) {
+        if (agent && agent.busy) agent.stop();
+        gig = g;
+        agent = VXAGENT.create({ key: anthropicKey, system: () => AI_SYSTEM() + gigContext(), tools: aiTools, run: aiRun, onEvent: aiEvent,
+          restore: gig.messages || (gig.messages = []), save: m => { gig.messages = m; gigSave(); } });
+        aiLog.innerHTML = gig.log || '';
+        aiLog.querySelectorAll('.ai-card button').forEach(b => { b.disabled = true; });
+        if (!aiLog.children.length) aiLine('bot', 'New gig. Tell me about it: where, when, what it should feel like. Or just start building the set.');
+        aiLog.scrollTop = aiLog.scrollHeight;
+        renderGigs();
+        try { localStorage.setItem(GIG_STORE + '.open', gig.id); } catch (e) {}
+      }
+      function newGig() {
+        const g = { id: 'g' + Date.now().toString(36), title: 'NEW GIG', date: '', venue: '', brief: '', created: new Date().toISOString(), messages: [], log: '', assets: [] };
+        gigs.unshift(g); gigSave(); openGig(g);
+        aiEl('aiGigTitle').focus(); document.getSelection().selectAllChildren(aiEl('aiGigTitle'));
+      }
+      function renderGigs() {
+        const list = aiEl('aiGigs'); list.innerHTML = '';
+        gigs.forEach(g => {
+          const b = document.createElement('button'); b.className = 'ai-gig' + (g === gig ? ' on' : '');
+          b.innerHTML = '<span></span><small></small>';
+          b.firstChild.textContent = g.title || 'UNTITLED GIG';
+          b.lastChild.textContent = [g.date, g.venue].filter(Boolean).join(' · ') || 'no date yet';
+          b.onclick = () => openGig(g);
+          list.appendChild(b);
+        });
+        if (gig) {
+          aiEl('aiGigTitle').textContent = gig.title || 'UNTITLED GIG';
+          aiEl('aiGigWhen').textContent = [gig.date || 'DATE', gig.venue || 'VENUE'].join('  ·  ');
         }
+      }
+      // the title is edited in place; date and venue by the agent (gig tool) or by clicking them
+      aiEl('aiGigTitle').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
+      aiEl('aiGigTitle').addEventListener('blur', e => { if (gig) { gig.title = e.target.textContent.trim().toUpperCase().slice(0, 60) || 'UNTITLED GIG'; gigSave(); renderGigs(); } });
+      aiEl('aiGigWhen').addEventListener('click', () => {
+        if (!gig) return;
+        const box = aiEl('aiGigWhen');
+        box.innerHTML = '<input type="date"><input placeholder="VENUE">';
+        const [d, v] = box.querySelectorAll('input'); d.value = gig.date || ''; v.value = gig.venue || '';
+        const done = () => { gig.date = d.value; gig.venue = v.value.trim().toUpperCase(); gigSave(); renderGigs(); };
+        [d, v].forEach(i => { i.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') done(); }); i.addEventListener('click', e => e.stopPropagation()); });
+        v.addEventListener('blur', () => setTimeout(() => { if (!box.contains(document.activeElement)) done(); }, 50));
+        d.focus();
       });
       function aiNeedKey() {
         const d = document.createElement('div'); d.className = 'ai-card';
@@ -5519,32 +5589,25 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
         aiLog.appendChild(d); inp.focus();
       }
       async function aiSendNow() {
-        if (agent.busy) { agent.stop(); aiEl('aiStatus').textContent = 'STOPPING…'; return; }
+        if (agent.busy) { agent.stop(); aiEl('aiStatus').textContent = 'stopping'; return; }
         const text = aiEl('aiInput').value.trim(); if (!text) return;
         if (!anthropicKey()) { aiNeedKey(); return; }
-        const chips = aiLog.querySelector('.ai-chips'); if (chips) chips.remove();
         aiEl('aiInput').value = '';
         aiLine('me', text);
         await agent.send(text).catch(e => aiLine('err', e.message));
       }
       aiEl('aiSend').addEventListener('click', aiSendNow);
       aiEl('aiInput').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); aiSendNow(); } });
-      aiEl('aiNew').addEventListener('click', () => { if (agent.busy) agent.stop(); agent.reset(); aiLog.innerHTML = ''; aiSaveLog(); aiChips(); });
-      try { const saved = localStorage.getItem(AI_STORE + '.log'); if (saved && agent.messages.length) { aiLog.innerHTML = saved; aiLog.querySelectorAll('.ai-card button').forEach(b => { b.disabled = true; }); aiLog.scrollTop = aiLog.scrollHeight; } } catch (e) {}
-      aiChips();
-      // the output, live, while the AI tab is open
+      aiEl('aiNew').addEventListener('click', newGig);
+      (() => { let open = null; try { open = localStorage.getItem(GIG_STORE + '.open'); } catch (e) {}
+        if (!gigs.length) newGig(); else openGig(gigs.find(g => g.id === open) || gigs[0]); })();
+      // the output, small, while the AI tab is open
       setInterval(async () => {
-        if (document.hidden || !aiEl('aiTab').classList.contains('active')) return;
-        try {
-          if (aiEl('aiMini').classList.contains('off')) return;
-          const b64 = await ipcRenderer.invoke('output-frame', 256);
-          if (b64) aiEl('aiMonitor').src = 'data:image/jpeg;base64,' + b64;
-          const snap = vxSnapshot();
-          aiEl('aiNow').textContent = document.querySelector('#outputPreview .preview-row-label')?.textContent || `OUTPUT · DECK ${snap.deck}`;
-        } catch (e) {}
+        if (document.hidden || !aiEl('aiTab').classList.contains('active') || aiEl('aiMini').classList.contains('off')) return;
+        try { const b64 = await ipcRenderer.invoke('output-frame', 256); if (b64) aiEl('aiMonitor').src = 'data:image/jpeg;base64,' + b64; } catch (e) {}
       }, 250);
-      aiEl('aiMini').addEventListener('click', () => { const off = aiEl('aiMini').classList.toggle('off'); if (off) aiEl('aiNow').textContent = 'SHOW'; try { localStorage.setItem(AI_STORE + '.mini', off ? 'off' : 'on'); } catch (e) {} });
-      try { if (localStorage.getItem(AI_STORE + '.mini') === 'off') { aiEl('aiMini').classList.add('off'); aiEl('aiNow').textContent = 'SHOW'; } } catch (e) {}
+      aiEl('aiMini').addEventListener('click', () => { const off = aiEl('aiMini').classList.toggle('off'); try { localStorage.setItem(AI_STORE + '.mini', off ? 'off' : 'on'); } catch (e) {} });
+      try { if (localStorage.getItem(AI_STORE + '.mini') === 'off') aiEl('aiMini').classList.add('off'); } catch (e) {}
 
       // ===== MINT: sketches (PATTERNS) and sets (COMPOSER) as 1Sat inscriptions through bWalletX =====
       async function mintWallet(statusFn) {
