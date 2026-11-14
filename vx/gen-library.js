@@ -334,5 +334,138 @@ function draw() {
   torus(R * 1.4 * (1 + vx.b * 0.5), 1 + vx.d * 20, 48, 4);
 }`);
 
+  // ---- lit 3D: solid geometry under real lights (p5 WEBGL), still monochrome ----
+  add('MONOLITHS', '3d · lit · bass', ['GRID', 'HEIGHT', 'ORBIT', 'TILT'], `
+// A city of lit monoliths. Heights ride slow noise and the bass; every kick sends a bright ring out from the centre.
+let waves = [];
+function setup() { createCanvas(windowWidth, windowHeight, WEBGL); }
+function draw() {
+  background(0);
+  const n = floor(10 + vx.a * 20), cell = min(width, height) * 1.5 / n, span = cell * n;
+  if (vx.kick) waves.push(0);
+  waves = waves.map(w => w + 0.25 + vx.c * 0.4).filter(w => w < n);
+  const ang = vx.t * (0.04 + vx.c * 0.25);
+  camera(cos(ang) * span * 1.1, -span * (0.45 + vx.d * 0.6), sin(ang) * span * 1.1, 0, -span * 0.08, 0, 0, 1, 0);
+  ambientLight(26);
+  directionalLight(255, 255, 255, -0.4, 0.9, -0.3);
+  directionalLight(90, 90, 90, 0.6, 0.3, 0.8);
+  noStroke();
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+    const r = dist(i, j, (n - 1) / 2, (n - 1) / 2);
+    let h = noise(i * 0.17, j * 0.17, vx.t * 0.12) * (0.5 + vx.bass * 1.5), glow = 0;
+    for (const w of waves) { const k = max(0, 1 - abs(r - w)); h += k * 0.3; glow = max(glow, k); }
+    h = cell * (0.25 + h * (1.5 + vx.b * 9));
+    push(); translate((i - n / 2 + 0.5) * cell, -h / 2, (j - n / 2 + 0.5) * cell);
+    emissiveMaterial(glow * 170); fill(70 + glow * 120); specularMaterial(220); shininess(25);
+    box(cell * 0.8, h, cell * 0.8); pop();
+  }
+}`);
+
+  add('LIQUID CHROME', '3d · lit · bass', ['MELT', 'DETAIL', 'FLOW', 'GLOSS'], `
+// A sphere of liquid metal: 3D noise pushes the surface out, the bass swells it, every kick ripples it.
+let rip = 0;
+const det = 60;
+function surf(th, ph, R, t) {
+  const x = sin(th) * cos(ph), y = cos(th), z = sin(th) * sin(ph), k = 0.7 + vx.b * 2.3;
+  const d = (noise(x * k + 10, y * k + 10, z * k + t) - 0.5) * (0.6 + vx.bass * 1.4) + sin(th * 9 - rip * 12) * rip * 0.07;
+  const r = R * (1 + d * (0.35 + vx.a * 1.1));
+  return [x * r, y * r, z * r];
+}
+function setup() { createCanvas(windowWidth, windowHeight, WEBGL); }
+function draw() {
+  background(0);
+  if (vx.kick) rip = 1;
+  rip *= 0.93;
+  const R = min(width, height) * 0.27, t = vx.t * (0.15 + vx.c * 1.2);
+  rotateY(vx.t * 0.2); rotateX(sin(vx.t * 0.13) * 0.4);
+  ambientLight(45);
+  directionalLight(230, 230, 230, 0.4, 0.7, -0.6);   // key, from the top left
+  directionalLight(150, 150, 150, -0.8, -0.2, 0.5);  // rim, from behind
+  pointLight(255, 255, 255, -width * 0.6, -height * 0.8, 600);
+  noStroke(); fill(110); specularMaterial(255); shininess(15 + vx.d * 160);
+  const P = [];
+  for (let i = 0; i <= det; i++) { P.push([]); for (let j = 0; j <= det; j++) P[i].push(surf(PI * (0.0001 + i) / (det + 0.0002), TWO_PI * j / det, R, t)); }
+  // surface normals from the neighbours, so the displaced shape catches the light
+  const N = P.map((row, i) => row.map((q, j) => {
+    const a = P[min(det, i + 1)][j], b = P[max(0, i - 1)][j], c = row[(j + 1) % det], e = row[(j - 1 + det) % det];
+    const u = [a[0] - b[0], a[1] - b[1], a[2] - b[2]], v = [c[0] - e[0], c[1] - e[1], c[2] - e[2]];
+    let n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+    if (n[0] * q[0] + n[1] * q[1] + n[2] * q[2] < 0) n = n.map(x => -x);
+    return n;
+  }));
+  for (let i = 0; i < det; i++) {
+    beginShape(TRIANGLE_STRIP);
+    for (let j = 0; j <= det; j++) {
+      const a = P[i][j], b = P[i + 1][j], na = N[i][j], nb = N[i + 1][j];
+      normal(na[0], na[1], na[2]); vertex(a[0], a[1], a[2]);
+      normal(nb[0], nb[1], nb[2]); vertex(b[0], b[1], b[2]);
+    }
+    endShape();
+  }
+}`);
+
+  add('SHARD STORM', '3d · lit · kick', ['COUNT', 'SPREAD', 'SPEED', 'ROLL'], `
+// Lit glass shards rushing at you out of the dark. Kicks blow the storm apart and speed it up.
+let shards = [];
+function make(far) { return { x: random(-1, 1), y: random(-1, 1), z: far ? random(-1, 0.1) : -1, rx: random(TWO_PI), ry: random(TWO_PI), s: random(0.3, 1), vr: random(-1, 1) }; }
+function setup() { createCanvas(windowWidth, windowHeight, WEBGL); }
+function draw() {
+  const n = floor(80 + vx.a * 520);
+  while (shards.length < n) shards.push(make(true));
+  shards.length = n;
+  background(0);
+  const D = max(width, height) * 2, sp = 0.002 + vx.c * 0.02 + vx.level * 0.015;
+  ambientLight(30);
+  directionalLight(255, 255, 255, 0.3, 0.6, -1);
+  pointLight(255, 255, 255, 0, 0, 300);
+  noStroke(); fill(190); specularMaterial(255); shininess(90);
+  rotateZ(vx.t * (vx.d - 0.5) * 0.6);
+  for (const s of shards) {
+    s.z += sp * (1 + vx.pulse * 3); s.rx += 0.02 * s.vr; s.ry += 0.03 * s.vr;
+    if (vx.kick) { s.x *= 1.06; s.y *= 1.06; }
+    if (s.z > 0.2 || abs(s.x) > 3 || abs(s.y) > 3) Object.assign(s, make(false));
+    push(); translate(s.x * width * 0.6 * (0.5 + vx.b), s.y * height * 0.6 * (0.5 + vx.b), s.z * D);
+    rotateX(s.rx); rotateY(s.ry);
+    const k = min(width, height) * 0.05 * s.s;
+    beginShape(TRIANGLES); normal(0, 0, 1); vertex(-k, -k * 0.6, 0); vertex(k, -k * 0.2, 0); vertex(0, k, 0); endShape();
+    pop();
+  }
+}`);
+
+  add('V3X MONUMENT', '3d · lit · type', ['SIZE', 'BLAST', 'SWING', 'GLOSS'], `
+// The V3X mark as a lit stone monument, turning slowly. Every kick knocks the pieces apart; they fall back into place.
+const GL = { V: [[[0, 1], [0.5, 0], [1, 1]]], '3': [[[0, 1], [1, 1], [0.42, 0.56], [1, 0.5], [1, 0], [0, 0]]], X: [[[0, 0], [1, 1]], [[1, 0], [0, 1]]] };
+let segs = null, blast = 0;
+function build() {
+  segs = [];
+  ['V', '3', 'X'].forEach((ch, i) => GL[ch].forEach(line => { for (let k = 1; k < line.length; k++) {
+    const [u0, v0] = line[k - 1], [u1, v1] = line[k];
+    segs.push({ x0: i * 0.86 + u0 * 0.62, y0: v0, x1: i * 0.86 + u1 * 0.62, y1: v1, d: [random(-1, 1), random(-1, 1), random(-1, 1)] });
+  } }));
+}
+function setup() { createCanvas(windowWidth, windowHeight, WEBGL); }
+function draw() {
+  if (!segs) build();
+  background(0);
+  if (vx.kick) blast = 1;
+  blast *= 0.9;
+  const H = min(width / 3.4, height * 0.5) * (0.6 + vx.a * 0.6), th = H * 0.11;
+  rotateY(sin(vx.t * (0.1 + vx.c * 0.6)) * 0.8); rotateX(-0.12 + sin(vx.t * 0.07) * 0.1);
+  ambientLight(22);
+  directionalLight(255, 255, 255, -0.6, 0.5, -0.7);
+  pointLight(255, 255, 255, H * 2, -H * 2, H * 2);
+  pointLight(80, 80, 80, -H * 2, H, H);
+  noStroke(); fill(165); specularMaterial(255); shininess(8 + vx.d * 150);
+  const b = blast * (0.2 + vx.b * 1.2);
+  for (const s of segs) {
+    const len = dist(s.x0, s.y0, s.x1, s.y1), a = atan2(s.y1 - s.y0, s.x1 - s.x0);
+    push();
+    translate(((s.x0 + s.x1) / 2 - 1.17) * H + s.d[0] * b * H, -((s.y0 + s.y1) / 2 - 0.5) * H + s.d[1] * b * H, s.d[2] * b * H);
+    rotateX(s.d[0] * b * 3); rotateZ(-a);
+    box(len * H + th, th, th * (1.6 + vx.bass * 1.5));
+    pop();
+  }
+}`);
+
   root.VXGEN_LIBRARY = L;
 })(typeof window !== 'undefined' ? window : this);
