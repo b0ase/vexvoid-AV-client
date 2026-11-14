@@ -1941,7 +1941,7 @@
   <!-- Tab Navigation -->
   <div class="tab-navigation">
     <button class="tab-button active" data-tab="ai">AI</button>
-    <button class="tab-button" data-tab="layers">LAYERS</button>
+    <button class="tab-button" data-tab="layers">MIXING DESK</button>
     <button class="tab-button" data-tab="patterns">PATTERNS</button>
     <button class="tab-button" data-tab="music">MUSIC</button>
     <button class="tab-button" data-tab="videos">VIDEOS</button>
@@ -4008,7 +4008,7 @@
       async function initializeVideosTab() {
         const local = videoLibrary.filter(v => v.source === 'local' && !/^GROK · /.test(v.name));
         const mine = walletMedia('clip').map(i => ({ name: 'WALLET · ' + i.name, url: i.url, format: (i.contentType.split('/')[1] || 'VIDEO').toUpperCase(), source: 'wallet', origin: i.origin }));
-        videoLibrary = mine.concat(grokFiles('video'), catalogue().clips.map(c => ({ name: c.name, url: c.url, format: 'MP4', source: c.set === 'rough' ? 'rough' : 'smooth' })), local);
+        videoLibrary = mine.concat(grokFiles('video'), catalogue().clips.map(c => ({ name: c.name, url: c.url, format: 'MP4', source: c.set || 'smooth' })), local);
         videoLibrary.forEach((v, i) => { v.id = i; });
         document.getElementById('videoCloudStatus').textContent = `● V3XV0ID CLIPS · ${videoLibrary.length - mine.length}` + (mine.length ? ` · YOUR WALLET · ${mine.length}` : '');
         renderVideoLibrary();

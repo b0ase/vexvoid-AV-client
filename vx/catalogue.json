@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-13",
+ "generated": "2026-11-14",
  "tracks": [
   {
    "id": "echoes-in-the-dust:A",
@@ -742,6 +742,636 @@
    "name": "JAM 22",
    "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/jam/jam-22.mp4",
    "set": "rough"
+  },
+  {
+   "name": "SLOW CROWD",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/slow/crowd.mp4",
+   "set": "slow"
+  },
+  {
+   "name": "SLOW FOUR TON SHADOW B01 1",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/slow/four-ton-shadow-b01-1.mp4",
+   "set": "slow"
+  },
+  {
+   "name": "SLOW FOUR TON SHADOW B01 2",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/slow/four-ton-shadow-b01-2.mp4",
+   "set": "slow"
+  },
+  {
+   "name": "SLOW FOUR TON SHADOW B01 3",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/slow/four-ton-shadow-b01-3.mp4",
+   "set": "slow"
+  },
+  {
+   "name": "SLOW FOUR TON SHADOW B01 4",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/slow/four-ton-shadow-b01-4.mp4",
+   "set": "slow"
+  },
+  {
+   "name": "SLOW FOUR TON SHADOW B02 1",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/slow/four-ton-shadow-b02-1.mp4",
+   "set": "slow"
+  },
+  {
+   "name": "SLOW FOUR TON SHADOW B02 2",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/slow/four-ton-shadow-b02-2.mp4",
+   "set": "slow"
+  },
+  {
+   "name": "SLOW FOUR TON SHADOW B02 3",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/slow/four-ton-shadow-b02-3.mp4",
+   "set": "slow"
+  },
+  {
+   "name": "SLOW FOUR TON SHADOW B02 4",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/slow/four-ton-shadow-b02-4.mp4",
+   "set": "slow"
+  },
+  {
+   "name": "SLOW FOUR TON SHADOW B03 1",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/slow/four-ton-shadow-b03-1.mp4",
+   "set": "slow"
+  },
+  {
+   "name": "SLOW FOUR TON SHADOW B03 2",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/slow/four-ton-shadow-b03-2.mp4",
+   "set": "slow"
+  },
+  {
+   "name": "SLOW FOUR TON SHADOW B03 3",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/slow/four-ton-shadow-b03-3.mp4",
+   "set": "slow"
+  },
+  {
+   "name": "SLOW FOUR TON SHADOW B03 4",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/slow/four-ton-shadow-b03-4.mp4",
+   "set": "slow"
+  },
+  {
+   "name": "SLOW FOUR TON SHADOW B04 1",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/slow/four-ton-shadow-b04-1.mp4",
+   "set": "slow"
+  },
+  {
+   "name": "SLOW FOUR TON SHADOW B04 2",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/slow/four-ton-shadow-b04-2.mp4",
+   "set": "slow"
+  },
+  {
+   "name": "SLOW FOUR TON SHADOW B04 3",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/slow/four-ton-shadow-b04-3.mp4",
+   "set": "slow"
+  },
+  {
+   "name": "SLOW FOUR TON SHADOW B04 4",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/slow/four-ton-shadow-b04-4.mp4",
+   "set": "slow"
+  },
+  {
+   "name": "SLOW FOUR TON SHADOW S01 5",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/slow/four-ton-shadow-s01-5.mp4",
+   "set": "slow"
+  },
+  {
+   "name": "SLOW FOUR TON SHADOW S01 6",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/slow/four-ton-shadow-s01-6.mp4",
+   "set": "slow"
+  },
+  {
+   "name": "SLOW FOUR TON SHADOW S01 7",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/slow/four-ton-shadow-s01-7.mp4",
+   "set": "slow"
+  },
+  {
+   "name": "SLOW FOUR TON SHADOW S01 8",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/slow/four-ton-shadow-s01-8.mp4",
+   "set": "slow"
+  },
+  {
+   "name": "SLOW OVERPASS",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/slow/overpass.mp4",
+   "set": "slow"
+  },
+  {
+   "name": "SLOW PLATFORM",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/slow/platform.mp4",
+   "set": "slow"
+  },
+  {
+   "name": "SLOW TUNNEL",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/slow/tunnel.mp4",
+   "set": "slow"
+  },
+  {
+   "name": "SLOW WINDOW",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/slow/window.mp4",
+   "set": "slow"
+  },
+  {
+   "name": "FAST CROWD",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/crowd.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R01 1",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r01-1.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R01 2",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r01-2.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R01 3",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r01-3.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R01 4",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r01-4.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R02 1",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r02-1.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R02 2",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r02-2.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R02 3",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r02-3.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R02 4",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r02-4.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R03 1",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r03-1.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R03 2",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r03-2.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R03 3",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r03-3.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R03 4",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r03-4.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R04 1",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r04-1.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R04 2",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r04-2.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R04 3",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r04-3.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R04 4",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r04-4.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R05 1",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r05-1.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R05 2",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r05-2.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R05 3",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r05-3.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R05 4",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r05-4.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R06 1",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r06-1.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R06 2",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r06-2.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R06 3",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r06-3.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R06 4",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r06-4.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R06 5",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r06-5.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R07 1",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r07-1.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R07 2",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r07-2.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R07 3",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r07-3.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R07 4",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r07-4.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R08 1",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r08-1.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R08 2",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r08-2.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R08 3",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r08-3.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R08 4",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r08-4.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R09 1",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r09-1.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R09 2",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r09-2.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R09 3",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r09-3.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R09 4",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r09-4.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R10 1",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r10-1.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R10 2",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r10-2.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R10 3",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r10-3.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST FOUR TON SHADOW R10 4",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/four-ton-shadow-r10-4.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST PLATFORM",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/platform.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R01 STAIRWELL 1",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r01-stairwell-1.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R01 STAIRWELL 2",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r01-stairwell-2.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R01 STAIRWELL 3",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r01-stairwell-3.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R01 STAIRWELL 4",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r01-stairwell-4.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R01 STAIRWELL 5",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r01-stairwell-5.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R01 STAIRWELL 6",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r01-stairwell-6.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R01 STAIRWELL 7",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r01-stairwell-7.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R02 SPEAKERS 1",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r02-speakers-1.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R02 SPEAKERS 2",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r02-speakers-2.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R02 SPEAKERS 3",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r02-speakers-3.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R02 SPEAKERS 4",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r02-speakers-4.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R02 SPEAKERS 5",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r02-speakers-5.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R02 SPEAKERS 6",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r02-speakers-6.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R02 SPEAKERS 7",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r02-speakers-7.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R02 SPEAKERS 8",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r02-speakers-8.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R03 DECKS 1",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r03-decks-1.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R03 DECKS 2",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r03-decks-2.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R03 DECKS 3",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r03-decks-3.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R03 DECKS 4",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r03-decks-4.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R03 DECKS 5",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r03-decks-5.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R03 DECKS 6",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r03-decks-6.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R03 DECKS 7",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r03-decks-7.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R03 DECKS 8",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r03-decks-8.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R04 TRACKS 1",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r04-tracks-1.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R04 TRACKS 6",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r04-tracks-6.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R04 TRACKS 7",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r04-tracks-7.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R04 TRACKS 8",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r04-tracks-8.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R04 TRACKS 9",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r04-tracks-9.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R05 FENCE 1",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r05-fence-1.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R05 FENCE 2",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r05-fence-2.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R05 FENCE 3",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r05-fence-3.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R05 FENCE 4",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r05-fence-4.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R05 FENCE 5",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r05-fence-5.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R05 FENCE 6",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r05-fence-6.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R05 FENCE 7",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r05-fence-7.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R05 FENCE 8",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r05-fence-8.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R06 ALLEY 1",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r06-alley-1.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R06 ALLEY 2",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r06-alley-2.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R06 ALLEY 3",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r06-alley-3.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R06 ALLEY 4",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r06-alley-4.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R06 ALLEY 5",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r06-alley-5.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R06 ALLEY 6",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r06-alley-6.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R06 ALLEY 7",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r06-alley-7.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R06 ALLEY 8",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r06-alley-8.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R07 ESCALATOR 1",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r07-escalator-1.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R07 ESCALATOR 2",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r07-escalator-2.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R07 ESCALATOR 3",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r07-escalator-3.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R07 ESCALATOR 4",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r07-escalator-4.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R07 ESCALATOR 5",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r07-escalator-5.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R07 ESCALATOR 6",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r07-escalator-6.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R07 ESCALATOR 7",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r07-escalator-7.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R07 ESCALATOR 8",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r07-escalator-8.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R08 STROBE 1",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r08-strobe-1.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R08 STROBE 4",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r08-strobe-4.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST R08 STROBE 6",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/r08-strobe-6.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST ROOFTOP",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/rooftop.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST TUNNEL",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/tunnel.mp4",
+   "set": "fast"
+  },
+  {
+   "name": "FAST WINDOW",
+   "url": "https://api.b0ase.com/storage/v1/object/public/videos/vexvoid/av/fast/window.mp4",
+   "set": "fast"
   }
  ],
  "images": [

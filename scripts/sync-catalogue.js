@@ -29,6 +29,17 @@ const images = fs.readdirSync(imgRoot, { withFileTypes: true })
     .sort()
     .map(f => ({ name: f.replace(/\.[^.]+$/, ''), set: d.name, url: `https://www.vexvoid.com/images/${encodeURIComponent(d.name)}/${encodeURIComponent(f)}` })));
 
-const out = { generated: new Date().toISOString().slice(0, 10), tracks, clips: [...grok, ...jam], images };
+// The curated music-video clip library (data/av/library.json: fast and slow cuts, already on public storage).
+// Its idents are the engine's Grok idents again, so they're skipped.
+let library = [];
+try {
+  const lib = JSON.parse(fs.readFileSync(path.join(site, 'data', 'av', 'library.json'), 'utf8'));
+  const seen = new Set([...grok, ...jam].map(c => c.url.split('/').pop()));
+  library = ['slow', 'fast'].flatMap(set => (lib[set] || []).filter(u => !seen.has(u.split('/').pop())).map(u => ({
+    name: set.toUpperCase() + ' ' + decodeURIComponent(u.split('/').pop()).replace(/\.mp4$/i, '').replace(/[-_]+/g, ' ').toUpperCase(), url: u, set
+  })));
+} catch (e) { console.warn('no data/av/library.json: ' + e.message); }
+
+const out = { generated: new Date().toISOString().slice(0, 10), tracks, clips: [...grok, ...jam, ...library], images };
 fs.writeFileSync(path.join(__dirname, '..', 'vx', 'catalogue.json'), JSON.stringify(out, null, 1) + '\n');
 console.log(`${tracks.length} tracks, ${out.clips.length} clips, ${images.length} images -> vx/catalogue.json`);
