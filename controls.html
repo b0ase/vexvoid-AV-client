@@ -1744,6 +1744,7 @@
     .ai-in textarea{flex:1;resize:none;background:#050505;color:#fff;border:1px solid #333;padding:8px;font:inherit;font-size:12px;text-transform:none;letter-spacing:.02em}
     .ai-in .gen-btn{width:82px}
     /* layer LOAD picker */
+    .layer-btn:disabled{opacity:.25;cursor:default}
     .mp-overlay{position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;padding:24px}
     .mp{width:min(1100px,100%);height:min(720px,100%);display:flex;flex-direction:column;gap:10px;background:#050505;border:1px solid rgba(255,255,255,.35);padding:14px}
     .mp-head{display:flex;gap:8px;align-items:center}.mp-head b{flex:1;font-family:'Michroma','IBM Plex Mono',sans-serif;font-weight:400;letter-spacing:.2em;font-size:12px}
@@ -2793,8 +2794,8 @@
       
       function updatePaletteList(paletteElement, layers, paletteName) {
         paletteElement.innerHTML = '';
-        
-        layers.forEach(layer => {
+        // top of the list = top of the stack (later layers draw over earlier ones)
+        layers.slice().reverse().forEach((layer, i, shown) => {
           const layerItem = document.createElement('div');
           layerItem.className = 'layer-item';
           if (selectedLayer && selectedLayer.id === layer.id) {
@@ -2811,6 +2812,8 @@
             <div class="layer-buttons">
               <button class="layer-btn ${layer.visible ? 'active' : ''}" onclick="toggleVisibility(${layer.id})" title="Show / hide on the output">${layer.visible ? 'ON' : 'OFF'}</button>
               <button class="layer-btn" onclick="loadImages(${layer.id})" title="Load images or video">LOAD</button>
+              <button class="layer-btn" onclick="moveLayerStep(${layer.id}, 1)" title="Move up (draws over the layer above)" ${i === 0 ? 'disabled' : ''}>UP</button>
+              <button class="layer-btn" onclick="moveLayerStep(${layer.id}, -1)" title="Move down" ${i === shown.length - 1 ? 'disabled' : ''}>DOWN</button>
               <button class="layer-btn" onclick="duplicateLayer(${layer.id})" title="Duplicate">DUP</button>
               <button class="layer-btn" onclick="removeLayer(${layer.id})" title="Remove">DEL</button>
               <button class="inverse-btn ${layer.inverse ? 'active' : ''}" onclick="toggleInverse(${layer.id})" title="Invert">INV</button>
@@ -3188,10 +3191,12 @@
       let draggedElement = null;
       let draggedLayerId = null;
       
+      // currentTarget is the layer card; e.target can be its name, a button or the handle, which carry no layer id
+      // (dropping on one of those did nothing, so layers could not be moved)
       function handleDragStart(e) {
-        draggedElement = e.target;
-        draggedLayerId = parseInt(e.target.dataset.layerId);
-        e.target.classList.add('dragging');
+        draggedElement = e.currentTarget;
+        draggedLayerId = parseInt(e.currentTarget.dataset.layerId);
+        e.currentTarget.classList.add('dragging');
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/html', e.target.outerHTML);
       }
@@ -3205,13 +3210,11 @@
       }
       
       function handleDragEnter(e) {
-        if (e.target !== draggedElement) {
-          e.target.classList.add('drag-over');
-        }
+        if (e.currentTarget !== draggedElement) e.currentTarget.classList.add('drag-over');
       }
       
       function handleDragLeave(e) {
-        e.target.classList.remove('drag-over');
+        if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('drag-over');
       }
       
       function handleDrop(e) {
@@ -3219,19 +3222,19 @@
           e.stopPropagation();
         }
         
-        if (draggedElement !== e.target) {
-          const targetLayerId = parseInt(e.target.dataset.layerId);
+        if (draggedElement !== e.currentTarget) {
+          const targetLayerId = parseInt(e.currentTarget.dataset.layerId);
           if (targetLayerId && draggedLayerId && targetLayerId !== draggedLayerId) {
             reorderLayers(draggedLayerId, targetLayerId);
           }
         }
         
-        e.target.classList.remove('drag-over');
+        e.currentTarget.classList.remove('drag-over');
         return false;
       }
       
       function handleDragEnd(e) {
-        e.target.classList.remove('dragging');
+        e.currentTarget.classList.remove('dragging');
         // Clean up any remaining drag-over classes
         document.querySelectorAll('.drag-over').forEach(el => {
           el.classList.remove('drag-over');
@@ -3283,6 +3286,17 @@
         updatePreview();
       }
       
+      // UP / DOWN on a layer card: one step in its deck's stack (up = drawn over the next layer)
+      window.moveLayerStep = function(id, dir) {
+        const palette = layersA.some(l => l.id === id) ? layersA : layersB;
+        const i = palette.findIndex(l => l.id === id), j = i + dir;
+        if (i < 0 || j < 0 || j >= palette.length) return;
+        [palette[i], palette[j]] = [palette[j], palette[i]];
+        renumberPaletteLayers(palette);
+        sendToOutput('reorder-layers', { layers: [...layersA, ...layersB].map(l => l.id) });
+        updateLayersList(); updatePreview();
+      };
+
       function moveLayerToPalette(draggedId, targetPalette, targetId = null) {
         // Find the dragged layer in both palettes
         const draggedFromA = layersA.find(l => l.id === draggedId);
