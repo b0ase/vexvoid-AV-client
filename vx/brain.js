@@ -39,7 +39,8 @@ Load a skill with the skill tool before the job it covers, then follow it:
 - shaders: writing a new GPU shader pattern (with a working example to build from).
 - grok: writing Grok Imagine prompts in the VexVoid look (only when new footage is wanted and approved).
 - clip-review: judging clips and stills against the owner's standard.
-- worlds: the three finished videos' worlds, as models for inventing a world for any track.`;
+- worlds: the three finished videos' worlds, as models for inventing a world for any track.
+- styles: the library of film styles VexVoid is learning (abstract digital film making), each with its grammar and how to do it here.`;
 
   var skills = {
     'music-video': { when: 'making a finished music video in the EDIT tab', text: `MUSIC VIDEO (EDIT tab, editor tool)
@@ -100,6 +101,23 @@ Write concrete pictures of the track's world (objects, places, light), one subje
 - Trim: Grok often turns a good clip into effects mush after a few seconds (a glacier becoming a spinning tunnel). Use the clean seconds only.
 - Score what is left: energy (how much moves), phase (rough raw handheld, bridge concrete and one light, smooth calm and pristine), and whether it says something about the track's world or is filler.
 Say the verdict per clip in a few words.` },
+
+    'styles': { when: 'a brief names or implies a film style, or the house look is not what is wanted', text: `STYLES (abstract digital film making; VexVoid is studying many styles, the house look is only one)
+Each style: its grammar, then how to get it with the tools here, and what is not built yet. Learn the language of a reference; never copy its footage, type or mark.
+
+HOUSE (the default; see your core rules): night city, monochrome, hard single light, haze, figure from behind, cut on bars, rough -> bridge -> smooth, faint corner idents.
+
+CONSTRUCTION (ref: @_zuji, "the construction of six"): a mark or wordmark built from modular blocks on a hairline grid; spec-sheet header (module, sub-divisions, reg. no., division, date), registration crosses, guides running off the frame, dark greys not pure white, calm pacing, one glyph per bar or two. Here: the V3X CONSTRUCTION pattern; for a title card put it on a deck and record, or cut its recording into an edit.
+
+SCOPE GLOW (ref: @unholyidea, "[int: white ferrari]"; the owner says the whole account is worth studying): a lyric edit.
+- Frame: letterboxed scope, about 2.4:1, inside 16:9.
+- Rhythm: very fast, about four cuts a second in the busy passages, some shots two frames long; held near-black frames between bursts; white flash frames on hits.
+- Type: tiny glowing lyric lines centred, timed to the vocal; a small credit block top-left; giant translucent words running off the frame edge; micro-type in the corners (timecode, notes) like an interface.
+- Compositing: multiple exposures in screen blend, picture-in-picture slabs of other shots, split panels.
+- Colour and texture: warm amber grade with halation and bloom; bursts of posterised or solarised colour (cyan, magenta, yellow); teal and cream duotone; light leaks. Colour is part of this style: use it only when the brief asks for this style or colour.
+- Abstract layer: particle orbit rings, shattered glass shards, chrome swirls, bokeh (our shaders: GYROID, LIQUID CHROME, INK, CATHEDRAL as sources).
+- Motif: a hooded figure from behind in coloured light (already ours).
+- Here now: fast cuts (auto_cut fast + manual shot lengths), shaders as the abstract layer, the hooded-figure clips. Not built yet: letterbox, flash frames, sub-beat cuts, lyric typography, blend layers and slabs in exports, grades (amber/halation, posterise, duotone). Say so when a brief needs them rather than faking it.` },
 
     'worlds': { when: 'choosing or inventing the world for a track', text: `WORLDS (the three finished videos)
 - Four Ton Shadow: weight and pressure. Steel, freight, concrete, machinery bearing down (a container swinging on a crane cable over a dock, a hydraulic press, a goods train pounding over a bridge, motorway pillars, a pile driver), then the climb: rooftoppers on cranes and towers at night, the city's lights from above, up into dawn and weightless light.
