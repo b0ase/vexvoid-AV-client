@@ -156,6 +156,10 @@
     var shots = [], recent = [], t = 0, seed = 1, cautionUsed = false;
     function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
     var noted = pool.some(function (p) { return p.energy != null || p.phase; });
+    // a clip's scene: its name without the take number (FAST FOUR TON SHADOW B01 3 -> ...B01); studio rule: consecutive
+    // shots come from different scenes where possible
+    function scene(p) { return String(p.name || p.src).replace(/\s+\d+$/, ''); }
+    var lastScenes = [];
     // with notes: score each candidate by how well its energy fits the bar and its phase fits the point in the track
     function choose(list, e, at) {
       if (!noted) return list[Math.floor(rnd() * list.length)];
@@ -165,6 +169,8 @@
         if (p.phase) s += p.phase === want ? 0.5 : p.phase === 'bridge' || want === 'bridge' ? 0.15 : 0;
         if (p.favourite) s += 0.3;
         if (p.filler) s -= 0.4;
+        var sc = scene(p);
+        if (lastScenes[lastScenes.length - 1] === sc) s -= 0.9; else if (lastScenes.indexOf(sc) >= 0) s -= 0.35;
         return { p: p, s: s + rnd() * 0.35 };
       }).sort(function (a, b) { return b.s - a.s; });
       return scored[0].p;
@@ -189,6 +195,7 @@
       if (!choices.length) choices = pool;
       var pick = peakPick && Math.abs(t - peak) < bar * 0.5 ? peakPick : choose(choices, e, t / o.seconds);
       if (pick.caution) cautionUsed = true;
+      lastScenes.push(scene(pick)); if (lastScenes.length > 3) lastScenes.shift();
       var room = pick.dur ? Math.max(0, pick.dur - dur) : 0;
       shots.push({ src: pick.src, name: pick.name, in: Math.round(room * rnd() * 100) / 100, dur: Math.round(dur * 1000) / 1000 });
       recent.push(pick.src); if (recent.length > Math.min(4, pool.length - 1)) recent.shift();

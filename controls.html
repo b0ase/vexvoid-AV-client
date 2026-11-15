@@ -2555,7 +2555,7 @@
           <div class="ed-title" id="edTitle" contenteditable="true" spellcheck="false">UNTITLED VIDEO</div>
           <select id="edTrack" class="gen-select"></select>
           <select id="edPace" class="gen-select"><option value="fast">FAST CUTS</option><option value="medium" selected>MEDIUM</option><option value="slow">SLOW</option></select>
-          <button id="edAuto" class="gen-btn hot">AUTO-CUT</button><button id="edPlay" class="gen-btn">PLAY</button><button id="edClear" class="gen-btn">CLEAR</button><label class="ed-finish" title="Faint V3X idents in the corners every ~19 s and matte flashes on the two biggest hits, as on the finished VexVoid videos"><input type="checkbox" id="edFinish" checked> FINISH</label><button id="edExport" class="gen-btn">EXPORT MP4</button>
+          <button id="edAuto" class="gen-btn hot">AUTO-CUT</button><button id="edPlay" class="gen-btn">PLAY</button><button id="edClear" class="gen-btn">CLEAR</button><label class="ed-finish" title="Faint V3X idents in the corners every ~19 s and matte flashes on the two biggest hits, as on the finished VexVoid videos"><input type="checkbox" id="edFinish" checked> FINISH</label><select id="edLook" class="gen-select" title="The look of the export: grade, letterbox and flash frames (rendered with MLT)"><option value="house">HOUSE · MONO</option><option value="scope">SCOPE · 2.39 + FLASHES</option><option value="raw">RAW · AS SHOT</option></select><button id="edExport" class="gen-btn">EXPORT MP4</button><button id="edShotcut" class="gen-btn" title="Open the last export as a Shotcut project, to finish it by hand" disabled>OPEN IN SHOTCUT</button>
         </div>
         <div class="ed-mid"><div class="ed-view"><video id="edVideo" muted playsinline></video></div><div class="ed-shot" id="edShot"></div></div>
         <div class="ed-bar"><span id="edLen"></span><span id="edStatus"></span></div>
@@ -5602,7 +5602,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       const ed = { title: 'UNTITLED VIDEO', track: null, shots: [], env: null, sel: -1, playing: false, audio: null, raf: 0, cur: -1, rendering: false };
       try { Object.assign(ed, JSON.parse(localStorage.getItem(ED_STORE) || '{}'), { env: null, playing: false, audio: null, cur: -1, rendering: false }); } catch (e) {}
       const edEl = id => document.getElementById(id);
-      function edSave() { try { localStorage.setItem(ED_STORE, JSON.stringify({ title: ed.title, track: ed.track, shots: ed.shots, sel: ed.sel })); } catch (e) {} }
+      function edSave() { try { localStorage.setItem(ED_STORE, JSON.stringify({ title: ed.title, track: ed.track, shots: ed.shots, sel: ed.sel, look: ed.look, lookOver: ed.lookOver })); } catch (e) {} }
       function edSay(t) { edEl('edStatus').textContent = t; }
       // the edit's tempo: one set by hand, else the track's own (detected when it loads), else the mixer's
       function edBpm() { return (ed.track && (ed.track.tempo || ed.track.bpm)) || (VXGEN.signals && VXGEN.signals.bpm) || 120; }
@@ -5758,6 +5758,35 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         });
       }
       const edFfmpeg = () => ['/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/usr/bin/ffmpeg'].find(p => require('fs').existsSync(p));
+      const edMelt = () => ['/opt/homebrew/bin/melt', '/usr/local/bin/melt'].find(p => require('fs').existsSync(p));
+      // looks for an MLT render: grade, letterbox and where flash frames go
+      const ED_LOOKS = {
+        house: { grade: { saturation: 0, contrast: 1.12 }, letterbox: 0, flashes: 'off' },
+        scope: { grade: { saturation: 0, contrast: 1.18, gamma: 0.95 }, letterbox: 2.39, flashes: 'hits' },
+        raw: { grade: null, letterbox: 0, flashes: 'off' }
+      };
+      function edLookNow() { return Object.assign({}, ED_LOOKS[ed.look || 'house'] || ED_LOOKS.house, ed.lookOver || {}); }
+      // flash frames: off, on the cuts at the two biggest hits, or on every cut
+      function edFlashTimes(mode) {
+        if (!mode || mode === 'off' || ed.shots.length < 2) return [];
+        const cuts = VXEDIT.layout(ed.shots).slice(1).map(s => s.start);
+        if (mode === 'all') return cuts;
+        const hits = VXEDIT.finishPlan({ shots: ed.shots, env: ed.env, seconds: edLength() }).mattes.map(m => m.t0 + 0.4);
+        return cuts.filter(c => hits.some(h => Math.abs(h - c) < 0.05));
+      }
+      function meltRun(melt, args, frames, label) {
+        return new Promise((res, rej) => {
+          const p = require('child_process').spawn(melt, args);
+          let err = '';
+          p.stderr.on('data', d => { err = (err + d).slice(-4000); const m = String(d).match(/Current Position: (\d+)/g); if (m && frames) edSay(`${label} ${Math.min(100, Math.round(+m[m.length - 1].split(': ')[1] / frames * 100))}%`); });
+          p.on('close', c => c === 0 ? res() : rej(new Error('melt stopped: ' + err.split('\n').filter(x => x && !/Current Position/.test(x)).slice(-2).join(' '))));
+        });
+      }
+      const identDurs = {};
+      function probeDur(file) {
+        if (identDurs[file]) return identDurs[file];
+        try { return (identDurs[file] = parseFloat(require('child_process').execFileSync(edFfmpeg().replace(/ffmpeg$/, 'ffprobe'), ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file], { encoding: 'utf8' })) || 4); } catch (e) { return 4; }
+      }
       async function edExport(title, finish = edEl('edFinish').checked) {
         if (ed.rendering) throw new Error('already rendering');
         if (!ed.track || !ed.shots.length) throw new Error('needs a track and some shots');
@@ -5773,7 +5802,19 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           fs.mkdirSync(recDir, { recursive: true });
           const slug = String(title || ed.title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'video';
           const out = path.join(recDir, `${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}-${slug}.mp4`);
-          const total = edLength(), base = finish ? out.replace(/\.mp4$/, '-base.mp4') : out;
+          const total = edLength(), melt = edMelt();
+          if (melt) {
+            // MLT: one render with every layer on its own track; the project stays beside the MP4 for Shotcut
+            const kit = path.join(__dirname, 'vx', 'assets', 'finish'), look = edLookNow();
+            const plan = finish ? VXEDIT.finishPlan({ shots: ed.shots, env: ed.env, seconds: total }) : { idents: [], mattes: [] };
+            const idents = plan.idents.map(d => { const file = path.join(kit, `V3X-ident-${d.name}.mp4`); return { t: d.t, corner: d.corner, file, dur: probeDur(file) }; });
+            const mltFile = out.replace(/\.mp4$/, '.mlt');
+            fs.writeFileSync(mltFile, VXMLT.project({ title: String(title || ed.title), seconds: total, track, shots, flashes: edFlashTimes(look.flashes),
+              idents, mattes: plan.mattes, mask: path.join(kit, 'V3X-matte-mask.mp4'), letterbox: look.letterbox, grade: look.grade }));
+            await meltRun(melt, VXMLT.renderArgs(mltFile, out), Math.round(total * 30), 'Rendering');
+            ed.lastProject = mltFile; edEl('edShotcut').disabled = false;
+          } else {
+          const base = finish ? out.replace(/\.mp4$/, '-base.mp4') : out;
           await ffmpegRun(ff, VXEDIT.ffmpegArgs({ shots, track, out: base }), total, 'Rendering');
           if (finish) {
             const kit = path.join(__dirname, 'vx', 'assets', 'finish'), seconds = Math.min(total, ed.track.seconds || total);
@@ -5788,6 +5829,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
             const idents = plan.idents.map(d => ({ t: d.t, corner: d.corner, file: path.join(kit, `V3X-ident-${d.name}.mp4`) }));
             await ffmpegRun(ff, VXEDIT.finishArgs({ base, mattes, idents, out }), seconds, 'Finishing');
             [base, ...mattes.map(m => m.file)].forEach(f => { try { fs.unlinkSync(f); } catch (e) {} });
+          }
           }
           ed.lastExport = out;
           initializeVideosTab();
@@ -5805,6 +5847,9 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       edEl('edAuto').addEventListener('click', () => edAutoCut({ pace: edEl('edPace').value }).catch(e => edSay(e.message)));
       edEl('edPlay').addEventListener('click', () => ed.playing ? edStop() : edPlay());
       edEl('edExport').addEventListener('click', () => edExport().catch(e => edSay(e.message)));
+      edEl('edLook').value = ed.look || 'house';
+      edEl('edLook').addEventListener('change', e => { ed.look = e.target.value; ed.lookOver = null; edSave(); });
+      edEl('edShotcut').addEventListener('click', () => { if (ed.lastProject && require('fs').existsSync('/Applications/Shotcut.app')) require('child_process').execFile('open', ['-a', 'Shotcut', ed.lastProject]); else edSay('Shotcut is not installed (brew install --cask shotcut).'); });
       edEl('edClear').addEventListener('click', () => { ed.shots = []; ed.sel = -1; edSave(); edRender(); });
       edEl('edTitle').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
       edEl('edTitle').addEventListener('blur', e => { ed.title = e.target.textContent.trim().toUpperCase().slice(0, 60) || 'UNTITLED VIDEO'; edSave(); });
@@ -5860,9 +5905,9 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
             input_schema: { type: 'object', properties: { path: { type: 'string' }, play: { type: 'boolean' } }, required: ['path'], additionalProperties: false } },
           { name: 'record', description: 'Make a music video: record the output screen together with the playing music into a video file (MP4). Start the track and your set first, then call record with until="track_end" (it returns when the track finishes and the file is saved) or seconds=N. action="stop" ends a recording early. The file lands in VIDEOS. Takes as long as the music.',
             input_schema: { type: 'object', properties: { action: { type: 'string', enum: ['record', 'stop'] }, title: { type: 'string' }, until: { type: 'string', enum: ['track_end'] }, seconds: { type: 'number' } }, additionalProperties: false } },
-          { name: 'editor', description: 'The EDIT tab: cut a music video from clips to a track, then export an MP4. Actions: state (what the edit is); set_track (track: catalogue number or words, or a file path); map (the track\'s tempo, detected from the audio, and its loudness, one digit 0-9 per bar, to read intro, builds, drops and breakdowns); tempo (bpm: set it by hand when the detected one is half or double what you hear; 0 goes back to detected); auto_cut (pace fast|medium|slow; source all|catalogue|generated|recorded|wallet; filter words to pick clips by name, set, phase or notes, e.g. "crane" or "rough"), which cuts on the bars with the loudest parts getting the shortest and most moving shots; add (clip: words or a path or URL, seconds); replace (index, clip: words or a path or URL) swaps one shot\'s clip; remove (index); title (title); export (renders the MP4 with ffmpeg; finish true (default) adds the corner idents and matte flashes; takes a few minutes; the file lands in VIDEOS); frames (a contact sheet of the last export, or of path, to check it). Prefer this over record for a finished music video: it is a real edit, not a live take.',
-            input_schema: { type: 'object', properties: { action: { type: 'string', enum: ['state', 'set_track', 'map', 'tempo', 'auto_cut', 'add', 'replace', 'remove', 'title', 'export', 'frames'] }, track: { type: 'string' }, pace: { type: 'string', enum: ['fast', 'medium', 'slow'] },
-              source: { type: 'string', enum: ['all', 'catalogue', 'generated', 'recorded', 'wallet'] }, filter: { type: 'string' }, clip: { type: 'string' }, seconds: { type: 'number' }, index: { type: 'number' }, title: { type: 'string' }, finish: { type: 'boolean' }, path: { type: 'string' }, bpm: { type: 'number' } }, required: ['action'], additionalProperties: false } },
+          { name: 'editor', description: 'The EDIT tab: cut a music video from clips to a track, then export an MP4. Actions: state (what the edit is); set_track (track: catalogue number or words, or a file path); map (the track\'s tempo, detected from the audio, and its loudness, one digit 0-9 per bar, to read intro, builds, drops and breakdowns); tempo (bpm: set it by hand when the detected one is half or double what you hear; 0 goes back to detected); auto_cut (pace fast|medium|slow; source all|catalogue|generated|recorded|wallet; filter words to pick clips by name, set, phase or notes, e.g. "crane" or "rough"), which cuts on the bars with the loudest parts getting the shortest and most moving shots; add (clip: words or a path or URL, seconds); replace (index, clip: words or a path or URL) swaps one shot\'s clip; remove (index); title (title); look (look house|scope|raw; letterbox ratio e.g. 2.39 or 0; flashes off|hits|all): the grade, letterbox and white flash frames of the export; export (renders the MP4 with MLT, also saving a Shotcut project; finish true (default) adds the corner idents and matte flashes; takes a few minutes; the file lands in VIDEOS); frames (a contact sheet of the last export, or of path, to check it). Prefer this over record for a finished music video: it is a real edit, not a live take.',
+            input_schema: { type: 'object', properties: { action: { type: 'string', enum: ['state', 'set_track', 'map', 'tempo', 'look', 'auto_cut', 'add', 'replace', 'remove', 'title', 'export', 'frames'] }, track: { type: 'string' }, pace: { type: 'string', enum: ['fast', 'medium', 'slow'] },
+              source: { type: 'string', enum: ['all', 'catalogue', 'generated', 'recorded', 'wallet'] }, filter: { type: 'string' }, clip: { type: 'string' }, seconds: { type: 'number' }, index: { type: 'number' }, title: { type: 'string' }, finish: { type: 'boolean' }, path: { type: 'string' }, bpm: { type: 'number' }, look: { type: 'string', enum: ['house', 'scope', 'raw'] }, letterbox: { type: 'number' }, flashes: { type: 'string', enum: ['off', 'hits', 'all'] } }, required: ['action'], additionalProperties: false } },
           { name: 'skill', description: 'Load one of your playbooks before the job it covers: ' + Object.entries(VEXVOID_BRAIN.skills).map(([k, v]) => `${k} (${v.when})`).join('; ') + '.',
             input_schema: { type: 'object', properties: { name: { type: 'string', enum: Object.keys(VEXVOID_BRAIN.skills) } }, required: ['name'], additionalProperties: false } },
           { name: 'project', description: 'Update this piece of work\'s details (only the fields you give change): a short title, the brief (what it is, for whom, the look, the length, anything agreed), and for a show only, its date (YYYY-MM-DD) and venue.',
@@ -5968,6 +6013,15 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
             const how = ed.track.tempo ? 'set by hand' : `detected from the audio, confidence ${ed.track.tempoConf ?? '?'}; bar 1 starts at ${edBar0().toFixed(2)} s`;
             return `${ed.track.name}: ${mmss(ed.env.seconds)} at ${edBpm()} BPM (${how}) = ${m.length} bars. Loudness per bar (0-9), in rows of 16 bars:\n` + m.match(/.{1,16}/g).map((r, i) => `bar ${String(i * 16 + 1).padStart(3)}: ${r}`).join('\n');
           }
+          if (a === 'look') {
+            if (input.look && ED_LOOKS[input.look]) { ed.look = input.look; ed.lookOver = null; edEl('edLook').value = ed.look; }
+            const over = Object.assign({}, ed.lookOver || {});
+            if (input.letterbox != null) over.letterbox = Number(input.letterbox) || 0;
+            if (input.flashes) over.flashes = input.flashes;
+            ed.lookOver = Object.keys(over).length ? over : null; edSave();
+            const L = edLookNow();
+            return `Look: ${ed.look || 'house'} (grade ${L.grade ? JSON.stringify(L.grade) : 'none'}, letterbox ${L.letterbox || 'none'}, flash frames ${L.flashes}).` + (edMelt() ? '' : ' MLT is not installed, so the export falls back to plain cuts without the look.');
+          }
           if (a === 'tempo') {
             if (!ed.track) throw new Error('pick a track first');
             const v = Number(input.bpm); ed.track.tempo = v >= 40 && v <= 240 ? v : null; edSave(); edRender();
@@ -5989,7 +6043,7 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
             return [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: fs.readFileSync(sheet).toString('base64') } },
               { type: 'text', text: `${require('path').basename(file)}: 20 frames, one every ${(secs / 20).toFixed(1)} s, left to right, top to bottom.` }];
           }
-          if (a === 'export') { const f = await edExport(input.title, input.finish !== false); if (gig) { (gig.assets = gig.assets || []).push(f); gigSave(); } return `Exported ${f}. It is in VIDEOS.`; }
+          if (a === 'export') { const f = await edExport(input.title, input.finish !== false); if (gig) { (gig.assets = gig.assets || []).push(f); gigSave(); } return `Exported ${f}. It is in VIDEOS.` + (ed.lastProject ? ` The Shotcut project is ${ed.lastProject} (the person can open it with OPEN IN SHOTCUT to finish by hand).` : ''); }
           throw new Error('unknown editor action ' + a);
         }
         if (name === 'project') {
@@ -7252,6 +7306,7 @@ Reply with only the JSON array in one \`\`\`json code block.`;
   <script src="./vx/market.js"></script>
   <script src="./vx/agent.js"></script>
   <script src="./vx/editor.js"></script>
+  <script src="./vx/mlt.js"></script>
   <script src="./vx/brain.js"></script>
   <script src="./vx/mint.js"></script>
   <script src="./vx/vx-keys.js"></script>
