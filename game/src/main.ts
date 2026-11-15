@@ -48,6 +48,13 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   canvas.style.cssText = 'width:100%;height:100%;display:block;outline:none;cursor:grab';
   canvas.tabIndex = 0;
   host.appendChild(canvas);
+  // one line over the picture for what to do next (press F here, hold the mouse, too high): the HUD line is easy to miss
+  const tip = document.createElement('div');
+  tip.style.cssText = 'position:absolute;left:50%;bottom:9%;transform:translateX(-50%);padding:9px 16px;background:rgba(0,0,0,.72);border:1px solid rgba(255,255,255,.55);color:#fff;font:600 13px/1 ui-monospace,Menlo,monospace;letter-spacing:.22em;text-transform:uppercase;white-space:nowrap;pointer-events:none;display:none';
+  if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+  host.appendChild(tip);
+  let tipNow = '', sprayed = false, follow = 0;
+  const prompt = (s: string) => { if (s !== tipNow) { tipNow = s; tip.textContent = s; tip.style.display = s ? 'block' : 'none'; } };
 
   const scene = new THREE.Scene();
   const cam = new THREE.PerspectiveCamera(62, 16 / 9, 0.05, 900);
@@ -119,7 +126,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   };
   const hud = () => { const s = hudText(); if (s !== lastHud) { lastHud = s; if (opts.onHud) opts.onHud(s); } };
   const nearestWall = () => {
-    let best: { id: string; spot: (typeof city.spots)[number] } | null = null, bd = 3.2;
+    let best: { id: string; spot: (typeof city.spots)[number] } | null = null, bd = 4.5;
     for (const sp of city.spots) {
       const dx = me.x - sp.center.x, dz = me.z - sp.center.z, off = dx * sp.normal.x + dz * sp.normal.z;
       const along = Math.abs(dx * sp.normal.z - dz * sp.normal.x);
@@ -232,15 +239,20 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       // stand square to the wall, an arm's length off it, within its ends
       const sp = paint.spot, n = sp.normal, tx = n.z, tz = -n.x;
       let off = (me.x - sp.center.x) * n.x + (me.z - sp.center.z) * n.z, along = (me.x - sp.center.x) * tx + (me.z - sp.center.z) * tz;
+      // spraying past arm's reach: the writer steps along the wall after the can
+      if (Math.abs(follow) > 1.1) along += Math.sign(follow) * Math.min(Math.abs(follow) - 1.1, 1.6 * dt);
       off = Math.max(0.55, Math.min(0.9, off)); along = Math.max(-sp.w / 2 + 0.3, Math.min(sp.w / 2 - 0.3, along));
       me.x = sp.center.x + n.x * off + tx * along; me.z = sp.center.z + n.z * off + tz * along;
       let dh = Math.atan2(-n.x, -n.z) - me.heading; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); me.heading += dh * Math.min(1, dt * 10);
-      // aim: where the mouse points on this wall, if the writer can reach it
+      // aim: where the mouse points on this wall. Anywhere along it paints (the writer steps after the can); only height is out of reach
       ray.setFromCamera(mouse, cam);
       const h = spray.hit(ray);
-      const reach = h && h.id === sp.id && h.point.y < me.gy + me.y + 2.35 && h.point.y > me.gy + 0.08 &&
-        Math.abs((h.point.x - me.x) * tx + (h.point.z - me.z) * tz) < 1.25;
+      const reach = h && h.id === sp.id && h.point.y < me.gy + me.y + 2.6 && h.point.y > me.gy + 0.08;
       reticle.visible = !!(h && h.id === sp.id);
+      const onWall = !!(h && h.id === sp.id), tooHigh = onWall && h!.point.y >= me.gy + me.y + 2.6;
+      follow = spraying && onWall && !tooHigh ? (h!.point.x - me.x) * tx + (h!.point.z - me.z) * tz : 0;
+      if (spraying && reach) sprayed = true;
+      prompt(tooHigh ? 'TOO HIGH TO REACH · AIM LOWER' : !onWall ? 'POINT AT THE WALL' : !sprayed ? 'HOLD THE MOUSE BUTTON TO SPRAY · F WHEN DONE' : '');
       if (h && h.id === sp.id) {
         reticle.position.copy(h.point).addScaledVector(n, 0.02); reticle.lookAt(h.point.clone().add(n));
         reticle.scale.setScalar(0.012 + can.dist * 0.45 * 0.6 + can.cap * 0.006);
@@ -251,7 +263,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       if (h && h.id === sp.id) writer.aim(aimHand.copy(h.point).addScaledVector(n, can.dist + 0.03), h.point, spraying ? 1 : 0.85);
       else writer.aim(null);
       hissOn(!!(spraying && reach));
-    } else { reticle.visible = false; hissOn(false); writer.aim(null); }
+    } else { reticle.visible = false; hissOn(false); writer.aim(null); follow = 0; prompt(!bust && nearestWall() ? 'PRESS F TO PAINT THIS WALL' : ''); }
     spray.update(dt);
     law.pushOut(me, 0.35);
     const ev = law.update(dt, t, { x: me.x, z: me.z, y: me.y, crouch: me.crouch, painting: !!paint, spraying: !!(paint && spraying && reticle.visible) });
@@ -348,7 +360,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     stop: () => {
       stopped = true; cancelAnimationFrame(raf); ro.disconnect();
       canvas.removeEventListener('keydown', kd); canvas.removeEventListener('keyup', ku);
-      hissOn(false); law.dispose(); if (bus) void bus.ctx.close(); spray.dispose(); writer.dispose(); city.dispose(); look.dispose(); comp.dispose(); r.dispose(); canvas.remove();
+      hissOn(false); law.dispose(); if (bus) void bus.ctx.close(); spray.dispose(); writer.dispose(); city.dispose(); look.dispose(); comp.dispose(); r.dispose(); canvas.remove(); tip.remove();
     },
   };
 }
