@@ -22,7 +22,9 @@ rsync -a relay/static/ hetzner:$DIR/relay/static/
 # the replay player (/replay/<id>) runs the mixer's sketch engine: p5, vx-gen, the chain reader, sketches, catalogue
 ssh hetzner "mkdir -p ~/$DIR/vx/lib"
 rsync -a vx/vx-gen.js vx/gen-library.js vx/chain.js vx/catalogue.json hetzner:$DIR/vx/
-rsync -a vx/lib/p5.min.js vx/lib/p5.LICENSE.txt hetzner:$DIR/vx/lib/
+rsync -a vx/lib/p5.min.js vx/lib/p5.LICENSE.txt vx/lib/three.global.js vx/lib/three.LICENSE.txt hetzner:$DIR/vx/lib/
+rsync -a vx/text3d.js hetzner:$DIR/vx/
+rsync -a vx/fonts/ hetzner:$DIR/vx/fonts/   # woff2 for text layers, ttf for 3D titles
 ssh hetzner "cd ~/$DIR && pm2 startOrReload relay/ecosystem.config.js --update-env && pm2 save >/dev/null && sleep 1 && curl -s http://127.0.0.1:8101/healthz && echo"
 
 # nginx site: only installed the first time, so certbot's TLS edits are never overwritten

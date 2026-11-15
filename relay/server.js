@@ -288,7 +288,15 @@ const STATIC = { 'livekit-client.umd.js': 'application/javascript', 'bwalletx-co
 // (relay/static/replay.html). It needs the mixer's sketch engine, p5, the chain reader, the sketch library and the
 // catalogue (music tracks and named clips), served from the mixer's own vx/ folder (deploy.sh copies it).
 const VX_STATIC = { 'p5.min.js': ['lib/p5.min.js', 'application/javascript'], 'vx-gen.js': ['vx-gen.js', 'application/javascript'],
-  'gen-library.js': ['gen-library.js', 'application/javascript'], 'chain.js': ['chain.js', 'application/javascript'], 'catalogue.json': ['catalogue.json', 'application/json'] };
+  'gen-library.js': ['gen-library.js', 'application/javascript'], 'chain.js': ['chain.js', 'application/javascript'], 'catalogue.json': ['catalogue.json', 'application/json'],
+  'lib/three.global.js': ['lib/three.global.js', 'application/javascript'], 'text3d.js': ['text3d.js', 'application/javascript'], 'fonts/fonts.css': ['fonts/fonts.css', 'text/css'] };
+// the named files above, plus the fonts by pattern (a plain name and the right extension, so nothing outside vx/fonts)
+function vxStatic(rel) {
+  if (Object.prototype.hasOwnProperty.call(VX_STATIC, rel)) return VX_STATIC[rel];
+  if (/^fonts\/[\w-]+\.woff2$/.test(rel)) return [rel, 'font/woff2'];
+  if (/^fonts\/ttf\/[\w-]+\.ttf$/.test(rel)) return [rel, 'font/ttf'];
+  return null;
+}
 
 async function handleLive(req, res, url, p) {
   let m;
@@ -296,9 +304,10 @@ async function handleLive(req, res, url, p) {
     res.writeHead(200, { 'content-type': STATIC[m[1]], 'cache-control': 'public, max-age=86400' });
     fs.createReadStream(path.join(__dirname, 'static', m[1])).pipe(res); return true;
   }
-  if ((m = p.match(/^\/vx\/([\w.-]+)$/)) && VX_STATIC[m[1]]) {
-    res.writeHead(200, { 'content-type': VX_STATIC[m[1]][1], 'cache-control': 'public, max-age=3600' });
-    fs.createReadStream(path.join(__dirname, '..', 'vx', VX_STATIC[m[1]][0])).on('error', () => res.end()).pipe(res); return true;
+  let vs;
+  if ((m = p.match(/^\/vx\/([\w.\/-]+)$/)) && (vs = vxStatic(m[1]))) {
+    res.writeHead(200, { 'content-type': vs[1], 'cache-control': 'public, max-age=3600' });
+    fs.createReadStream(path.join(__dirname, '..', 'vx', vs[0])).on('error', () => res.end()).pipe(res); return true;
   }
   if (req.method === 'GET' && /^\/replay(\/[0-9a-f]{64}_\d+)?\/?$/.test(p)) {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache' });
