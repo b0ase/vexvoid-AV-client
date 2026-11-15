@@ -469,6 +469,9 @@ export function buildCity({ renderer, scene, high, look, vexvoid = false }: { re
     }
   }
 
+  // what a body cannot walk through (the writer, the officers): filled in as the street is dressed
+  const blockers: Blocker[] = [];
+  const solid = (x: number, z: number, hx: number, hz: number, low = false) => blockers.push({ x0: x - hx, x1: x + hx, z0: z - hz, z1: z + hz, low });
   // ── Elevated layers along the street: an expressway over the left kerb, a rail line over the right ──
   const EXL = -20; // expressway centre x
   const EXY = 15.2; // expressway deck underside
@@ -482,6 +485,7 @@ export function buildCity({ renderer, scene, high, look, vexvoid = false }: { re
     box(buckets.concrete, EXL + 4.5, EXL + 4.7, EXY + 1.3, EXY + 2.4, z1, z0);
     for (let z = 4; z > -220; z -= 20) {
       box(buckets.concrete, EXL - 0.9, EXL + 0.9, 0, EXY, z - 1.3, z + 1.3);
+      solid(EXL, z, 0.9, 1.3);
       box(buckets.concrete, EXL - 3.6, EXL + 3.6, EXY - 1.0, EXY, z - 1.6, z + 1.6);
     }
     for (let z = 0; z > -220; z -= 10) {
@@ -499,6 +503,7 @@ export function buildCity({ renderer, scene, high, look, vexvoid = false }: { re
     box(buckets.iron, RLX - 0.02, RLX + 0.02, RLY + 4.6, RLY + 4.64, z1, z0); // overhead wire
     for (let z = 0; z > -220; z -= 14) {
       box(buckets.concrete, RLX - 0.7, RLX + 0.7, 0, RLY - 0.5, z - 1.8, z + 1.8);
+      solid(RLX, z, 0.7, 1.8);
       box(buckets.iron, RLX + 2.3 - 0.07, RLX + 2.3 + 0.07, RLY + 0.3, RLY + 4.6, z - 0.07, z + 0.07);
       addGlow(RLX, RLY - 0.8, z, '#7ee8ff', 1.0, 2, 0.8);
     }
@@ -739,9 +744,6 @@ export function buildCity({ renderer, scene, high, look, vexvoid = false }: { re
   if (vexvoid) hideEnd();
 
   // ── Street furniture: lamps, cables, lanterns, vending machines, barriers, trash ──
-  // what a body cannot walk through (the writer, the officers): filled in as the street is dressed
-  const blockers: Blocker[] = [];
-  const solid = (x: number, z: number, hx: number, hz: number, low = false) => blockers.push({ x0: x - hx, x1: x + hx, z0: z - hz, z1: z + hz, low });
   const poleMat = track(new THREE.MeshStandardMaterial({ color: '#1b1e25', roughness: 0.5, metalness: 0.8 }));
   const lampBulb = track(neon('#ffcf8a', 3));
   const lamps: THREE.PointLight[] = [];
@@ -1055,7 +1057,7 @@ export function buildCity({ renderer, scene, high, look, vexvoid = false }: { re
   for (let i = 0; i < nPark; i++) {
     const sx = i % 2 ? 1 : -1;
     const z = -14 - i * rr(9, 12);
-    parkM.push(M(sx * 13.3, 0.45, z, 1, 1, 1, R() < 0.5 ? 0 : Math.PI));
+    parkM.push(M(sx * 13.3, vexvoid ? 0.2 : 0.45, z, 1, 1, 1, R() < 0.5 ? 0 : Math.PI)); // VexVoid's cars sit down on their wheels
     solid(sx * 13.3, z, 1.2, 2.45, true);
     parkC.push(new THREE.Color(PAINT[ri(PAINT.length)]));
     const gc = GLOWC[ri(GLOWC.length)];
@@ -1065,6 +1067,14 @@ export function buildCity({ renderer, scene, high, look, vexvoid = false }: { re
   }
   instanced(carBody.clone(), carPaint, parkM, parkC, high);
   instanced(carGlow.clone(), carLight, parkM, parkG);
+  if (vexvoid) {
+    // VexVoid's street is on the ground: the parked cars stand on four wheels (dark tyres, a pale hub)
+    const tyre = new THREE.CylinderGeometry(0.34, 0.34, 0.26, 20).rotateZ(Math.PI / 2), hub = new THREE.CylinderGeometry(0.17, 0.17, 0.28, 12).rotateZ(Math.PI / 2);
+    const wheelM: THREE.Matrix4[] = [];
+    for (const m of parkM) for (const wx of [-0.86, 0.86]) for (const wz of [1.45, -1.3]) wheelM.push(m.clone().multiply(M(wx, 0.14, wz)));
+    instanced(tyre, track(new THREE.MeshStandardMaterial({ color: '#0a0a0b', roughness: 0.85, metalness: 0 })), wheelM, undefined, high);
+    instanced(hub, track(new THREE.MeshStandardMaterial({ color: '#8d9096', roughness: 0.35, metalness: 0.8 })), wheelM);
+  }
 
   type Flyer = { x: number; y: number; z: number; ax: 0 | 1; dir: number; spd: number; sc: number; lo: number; hi: number; ry: number };
   const flyers: Flyer[] = [];
