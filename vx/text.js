@@ -11,13 +11,20 @@
 
   var FONTS = [
     { id: 'michroma', family: 'Michroma', weight: 400, label: 'MICHROMA · wide, the V3XV0ID face' },
-    { id: 'syncopate', family: 'Syncopate', weight: 700, label: 'SYNCOPATE · wide caps' },
-    { id: 'unbounded', family: 'Unbounded', weight: 800, label: 'UNBOUNDED · heavy, round' },
-    { id: 'barlow', family: 'Barlow Condensed', weight: 800, label: 'BARLOW CONDENSED · tall, tight' },
-    { id: 'bebas', family: 'Bebas Neue', weight: 400, label: 'BEBAS NEUE · poster' },
-    { id: 'plex', family: 'IBM Plex Mono', weight: 500, label: 'PLEX MONO · technical' },
-    { id: 'majormono', family: 'Major Mono Display', weight: 400, label: 'MAJOR MONO · stylised mono' },
-    { id: 'instrument', family: 'Instrument Serif', weight: 400, italic: true, label: 'INSTRUMENT SERIF · italic' }
+    { id: 'geist', family: 'Geist', weight: 600, label: 'GEIST · crisp grotesk' },
+    { id: 'geistmono', family: 'Geist Mono', weight: 500, label: 'GEIST MONO · precise mono' },
+    { id: 'intertight', family: 'Inter Tight', weight: 800, label: 'INTER TIGHT · heavy, tight' },
+    { id: 'spacegrotesk', family: 'Space Grotesk', weight: 600, label: 'SPACE GROTESK · techy grotesk' },
+    { id: 'bigshoulders', family: 'Big Shoulders Stencil Display', weight: 800, label: 'BIG SHOULDERS STENCIL DISPLAY · tall industrial stencil' },
+    { id: 'sairastencil', family: 'Saira Stencil One', weight: 400, label: 'SAIRA STENCIL ONE · heavy wide stencil' },
+    { id: 'doto', family: 'Doto', weight: 800, label: 'DOTO · dot matrix' },
+    { id: 'chakra', family: 'Chakra Petch', weight: 600, label: 'CHAKRA PETCH · angular techno' },
+    { id: 'rajdhani', family: 'Rajdhani', weight: 600, label: 'RAJDHANI · squared, condensed' },
+    { id: 'oxanium', family: 'Oxanium', weight: 600, label: 'OXANIUM · squared techno' },
+    { id: 'syne', family: 'Syne', weight: 700, label: 'SYNE · wide avant-garde' },
+    { id: 'antonio', family: 'Antonio', weight: 700, label: 'ANTONIO · tall condensed' },
+    { id: 'redhatmono', family: 'Red Hat Mono', weight: 500, label: 'RED HAT MONO · clean mono' },
+    { id: 'unica', family: 'Unica One', weight: 400, label: 'UNICA ONE · thin condensed caps' }
   ];
   var STYLES = [
     { id: 'static', label: 'STATIC', about: 'holds still, fades in' },

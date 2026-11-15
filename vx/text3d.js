@@ -9,8 +9,7 @@
  */
 (function (root) {
   'use strict';
-  var TTF = { michroma: 'michroma', syncopate: 'syncopate-700', unbounded: 'unbounded-800', barlow: 'barlowcondensed-800', bebas: 'bebasneue-400',
-    plex: 'plexmono-500', majormono: 'majormono-400', instrument: 'instrumentserif-italic' };
+  var TTF = { michroma: 'michroma', geist: 'geist-600', geistmono: 'geistmono-500', intertight: 'intertight-800', spacegrotesk: 'spacegrotesk-600', bigshoulders: 'bigshouldersstencildisplay-800', sairastencil: 'sairastencilone-400', doto: 'doto-800', chakra: 'chakrapetch-600', rajdhani: 'rajdhani-600', oxanium: 'oxanium-600', syne: 'syne-700', antonio: 'antonio-700', redhatmono: 'redhatmono-500', unica: 'unicaone-400' };
   var MATERIALS = [{ id: 'chrome', label: 'CHROME' }, { id: 'black', label: 'BLACK CHROME' }, { id: 'matte', label: 'MATTE' }, { id: 'wire', label: 'WIRE' }];
   var SPINS = [{ id: 'none', label: 'NONE' }, { id: 'sway', label: 'SWAY' }, { id: 'orbit', label: 'ORBIT' }, { id: 'tumble', label: 'TUMBLE' }];
 
