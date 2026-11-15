@@ -97,4 +97,10 @@ check('transitions: crossfade from the cut, dips centred, split halves start cle
   T.split(p, 6); assert.strictEqual(T.sorted(v1(p))[2].tr, undefined);
   b.start = 4.5; assert.strictEqual(T.transitions(v1(p)).filter(x => x.kind === 'cross').length, 0); // a gap: no crossfade
 });
+check('speed: cuts and trims move the in-point by time x speed', () => {
+  const p = T.newProject(); const a = T.place(v1(p), { src: 'a', start: 0, in: 1, dur: 4, speed: 2 });
+  T.split(p, 1); assert.deepStrictEqual(spans(v1(p)), [[0, 1, 1], [1, 3, 3]]);
+  const b = T.place(T.track(p, 'v2'), { src: 'b', start: 4, in: 2, dur: 2, speed: -0.5 });
+  T.trim(T.track(p, 'v2'), b.id, 'in', 3); assert.deepStrictEqual(spans(T.track(p, 'v2')), [[3, 1.5, 3]]);
+});
 console.log(`${n} timeline checks passed`);

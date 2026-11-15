@@ -4,9 +4,12 @@
  *   VXMLT.project({ title, w, h, fps, seconds, track, shots, flashes, idents, mattes, mask, letterbox, grade }) -> XML
  *   VXMLT.renderArgs(mltFile, outFile, { crf }) -> argv for melt
  *
- *   shots   [{ file, name, in, dur, start }]  the cut on V1 (seconds); without start, shots run end to end; gaps are black;
- *                                         short clips loop rather than leave a gap
- *   overlay [{ file, name, in, dur, start }]  V2, full frame over V1 where it has items
+ *   shots   [{ file, name, in, dur, start, speed, srcDur }]  the cut on V1 (seconds); without start, shots run end to
+ *                                         end; gaps are black; short clips loop rather than leave a gap; speed (negative
+ *                                         = backwards) uses MLT's timewarp, which needs srcDur (the file's length) to loop
+ *   overlay [{ file, name, in, dur, start, x, y, scale, opacity }]  V2 over V1 where it has items: full frame, or
+ *                                         scaled (scale 1 = full frame), moved (x, y: centre offset as a fraction of the
+ *                                         frame) and faded (opacity 0-1), held for each item
  *   titles  [{ file, start, dur }]           rendered titles (video with alpha, e.g. QuickTime RLE), over everything
  *   trans   [{ kind, a, b, file, in }]       transitions on V1 cuts, a..b in seconds: 'cross' plays file (the outgoing
  *                                         shot, from its source time in) over V1 and fades it out, under V2; 'black' and
@@ -30,12 +33,14 @@
   function project(o) {
     var w = o.w || 1920, h = o.h || 1080, fps = o.fps || 30, F = function (t) { return Math.round(t * fps); };
     var total = F(o.seconds), out = [], producers = {}, pid = 0;
-    function producer(file, loop) {
-      var key = file + (loop ? '#loop' : '');
+    function producer(file, loop, speed) {
+      speed = speed || 1;
+      var key = file + (loop ? '#loop' : '') + (speed !== 1 ? '@' + speed : '');
       if (producers[key]) return producers[key];
       var id = 'clip' + (pid++);
       // shots fill the frame (scale up, crop the overflow) rather than sit in black bars like MLT's default fit
       var fill = loop ? '<filter mlt_service="crop">' + prop('center', 1) + prop('use_profile', 1) + '</filter>' : '';
+      if (speed !== 1) { out.push('<producer id="' + id + '">' + prop('resource', speed + ':' + file) + prop('mlt_service', 'timewarp') + prop('shotcut:caption', file.split('/').pop() + ' ' + speed + 'x') + fill + '</producer>'); producers[key] = id; return id; }
       out.push('<producer id="' + id + '">' + prop('resource', file) + prop('mlt_service', 'avformat') +
         (loop ? prop('eof', 'loop') + prop('length', 1e7) : '') + prop('shotcut:caption', file.split('/').pop()) + fill + '</producer>');
       producers[key] = id;
@@ -52,20 +57,36 @@
     function lay(list) { var t = 0; return (list || []).map(function (s) { var st = s.start != null ? s.start : t; t = st + s.dur; return { s: s, start: st }; }).sort(function (a, b) { return a.start - b.start; }); }
     var layout = lay(o.shots);
     var flashAt = {}; (o.flashes || []).forEach(function (x) { flashAt[F(x)] = true; });
+    // n frames of a clip from in-point inF: one entry, or for a sped-up clip (timewarp does not loop) entries that wrap
+    // round its length, counted in its own sped-up frames
+    function clipEntries(s, inF, n) {
+      var speed = s.speed || 1, id = producer(s.file, true, speed);
+      if (speed === 1 || !s.srcDur) return ['<entry producer="' + id + '" in="' + inF + '" out="' + (inF + n - 1) + '"/>'];
+      var Lw = Math.max(1, Math.floor(s.srcDur * fps / Math.abs(speed))), pl = [], k = inF % Lw;
+      while (n > 0) { var m = Math.min(n, Lw - k); pl.push('<entry producer="' + id + '" in="' + k + '" out="' + (k + m - 1) + '"/>'); n -= m; k = 0; }
+      return pl;
+    }
+    function inFrames(s, sec) { return F(sec / Math.abs(s.speed || 1)); }
     // a video track as a playlist: blanks for the gaps, every entry on frames from its own start so rounding never drifts
     function entries(list, flashes) {
       var pl = [], at = 0;
       list.forEach(function (L) {
-        var f0 = Math.max(F(L.start), at), f1 = F(L.start + L.s.dur), n = f1 - f0, inF = F(L.s.in || 0) + (f0 - F(L.start)), id = producer(L.s.file, true);
+        var f0 = Math.max(F(L.start), at), f1 = F(L.start + L.s.dur), n = f1 - f0, inF = inFrames(L.s, L.s.in || 0) + (f0 - F(L.start));
         if (n <= 0) return;
         if (f0 > at) pl.push('<blank length="' + (f0 - at) + '"/>');
         if (flashes && flashAt[f0] && n > 4) { pl.push('<entry producer="flash" in="0" out="1"/>'); n -= 2; inF += 2; }
-        pl.push('<entry producer="' + id + '" in="' + inF + '" out="' + (inF + n - 1) + '"/>');
+        pl.push.apply(pl, clipEntries(L.s, inF, n));
         at = f1;
       });
       return pl;
     }
     var v1 = entries(layout, true), ov = entries(lay(o.overlay), false);
+    // V2 placement: one discrete keyframe per item on the overlay track's blend
+    var ovKeys = [], ovMoved = (o.overlay || []).some(function (s) { return (s.scale != null && s.scale !== 1) || s.x || s.y || (s.opacity != null && s.opacity !== 1); });
+    if (ovMoved) lay(o.overlay).forEach(function (L) {
+      var s = L.s, sc = s.scale == null ? 1 : s.scale, ww = Math.round(w * sc), hh = Math.round(h * sc);
+      ovKeys.push(F(L.start) + '|=' + Math.round(w / 2 + (s.x || 0) * w - ww / 2) + ' ' + Math.round(h / 2 + (s.y || 0) * h - hh / 2) + ' ' + ww + ' ' + hh + ' ' + (s.opacity == null ? 1 : s.opacity));
+    });
     // transitions: crossfades on one track over V1, dips on another over everything but idents and titles; each track's
     // opacity is keyframed (linear) through its transitions
     function transTrack(list) {
@@ -74,7 +95,7 @@
         var f0 = Math.max(F(T.a), at), n = F(T.b) - f0;
         if (n < 2) return;
         if (f0 > at) pl.push('<blank length="' + (f0 - at) + '"/>');
-        if (T.kind === 'cross') { var inF = F(T.in || 0); pl.push('<entry producer="' + producer(T.file, true) + '" in="' + inF + '" out="' + (inF + n - 1) + '"/>'); keys.push(f0 + '=' + R + '1', (f0 + n - 1) + '=' + R + '0'); }
+        if (T.kind === 'cross') { pl.push.apply(pl, clipEntries({ file: T.file, speed: T.speed, srcDur: T.srcDur }, inFrames(T, T.in || 0), n)); keys.push(f0 + '=' + R + '1', (f0 + n - 1) + '=' + R + '0'); }
         else { pl.push('<entry producer="' + (T.kind === 'white' ? 'flash' : 'dip') + '" in="0" out="' + (n - 1) + '"/>'); keys.push(f0 + '=' + R + '0', (f0 + Math.floor(n / 2)) + '=' + R + '1', (f0 + n - 1) + '=' + R + '0'); }
         at = f0 + n;
       });
@@ -98,9 +119,9 @@
       layout.forEach(function (L) {
         var s0 = L.start, s1 = L.start + L.s.dur, lo = Math.max(a, s0), hi = Math.min(b, s1);
         if (hi - lo < 1 / fps) return;
-        var inF = F((L.s.in || 0) + lo - s0), n = F(hi) - F(lo);
+        var inF = inFrames(L.s, (L.s.in || 0) + (lo - s0) * Math.abs(L.s.speed || 1)), n = F(hi) - F(lo);
         if (F(lo) > c) ents.push('<blank length="' + (F(lo) - c) + '"/>');
-        if (n > 0) { ents.push('<entry producer="' + producer(L.s.file, true) + '" in="' + inF + '" out="' + (inF + n - 1) + '"/>'); c = F(hi); }
+        if (n > 0) { ents.push.apply(ents, clipEntries(L.s, inF, n)); c = F(hi); }
       });
       if (!ents.length || !o.mask) return;
       var id = 'matte' + k;
@@ -157,7 +178,8 @@
       '<transition mlt_service="mix">' + prop('a_track', 0) + prop('b_track', 8) + prop('always_active', 1) + prop('sum', 1) + '</transition>' +
       '<transition mlt_service="qtblend">' + prop('a_track', 0) + prop('b_track', 1) + prop('compositing', 0) + prop('distort', 0) + '</transition>' +
       '<transition mlt_service="qtblend">' + prop('a_track', 0) + prop('b_track', 2) + prop('compositing', 0) + prop('distort', 0) + (TX.keys.length ? prop('rect', TX.keys.join(';')) : '') + '</transition>' +
-      [3, 4].map(function (b) { return '<transition mlt_service="qtblend">' + prop('a_track', 0) + prop('b_track', b) + prop('compositing', 0) + prop('distort', 0) + '</transition>'; }).join('') +
+      '<transition mlt_service="qtblend">' + prop('a_track', 0) + prop('b_track', 3) + prop('compositing', 0) + prop('distort', 0) + (ovKeys.length ? prop('rect', ovKeys.join(';')) : '') + '</transition>' +
+      '<transition mlt_service="qtblend">' + prop('a_track', 0) + prop('b_track', 4) + prop('compositing', 0) + prop('distort', 0) + '</transition>' +
       '<transition mlt_service="qtblend">' + prop('a_track', 0) + prop('b_track', 5) + prop('compositing', 0) + prop('distort', 0) + (DP.keys.length ? prop('rect', DP.keys.join(';')) : '') + '</transition>' +
       '<transition mlt_service="qtblend">' + prop('a_track', 0) + prop('b_track', 6) + prop('compositing', 14) + prop('distort', 0) + (rect.length ? prop('rect', rect.join(';')) : '') + '</transition>' +
       '<transition mlt_service="qtblend">' + prop('a_track', 0) + prop('b_track', 7) + prop('compositing', 0) + prop('distort', 0) + '</transition>' +

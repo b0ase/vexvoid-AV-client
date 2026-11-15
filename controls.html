@@ -1809,7 +1809,7 @@
     .ed-stage{flex:1;min-height:0;container-type:size;display:grid;place-items:center;background:#030303}
     .ed-frame{position:relative;width:min(100cqw,calc(100cqh * 16 / 9));aspect-ratio:16/9;background:#000;overflow:hidden}
     .ed-frame[data-look="house"] .ed-layer,.ed-frame[data-look="scope"] .ed-layer{filter:grayscale(1) contrast(1.12)}
-    .ed-layer{position:absolute;inset:0}.ed-layer video{width:100%;height:100%;object-fit:cover;display:block}
+    .ed-layer{position:absolute;inset:0;transform-origin:50% 50%}.ed-layer video{width:100%;height:100%;object-fit:cover;display:block}
     .ed-lbox{position:absolute;inset:0;pointer-events:none}
     .ed-lbox::before,.ed-lbox::after{content:'';position:absolute;left:0;right:0;height:var(--lb,0%);background:#000}.ed-lbox::before{top:0}.ed-lbox::after{bottom:0}
     .ed-transport{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-top:1px solid #1d1d1d;gap:10px}
@@ -5844,19 +5844,32 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         if (edVids.size > 10) for (const [k, old] of edVids) { if (edVids.size <= 10) break; if (!old.isConnected) { old.removeAttribute('src'); old.load(); edVids.delete(k); } }
         return v;
       }
+      // where in its file a clip is at time t (speed, backwards, and looping as the export does), and whether it can simply
+      // play (a backwards clip is stepped frame by frame instead)
+      function edSrcPos(it, t, dur) { const s = it.speed || 1, p = (it.in + (t - it.start) * Math.abs(s)) % dur; return s < 0 ? Math.max(0, dur - p - 0.001) : p; }
+      function edDrive(v, it, t, playing) {
+        if (!v.duration) return;
+        const pos = edSrcPos(it, t, v.duration), s = it.speed || 1;
+        if (playing && s > 0) { v.playbackRate = Math.min(16, Math.max(0.0625, s * ed.rate)); if (v.paused) { v.currentTime = pos; v.play().catch(() => {}); } else if (Math.abs(v.currentTime - pos) > 0.2) v.currentTime = pos; }
+        else { if (!v.paused) v.pause(); if (Math.abs(v.currentTime - pos) > 0.5 / VXTL.FPS) v.currentTime = pos; }
+      }
+      // V2's size, position and opacity in the preview, as the export places it
+      function edPlaceV2(slot, it) {
+        const sc = it && it.scale != null ? it.scale : 1, x = it && it.x || 0, y = it && it.y || 0;
+        slot.style.transform = sc === 1 && !x && !y ? '' : `translate(${x * 100}%, ${y * 100}%) scale(${sc})`;
+        slot.style.opacity = it && it.opacity != null ? it.opacity : '';
+      }
       function edShowAt(t, playing) {
         const stage = edEl('edStage'); if (!stage) return;
         const used = new Set();
         ['v1', 'v2'].forEach(tid => {
           const tr = edTrk(tid), slot = stage.querySelector(`.ed-layer[data-track="${tid}"]`);
           const it = tr && !tr.hidden ? VXTL.itemAt(tr, t) : null;
-          if (!it) { if (slot.firstChild) slot.firstChild.remove(); return; }
+          if (!it) { if (slot.firstChild) slot.firstChild.remove(); if (tid === 'v2') edPlaceV2(slot, null); return; }
           const v = edVid(it.src); used.add(v);
           if (slot.firstChild !== v) { if (slot.firstChild) slot.firstChild.remove(); slot.appendChild(v); v.style.opacity = ''; }
-          if (!v.duration) return;
-          const pos = (it.in + t - it.start) % v.duration; // a clip shorter than its shot loops, as it does in the export
-          if (playing) { v.playbackRate = Math.max(0.25, ed.rate); if (v.paused) { v.currentTime = pos; v.play().catch(() => {}); } else if (Math.abs(v.currentTime - pos) > 0.2) v.currentTime = pos; }
-          else { if (!v.paused) v.pause(); if (Math.abs(v.currentTime - pos) > 0.5 / VXTL.FPS) v.currentTime = pos; }
+          edDrive(v, it, t, playing);
+          if (tid === 'v2') edPlaceV2(slot, it);
         });
         // a transition on V1: the outgoing shot runs on and fades out (crossfade), or black or white rises and falls (dip)
         const txSlot = stage.querySelector('.ed-layer[data-track="tx"]'), dip = stage.querySelector('.ed-dip');
@@ -5866,7 +5879,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           const v = edVid(T.T.from.src); used.add(v);
           if (txVid !== v) { if (txVid) txVid.remove(); txSlot.appendChild(v); }
           v.style.opacity = T.alpha; dip.style.opacity = 0;
-          if (v.duration) { const pos = (T.T.from.in + t - T.T.from.start) % v.duration; if (playing) { if (v.paused) { v.currentTime = pos; v.play().catch(() => {}); } else if (Math.abs(v.currentTime - pos) > 0.2) v.currentTime = pos; } else { if (!v.paused) v.pause(); if (Math.abs(v.currentTime - pos) > 0.5 / VXTL.FPS) v.currentTime = pos; } }
+          edDrive(v, T.T.from, t, playing);
         } else {
           if (txVid) { txVid.style.opacity = ''; txVid.remove(); }
           dip.style.opacity = T && T.T.kind !== 'cross' ? T.alpha : 0; if (T) dip.style.background = T.T.kind === 'white' ? '#fff' : '#000';
@@ -5876,7 +5889,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           const tr = edTrk(tid), now = VXTL.itemAt(tr, t), nx = VXTL.itemAt(tr, t + 1);
           if (!nx || (now && now.id === nx.id)) return;
           const v = edVid(nx.src); if (used.has(v) || !v.duration) return;
-          if (Math.abs(v.currentTime - nx.in % v.duration) > 0.1) v.currentTime = nx.in % v.duration;
+          const p0 = edSrcPos(nx, nx.start, v.duration); if (Math.abs(v.currentTime - p0) > 0.1) v.currentTime = p0;
         });
         edVids.forEach(v => { if (!used.has(v) && !v.paused) v.pause(); });
         edTitleAt(t);
@@ -6037,7 +6050,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           el.title = `${it.mode === '3d' ? '3D' : 'TEXT'} · ${it.text}\n${(VXTEXT.STYLES.find(x => x.id === it.style) || {}).label || ''} · ${f.family}\n${VXTL.timecode(it.start)} · ${it.dur.toFixed(2)} s`;
         } else {
           const th = edThumbs.get(it.src); if (th) el.style.backgroundImage = `url(${th})`; else edThumb(it.src);
-          n.textContent = it.name.replace(/^(GROK|RECORDED|WALLET) · /, '');
+          n.textContent = (it.speed && it.speed !== 1 ? `${it.speed < 0 ? 'REV ' : ''}${Math.abs(it.speed)}× · ` : '') + it.name.replace(/^(GROK|RECORDED|WALLET) · /, '');
           el.title = `${it.name}\n${VXTL.timecode(it.start)} · ${it.dur.toFixed(2)} s · from ${it.in.toFixed(2)} s into the clip`;
         }
         const l = document.createElement('i'), r = document.createElement('i'); l.className = 'l'; r.className = 'r';
@@ -6142,6 +6155,23 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
             <div class="ed-fields"><label>START<input data-f="start" type="number" step="0.01" min="0"></label><label>LENGTH<input data-f="dur" type="number" step="0.01" min="0.04"></label><label>IN<input data-f="in" type="number" step="0.01" min="0"></label></div>
             <div class="ed-isub">${(it.dur / beat).toFixed(2)} BEATS · ${VXTL.timecode(it.start)} → ${VXTL.timecode(it.start + it.dur)}</div>
             <div class="ed-btns"><button data-a="short">− BEAT</button><button data-a="long">+ BEAT</button><button data-a="later">LATER IN CLIP</button><button data-a="swap">SWAP CLIP</button><button data-a="split">SPLIT · S</button><button data-a="layer">TO ${tr.id === 'v1' ? 'V2' : 'V1'}</button><button data-a="del">DELETE · ⌫</button><button data-a="ripple">RIPPLE · ⇧⌫</button></div>`;
+          {
+            const sp = Math.abs(it.speed || 1), rev = (it.speed || 1) < 0;
+            box.querySelector('.ed-btns').insertAdjacentHTML('beforebegin', `<div class="ed-ih">SPEED</div><div class="ed-trs">${[0.25, 0.5, 0.75, 1].map(x => `<button data-sp="${x}" class="${x === sp ? 'on' : ''}">${x}×</button>`).join('')}</div>
+              <div class="ed-trs">${[1.5, 2, 4].map(x => `<button data-sp="${x}" class="${x === sp ? 'on' : ''}">${x}×</button>`).join('')}<button data-rev="1" class="${rev ? 'on' : ''}">REVERSE</button></div>`);
+            box.querySelectorAll('[data-sp]').forEach(b => b.onclick = () => { if (!tr.locked) edSetSpeed([it.id], +b.dataset.sp * (rev ? -1 : 1)); });
+            box.querySelector('[data-rev]').onclick = () => { if (!tr.locked) edSetSpeed([it.id], -(it.speed || 1)); };
+          }
+          if (tr.id === 'v2') {
+            const vals = { scale: it.scale ?? 1, x: it.x || 0, y: it.y || 0, opacity: it.opacity ?? 1 };
+            const knob = (k, l, lo, hi) => `<label>${l}<input type="range" min="${lo}" max="${hi}" step="0.01" data-p="${k}" value="${vals[k]}"></label>`;
+            box.querySelector('.ed-btns').insertAdjacentHTML('beforebegin', `<div class="ed-ih">PLACE · DRAG THE PICTURE, SCROLL TO SIZE</div><div class="ed-knobs">${knob('scale', 'SIZE', 0.1, 1.5)}${knob('x', 'ACROSS', -0.6, 0.6)}${knob('y', 'UP / DOWN', -0.6, 0.6)}${knob('opacity', 'OPACITY', 0, 1)}</div>
+              <div class="ed-trs"><button data-pl="full">FULL</button><button data-pl="pip">CORNER</button><button data-pl="half">HALF</button><button data-pl="ghost">GHOST</button></div>`);
+            let pushed = false;
+            box.querySelectorAll('[data-p]').forEach(r => { r.onpointerdown = () => { if (!pushed) { edHist.push(ed.proj); pushed = true; } }; r.oninput = () => { if (tr.locked) return; it[r.dataset.p] = +r.value; edShowAt(ed.t, false); }; r.onchange = () => { edSave(); pushed = false; }; });
+            const PL = { full: { scale: 1, x: 0, y: 0, opacity: 1 }, pip: { scale: 0.32, x: 0.3, y: -0.28, opacity: 1 }, half: { scale: 0.5, x: 0, y: 0, opacity: 1 }, ghost: { scale: 1, x: 0, y: 0, opacity: 0.35 } };
+            box.querySelectorAll('[data-pl]').forEach(b => b.onclick = () => { if (!tr.locked) edDo(() => Object.assign(it, PL[b.dataset.pl])); });
+          }
           if (tr.id === 'v1') {
             const cur = (it.tr && it.tr.kind) || 'cut', beats = it.tr && it.tr.beats || 1;
             box.querySelector('.ed-btns').insertAdjacentHTML('beforebegin', `<div class="ed-ih">IN FROM THE SHOT BEFORE · X</div><div class="ed-trs">${['cut', 'cross', 'black', 'white'].map(k => `<button data-tr="${k}" class="${k === cur ? 'on' : ''}">${k === 'cross' ? 'CROSSFADE' : k.toUpperCase()}</button>`).join('')}</div>
@@ -6151,7 +6181,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           }
           box.querySelector('b').textContent = it.name;
           box.querySelector('.ed-isub').textContent = [tr8.phase, tr8.energy != null ? 'energy ' + Math.round(tr8.energy * 9) : '', tr8.desc].filter(Boolean).join(' · ') || it.src.split('/').pop();
-          box.querySelectorAll('input').forEach(inp => {
+          box.querySelectorAll('.ed-fields input').forEach(inp => {
             inp.value = it[inp.dataset.f].toFixed(2);
             inp.onchange = () => { const v = Math.max(0, +inp.value || 0); if (tr.locked) return edInspector(); edDo(() => { it[inp.dataset.f] = inp.dataset.f === 'dur' ? Math.max(1 / VXTL.FPS, v) : v; VXTL.place(tr, it); }); };
           });
@@ -6234,6 +6264,11 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         if (!under) { edSay('Nothing under the playhead to split.'); return; }
         edDo(() => VXTL.split(ed.proj, ed.t, ids || undefined));
       }
+      // speed keeps the clip's place and length on the timeline (the cut stays on the beat) and changes what plays in it
+      function edSetSpeed(ids, speed) {
+        const v = Math.max(-4, Math.min(4, Number(speed) || 1)), sv = Math.abs(v) < 0.1 ? 1 : v;
+        edDo(() => ids.forEach(i => { const f = VXTL.find(ed.proj, i); if (!f || f.track.kind !== 'video' || f.track.locked) return; f.item.speed = sv === 1 ? undefined : sv; }));
+      }
       // transitions go on the incoming V1 shot; beats sets the length on the song's tempo
       function edSetTransition(ids, kind, beats = 1) {
         edDo(() => ids.forEach(i => { const f = VXTL.find(ed.proj, i); if (!f || f.track.id !== 'v1' || f.track.locked) return; f.item.tr = kind === 'cut' ? undefined : { kind, beats, dur: Math.round(beats * 60 / edBpm() * 1000) / 1000 }; }));
@@ -6253,6 +6288,24 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         ed.sel = made; edMarkSel();
       }
       function edTool(t) { ed.tool = t; edTools(); edEl('edContent').classList.toggle('razor', t === 'razor'); }
+
+      // ----- the preview: drag the selected V2 clip (under the playhead) to move it, scroll on it to size it
+      function edV2Here() { const f = ed.sel.length === 1 && VXTL.find(ed.proj, ed.sel[0]); return f && f.track.id === 'v2' && !f.track.locked && ed.t >= f.item.start && ed.t < f.item.start + f.item.dur ? f.item : null; }
+      edEl('edStage').addEventListener('pointerdown', e => {
+        const it = edV2Here(); if (!it || e.button !== 0) return;
+        const r = edEl('edStage').getBoundingClientRect(), x0 = it.x || 0, y0 = it.y || 0, px = e.clientX, py = e.clientY;
+        edHist.push(ed.proj); edEl('edStage').setPointerCapture(e.pointerId);
+        const move = m => { it.x = Math.round((x0 + (m.clientX - px) / r.width) * 1000) / 1000; it.y = Math.round((y0 + (m.clientY - py) / r.height) * 1000) / 1000; edShowAt(ed.t, false); };
+        const up = () => { edEl('edStage').removeEventListener('pointermove', move); edEl('edStage').removeEventListener('pointerup', up); edSave(); edInspector(); };
+        edEl('edStage').addEventListener('pointermove', move); edEl('edStage').addEventListener('pointerup', up);
+      });
+      let edWheelT = 0, edWheelTimer = 0;
+      edEl('edStage').addEventListener('wheel', e => {
+        const it = edV2Here(); if (!it) return; e.preventDefault();
+        if (performance.now() - edWheelT > 600) edHist.push(ed.proj); edWheelT = performance.now();
+        it.scale = Math.round(Math.max(0.1, Math.min(1.5, (it.scale ?? 1) * Math.exp(-e.deltaY * 0.002))) * 1000) / 1000; edShowAt(ed.t, false); edSave();
+        clearTimeout(edWheelTimer); edWheelTimer = setTimeout(edInspector, 300);
+      }, { passive: false });
 
       // ----- the mouse on the timeline: scrub the ruler, select, move (⌥ copies), trim edges, razor, drag markers
       let edDrag = null;
@@ -6500,8 +6553,11 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           edSay('Gathering clips…');
           const shots = [], overlay = [];
           for (const s of v1) shots.push({ ...s, file: await edLocal(s.src) });
-          const trans = edTrk('v1').hidden ? [] : VXTL.transitions(edTrk('v1')).map(T => ({ kind: T.kind, a: T.a, b: T.b, in: T.from.in + (T.a - T.from.start), file: (shots.find(x => x.id === T.from.id) || {}).file })).filter(T => T.kind !== 'cross' || T.file);
+          // a sped-up or backwards clip needs its file's length to loop (MLT's timewarp does not)
+          const withDur = list => list.forEach(s => { if (s.speed && s.speed !== 1) s.srcDur = probeDur(s.file); });
+          const trans = edTrk('v1').hidden ? [] : VXTL.transitions(edTrk('v1')).map(T => { const sh = shots.find(x => x.id === T.from.id) || {}; return { kind: T.kind, a: T.a, b: T.b, in: T.from.in + (T.a - T.from.start) * Math.abs(T.from.speed || 1), speed: T.from.speed, file: sh.file }; }).filter(T => T.kind !== 'cross' || T.file);
           for (const s of v2) overlay.push({ ...s, file: await edLocal(s.src) });
+          withDur(shots); withDur(overlay); withDur(trans.filter(T => T.file));
           const music = ed.track && !edTrk('a1').muted;
           const tts = edTrk('t1').hidden ? [] : VXTL.sorted(edTrk('t1'));
           const track = !music ? null : ed.track.source === 'local' ? ed.track.url : await cacheMedia({ name: ed.track.name, url: ed.track.url });
@@ -6713,9 +6769,9 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
             input_schema: { type: 'object', properties: { path: { type: 'string' }, play: { type: 'boolean' } }, required: ['path'], additionalProperties: false } },
           { name: 'record', description: 'Make a music video: record the output screen together with the playing music into a video file (MP4). Start the track and your set first, then call record with until="track_end" (it returns when the track finishes and the file is saved) or seconds=N. action="stop" ends a recording early. The file lands in VIDEOS. Takes as long as the music.',
             input_schema: { type: 'object', properties: { action: { type: 'string', enum: ['record', 'stop'] }, title: { type: 'string' }, until: { type: 'string', enum: ['track_end'] }, seconds: { type: 'number' } }, additionalProperties: false } },
-          { name: 'editor', description: 'The EDIT tab: cut a music video from clips to a track, then export an MP4. Actions: state (what the edit is); set_track (track: catalogue number or words, or a file path); map (the track\'s tempo, detected from the audio, and its loudness, one digit 0-9 per bar, to read intro, builds, drops and breakdowns); tempo (bpm: set it by hand when the detected one is half or double what you hear; 0 goes back to detected); auto_cut (pace fast|medium|slow; source all|catalogue|generated|recorded|wallet; filter words to pick clips by name, set, phase or notes, e.g. "crane" or "rough"), which cuts on the bars with the loudest parts getting the shortest and most moving shots; add (clip: words or a path or URL, seconds) appends a shot to V1; replace (index, clip) swaps one clip; remove (index) takes a clip out (on V1 the shots after it close up). The EDIT tab is a real timeline: V1 holds the shots, V2 sits full frame over V1 wherever it has clips, A1 is the music; times are seconds from the start, and the person can undo every edit you make (⌘Z) and change it by hand. Timeline actions: overlay (clip, at, seconds, in) puts a clip on V2; split (at) cuts every clip under that time; move (index, at) moves a clip, overwriting what it lands on; trim (index, in, seconds) sets where in the source a clip starts and how long it runs; marker (at, label) marks a moment for the person (a drop, a lyric); undo; text (text, at, seconds, font, style, mode 2d|3d) puts a title on T1, over everything, in the export too; transition (index, kind cut|cross|black|white, beats) sets how a V1 shot comes in: a crossfade starts on the cut and runs that many beats, a dip to black or white is centred on the cut (use them sparingly: hard cuts on the beat are the VexVoid default, a dip for a section change, a crossfade for a breakdown) (fonts and styles as for text_layer; it moves on the beat of the song). index and layer (v1, default, v2 or t1) pick a clip as listed by state. title (title); look (look house|scope|raw; letterbox ratio e.g. 2.39 or 0; flashes off|hits|all): the grade, letterbox and white flash frames of the export; export (renders the MP4 with MLT, also saving a Shotcut project; finish true (default) adds the corner idents and matte flashes; takes a few minutes; the file lands in VIDEOS); frames (a contact sheet of the last export, or of path, to check it). Prefer this over record for a finished music video: it is a real edit, not a live take.',
-            input_schema: { type: 'object', properties: { action: { type: 'string', enum: ['state', 'set_track', 'map', 'tempo', 'look', 'auto_cut', 'add', 'replace', 'remove', 'overlay', 'split', 'move', 'trim', 'marker', 'undo', 'text', 'transition', 'title', 'export', 'frames'] }, track: { type: 'string' }, pace: { type: 'string', enum: ['fast', 'medium', 'slow'] },
-              source: { type: 'string', enum: ['all', 'catalogue', 'generated', 'recorded', 'wallet'] }, filter: { type: 'string' }, clip: { type: 'string' }, seconds: { type: 'number' }, index: { type: 'number' }, title: { type: 'string' }, finish: { type: 'boolean' }, path: { type: 'string' }, bpm: { type: 'number' }, at: { type: 'number' }, in: { type: 'number' }, layer: { type: 'string', enum: ['v1', 'v2', 't1'] }, label: { type: 'string' }, text: { type: 'string' }, font: { type: 'string' }, style: { type: 'string' }, mode: { type: 'string', enum: ['2d', '3d'] }, kind: { type: 'string', enum: ['cut', 'cross', 'black', 'white'] }, beats: { type: 'number' }, look: { type: 'string', enum: ['house', 'scope', 'raw'] }, letterbox: { type: 'number' }, flashes: { type: 'string', enum: ['off', 'hits', 'all'] } }, required: ['action'], additionalProperties: false } },
+          { name: 'editor', description: 'The EDIT tab: cut a music video from clips to a track, then export an MP4. Actions: state (what the edit is); set_track (track: catalogue number or words, or a file path); map (the track\'s tempo, detected from the audio, and its loudness, one digit 0-9 per bar, to read intro, builds, drops and breakdowns); tempo (bpm: set it by hand when the detected one is half or double what you hear; 0 goes back to detected); auto_cut (pace fast|medium|slow; source all|catalogue|generated|recorded|wallet; filter words to pick clips by name, set, phase or notes, e.g. "crane" or "rough"), which cuts on the bars with the loudest parts getting the shortest and most moving shots; add (clip: words or a path or URL, seconds) appends a shot to V1; replace (index, clip) swaps one clip; remove (index) takes a clip out (on V1 the shots after it close up). The EDIT tab is a real timeline: V1 holds the shots, V2 sits full frame over V1 wherever it has clips, A1 is the music; times are seconds from the start, and the person can undo every edit you make (⌘Z) and change it by hand. Timeline actions: overlay (clip, at, seconds, in) puts a clip on V2; split (at) cuts every clip under that time; move (index, at) moves a clip, overwriting what it lands on; trim (index, in, seconds) sets where in the source a clip starts and how long it runs; marker (at, label) marks a moment for the person (a drop, a lyric); undo; text (text, at, seconds, font, style, mode 2d|3d) puts a title on T1, over everything, in the export too; transition (index, kind cut|cross|black|white, beats) sets how a V1 shot comes in: a crossfade starts on the cut and runs that many beats, a dip to black or white is centred on the cut (use them sparingly: hard cuts on the beat are the VexVoid default, a dip for a section change, a crossfade for a breakdown); speed (index, layer, speed 0.25-4, negative plays it backwards) changes how fast a clip plays without moving its cut: slow motion for a breakdown, 2x for energy; place (index of a V2 clip, size 0.1-1.5 where 1 is full frame, x and y the centre offset as a fraction of the frame, opacity 0-1) for picture-in-picture slabs and ghosted layers (fonts and styles as for text_layer; it moves on the beat of the song). index and layer (v1, default, v2 or t1) pick a clip as listed by state. title (title); look (look house|scope|raw; letterbox ratio e.g. 2.39 or 0; flashes off|hits|all): the grade, letterbox and white flash frames of the export; export (renders the MP4 with MLT, also saving a Shotcut project; finish true (default) adds the corner idents and matte flashes; takes a few minutes; the file lands in VIDEOS); frames (a contact sheet of the last export, or of path, to check it). Prefer this over record for a finished music video: it is a real edit, not a live take.',
+            input_schema: { type: 'object', properties: { action: { type: 'string', enum: ['state', 'set_track', 'map', 'tempo', 'look', 'auto_cut', 'add', 'replace', 'remove', 'overlay', 'split', 'move', 'trim', 'marker', 'undo', 'text', 'transition', 'speed', 'place', 'title', 'export', 'frames'] }, track: { type: 'string' }, pace: { type: 'string', enum: ['fast', 'medium', 'slow'] },
+              source: { type: 'string', enum: ['all', 'catalogue', 'generated', 'recorded', 'wallet'] }, filter: { type: 'string' }, clip: { type: 'string' }, seconds: { type: 'number' }, index: { type: 'number' }, title: { type: 'string' }, finish: { type: 'boolean' }, path: { type: 'string' }, bpm: { type: 'number' }, at: { type: 'number' }, in: { type: 'number' }, layer: { type: 'string', enum: ['v1', 'v2', 't1'] }, label: { type: 'string' }, text: { type: 'string' }, font: { type: 'string' }, style: { type: 'string' }, mode: { type: 'string', enum: ['2d', '3d'] }, kind: { type: 'string', enum: ['cut', 'cross', 'black', 'white'] }, beats: { type: 'number' }, speed: { type: 'number' }, size: { type: 'number' }, x: { type: 'number' }, y: { type: 'number' }, opacity: { type: 'number' }, look: { type: 'string', enum: ['house', 'scope', 'raw'] }, letterbox: { type: 'number' }, flashes: { type: 'string', enum: ['off', 'hits', 'all'] } }, required: ['action'], additionalProperties: false } },
           { name: 'text_layer', description: 'Put a text layer on a deck (the TITLES tab): words in a VexVoid font, animated, transparent over the deck\'s other layers. Fonts: ' + VXTEXT.FONTS.map(f => `${f.id} (${f.label.split(' · ')[1]})`).join(', ') + '. Styles: ' + VXTEXT.STYLES.map(s => `${s.id} (${s.about})`).join('; ') + '. Knobs 0-1: size, speed, intensity, height (0 top, 1 bottom). d3 true makes a 3D title instead: extruded letters with a material (chrome, black chrome, matte, wire) and a spin (none, sway, orbit, tumble), the same moves done in 3D, height then sets the extrude depth; keep 3D titles to a word or two. Use text for titles, lyric lines, idents and decorative type; keep words few.',
             input_schema: { type: 'object', properties: { text: { type: 'string', description: 'The words; \\n for a second line' }, font: { type: 'string', enum: VXTEXT.FONTS.map(f => f.id) }, style: { type: 'string', enum: VXTEXT.STYLES.map(s => s.id) },
               upper: { type: 'boolean' }, deck: { type: 'string', enum: ['A', 'B'] }, size: { type: 'number' }, speed: { type: 'number' }, intensity: { type: 'number' }, height: { type: 'number', description: '2D: where it sits, 0 top to 1 bottom. 3D: how deep the letters extrude' },
@@ -6809,7 +6865,7 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
           const a = input.action;
           const st = () => {
             const sh = edShots(), ov = VXTL.sorted(edTrk('v2'));
-            const row = (s, i) => { const c = catalogue().clips.find(x => x.url === s.src), tr = c ? clipTraits(c.url, c.set) : {}; return `${i} ${mmss(s.start)} ${s.name.slice(0, 28)} ${s.dur.toFixed(1)}s` + (s.in ? ` from ${s.in.toFixed(1)}s` : '') + (s.tr && s.tr.kind ? ` (in: ${s.tr.kind} ${s.tr.beats || 1} beat)` : '') + (tr.phase || tr.energy != null ? ` [${tr.phase || '-'} ${tr.energy != null ? Math.round(tr.energy * 9) : '-'}]` : '') + (tr.desc ? ' ' + tr.desc.slice(0, 60) : ''); };
+            const row = (s, i) => { const c = catalogue().clips.find(x => x.url === s.src), tr = c ? clipTraits(c.url, c.set) : {}; return `${i} ${mmss(s.start)} ${s.name.slice(0, 28)} ${s.dur.toFixed(1)}s` + (s.in ? ` from ${s.in.toFixed(1)}s` : '') + (s.tr && s.tr.kind ? ` (in: ${s.tr.kind} ${s.tr.beats || 1} beat)` : '') + (s.speed && s.speed !== 1 ? ` at ${s.speed}x` : '') + (s.scale != null && s.scale !== 1 || s.x || s.y || (s.opacity != null && s.opacity !== 1) ? ` placed size ${s.scale ?? 1} x ${s.x || 0} y ${s.y || 0} opacity ${s.opacity ?? 1}` : '') + (tr.phase || tr.energy != null ? ` [${tr.phase || '-'} ${tr.energy != null ? Math.round(tr.energy * 9) : '-'}]` : '') + (tr.desc ? ' ' + tr.desc.slice(0, 60) : ''); };
             return `Edit "${ed.title}": track ${ed.track ? ed.track.name + ' (' + mmss(ed.track.seconds || 0) + ')' : 'none'}, V1 ${sh.length} shots, V2 ${ov.length} overlays, ${mmss(edLength())}.` +
               (sh.length ? '\nV1 shots (index start name length [phase energy]):\n' + sh.slice(0, 80).map(row).join('\n') : '') +
               (ov.length ? '\nV2 overlays (index start name length):\n' + ov.slice(0, 40).map(row).join('\n') : '') +
@@ -6847,6 +6903,8 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
           if (a === 'trim') { const it = nth(), tr = layer(); edDo(() => { if (input.in != null) it.in = Math.max(0, Number(input.in)); if (input.seconds) it.dur = Math.max(1 / VXTL.FPS, Number(input.seconds)); VXTL.place(tr, it); }); return st(); }
           if (a === 'marker') { edDo(() => ed.proj.markers.push({ id: VXTL.id('m'), t: Math.max(0, Number(input.at) || 0), label: String(input.label || 'M' + (ed.proj.markers.length + 1)).slice(0, 40) })); return st(); }
           if (a === 'undo') { edUndo(); return 'Undone.\n' + st(); }
+          if (a === 'place') { const it = VXTL.sorted(edTrk('v2'))[Number(input.index)]; if (!it) throw new Error('no V2 clip ' + input.index); edDo(() => { if (input.size != null) it.scale = Math.max(0.1, Math.min(1.5, +input.size)); if (input.x != null) it.x = Math.max(-0.6, Math.min(0.6, +input.x)); if (input.y != null) it.y = Math.max(-0.6, Math.min(0.6, +input.y)); if (input.opacity != null) it.opacity = Math.max(0, Math.min(1, +input.opacity)); }); return st(); }
+          if (a === 'speed') { const it = nth(); edSetSpeed([it.id], Number(input.speed) || 1); return st(); }
           if (a === 'transition') { const it = VXTL.sorted(edTrk('v1'))[Number(input.index)]; if (!it) throw new Error('no V1 shot ' + input.index); edSetTransition([it.id], ['cut', 'cross', 'black', 'white'].includes(input.kind) ? input.kind : 'cross', Number(input.beats) || 1); return st(); }
           if (a === 'text') {
             const q = String(input.font || '').toLowerCase(), font = VXTEXT.FONTS.find(f => f.id === q || f.family.toLowerCase() === q), style = VXTEXT.STYLES.find(x => x.id === String(input.style || '').toLowerCase());

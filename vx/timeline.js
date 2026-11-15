@@ -6,6 +6,8 @@
  *   item     { id, src, name, start, in, dur }   seconds: where it sits, where in the source it starts, how long it runs
  *            a title on the text track has no src; it carries its TITLES settings instead (text, font, style, mode ...),
  *            and its in is how far into the title's animation it starts
+ *            speed: 1 by default, 0.25-4 slower or faster, negative plays it backwards; in counts source seconds
+ *            through the clip as it plays (so a cut or trim moves in by the time that passed times the speed)
  *            tr { kind: 'cross'|'black'|'white', dur }: the transition into this clip from the one before it on the track.
  *            A crossfade starts at the cut (the outgoing clip runs on and fades out over this one), so nothing moves
  *            off the beat; a dip to black or white is centred on the cut.
@@ -22,6 +24,7 @@
   function id(p) { return (p || 'i') + Date.now().toString(36) + (uid++).toString(36); }
   function r3(t) { return Math.round(t * 1000) / 1000; }
   function end(it) { return it.start + it.dur; }
+  function sp(it) { return Math.abs(it.speed || 1); }
 
   function newProject() {
     return { tracks: [
@@ -59,7 +62,7 @@
     t.items.forEach(function (it) {
       if (it.id === keep || end(it) <= a + EPS || it.start >= b - EPS) { out.push(it); return; }
       if (it.start < a - EPS) out.push(Object.assign({}, it, { dur: r3(a - it.start) }));
-      if (end(it) > b + EPS) out.push(Object.assign({}, it, { id: it.start < a - EPS ? id() : it.id, start: r3(b), in: r3(it.in + (b - it.start)), dur: r3(end(it) - b), tr: undefined }));
+      if (end(it) > b + EPS) out.push(Object.assign({}, it, { id: it.start < a - EPS ? id() : it.id, start: r3(b), in: r3(it.in + (b - it.start) * sp(it)), dur: r3(end(it) - b), tr: undefined }));
     });
     t.items = out;
   }
@@ -79,7 +82,7 @@
       t.items.slice().forEach(function (it) {
         if (ids && ids.indexOf(it.id) < 0) return;
         if (time <= it.start + 1 / FPS || time >= end(it) - 1 / FPS) return;
-        var right = Object.assign({}, it, { id: id(), start: r3(time), in: r3(it.in + (time - it.start)), dur: r3(end(it) - time), tr: undefined });
+        var right = Object.assign({}, it, { id: id(), start: r3(time), in: r3(it.in + (time - it.start) * sp(it)), dur: r3(end(it) - time), tr: undefined });
         it.dur = r3(time - it.start);
         t.items.push(right); made.push(right.id);
       });
@@ -93,8 +96,8 @@
     if (!it) return null;
     var min = 1 / FPS;
     if (edge === 'in') {
-      var s = Math.min(Math.max(time, it.start - it.in, 0), end(it) - min);
-      it.in = r3(it.in + (s - it.start)); it.dur = r3(end(it) - s); it.start = r3(s);
+      var s = Math.min(Math.max(time, it.start - it.in / sp(it), 0), end(it) - min);
+      it.in = r3(Math.max(0, it.in + (s - it.start) * sp(it))); it.dur = r3(end(it) - s); it.start = r3(s);
     } else it.dur = r3(Math.max(min, time - it.start));
     return place(t, it);
   }
