@@ -19,7 +19,7 @@
     return './vx/';
   })();
 
-  var shared = null, fonts = {}, live = [];
+  var shared = null, fonts = {}, live = [], building = 0; // building: layers still waiting for their font
   function renderer() {
     if (shared) return shared;
     var T3 = root.THREE, r = new T3.WebGLRenderer({ alpha: true, antialias: true });
@@ -64,6 +64,7 @@
     scene.add(new T3.AmbientLight(0xffffff, 0.15));
     var R = rnd(T.seed || 7), dirs = [], cutPose = null, bars = 0, lastBar = 0, built = false, width = 1, height = 1, t0 = -1;
 
+    building++;
     font(T.font).then(function (f) {
       var lines = T.text.split('\n'), lh = 1.35, res = f.data.resolution || 1000, maxW = 1;
       lines.forEach(function (line, li) {
@@ -86,17 +87,18 @@
       letters.forEach(function (m) { m.userData.y += lift; m.position.set(m.userData.x, m.userData.y, 0); dirs.push(new T3.Vector3(R() - 0.5, R() - 0.5, R() - 0.5).normalize()); });
       group.userData.w = maxW;
       var yb = new T3.Box3().setFromObject(group); group.userData.y0 = yb.min.y; group.userData.y1 = yb.max.y;
-      built = true;
-    });
+      built = true; building--;
+    }, function () { building--; });
 
     var L = {
       seen: performance.now(),
       dispose: function () { letters.forEach(function (m) { m.geometry.dispose(); }); mat.dispose(); },
       frame: function (vx, ctx, w, h) {
         L.seen = performance.now();
-        if (t0 < 0) t0 = vx.t;
+        if (t0 < 0) t0 = vx.manual ? 0 : vx.t;
         if (vx.bar < lastBar) bars++;
         lastBar = vx.bar;
+        if (vx.barN != null) bars = vx.barN;
         if (!built) return;
         var I = vx.c, sp = 0.3 + vx.b * 2.4, t = vx.t, life = t - t0, st = T.style, n = letters.length;
         // frame the words across the width: SIZE 1 nearly fills it, 0 leaves them small in the middle
@@ -118,12 +120,13 @@
         } else if (st === 'strobe') {
           var div = [1, 2, 4, 8][Math.min(3, Math.floor(vx.b * 4))]; vis = Math.floor(vx.beat * div * 2) % 2 === 0 || (I > 0.5 && vx.pulse > 0.85);
         } else if (st === 'drift') {
-          var span = fit * 2.2; gx = span / 2 - ((t * sp * 0.6) % span); gy = Math.sin(t * sp * 0.5) * 0.2 * I;
+          var span = fit * 2.2; gx = span / 2 - ((t * sp * 0.6 + span / 2) % span); // starts centred, slides left, wraps gy = Math.sin(t * sp * 0.5) * 0.2 * I;
         } else if (st === 'zoom') {
           var per = 4 / Math.max(0.25, sp), ph = (t / per) % 1; camR *= 1.6 - Math.pow(ph, 2.2) * 1.62 + 0.04; camR *= 1 - vx.pulse * 0.06 * (0.3 + I);
         } else if (st === 'cut') {
           var slot = Math.floor((bars * 4 + vx.bar * 4) * (sp > 1.5 ? 2 : 1));
-          if (!cutPose || cutPose.slot !== slot) cutPose = { slot: slot, yaw: (R() - 0.5) * 1.6, pitch: (R() - 0.5) * 0.8, dist: 0.7 + R() * 0.8, hide: R() < 0.2 + I * 0.3 };
+          // a hidden beat is never the first one shown, nor two in a row, so the words always read
+          if (!cutPose || cutPose.slot !== slot) { var was = cutPose && cutPose.hide; cutPose = { slot: slot, yaw: (R() - 0.5) * 1.6, pitch: (R() - 0.5) * 0.8, dist: 0.7 + R() * 0.8, hide: !!cutPose && !was && R() < 0.2 + I * 0.3 }; }
           yaw += cutPose.yaw; pitch += cutPose.pitch; camR *= cutPose.dist; vis = !cutPose.hide;
         } else if (st === 'typeon') {
           var per2 = Math.max(1, Math.round(2 / sp)), ph2 = ((bars % per2) + vx.bar) / per2, shown = Math.ceil(Math.min(1, ph2 * 2.2) * n);
@@ -160,7 +163,7 @@
     var f = (X.FONTS.filter(function (x) { return x.id === o.font; })[0]) || { id: 'michroma', family: 'Michroma' };
     var st = (X.STYLES.filter(function (x) { return x.id === o.style; })[0]) || { id: 'static', label: 'STATIC', about: '' };
     var text = String(o.text == null ? 'V3XV0ID' : o.text).replace(/\r/g, '').slice(0, 80);
-    var cfg = { text: o.upper === false ? text : text.toUpperCase(), font: f.id, style: st.id, material: o.material || 'chrome', spin: o.spin || 'sway', bevel: o.bevel !== false, seed: Math.floor(Math.random() * 1e6) };
+    var cfg = { text: o.upper === false ? text : text.toUpperCase(), font: f.id, style: st.id, material: o.material || 'chrome', spin: o.spin || 'sway', bevel: o.bevel !== false, seed: o.seed != null ? o.seed : Math.floor(Math.random() * 1e6) };
     return '// 3D TITLE (TITLES tab): ' + st.label + ' in ' + f.family + ', ' + cfg.material + ', spin ' + cfg.spin + '.\n' +
       '// Knobs: SIZE, SPEED, INTENSITY, DEPTH (how far the letters extrude). Edit T to change the words or the look.\n' +
       'const T = ' + JSON.stringify(cfg) + ';\nlet L;\n' +
@@ -168,5 +171,5 @@
       'function draw() { clear(); L.frame(vx, drawingContext, width, height); }\n';
   }
 
-  root.VXTEXT3D = { layer: layer, code: code, MATERIALS: MATERIALS, SPINS: SPINS, KNOBS: ['SIZE', 'SPEED', 'INTENSITY', 'DEPTH'] };
+  root.VXTEXT3D = { layer: layer, busy: function () { return building; }, code: code, MATERIALS: MATERIALS, SPINS: SPINS, KNOBS: ['SIZE', 'SPEED', 'INTENSITY', 'DEPTH'] };
 })(typeof window !== 'undefined' ? window : this);

@@ -65,9 +65,10 @@ function buffer(sz, tracking) {
 function blit(b, sx, sy, sw, sh, dx, dy, dw, dh) { if (sw > 0 && sh > 0) drawingContext.drawImage(b.elt, sx, sy, sw, sh, dx, dy, dw ?? sw, dh ?? sh); }
 function draw() {
   clear();
-  if (t0 < 0) t0 = vx.t;
+  if (t0 < 0) t0 = vx.manual ? 0 : vx.t;
   if (vx.bar < lastBar) bars++;
   lastBar = vx.bar;
+  if (vx.barN != null) bars = vx.barN;
   const I = vx.c, sp = 0.3 + vx.b * 2.4, life = vx.t - t0;
   const sz = Math.min(height * (0.05 + vx.a * 0.32), width * 0.9 / Math.max(3, T.text.split('\\n').reduce((n, l) => Math.max(n, l.length), 0) * 0.62));
   const track = T.style === 'track' ? sz * (0.02 + (0.5 - 0.5 * Math.cos(vx.bar * TWO_PI)) * (0.2 + I * 0.8)) : sz * T.tracking;
@@ -105,7 +106,8 @@ function draw() {
     blit(b, 0, 0, W, H, cx - W * s / 2, cy - H * s / 2, W * s, H * s);
   } else if (st === 'cut') {
     const div = sp > 1.5 ? 2 : 1, slot = Math.floor((bars * 4 + vx.bar * 4) * div);
-    if (slot !== cutPos[3]) { cutPos = [random(0.2, 0.8), random(0.2, 0.8), random(0.6, 1.5), slot, random() < 0.25 + I * 0.4]; }
+    // a hidden beat is never the first one shown, nor two in a row, so the words always read
+    if (slot !== cutPos[3]) { const was = cutPos[4], first = cutPos[3] == null; cutPos = [random(0.2, 0.8), random(0.2, 0.8), random(0.6, 1.5), slot, !first && !was && random() < 0.25 + I * 0.4]; }
     if (!cutPos[4]) { const s = cutPos[2]; blit(b, 0, 0, W, H, width * cutPos[0] - W * s / 2, height * cutPos[1] - H * s / 2, W * s, H * s); }
   } else if (st === 'typeon') {
     const per = Math.max(1, Math.round(2 / sp)), ph = ((bars % per) + vx.bar) / per, show = Math.min(1, ph * 2.2), wv = W * show;

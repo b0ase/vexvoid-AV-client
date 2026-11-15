@@ -14,8 +14,11 @@
  * createCanvas(w, h[, WEBGL]) always fills the host, whatever w and h say, so library sketches and
  * pasted 400x400 sketches both fill the screen.
  *
- *   var g = VXGEN.mount(el, code, { seed, params: {a,b,c,d}, scale: 0.75, onError, onFps })
+ *   var g = VXGEN.mount(el, code, { seed, params: {a,b,c,d}, scale: 0.75, onError, onFps, manual })
  *   g.stop(); g.setParams({a:.3}); g.reseed(); g.fps
+ *   manual: true stops the sketch's own clock; g.renderAt(t, { bpm, beats, level }) draws the one frame at time t and
+ *   beat position beats (the EDIT timeline and its exports step titles frame by frame this way; vx.manual is true and
+ *   vx.barN counts whole bars, so a sketch can tell where it is without having seen every frame)
  *   VXGEN.signals  shared audio/clock state (set by VXGEN.listen or by IPC from the controls window)
  */
 (function (root) {
@@ -52,6 +55,8 @@
     var vx = { t: 0, frame: 0, w: 1, h: 1, seed: seed, a: params.a, b: params.b, c: params.c, d: params.d,
       bpm: 120, beat: 0, bar: 0, level: 0, bass: 0, mid: 0, high: 0, kick: false, pulse: 0, ink: 255, void: 0 };
     var lastBeat = -1, t0 = 0, inst = null, handlers = null, mode = null, ro = null;
+    var man = opts.manual ? { t: 0, bpm: 120, beats: 0, level: 0 } : null;
+    if (man) vx.manual = true;
 
     function size() {
       var r = host.getBoundingClientRect();
@@ -88,23 +93,32 @@
         } catch (e) { fail(e); }
         vx.w = p.width; vx.h = p.height;
         t0 = p.millis();
+        if (man) p.noLoop();
       };
       p.draw = function () {
         var now = performance.now();
-        vx.t = (p.millis() - t0) / 1000; vx.frame = p.frameCount; vx.w = p.width; vx.h = p.height;
+        vx.t = man ? man.t : (p.millis() - t0) / 1000; vx.frame = p.frameCount; vx.w = p.width; vx.h = p.height;
         vx.a = params.a; vx.b = params.b; vx.c = params.c; vx.d = params.d;
-        vx.bpm = signals.bpm || 120;
-        var beats = (now - signals.beat0) / 60000 * vx.bpm;
+        vx.bpm = man ? man.bpm : signals.bpm || 120;
+        var beats = man ? man.beats : (now - signals.beat0) / 60000 * vx.bpm;
         vx.beat = beats - Math.floor(beats);
         vx.bar = (beats / 4) - Math.floor(beats / 4);
-        vx.level = signals.level; vx.bass = signals.bass; vx.mid = signals.mid; vx.high = signals.high;
-        // a kick is an audio onset when audio is live, otherwise the clock's own beat
         var b = Math.floor(beats);
-        var clockKick = b !== lastBeat; lastBeat = b;
-        var audioKick = signals.kickAt > now - 1000 / 30 && signals.kickAt !== vx._kickSeen;
-        if (audioKick) vx._kickSeen = signals.kickAt;
-        vx.kick = signals.external ? audioKick : clockKick;
-        vx.pulse = vx.kick ? 1 : vx.pulse * 0.9;
+        if (man) {
+          // everything from the time alone: a kick on the first frame of each beat, the pulse decaying from it
+          var since = vx.beat * 60 / vx.bpm;
+          vx.barN = Math.floor(beats / 4); vx.kick = b !== lastBeat && since < 0.1; lastBeat = b;
+          vx.pulse = Math.pow(0.9, since * 30);
+          vx.level = vx.bass = vx.mid = vx.high = man.level;
+        } else {
+          vx.level = signals.level; vx.bass = signals.bass; vx.mid = signals.mid; vx.high = signals.high;
+          // a kick is an audio onset when audio is live, otherwise the clock's own beat
+          var clockKick = b !== lastBeat; lastBeat = b;
+          var audioKick = signals.kickAt > now - 1000 / 30 && signals.kickAt !== vx._kickSeen;
+          if (audioKick) vx._kickSeen = signals.kickAt;
+          vx.kick = signals.external ? audioKick : clockKick;
+          vx.pulse = vx.kick ? 1 : vx.pulse * 0.9;
+        }
         try { if (handlers.draw) handlers.draw(); } catch (e) { fail(e); }
         api.fps = api.fps ? api.fps * 0.95 + (1000 / Math.max(1, p.deltaTime)) * 0.05 : p.frameRate(); // smoothed; p5's own figure jumps
         if (opts.onFps && p.frameCount % 30 === 0) opts.onFps(Math.round(api.fps));
@@ -131,6 +145,12 @@
     api.params = params;
     api.reseed = function (s) { seed = s != null ? s : Math.floor(Math.random() * 1e9); vx.seed = api.seed = seed; if (inst) { inst.randomSeed(seed); inst.noiseSeed(seed); } return seed; };
     api.canvas = function () { return host.querySelector('canvas'); };
+    // manual clock: draw the frame at t now; false until the sketch has finished setting up
+    api.renderAt = function (t, o) {
+      if (!man || !inst || api.stopped || !inst._setupDone) return false;
+      o = o || {}; man.t = t; man.bpm = o.bpm || 120; man.beats = o.beats != null ? o.beats : t * man.bpm / 60; man.level = o.level || 0;
+      inst.redraw(); return true;
+    };
     return api;
   }
 

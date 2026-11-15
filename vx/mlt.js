@@ -7,13 +7,14 @@
  *   shots   [{ file, name, in, dur, start }]  the cut on V1 (seconds); without start, shots run end to end; gaps are black;
  *                                         short clips loop rather than leave a gap
  *   overlay [{ file, name, in, dur, start }]  V2, full frame over V1 where it has items
+ *   titles  [{ file, start, dur }]           rendered titles (video with alpha, e.g. QuickTime RLE), over everything
  *   flashes [seconds]                     a two-frame white flash frame on each of these cuts
  *   idents  [{ t, file, dur, corner }]     faint corner idents (tl tr bl br), screen-blended at 55%
  *   mattes  [{ t0, t1 }]                   8 s at t0 showing the edit's own moment t1 through the moving mask
  *   letterbox  aspect ratio, e.g. 2.39 (0 = none)
  *   grade   { contrast, brightness, saturation, gamma, lut, vignette }   (avfilter eq / lut3d / vignette)
  *
- * Tracks, in Shotcut's order: 0 black background, 1 shots, 2 overlay, 3 mattes, 4 idents, 5 music. Video tracks composite onto
+ * Tracks, in Shotcut's order: 0 black background, 1 shots, 2 overlay, 3 mattes, 4 idents, 5 titles, 6 music. Video tracks composite onto
  * track 0 with qtblend; the music joins with mix. Times are frames (MLT's out points are inclusive).
  */
 (function (root) {
@@ -60,6 +61,15 @@
       return pl;
     }
     var v1 = entries(layout, true), ov = entries(lay(o.overlay), false);
+    // titles: each its own file, already the right length, never looped or cropped
+    var tt = [], att = 0;
+    lay(o.titles).forEach(function (L) {
+      var f0 = Math.max(F(L.start), att), f1 = F(L.start + L.s.dur), n = f1 - f0;
+      if (n <= 0) return;
+      if (f0 > att) tt.push('<blank length="' + (f0 - att) + '"/>');
+      tt.push('<entry producer="' + producer(L.s.file, false) + '" in="' + (f0 - F(L.start)) + '" out="' + (f0 - F(L.start) + n - 1) + '"/>');
+      att = f1;
+    });
 
     // mattes: each is a playlist of the edit's own slice t1..t1+8 with the mask's luma as its alpha
     var mattePl = [], v2 = [], at = 0;
@@ -103,6 +113,7 @@
     out.push('<playlist id="ov">' + prop('shotcut:video', 1) + prop('shotcut:name', 'V2 overlay') + ov.join('') + '</playlist>');
     out.push('<playlist id="v2">' + prop('shotcut:video', 1) + prop('shotcut:name', 'V3 mattes') + v2.join('') + '</playlist>');
     out.push('<playlist id="v3">' + prop('shotcut:video', 1) + prop('shotcut:name', 'V4 idents') + v3.join('') + '</playlist>');
+    out.push('<playlist id="tt">' + prop('shotcut:video', 1) + prop('shotcut:name', 'V5 titles') + tt.join('') + '</playlist>');
     out.push('<playlist id="a1">' + prop('shotcut:audio', 1) + prop('shotcut:name', 'A1 music') + (music ? '<entry producer="' + music + '" in="0" out="' + (total - 1) + '"/>' : '') + '</playlist>');
 
     // the whole picture: grade, then letterbox
@@ -120,10 +131,11 @@
     }
 
     out.push('<tractor id="tractor0" title="' + esc(o.title || 'V3XV0ID edit') + '">' + prop('shotcut', 1) +
-      '<track producer="background"/><track producer="v1" hide="audio"/><track producer="ov" hide="audio"/><track producer="v2" hide="audio"/><track producer="v3" hide="audio"/><track producer="a1" hide="video"/>' +
-      '<transition mlt_service="mix">' + prop('a_track', 0) + prop('b_track', 5) + prop('always_active', 1) + prop('sum', 1) + '</transition>' +
+      '<track producer="background"/><track producer="v1" hide="audio"/><track producer="ov" hide="audio"/><track producer="v2" hide="audio"/><track producer="v3" hide="audio"/><track producer="tt" hide="audio"/><track producer="a1" hide="video"/>' +
+      '<transition mlt_service="mix">' + prop('a_track', 0) + prop('b_track', 6) + prop('always_active', 1) + prop('sum', 1) + '</transition>' +
       [1, 2, 3].map(function (b) { return '<transition mlt_service="qtblend">' + prop('a_track', 0) + prop('b_track', b) + prop('compositing', 0) + prop('distort', 0) + '</transition>'; }).join('') +
       '<transition mlt_service="qtblend">' + prop('a_track', 0) + prop('b_track', 4) + prop('compositing', 14) + prop('distort', 0) + (rect.length ? prop('rect', rect.join(';')) : '') + '</transition>' +
+      '<transition mlt_service="qtblend">' + prop('a_track', 0) + prop('b_track', 5) + prop('compositing', 0) + prop('distort', 0) + '</transition>' +
       filters.join('') + '</tractor>');
 
     return '<?xml version="1.0" standalone="no"?>\n<mlt LC_NUMERIC="C" version="7.42.0" title="' + esc(o.title || 'V3XV0ID edit') + '" producer="main_bin">\n' + out.join('\n') + '\n</mlt>\n';

@@ -82,4 +82,11 @@ check('ruler intervals and timecode', () => {
   assert.strictEqual(T.ruler(2).label, 60);
   assert.strictEqual(T.timecode(61.5), '01:01:15');
 });
+check('titles keep their settings through place, split and length', () => {
+  const p = T.newProject(), t1 = T.track(p, 't1'); assert.strictEqual(p.tracks[0].id, 't1');
+  T.place(t1, { text: 'V3XV0ID', font: 'doto', style: 'glitch', start: 2, dur: 4 });
+  T.split(p, 3); const L = T.sorted(t1);
+  assert.deepStrictEqual(L.map(i => [i.start, i.in, i.dur, i.text, i.font]), [[2, 0, 1, 'V3XV0ID', 'doto'], [3, 1, 3, 'V3XV0ID', 'doto']]);
+  assert.strictEqual(L[0].name, 'V3XV0ID'); assert.strictEqual(T.length(p), 6); assert.deepStrictEqual(T.edits(p), [0, 2, 3, 6]);
+});
 console.log(`${n} timeline checks passed`);

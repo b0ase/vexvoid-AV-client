@@ -2,10 +2,12 @@
  * mouse and the keyboard all make the same edits (and scripts/test-timeline.js can check them).
  *
  *   project  { tracks: [track], markers: [{ id, t, label }] }
- *   track    { id, kind: 'video'|'audio', name, hidden, locked, muted, items: [item] }   (tracks[0] is the top layer)
+ *   track    { id, kind: 'text'|'video'|'audio', name, hidden, locked, muted, items: [item] }   (tracks[0] is the top layer)
  *   item     { id, src, name, start, in, dur }   seconds: where it sits, where in the source it starts, how long it runs
+ *            a title on the text track has no src; it carries its TITLES settings instead (text, font, style, mode ...),
+ *            and its in is how far into the title's animation it starts
  *
- * Video tracks overwrite: an item dropped onto others trims, splits or removes what it covers, as in an NLE.
+ * Text and video tracks overwrite: an item dropped onto others trims, splits or removes what it covers, as in an NLE.
  * The design (items with start/trim/duration, pixel snap threshold, ruler intervals) follows OpenCut classic's
  * timeline (MIT, github.com/OpenCut-app/OpenCut), rewritten here in plain JS.
  */
@@ -20,6 +22,7 @@
 
   function newProject() {
     return { tracks: [
+      { id: 't1', kind: 'text', name: 'T1', hidden: false, locked: false, muted: false, items: [] },
       { id: 'v2', kind: 'video', name: 'V2', hidden: false, locked: false, muted: false, items: [] },
       { id: 'v1', kind: 'video', name: 'V1', hidden: false, locked: false, muted: false, items: [] },
       { id: 'a1', kind: 'audio', name: 'A1', hidden: false, locked: true, muted: false, items: [] }
@@ -34,14 +37,15 @@
   }
   function length(p) {
     var e = 0;
-    p.tracks.forEach(function (t) { if (t.kind === 'video') t.items.forEach(function (it) { e = Math.max(e, end(it)); }); });
+    p.tracks.forEach(function (t) { if (t.kind !== 'audio') t.items.forEach(function (it) { e = Math.max(e, end(it)); }); });
     return e;
   }
   function itemAt(t, time) {
     for (var i = 0; i < t.items.length; i++) { var it = t.items[i]; if (time >= it.start - EPS && time < end(it) - EPS) return it; }
     return null;
   }
-  function item(o) { return { id: o.id || id(), src: o.src, name: o.name || String(o.src).split('/').pop(), start: r3(Math.max(0, o.start || 0)), in: r3(Math.max(0, o.in || 0)), dur: r3(Math.max(1 / FPS, o.dur)) }; }
+  // an item's other fields (a title's settings) travel with it
+  function item(o) { return Object.assign({}, o, { id: o.id || id(), src: o.src, name: o.name || (o.text != null ? String(o.text) : String(o.src).split('/').pop()), start: r3(Math.max(0, o.start || 0)), in: r3(Math.max(0, o.in || 0)), dur: r3(Math.max(1 / FPS, o.dur)) }); }
 
   // a sequence of shots (the auto-cutter's output) laid end to end
   function fromShots(shots) { var t = 0; return shots.map(function (s) { var it = item({ src: s.src, name: s.name, start: s.start != null ? s.start : t, in: s.in, dur: s.dur }); t = end(it); return it; }); }
@@ -68,7 +72,7 @@
   function split(p, time, ids) {
     var made = [];
     p.tracks.forEach(function (t) {
-      if (t.locked || t.kind !== 'video') return;
+      if (t.locked || t.kind === 'audio') return;
       t.items.slice().forEach(function (it) {
         if (ids && ids.indexOf(it.id) < 0) return;
         if (time <= it.start + 1 / FPS || time >= end(it) - 1 / FPS) return;
@@ -104,7 +108,7 @@
   // every edit point, sorted (cuts on visible video tracks, plus 0 and the end)
   function edits(p) {
     var s = { 0: 0 };
-    p.tracks.forEach(function (t) { if (t.kind === 'video' && !t.hidden) t.items.forEach(function (it) { s[r3(it.start)] = r3(it.start); s[r3(end(it))] = r3(end(it)); }); });
+    p.tracks.forEach(function (t) { if (t.kind !== 'audio' && !t.hidden) t.items.forEach(function (it) { s[r3(it.start)] = r3(it.start); s[r3(end(it))] = r3(end(it)); }); });
     return Object.keys(s).map(function (k) { return s[k]; }).sort(function (a, b) { return a - b; });
   }
 
