@@ -40,45 +40,104 @@
     return { rms: rms, step: STEP, seconds: ab.duration, bpm: tp.bpm, bar0: tp.bar0, tempoConf: tp.conf };
   }
 
-  // Tempo from the audio: an onset curve (rises in loudness, full band plus a kick band), autocorrelated over
-  // 60-200 BPM with a comb across four beat multiples and a mild preference for 85-175 BPM. Then the beat phase
-  // that best lines up with the onsets, and the downbeat: of the four beats in a bar, the one with the most kick.
+  // Tempo from the audio: an onset curve (rises in loudness: full band, a kick band and a snare/hat band), every
+  // candidate tempo from 70 to 190 BPM scored by how hard its best beat grid lands on hits, refined to 0.05 BPM.
+  // Then the beat phase and the downbeat: of the four beats in a bar, the one with the most kick.
   function tempo(chans, sr) {
     var hop = 512, len = chans[0].length, n = Math.floor(len / hop), fps = sr / hop;
-    var full = new Float32Array(n), low = new Float32Array(n), lp = 0, a = 1 - Math.exp(-2 * Math.PI * 150 / sr), nc = chans.length;
+    var full = new Float32Array(n), low = new Float32Array(n), high = new Float32Array(n), highLin = new Float32Array(n), lp = 0, lp2 = 0, nc = chans.length;
+    var a = 1 - Math.exp(-2 * Math.PI * 150 / sr), a2 = 1 - Math.exp(-2 * Math.PI * 1500 / sr);
     for (var i = 0; i < n; i++) {
-      var ef = 0, el = 0;
-      for (var j = i * hop; j < (i + 1) * hop; j++) { var v = 0; for (var c = 0; c < nc; c++) v += chans[c][j]; v /= nc; lp += a * (v - lp); ef += v * v; el += lp * lp; }
-      full[i] = Math.log(1 + 1000 * ef); low[i] = Math.log(1 + 1000 * el);
+      var ef = 0, el = 0, eh = 0;
+      for (var j = i * hop; j < (i + 1) * hop; j++) {
+        var v = 0; for (var c = 0; c < nc; c++) v += chans[c][j]; v /= nc;
+        lp += a * (v - lp); lp2 += a2 * (v - lp2); ef += v * v; el += lp * lp; eh += (v - lp2) * (v - lp2);
+      }
+      full[i] = Math.log(1 + 1000 * ef); low[i] = Math.log(1 + 1000 * el); high[i] = Math.log(1 + 1000 * eh); highLin[i] = Math.sqrt(eh / hop);
     }
     var o = new Float32Array(n);
-    for (i = 1; i < n; i++) o[i] = Math.max(0, full[i] - full[i - 1]) + Math.max(0, low[i] - low[i - 1]);
+    for (i = 1; i < n; i++) o[i] = Math.max(0, full[i] - full[i - 1]) + Math.max(0, low[i] - low[i - 1]) + 0.7 * Math.max(0, high[i] - high[i - 1]);
     // take away the local average so sustained loud passages do not swamp the beat
     var w = Math.round(fps * 0.4), acc = 0, avg = new Float32Array(n);
     for (i = 0; i < n; i++) { acc += o[i]; if (i >= w) acc -= o[i - w]; avg[i] = acc / Math.min(i + 1, w); }
-    for (i = 0; i < n; i++) o[i] = Math.max(0, o[i] - avg[i]);
-    function ac(L) { var s = 0, k = 0, fl = Math.floor(L), fr = L - fl; for (var x = 0; x + fl + 1 < n; x++) { s += o[x] * (o[x + fl] * (1 - fr) + o[x + fl + 1] * fr); k++; } return k ? s / k : 0; }
-    var best = 0, bestL = fps / 2, minL = fps * 60 / 200, maxL = fps * 60 / 60;
-    var scores = [];
-    for (var L = minL; L <= maxL; L += 0.25) {
-      var bpm = 60 * fps / L, comb = ac(L) + 0.6 * ac(2 * L) + 0.4 * ac(3 * L) + 0.5 * ac(4 * L);
-      var pr = Math.log2(bpm / 125) / 0.8, score = comb * Math.exp(-0.5 * pr * pr);
-      scores.push(score);
-      if (score > best) { best = score; bestL = L; }
+    var tot = 0;
+    for (i = 0; i < n; i++) { o[i] = Math.max(0, o[i] - avg[i]); tot += o[i]; }
+    var meanO = tot / n || 1;
+    // the grid at this tempo that lands on the most onset strength, and its phase
+    function fit(bpmTry) { var Pp = 60 * fps / bpmTry, bs = -1, bp = 0, cnt = 1; for (var p = 0; p < Pp; p += 0.5) { var s2 = 0, k = 0; for (var t = p; t < n; t += Pp) { var r = Math.round(t); s2 += Math.max(o[r] || 0, o[r - 1] || 0, o[r + 1] || 0); k++; } if (s2 > bs) { bs = s2; bp = p; cnt = k; } } return { s: bs, p: bp, mean: bs / cnt }; }
+    // choose the tempo: autocorrelation of the onset curve with a comb over 1, 2 and 4 beats (binary metre; a 3-beat
+    // term turned syncopated kicks into two-thirds errors) and a mild preference for 85-175 BPM
+    function ac(L) { var s4 = 0, k4 = 0, fl = Math.floor(L), fr4 = L - fl; for (var x = 0; x + fl + 1 < n; x++) { s4 += o[x] * (o[x + fl] * (1 - fr4) + o[x + fl + 1] * fr4); k4++; } return k4 ? s4 / k4 : 0; }
+    var best = -1, bestL = fps / 2, scores = [];
+    for (var L = fps * 60 / 200; L <= fps; L += 0.25) {
+      var bpmL = 60 * fps / L, comb = ac(L) + 0.6 * ac(2 * L) + 0.5 * ac(4 * L);
+      var pr = Math.log2(bpmL / 125) / 0.8, sc = comb * Math.exp(-0.5 * pr * pr);
+      scores.push(sc);
+      if (sc > best) { best = sc; bestL = L; }
     }
-    var mean = scores.reduce(function (p, q) { return p + q; }, 0) / scores.length;
     var bpmOut = 60 * fps / bestL;
     while (bpmOut < 80) bpmOut *= 2;
     while (bpmOut > 180) bpmOut /= 2;
-    // refine: the tempo whose beat grid lines up best with the onsets across the whole track (a 0.5 BPM error
-    // drifts a whole beat in two minutes); DAW tracks sit on whole numbers, so snap when close
-    function fit(bpmTry) { var Pp = 60 * fps / bpmTry, bs = -1, bp = 0; for (var p = 0; p < Pp; p += 0.5) { var s2 = 0; for (var t = p; t < n; t += Pp) s2 += o[Math.round(t)] || 0; if (s2 > bs) { bs = s2; bp = p; } } return { s: bs, p: bp }; }
-    var coarse = bpmOut, bestFit = fit(coarse);
-    for (var tb = coarse - 1.5; tb <= coarse + 1.5; tb += 0.05) { var fr = fit(tb); if (fr.s > bestFit.s) { bestFit = fr; bpmOut = tb; } }
-    bpmOut = Math.abs(bpmOut - Math.round(bpmOut)) < 0.2 ? Math.round(bpmOut) : Math.round(bpmOut * 10) / 10;
+    var mean = scores.reduce(function (p, q) { return p + q; }, 0) / scores.length;
+    // refine to 0.05 BPM by total fit (a 0.5 BPM error drifts a whole beat in two minutes); DAW tracks sit on whole
+    // numbers, so snap when close
+    function refine(c) {
+      var bf = fit(c), bt = c;
+      for (var tb = c - 1; tb <= c + 1; tb += 0.05) { var fr = fit(tb); if (fr.s > bf.s) { bf = fr; bt = tb; } }
+      bt = Math.abs(bt - Math.round(bt)) < 0.2 ? Math.round(bt) : Math.round(bt * 10) / 10;
+      return { bpm: bt, mean: fit(bt).mean };
+    }
+    var rd = refine(bpmOut); bpmOut = rd.bpm;
     var P = 60 * fps / bpmOut, bestP = fit(bpmOut).p, t;
-    var bestB = 0, bestK = -1;
-    for (var b = 0; b < 4; b++) { var k2 = 0; for (t = bestP + b * P; t < n; t += 4 * P) k2 += Math.max(0, (low[Math.round(t)] || 0) - (low[Math.round(t) - 2] || 0)); if (k2 > bestK) { bestK = k2; bestB = b; } }
+    var rise = function (arr, at) { var r = Math.round(at), m = 0; for (var d = -1; d <= 1; d++) m = Math.max(m, (arr[r + d] || 0) - (arr[r + d - 2] || 0)); return Math.max(0, m); };
+    // check against the backbeat. In almost all modern music the snare repeats every two beats, so its period gives
+    // the true tempo. Autocorrelation can lock onto half the tempo (87 for 174 drum and bass) or a three-to-two
+    // relative (116 for 174, 120 for 90 boom-bap); when the backbeat says one of those, take its tempo instead.
+    var ho = new Float32Array(n), ha = 0;
+    for (i = 1; i < n; i++) ho[i] = Math.max(0, highLin[i] - highLin[i - 1]); // linear: loud snares outweigh quiet hats, as to the ear
+    for (i = 0; i < n; i++) { ha += ho[i]; if (i >= w) ha -= ho[i - w]; avg[i] = ha / Math.min(i + 1, w); }
+    for (i = 0; i < n; i++) ho[i] = Math.max(0, ho[i] - avg[i]);
+    var hac = function (L) { var s3 = 0, k3 = 0; for (var x = 0; x + L < n; x++) { s3 += ho[x] * ho[x + L]; k3++; } return k3 ? s3 / k3 : 0; };
+    // the backbeat repeats every two beats and also every bar (four), so take the shortest strong repeat: the first
+    // peak within 75% of the strongest, not the strongest itself
+    var L0 = Math.round(0.6 * fps), L1 = Math.round(1.75 * fps), hv = [], bestH = 0, bestHL = 0; // 2 beats at 200 down to 69 BPM
+    for (var Lh = L0 - 1; Lh <= L1 + 1; Lh++) hv.push(hac(Lh));
+    for (Lh = 1; Lh < hv.length - 1; Lh++) bestH = Math.max(bestH, hv[Lh]);
+    for (Lh = 1; Lh < hv.length - 1; Lh++) if (hv[Lh] >= hv[Lh - 1] && hv[Lh] >= hv[Lh + 1] && hv[Lh] >= 0.75 * bestH) { bestHL = L0 - 1 + Lh; break; }
+    // only a real backbeat counts: snares alternate, so the two-beat repeat must clearly beat the one-beat repeat
+    // (hats ticking every beat repeat just as strongly at both, and say nothing about the tempo)
+    var backbeat = bestHL && hac(bestHL) > 1.5 * hac(Math.round(bestHL / 2));
+    var implied = backbeat ? 120 * fps / bestHL : 0, ratio = implied / bpmOut;
+    var ri = implied ? refine(implied) : null;
+    if (typeof globalThis !== 'undefined' && globalThis.VXEDIT_DEBUG) console.log('  backbeat', (bestHL / fps).toFixed(3), 's -> implies', implied.toFixed(1), 'BPM; detected', bpmOut, ri ? 'fit ratio ' + (ri.mean / rd.mean).toFixed(3) : '');
+    var rels = bpmOut < 100 ? [2, 1.5, 4 / 3, 0.75, 2 / 3] : [1.5, 4 / 3, 0.75, 2 / 3];
+    // and the backbeat's tempo has to fit all the other hits (kicks and the rest) about as well as the detected one:
+    // a real backbeat always does, a phantom one (odd repeats of kick clicks and hats) does not
+    if (implied >= 70 && implied <= 190 && rels.some(function (r) { return Math.abs(ratio / r - 1) < 0.04; }) && ri.mean >= 0.9 * rd.mean) {
+      bpmOut = ri.bpm; P = 60 * fps / bpmOut; bestP = fit(bpmOut).p;
+    } else {
+      // no backbeat to ask: settle a three-to-two slip by the grid itself. At the true tempo every beat lands on a
+      // hit; at two thirds (or three halves) every other beat lands on a gap or a hat. Only that pair: across half,
+      // double or 3:4 the sparser grid always looks stronger.
+      var swap = null;
+      [1.5, 2 / 3].forEach(function (r) {
+        var c3 = bpmOut * r; if (c3 < 80 || c3 > 190) return;
+        var rc = refine(c3); if (rc.mean > 1.2 * rd.mean && (!swap || rc.mean > swap.mean)) swap = rc;
+      });
+      if (swap) { bpmOut = swap.bpm; P = 60 * fps / bpmOut; bestP = fit(bpmOut).p; }
+    }
+    // the downbeat: of the four beats in a bar, the one with the most kick, the least snare (snares live on 2 and 4),
+    // and where the music's sections change (big jumps in loudness start on bar 1 of a phrase)
+    var bestB = 0, bestK = -Infinity, bars = Math.max(1, Math.round(n / (4 * P)));
+    for (var b = 0; b < 4; b++) {
+      var k2 = 0;
+      for (t = bestP + b * P; t < n; t += 4 * P) {
+        var r = Math.round(t), before = 0, after = 0;
+        for (var q = 1; q <= Math.round(2 * P); q++) { before += full[r - q] || 0; after += full[r + q] || 0; }
+        k2 += rise(low, t) - 0.5 * rise(high, t) + 0.5 * Math.max(0, (after - before) / Math.round(2 * P));
+      }
+      if (k2 / bars > bestK) { bestK = k2 / bars; bestB = b; }
+    }
     var barLen = 240 / bpmOut, bar0 = ((bestP + bestB * P) / fps) % barLen;
     if (bar0 > barLen - 0.15) bar0 = 0; // a downbeat a hair under a bar in is really bar 1 at the start
     return { bpm: bpmOut, beat0: bestP / fps, bar0: Math.round(bar0 * 1000) / 1000, conf: Math.round(Math.min(1, (best / (mean || 1) - 1) / 2) * 100) / 100 };

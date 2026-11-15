@@ -16,7 +16,8 @@
     "sync-docs": "cp vx/vx-engine.js vx/vx-keys.js docs/",
     "mix": "node bin/vexvoid-mix.js",
     "sync-catalogue": "node scripts/sync-catalogue.js",
-    "relay": "node relay/server.js"
+    "relay": "node relay/server.js",
+    "test:tempo": "node scripts/test-tempo.js"
   },
   "keywords": [
     "animation",
