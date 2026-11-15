@@ -19,10 +19,14 @@ import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { buildCity, EYE } from './city';
 import { loadLook, makeGradePass } from './look';
 import { loadWriter } from './writer';
-import { makeSpray, COLOURS, COLOUR_NAMES, type Can } from './spray';
+import { makeSpray, COLOURS, COLOUR_NAMES, type Can, type WallStore } from './spray';
 import { makeLaw, type LawState } from './cops';
 
-export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) => void; onHud?: (s: string) => void; onRec?: () => void };
+export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) => void; onHud?: (s: string) => void; onRec?: () => void;
+  /** Where the walls' paint is kept (default: this browser). */
+  store?: WallStore;
+  /** What happens to the writer, for a host that keeps a player's history: seen, caught, got away. */
+  onEvent?: (ev: 'alert' | 'busted' | 'escaped') => void };
 export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?: number) => string; inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string }) => void; where: () => { x: number; z: number; yaw: number; heading: number; anim: string }; spots: () => { id: string; w: number; h: number; x: number; y: number; z: number }[]; paint: (id: string, pts: [number, number][], o?: { colour?: string; cap?: 1 | 2 | 3; dist?: number }) => void; clearPaint: (id?: string) => void; piece: (id: string) => string; painting: () => string; flush: () => Promise<void>; goto: (x: number, z: number, yaw?: number, pitch?: number) => void; law: () => LawState; cops: (on: boolean) => void; audio: () => { ctx: AudioContext; node: AudioNode } | null };
 
 // VexVoid's grade: no colour at all, hard contrast, a heavy vignette
@@ -53,7 +57,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   say('Dressing the writer…');
   const writer = await loadWriter(opts.base + 'anims/ual.glb', high, opts.base + 'models/writer.glb');
   scene.add(writer.root, writer.can);
-  const spray = makeSpray(scene, city.spots);
+  const spray = makeSpray(scene, city.spots, opts.store);
   // every sound the game makes goes through one node, so a recorder can tap it (made the first time something needs it)
   let bus: { ctx: AudioContext; out: GainNode } | null = null;
   const sound = () => {
@@ -251,6 +255,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     spray.update(dt);
     law.pushOut(me, 0.35);
     const ev = law.update(dt, t, { x: me.x, z: me.z, y: me.y, crouch: me.crouch, painting: !!paint, spraying: !!(paint && spraying && reticle.visible) });
+    if (ev && opts.onEvent) try { opts.onEvent(ev); } catch { /* the host's business */ }
     if (ev === 'busted') {
       bust = { t: 0, spot: lastSpray };
       if (paint) togglePaint();

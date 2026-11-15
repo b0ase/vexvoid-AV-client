@@ -35,9 +35,17 @@ const tx = async <T>(mode: IDBTransactionMode, f: (st: IDBObjectStore) => IDBReq
   return new Promise<T | undefined>((res) => { try { const q = f(d.transaction(STORE, mode).objectStore(STORE)); q.onsuccess = () => res(q.result); q.onerror = () => res(undefined); } catch { res(undefined); } });
 };
 
+/** Where the walls' paint is kept between sessions. The default is this browser (IndexedDB); a host can pass its own,
+ *  e.g. a player's account on a server, so their walls follow them. save(id, null) forgets a wall. */
+export type WallStore = { load: (id: string) => Promise<Blob | null>; save: (id: string, png: Blob | null) => Promise<void> };
+const local: WallStore = {
+  load: async (id) => { const v = await tx<Saved>('readonly', (st) => st.get(id)); return v ? v.png : null; },
+  save: async (id, png) => { await tx('readwrite', (st) => (png ? st.put({ w: 0, h: 0, png } as Saved, id) : st.delete(id))); },
+};
+
 type Drip = { L: Layer; x: number; y: number; w: number; left: number; colour: string; speed: number };
 
-export function makeSpray(scene: THREE.Scene, spots: Spot[]) {
+export function makeSpray(scene: THREE.Scene, spots: Spot[], store: WallStore = local) {
   const layers = new Map<string, Layer>();
   const drips: Drip[] = [];
   for (const spot of spots) {
@@ -57,12 +65,15 @@ export function makeSpray(scene: THREE.Scene, spots: Spot[]) {
 
   // what was painted last time comes back (a wall whose size changed starts clean)
   const loaded = Promise.all([...layers.values()].map(async (L) => {
-    const v = await tx<Saved>('readonly', (st) => st.get(L.spot.id));
-    if (!v || v.w !== L.W || v.h !== L.H) return;
-    try { const im = await createImageBitmap(v.png); L.g.drawImage(im, 0, 0); im.close(); L.dirty = true; } catch { /* a broken save: start clean */ }
+    try {
+      const png = await store.load(L.spot.id); if (!png) return;
+      const im = await createImageBitmap(png);
+      if (im.width === L.W && im.height === L.H) { L.g.drawImage(im, 0, 0); L.dirty = true; }
+      im.close();
+    } catch { /* a broken save, or the store is away: start clean */ }
   }));
   const save = (L: Layer) => new Promise<void>((res) => L.cv.toBlob(async (b) => {
-    if (b) await tx('readwrite', (st) => st.put({ w: L.W, h: L.H, png: b } as Saved, L.spot.id));
+    try { if (b) await store.save(L.spot.id, b); } catch { /* the store is away: the paint stays on the wall this session */ }
     res();
   }, 'image/png'));
 
@@ -118,7 +129,7 @@ export function makeSpray(scene: THREE.Scene, spots: Spot[]) {
       for (const L of layers.values()) if (!id || L.spot.id === id) {
         L.g.clearRect(0, 0, L.W, L.H); L.wet.fill(0); L.dirty = true; L.unsaved = 0;
         for (let i = drips.length - 1; i >= 0; i--) if (drips[i].L === L) drips.splice(i, 1);
-        void tx('readwrite', (st) => st.delete(L.spot.id));
+        void store.save(L.spot.id, null).catch(() => {});
       }
     },
     /** Resolves once last session's paint is back on the walls. */
