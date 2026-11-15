@@ -5708,7 +5708,8 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         await edEnsureEnv(); if (!ed.env) throw new Error('could not read the track');
         edSay('Measuring the clips…');
         const wantsIdents = /ident|logo|glyph/i.test(filter);
-        let cands = edPool(source, filter).filter(p => wantsIdents || !isIdent(p));
+        // recordings and earlier exports are whole videos: never cut them in unless asked for by name or source
+        let cands = edPool(source, filter).filter(p => (wantsIdents || !isIdent(p)) && (source === 'recorded' || /record/i.test(filter) || p.kind !== 'recorded'));
         // studio rule: a video uses its own world's clips plus the shared ones, never another track's world
         if (!filter) {
           const worlds = [...new Set(catalogue().tracks.map(t => t.title.toUpperCase()))], mine = ed.track.name.toUpperCase();

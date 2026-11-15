@@ -148,8 +148,8 @@
     return k ? s / k : 0;
   }
 
-  // pace: how many bars a shot holds at full, mid and low energy
-  var PACE = { fast: [1, 2, 4], medium: [2, 4, 8], slow: [4, 8, 16] };
+  // pace: how many bars a shot holds at full, mid and low energy (half a bar = two beats, still on the beat)
+  var PACE = { fast: [0.5, 1, 2], medium: [1, 2, 4], slow: [2, 4, 8] };
   function autoCut(o) {
     var bar = 240 / (o.bpm || 120), off = o.offset || 0, pace = PACE[o.pace] || PACE.medium, pool = (o.pool || []).filter(function (p) { return p && p.src; });
     if (!pool.length) throw new Error('no clips to cut with');
