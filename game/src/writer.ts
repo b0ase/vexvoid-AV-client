@@ -32,6 +32,10 @@ const LOOK: Record<string, () => THREE.Material> = {
   Shoes: () => new THREE.MeshStandardMaterial({ color: '#f4f4f4', roughness: 0.4, metalness: 0, emissive: '#202020' }),
   Sole: () => new THREE.MeshStandardMaterial({ color: '#8c8c8e', roughness: 0.6, metalness: 0 }),
   Void: () => new THREE.MeshBasicMaterial({ color: '#000000' }),
+  Mask: () => new THREE.MeshStandardMaterial({ color: '#232326', roughness: 0.95, metalness: 0 }),
+  Pack: () => new THREE.MeshStandardMaterial({ color: '#36373c', roughness: 0.5, metalness: 0.05 }), // nylon, a little sheen
+  Can: () => new THREE.MeshStandardMaterial({ color: '#d6d6da', roughness: 0.28, metalness: 0.85 }),
+  Cap: () => new THREE.MeshStandardMaterial({ color: '#f2f2f2', roughness: 0.5, metalness: 0 }),
 };
 
 export async function loadWriter(url: string, shadow: boolean, modelUrl?: string): Promise<Writer> {
