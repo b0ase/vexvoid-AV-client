@@ -1786,6 +1786,10 @@
     .code-in input{flex:1;background:none;border:0;color:#fff;font:inherit;outline:none}
     /* EDIT */
     .ed{display:flex;flex-direction:column;gap:8px;width:100%;height:100%;min-height:0}
+    .gm{display:flex;flex-direction:column;gap:6px;width:100%;height:100%;min-height:0}
+    .gm-view{flex:1;min-height:0;background:#000;border:1px solid #1d1d1d;position:relative}
+    .gm-view .gm-msg{position:absolute;inset:0;display:grid;place-items:center;text-align:center;font-size:10px;letter-spacing:.2em;color:#777;line-height:2}
+    .gm-bar{display:flex;justify-content:space-between;font-size:9px;letter-spacing:.2em;color:#666}
     .ed-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
     .ed-title{flex:1;min-width:160px;font-family:'Michroma','IBM Plex Mono',sans-serif;font-size:18px;letter-spacing:.16em;outline:none}
     .ed-ic{font:inherit;font-size:14px;line-height:1;background:none;color:#ddd;border:1px solid #333;width:30px;height:28px;cursor:pointer;padding:0}.ed-ic:hover{border-color:#fff;color:#fff}.ed-ic:disabled{opacity:.3;cursor:default;border-color:#333}
@@ -2114,6 +2118,7 @@
     <button class="tab-button" data-tab="composer">COMPOSER</button>
     <button class="tab-button" data-tab="edit">EDIT</button>
     <button class="tab-button" data-tab="titles">TITLES</button>
+    <button class="tab-button" data-tab="game">GAME</button>
     <button class="tab-button" data-tab="wallet">WALLET</button>
     <button class="tab-button" data-tab="market">MARKET</button>
     <button class="tab-button" data-tab="code">CODE</button>
@@ -2734,6 +2739,10 @@
 
     <!-- VEXVOID Tab Content -->
     <!-- Wallet Tab: everything the connected bWalletX holds that the mixer can use -->
+    <!-- GAME: the VexVoid game (game/src, built to vx/game/vexvoid-game.js), loaded the first time the tab opens -->
+    <div class="tab-content" id="gameTab">
+      <div class="gm"><div class="gm-view" id="gmView"></div><div class="gm-bar"><span id="gmNote">WASD / ARROWS WALK · SHIFT RUNS · DRAG TO LOOK</span><span id="gmStatus"></span></div></div>
+    </div>
     <!-- TITLES: text layers in VexVoid fonts, animated, for the decks (2D now; 3D titles next) -->
     <div class="tab-content" id="titlesTab">
       <div class="ti">
@@ -6625,6 +6634,29 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       edEl('edClear').addEventListener('click', () => { if (!edLength() && !ed.proj.markers.length) return; ed.sel = []; edDo(() => { ed.proj.tracks.forEach(tr => { tr.items = []; }); ed.proj.markers = []; }); edSay('Cleared. ⌘Z brings it back.'); });
       edEl('edTitle').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
       edEl('edTitle').addEventListener('blur', e => { ed.title = e.target.textContent.trim().toUpperCase().slice(0, 60) || 'UNTITLED VIDEO'; edSave(); });
+
+      // ===== GAME: the VexVoid game. The engine (window.VXGAME) loads the first time the tab opens and runs only while the
+      // tab is open, so it never competes with the decks for the GPU.
+      const gm = { g: null, loading: null };
+      function gmLoad() {
+        if (window.VXGAME) return Promise.resolve();
+        if (!require('fs').existsSync(require('path').join(__dirname, 'vx', 'game', 'vexvoid-game.js'))) return Promise.reject(new Error('The game engine is not installed yet (scripts/build-game.sh builds it).'));
+        return gm.loading || (gm.loading = new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = './vx/game/vexvoid-game.js'; sc.onload = res; sc.onerror = () => { gm.loading = null; rej(new Error('The game engine did not load.')); }; document.body.appendChild(sc); }));
+      }
+      async function gmStart() {
+        if (gm.g) return;
+        const view = document.getElementById('gmView'), st = document.getElementById('gmStatus');
+        view.innerHTML = '<div class="gm-msg">LOADING…</div>';
+        try {
+          await gmLoad();
+          if (!document.getElementById('gameTab').classList.contains('active')) { view.innerHTML = ''; return; }
+          view.innerHTML = '';
+          gm.g = await VXGAME.mount(view, { base: 'vx/game/', high: true, onStatus: s => { st.textContent = s; } });
+          gm.g.canvas.focus();
+        } catch (e) { view.innerHTML = `<div class="gm-msg"></div>`; view.firstChild.textContent = e.message; }
+      }
+      function gmStop() { if (gm.g) { gm.g.stop(); gm.g = null; } }
+      document.querySelectorAll('.tab-button').forEach(b => b.addEventListener('click', () => { if (b.dataset.tab === 'game') gmStart(); else gmStop(); }));
 
       // ===== VEXVOID title screen: plays the whole time the VEXVOID tab is open (a shader behind the chrome V3XV0ID)
       let pgHero = [];

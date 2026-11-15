@@ -1,0 +1,5 @@
+vexvoid-game.js: game/src (TypeScript) bundled by scripts/build-game.sh with esbuild 0.27.2 (darwin-arm64, npm
+integrity checked) and three 0.182.0 (MIT, npm sha512-GbHabT+Irv+ihI1/f5kIIsZ+Ef9Sl5A1Y7imvS5RQjWgtTPfPnZ43JmlYI7NtCRDK9zir20lQpfg8/9Yd02OvQ==).
+sha256 d1ae7305c491151e40c2180a8252606ce763dcd69612550c065daab164733cf1
+The city (game/src/city*.ts) is forked from tokenblaster.lol @88d14f1 src/lib/galleryGame (ESCAPE FROM TERRORNODE, NPG Ltd).
+tex/: Poly Haven concrete_floor_02 and large_floor_tiles_02 (CC0), via tokenblaster.lol public/doubleo/tex.
