@@ -6,7 +6,8 @@
  *   g.stop();  g.canvas  (to record)
  *
  * Stage 2: the writer, third person (./writer.ts). WASD or arrows move relative to the camera (jog), Shift sprints,
- * C crouches (sneak), Space jumps, drag to look. city.spots are the walls to paint; the paint and the cops come next.
+ * C crouches (sneak), Space jumps, drag to look. Stage 3: F at a wall paints it (./spray.ts).
+ * Stage 4: the law (./cops.ts): heat, a patrol car, officers on foot; BUSTED loses the piece. P turns the patrol off.
  * Built by scripts/build-game.sh into vx/game/vexvoid-game.js (window.VXGAME).
  */
 import * as THREE from 'three';
@@ -19,9 +20,10 @@ import { buildCity, EYE } from './city';
 import { loadLook, makeGradePass } from './look';
 import { loadWriter } from './writer';
 import { makeSpray, COLOURS, COLOUR_NAMES, type Can } from './spray';
+import { makeLaw, type LawState } from './cops';
 
 export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) => void; onHud?: (s: string) => void };
-export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?: number) => string; inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string }) => void; where: () => { x: number; z: number; yaw: number; heading: number; anim: string }; spots: () => { id: string; w: number; h: number; x: number; y: number; z: number }[]; paint: (id: string, pts: [number, number][], o?: { colour?: string; cap?: 1 | 2 | 3; dist?: number }) => void; clearPaint: (id?: string) => void; piece: (id: string) => string; painting: () => string; flush: () => Promise<void>; goto: (x: number, z: number, yaw?: number, pitch?: number) => void };
+export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?: number) => string; inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string }) => void; where: () => { x: number; z: number; yaw: number; heading: number; anim: string }; spots: () => { id: string; w: number; h: number; x: number; y: number; z: number }[]; paint: (id: string, pts: [number, number][], o?: { colour?: string; cap?: 1 | 2 | 3; dist?: number }) => void; clearPaint: (id?: string) => void; piece: (id: string) => string; painting: () => string; flush: () => Promise<void>; goto: (x: number, z: number, yaw?: number, pitch?: number) => void; law: () => LawState; cops: (on: boolean) => void };
 
 // VexVoid's grade: no colour at all, hard contrast, a heavy vignette
 const MONO = { shadow: [1, 1, 1] as [number, number, number], high: [1, 1, 1] as [number, number, number], sat: 0, contrast: 1.32, vignette: 0.72 };
@@ -52,6 +54,8 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const writer = await loadWriter(opts.base + 'anims/ual.glb', high, opts.base + 'models/writer.glb');
   scene.add(writer.root, writer.can);
   const spray = makeSpray(scene, city.spots);
+  say('Calling the law…');
+  const law = await makeLaw({ scene, high, base: opts.base, blockers: city.blockers, bounds: BOUNDS });
   // a soft light that rides with the writer so the hoodie reads against the dark street
   const rim = new THREE.PointLight('#ffffff', 9, 7, 2);
   const back = new THREE.PointLight('#ffffff', 6, 5, 2); // a kicker behind, to edge the hood and shoulders
@@ -86,14 +90,24 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const me = { x: 0, z: 8, y: 0, vy: 0, heading: Math.PI, crouch: false, airborne: false };
   const camO = { yaw: 0, pitch: 0.12, dist: 3.4 };
   const keys = new Set<string>();
-  const MOVE = ['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Shift', ' ', 'c', 'f', '1', '2', '3', 'Tab', 'Escape'];
+  const MOVE = ['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Shift', ' ', 'c', 'f', 'p', '1', '2', '3', 'Tab', 'Escape'];
   // painting: F at a wall squares up to it; the mouse aims, holding it sprays; the wheel sets the can's distance
   const can: Can = { colour: COLOURS[0], cap: 2, dist: 0.22 };
   let paint: { id: string; spot: (typeof city.spots)[number] } | null = null, spraying = false, colourI = 0;
   const mouse = new THREE.Vector2(), ray = new THREE.Raycaster(), aimHand = new THREE.Vector3();
-  const hud = () => opts.onHud && opts.onHud(paint
-    ? `PAINTING ${paint.id.toUpperCase()} · HOLD MOUSE TO SPRAY · WHEEL DISTANCE ${Math.round(can.dist * 100)} CM · 1 2 3 CAP ${['', 'SKINNY', 'MEDIUM', 'FAT'][can.cap]} · TAB ${COLOUR_NAMES[colourI]} · A D MOVE · F DONE`
-    : 'WASD MOVE · SHIFT SPRINT · C CROUCH · SPACE JUMP · DRAG LOOK · F AT A WALL TO PAINT');
+  // the HUD line: the controls, then the heat (five cells) and what the law is doing; a flash message takes it over a while
+  let flash = { text: '', until: 0 }, lastHud = '', t = 0;
+  const say2 = (text: string, secs: number) => { flash = { text, until: t + secs }; };
+  const hudText = () => {
+    if (flash.until > t) return flash.text;
+    const L = law.state(), cells = Math.min(5, Math.ceil(L.heat * 5 - 0.001));
+    const what = { off: 'PATROL OFF', calm: L.seen ? 'SEEN' : L.heat >= 0.6 ? 'WANTED' : 'CALM', alerted: 'ALERT', chase: 'CHASE', searching: 'SEARCHING', busted: 'BUSTED' }[L.chase];
+    const lawS = L.on ? `HEAT ${'▮'.repeat(cells)}${'▯'.repeat(5 - cells)} ${what} · P PATROL OFF` : 'PATROL OFF · P PATROL ON';
+    return (paint
+      ? `PAINTING ${paint.id.toUpperCase()} · HOLD MOUSE TO SPRAY · WHEEL ${Math.round(can.dist * 100)} CM · 1 2 3 CAP ${['', 'SKINNY', 'MEDIUM', 'FAT'][can.cap]} · TAB ${COLOUR_NAMES[colourI]} · A D MOVE · F DONE`
+      : 'WASD MOVE · SHIFT SPRINT · C CROUCH · SPACE JUMP · DRAG LOOK · F AT A WALL TO PAINT') + ' · ' + lawS;
+  };
+  const hud = () => { const s = hudText(); if (s !== lastHud) { lastHud = s; if (opts.onHud) opts.onHud(s); } };
   const nearestWall = () => {
     let best: { id: string; spot: (typeof city.spots)[number] } | null = null, bd = 3.2;
     for (const sp of city.spots) {
@@ -105,7 +119,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   };
   const togglePaint = () => {
     if (paint) { paint = null; spraying = false; spray.lift(); hud(); return; }
-    const w = nearestWall(); if (!w) { opts.onHud && opts.onHud('GET CLOSER TO A WALL TO PAINT (F)'); return; }
+    const w = nearestWall(); if (!w) { say2('GET CLOSER TO A WALL TO PAINT (F)', 1.6); return; }
     paint = w; me.crouch = false;
     camO.yaw = Math.atan2(w.spot.normal.x, w.spot.normal.z); camO.pitch = 0.1; camO.dist = 2.6;
     hud();
@@ -129,7 +143,9 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
     if (!MOVE.includes(k)) return;
     e.preventDefault(); e.stopPropagation();
+    if (bust) return; // nothing to do while you are being nicked
     if (down && !e.repeat && k === 'f') togglePaint();
+    if (down && !e.repeat && k === 'p') { const on = !law.state().on; law.setOn(on); say2(on ? 'PATROL ON · WATCH FOR THE CAR' : 'PATROL OFF · PAINT IN PEACE', 2); }
     if (down && !e.repeat && k === 'Escape' && paint) togglePaint();
     if (down && paint && (k === '1' || k === '2' || k === '3')) { can.cap = Number(k) as 1 | 2 | 3; hud(); }
     if (down && paint && k === 'Tab') { colourI = (colourI + 1) % COLOURS.length; can.colour = COLOURS[colourI]; hud(); }
@@ -167,16 +183,18 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   ro.observe(host);
 
   const clock = new THREE.Clock();
-  let raf = 0, t = 0, stopped = false;
+  let raf = 0, stopped = false, lastSpray = '';
+  // BUSTED: a slow-motion beat with the camera swinging round, the wall gets buffed, the writer starts again
+  let bust: { t: number; spot: string } | null = null;
   const fwd = new THREE.Vector3(), side = new THREE.Vector3(), camPos = new THREE.Vector3(0, 2, 12), camLook = new THREE.Vector3();
   let landT = 0, forceAnim = '', idleT = 0;
   cam.position.copy(camPos);
   const frame = () => {
     if (stopped) return;
     raf = requestAnimationFrame(frame);
-    const dt = Math.min(0.05, clock.getDelta()); t += dt;
-    const ax = (keys.has('d') || keys.has('ArrowRight') ? 1 : 0) - (keys.has('a') || keys.has('ArrowLeft') ? 1 : 0);
-    const az = (keys.has('w') || keys.has('ArrowUp') ? 1 : 0) - (keys.has('s') || keys.has('ArrowDown') ? 1 : 0);
+    const rdt = Math.min(0.05, clock.getDelta()), dt = bust && bust.t < 1.4 ? rdt * 0.3 : rdt; t += rdt;
+    const ax = bust ? 0 : (keys.has('d') || keys.has('ArrowRight') ? 1 : 0) - (keys.has('a') || keys.has('ArrowLeft') ? 1 : 0);
+    const az = bust ? 0 : (keys.has('w') || keys.has('ArrowUp') ? 1 : 0) - (keys.has('s') || keys.has('ArrowDown') ? 1 : 0);
     const sprint = keys.has('Shift') && !me.crouch && !paint, moving = !!(ax || (az && !paint));
     const speed = paint ? 1.1 : me.crouch ? 1.35 : sprint ? 6.2 : 3.3;
     // movement is relative to where the camera looks
@@ -216,14 +234,38 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
         reticle.scale.setScalar(0.012 + can.dist * 0.45 * 0.6 + can.cap * 0.006);
         (reticle.material as THREE.MeshBasicMaterial).color.set(reach ? '#ffffff' : '#555555');
       }
-      if (spraying && reach && h) spray.spray(h.id, h.u, h.v, dt, can); else spray.lift();
+      if (spraying && reach && h) { spray.spray(h.id, h.u, h.v, dt, can); lastSpray = h.id; } else spray.lift();
       // the arm goes up with the can wherever the aim is on the wall; the hand stops the can's distance off it
       if (h && h.id === sp.id) writer.aim(aimHand.copy(h.point).addScaledVector(n, can.dist + 0.03), h.point, spraying ? 1 : 0.85);
       else writer.aim(null);
       hissOn(!!(spraying && reach));
     } else { reticle.visible = false; hissOn(false); writer.aim(null); }
     spray.update(dt);
-    if (paint && !moving) writer.play('Idle_Loop', 0.15);
+    law.pushOut(me, 0.35);
+    const ev = law.update(dt, t, { x: me.x, z: me.z, y: me.y, crouch: me.crouch, painting: !!paint, spraying: !!(paint && spraying && reticle.visible) });
+    if (ev === 'busted') {
+      bust = { t: 0, spot: lastSpray };
+      if (paint) togglePaint();
+      spraying = false; me.crouch = false; keys.clear();
+      writer.play('Hit_Knockback', 0.08, true);
+      const c = law.nearest(); if (c) camO.yaw = Math.atan2(me.x - c.x, me.z - c.z) + 1.1;
+    }
+    if (ev === 'escaped') { say2('ESCAPED · THEY LOST YOU', 3); lastSpray = ''; }
+    if (ev === 'alert') say2('ALERT · THEY SAW YOU · RUN', 1.4);
+    if (bust) {
+      bust.t += rdt;
+      camO.yaw += rdt * 0.45; camO.dist += (5.2 - camO.dist) * Math.min(1, rdt * 2); camO.pitch += (0.32 - camO.pitch) * Math.min(1, rdt * 2);
+      flash = { text: bust.spot ? `BUSTED · THEY ARE BUFFING ${bust.spot.toUpperCase()}` : 'BUSTED', until: t + 0.1 };
+      if (bust.t > 2.8) {
+        if (bust.spot) spray.clear(bust.spot);
+        say2(bust.spot ? `BUSTED · ${bust.spot.toUpperCase()} GOT BUFFED · BACK TO THE START` : 'BUSTED · BACK TO THE START', 3.5);
+        Object.assign(me, { x: 0, z: 8, y: 0, vy: 0, heading: Math.PI, crouch: false, airborne: false });
+        Object.assign(camO, { yaw: 0, pitch: 0.12, dist: 3.4 });
+        bust = null; lastSpray = ''; law.reset(); writer.play('Idle_Loop', 0.2);
+      }
+    }
+    if (bust) { /* the knockback clip plays out */ }
+    else if (paint && !moving) writer.play('Idle_Loop', 0.15);
     else if (me.airborne) {
       me.vy -= 13 * dt; me.y += me.vy * dt;
       if (me.y <= 0) { me.y = 0; me.vy = 0; me.airborne = false; writer.play('Jump_Land', 0.06, true); landT = 0.28; }
@@ -253,6 +295,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     city.beforeRender(r, scene, cam);
     grade.tick(t);
     comp.render(dt);
+    hud();
   };
   say(''); hud();
   frame();
@@ -280,11 +323,14 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     /** Save the walls' paint now (it saves itself a moment after each stroke settles). */
     flush: async () => { await spray.loaded; await spray.flush(); },
     spots: () => city.spots.map((s) => ({ id: s.id, w: s.w, h: s.h, x: s.center.x, y: s.center.y, z: s.center.z })),
+    /** The law: heat 0..1, chase (off, calm, alerted, chase, searching, busted), the patrol car and the officers. */
+    law: () => law.state(),
+    cops: (on: boolean) => law.setOn(on),
     goto: (x, z, yaw, pitch) => { me.x = x; me.z = z; if (yaw != null) { camO.yaw = yaw; me.heading = yaw + Math.PI; } if (pitch != null) camO.pitch = pitch; },
     stop: () => {
       stopped = true; cancelAnimationFrame(raf); ro.disconnect();
       canvas.removeEventListener('keydown', kd); canvas.removeEventListener('keyup', ku);
-      hissOn(false); if (hiss) hiss.ctx.close(); spray.dispose(); writer.dispose(); city.dispose(); look.dispose(); comp.dispose(); r.dispose(); canvas.remove();
+      hissOn(false); if (hiss) hiss.ctx.close(); law.dispose(); spray.dispose(); writer.dispose(); city.dispose(); look.dispose(); comp.dispose(); r.dispose(); canvas.remove();
     },
   };
 }

@@ -9,7 +9,7 @@
  *   const w = await loadWriter(animsUrl, castShadow, modelUrl?); scene.add(w.root); w.play('Walk_Loop'); w.update(dt)
  */
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 export type Writer = {
@@ -77,8 +77,13 @@ const LOOK: Record<string, () => THREE.Material> = {
   Cap: () => new THREE.MeshStandardMaterial({ color: '#f2f2f2', roughness: 0.5, metalness: 0 }),
 };
 
-export async function loadWriter(url: string, shadow: boolean, modelUrl?: string): Promise<Writer> {
-  const gltf = await new GLTFLoader().loadAsync(url);
+// each file is fetched and parsed once (the cops are the same model on the same skeleton)
+const files = new Map<string, Promise<GLTF>>();
+const load = (url: string) => files.get(url) || files.set(url, new GLTFLoader().loadAsync(url).catch((e) => { files.delete(url); throw e; })).get(url)!;
+
+/** `look` swaps the materials of named slots (Hoodie, Trousers, Shoes ...), e.g. to dress a cop in the writer's body. */
+export async function loadWriter(url: string, shadow: boolean, modelUrl?: string, look: Record<string, () => THREE.Material> = {}): Promise<Writer> {
+  const gltf = await load(url);
   const armSrc = gltf.scene.getObjectByName('Armature') || gltf.scene.children[0];
   const hipsSrc = armSrc.children[0];
 
@@ -112,7 +117,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
   const owned: { dispose: () => void }[] = [];
   // the modelled body: each skinned mesh, its weights moved onto this skeleton by bone name, in the same rest pose
   if (modelUrl) try {
-    const model = await new GLTFLoader().loadAsync(modelUrl);
+    const model = await load(modelUrl);
     model.scene.updateMatrixWorld(true);
     model.scene.traverse((o) => {
       const sm = o as THREE.SkinnedMesh; if (!sm.isSkinnedMesh) return;
@@ -121,7 +126,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       const si = geo.attributes.skinIndex as THREE.BufferAttribute;
       for (let i = 0; i < si.array.length; i++) (si.array as Uint16Array)[i] = Math.max(0, map[si.array[i]]);
       si.needsUpdate = true;
-      const src = sm.material as THREE.Material, mat = (LOOK[src.name] || (() => src))();
+      const src = sm.material as THREE.Material, mat = (look[src.name] || LOOK[src.name] || (() => src))();
       const m = new THREE.SkinnedMesh(geo, mat); m.name = sm.name;
       meshes.push(m); owned.push(geo, mat);
     });
