@@ -1,11 +1,12 @@
 /**
- * The writer: VexVoid's hooded figure, built in code around the skeleton of the Quaternius Universal Animation Library
+ * The writer: VexVoid's hooded figure. The modelled body comes from Blender (game/blender/writer.py ->
+ * vx/game/models/writer.glb), rigged to bones of the same names; without it, a stand-in is built in code around the skeleton of the Quaternius Universal Animation Library
  * clips (vx/game/anims/ual.glb, CC0), so every clip (idle, walk, jog, sprint, crouch, jump, roll ...) plays on it as is.
  * The body is lofted and capsule shapes skinned to those bones with blended weights at the joints: a hoodie with the
  * hood up and nothing but black inside it (no faces), baggy trousers, white trainers. A modelled character on the same
  * skeleton can replace the body later without touching the game.
  *
- *   const w = await loadWriter(url, castShadow); scene.add(w.root); w.play('Walk_Loop'); w.update(dt)
+ *   const w = await loadWriter(animsUrl, castShadow, modelUrl?); scene.add(w.root); w.play('Walk_Loop'); w.update(dt)
  */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -22,7 +23,18 @@ export type Writer = {
 
 const HEIGHT = 1.78;
 
-export async function loadWriter(url: string, shadow: boolean): Promise<Writer> {
+// the game's own materials for the model's named slots
+const LOOK: Record<string, () => THREE.Material> = {
+  Hoodie: () => new THREE.MeshStandardMaterial({ color: '#45464c', roughness: 0.86, metalness: 0 }),
+  Trousers: () => new THREE.MeshStandardMaterial({ color: '#5a5b61', roughness: 0.8, metalness: 0 }),
+  Gloves: () => new THREE.MeshStandardMaterial({ color: '#6a6a6e', roughness: 0.65, metalness: 0 }),
+  Trim: () => new THREE.MeshStandardMaterial({ color: '#2e2f34', roughness: 0.9, metalness: 0 }),
+  Shoes: () => new THREE.MeshStandardMaterial({ color: '#f4f4f4', roughness: 0.4, metalness: 0, emissive: '#202020' }),
+  Sole: () => new THREE.MeshStandardMaterial({ color: '#8c8c8e', roughness: 0.6, metalness: 0 }),
+  Void: () => new THREE.MeshBasicMaterial({ color: '#000000' }),
+};
+
+export async function loadWriter(url: string, shadow: boolean, modelUrl?: string): Promise<Writer> {
   const gltf = await new GLTFLoader().loadAsync(url);
   const armSrc = gltf.scene.getObjectByName('Armature') || gltf.scene.children[0];
   const hipsSrc = armSrc.children[0];
@@ -53,7 +65,27 @@ export async function loadWriter(url: string, shadow: boolean): Promise<Writer> 
   const Hs = (headY - foot) / 0.89; // the head bone sits at about 89% of standing height
   const u = (m: number) => (m / HEIGHT) * Hs; // metres to skeleton units
 
+  const meshes: THREE.SkinnedMesh[] = [];
+  const owned: { dispose: () => void }[] = [];
+  // the modelled body: each skinned mesh, its weights moved onto this skeleton by bone name, in the same rest pose
+  if (modelUrl) try {
+    const model = await new GLTFLoader().loadAsync(modelUrl);
+    model.scene.updateMatrixWorld(true);
+    model.scene.traverse((o) => {
+      const sm = o as THREE.SkinnedMesh; if (!sm.isSkinnedMesh) return;
+      const geo = sm.geometry.clone(); geo.applyMatrix4(sm.matrixWorld);
+      const map = sm.skeleton.bones.map((b) => bones.findIndex((x) => x.name === b.name));
+      const si = geo.attributes.skinIndex as THREE.BufferAttribute;
+      for (let i = 0; i < si.array.length; i++) (si.array as Uint16Array)[i] = Math.max(0, map[si.array[i]]);
+      si.needsUpdate = true;
+      const src = sm.material as THREE.Material, mat = (LOOK[src.name] || (() => src))();
+      const m = new THREE.SkinnedMesh(geo, mat); m.name = sm.name;
+      meshes.push(m); owned.push(geo, mat);
+    });
+  } catch (e) { console.warn('writer model', e); }
+
   const parts: { geo: THREE.BufferGeometry; mat: number }[] = [];
+  if (!meshes.length) {
   const MAT = { hoodie: 0, trousers: 1, shoes: 2, skin: 3, void: 4, trim: 5 };
 
   // weights: a vertex at fraction t along bone A->B belongs to A, blending into A's parent near the start and into B
@@ -188,11 +220,12 @@ export async function loadWriter(url: string, shadow: boolean): Promise<Writer> 
     new THREE.MeshBasicMaterial({ color: '#000000' }), // inside the hood
   ];
   const usedMats = order.map((m) => mats[m]);
-  const mesh = new THREE.SkinnedMesh(geo, usedMats);
-  mesh.castShadow = shadow; mesh.receiveShadow = true; mesh.frustumCulled = false;
-  char.add(mesh);
+  meshes.push(new THREE.SkinnedMesh(geo, usedMats)); owned.push(geo, ...mats);
+  }
+  for (const m of meshes) { m.castShadow = shadow; m.receiveShadow = true; m.frustumCulled = false; char.add(m); }
   char.updateMatrixWorld(true);
-  mesh.bind(new THREE.Skeleton(bones));
+  const skeleton = new THREE.Skeleton(bones);
+  for (const m of meshes) m.bind(skeleton);
 
   // stand on the ground at 1.78 m, feet at y = 0
   const k = HEIGHT / Hs;
@@ -222,6 +255,6 @@ export async function loadWriter(url: string, shadow: boolean): Promise<Writer> 
   return {
     root, height: HEIGHT, play, playing: () => curName,
     update: (dt) => mixer.update(dt),
-    dispose: () => { mixer.stopAllAction(); geo.dispose(); mats.forEach((m) => m.dispose()); },
+    dispose: () => { mixer.stopAllAction(); owned.forEach((d) => d.dispose()); },
   };
 }

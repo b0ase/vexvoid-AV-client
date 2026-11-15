@@ -48,7 +48,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const city = buildCity({ renderer: r, scene, high, look, vexvoid: true });
   scene.add(city.group);
   say('Dressing the writer…');
-  const writer = await loadWriter(opts.base + 'anims/ual.glb', high);
+  const writer = await loadWriter(opts.base + 'anims/ual.glb', high, opts.base + 'models/writer.glb');
   scene.add(writer.root);
   // a soft light that rides with the writer so the hoodie reads against the dark street
   const rim = new THREE.PointLight('#ffffff', 26, 7, 1.8);
