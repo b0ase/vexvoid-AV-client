@@ -18,9 +18,10 @@ import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { buildCity, EYE } from './city';
 import { loadLook, makeGradePass } from './look';
 import { loadWriter } from './writer';
+import { makeSpray, COLOURS, COLOUR_NAMES, type Can } from './spray';
 
-export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) => void };
-export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?: number) => string; inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string }) => void; where: () => { x: number; z: number; yaw: number; heading: number; anim: string }; spots: () => { id: string; w: number; h: number; x: number; y: number; z: number }[]; goto: (x: number, z: number, yaw?: number, pitch?: number) => void };
+export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) => void; onHud?: (s: string) => void };
+export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?: number) => string; inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string }) => void; where: () => { x: number; z: number; yaw: number; heading: number; anim: string }; spots: () => { id: string; w: number; h: number; x: number; y: number; z: number }[]; paint: (id: string, pts: [number, number][], o?: { colour?: string; cap?: 1 | 2 | 3; dist?: number }) => void; clearPaint: (id?: string) => void; piece: (id: string) => string; painting: () => string; goto: (x: number, z: number, yaw?: number, pitch?: number) => void };
 
 // VexVoid's grade: no colour at all, hard contrast, a heavy vignette
 const MONO = { shadow: [1, 1, 1] as [number, number, number], high: [1, 1, 1] as [number, number, number], sat: 0, contrast: 1.32, vignette: 0.72 };
@@ -50,6 +51,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   say('Dressing the writer…');
   const writer = await loadWriter(opts.base + 'anims/ual.glb', high, opts.base + 'models/writer.glb');
   scene.add(writer.root);
+  const spray = makeSpray(scene, city.spots);
   // a soft light that rides with the writer so the hoodie reads against the dark street
   const rim = new THREE.PointLight('#ffffff', 9, 7, 2);
   const back = new THREE.PointLight('#ffffff', 6, 5, 2); // a kicker behind, to edge the hood and shoulders
@@ -84,12 +86,54 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const me = { x: 0, z: 8, y: 0, vy: 0, heading: Math.PI, crouch: false, airborne: false };
   const camO = { yaw: 0, pitch: 0.12, dist: 3.4 };
   const keys = new Set<string>();
-  const MOVE = ['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Shift', ' ', 'c'];
+  const MOVE = ['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Shift', ' ', 'c', 'f', '1', '2', '3', 'Tab', 'Escape'];
+  // painting: F at a wall squares up to it; the mouse aims, holding it sprays; the wheel sets the can's distance
+  const can: Can = { colour: COLOURS[0], cap: 2, dist: 0.22 };
+  let paint: { id: string; spot: (typeof city.spots)[number] } | null = null, spraying = false, colourI = 0;
+  const mouse = new THREE.Vector2(), ray = new THREE.Raycaster();
+  const hud = () => opts.onHud && opts.onHud(paint
+    ? `PAINTING ${paint.id.toUpperCase()} · HOLD MOUSE TO SPRAY · WHEEL DISTANCE ${Math.round(can.dist * 100)} CM · 1 2 3 CAP ${['', 'SKINNY', 'MEDIUM', 'FAT'][can.cap]} · TAB ${COLOUR_NAMES[colourI]} · A D MOVE · F DONE`
+    : 'WASD MOVE · SHIFT SPRINT · C CROUCH · SPACE JUMP · DRAG LOOK · F AT A WALL TO PAINT');
+  const nearestWall = () => {
+    let best: { id: string; spot: (typeof city.spots)[number] } | null = null, bd = 3.2;
+    for (const sp of city.spots) {
+      const dx = me.x - sp.center.x, dz = me.z - sp.center.z, off = dx * sp.normal.x + dz * sp.normal.z;
+      const along = Math.abs(dx * sp.normal.z - dz * sp.normal.x);
+      if (off > 0 && off < bd && along < sp.w / 2 + 0.4) { bd = off; best = { id: sp.id, spot: sp }; }
+    }
+    return best;
+  };
+  const togglePaint = () => {
+    if (paint) { paint = null; spraying = false; spray.lift(); hud(); return; }
+    const w = nearestWall(); if (!w) { opts.onHud && opts.onHud('GET CLOSER TO A WALL TO PAINT (F)'); return; }
+    paint = w; me.crouch = false;
+    camO.yaw = Math.atan2(w.spot.normal.x, w.spot.normal.z); camO.pitch = 0.1; camO.dist = 2.6;
+    hud();
+  };
+  // the hiss of the can (made from noise, so nothing to download)
+  let hiss: { ctx: AudioContext; gain: GainNode } | null = null;
+  const hissOn = (on: boolean) => {
+    if (!hiss && on) {
+      const ctx = new AudioContext(), buf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 3800; bp.Q.value = 0.7;
+      const gain = ctx.createGain(); gain.gain.value = 0; src.connect(bp).connect(gain).connect(ctx.destination); src.start();
+      hiss = { ctx, gain };
+    }
+    if (hiss) hiss.gain.gain.setTargetAtTime(on ? 0.12 : 0, hiss.ctx.currentTime, 0.03);
+  };
+  const reticle = new THREE.Mesh(new THREE.RingGeometry(0.8, 1, 32), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.8, depthTest: false }));
+  reticle.renderOrder = 10; reticle.visible = false; scene.add(reticle);
   const onKey = (e: KeyboardEvent, down: boolean) => {
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
     if (!MOVE.includes(k)) return;
     e.preventDefault(); e.stopPropagation();
-    if (down && !e.repeat && k === 'c') me.crouch = !me.crouch;
+    if (down && !e.repeat && k === 'f') togglePaint();
+    if (down && !e.repeat && k === 'Escape' && paint) togglePaint();
+    if (down && paint && (k === '1' || k === '2' || k === '3')) { can.cap = Number(k) as 1 | 2 | 3; hud(); }
+    if (down && paint && k === 'Tab') { colourI = (colourI + 1) % COLOURS.length; can.colour = COLOURS[colourI]; hud(); }
+    if (down && !e.repeat && k === 'c' && !paint) me.crouch = !me.crouch;
     if (down && !e.repeat && k === ' ' && !me.airborne) { me.vy = 4.6; me.airborne = true; me.crouch = false; writer.play('Jump_Start', 0.08, true); }
     if (down) keys.add(k); else keys.delete(k);
   };
@@ -98,16 +142,22 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   canvas.addEventListener('keyup', ku);
   canvas.addEventListener('blur', () => keys.clear());
   let drag: { x: number; y: number } | null = null;
-  canvas.addEventListener('pointerdown', (e) => { canvas.focus(); drag = { x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId); canvas.style.cursor = 'grabbing'; });
+  const aim = (e: PointerEvent) => { const b = canvas.getBoundingClientRect(); mouse.set(((e.clientX - b.left) / b.width) * 2 - 1, -((e.clientY - b.top) / b.height) * 2 + 1); };
+  canvas.addEventListener('pointerdown', (e) => {
+    canvas.focus(); aim(e); canvas.setPointerCapture(e.pointerId);
+    if (paint && e.button === 0) { spraying = true; return; }   // in paint mode the mouse is the can
+    drag = { x: e.clientX, y: e.clientY }; canvas.style.cursor = 'grabbing';
+  });
   canvas.addEventListener('pointermove', (e) => {
+    aim(e);
     if (!drag) return;
     camO.yaw -= (e.clientX - drag.x) * 0.0045; camO.pitch = Math.max(-0.35, Math.min(0.75, camO.pitch + (e.clientY - drag.y) * 0.003));
     drag = { x: e.clientX, y: e.clientY };
   });
-  const endDrag = () => { drag = null; canvas.style.cursor = 'grab'; };
+  const endDrag = () => { drag = null; spraying = false; spray.lift(); canvas.style.cursor = paint ? 'crosshair' : 'grab'; };
   canvas.addEventListener('pointerup', endDrag);
   canvas.addEventListener('pointercancel', endDrag);
-  canvas.addEventListener('wheel', (e) => { e.preventDefault(); camO.dist = Math.max(1.2, Math.min(7, camO.dist * Math.exp(e.deltaY * 0.001))); }, { passive: false });
+  canvas.addEventListener('wheel', (e) => { e.preventDefault(); if (paint) { can.dist = Math.max(0.05, Math.min(0.6, can.dist + e.deltaY * 0.0005)); hud(); return; } camO.dist = Math.max(1.2, Math.min(7, camO.dist * Math.exp(e.deltaY * 0.001))); }, { passive: false });
 
   const ro = new ResizeObserver(() => {
     ({ w, h } = size());
@@ -127,16 +177,17 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     const dt = Math.min(0.05, clock.getDelta()); t += dt;
     const ax = (keys.has('d') || keys.has('ArrowRight') ? 1 : 0) - (keys.has('a') || keys.has('ArrowLeft') ? 1 : 0);
     const az = (keys.has('w') || keys.has('ArrowUp') ? 1 : 0) - (keys.has('s') || keys.has('ArrowDown') ? 1 : 0);
-    const sprint = keys.has('Shift') && !me.crouch, moving = !!(ax || az);
-    const speed = me.crouch ? 1.35 : sprint ? 6.2 : 3.3;
+    const sprint = keys.has('Shift') && !me.crouch && !paint, moving = !!(ax || (az && !paint));
+    const speed = paint ? 1.1 : me.crouch ? 1.35 : sprint ? 6.2 : 3.3;
     // movement is relative to where the camera looks
     fwd.set(-Math.sin(camO.yaw), 0, -Math.cos(camO.yaw)); side.set(Math.cos(camO.yaw), 0, -Math.sin(camO.yaw));
     if (moving) {
-      const dx = fwd.x * az + side.x * ax, dz = fwd.z * az + side.z * ax, l = Math.hypot(dx, dz);
+      const azz = paint ? 0 : az;
+      const dx = fwd.x * azz + side.x * ax, dz = fwd.z * azz + side.z * ax, l = Math.hypot(dx, dz);
       me.x = Math.max(-BOUNDS.x, Math.min(BOUNDS.x, me.x + (dx / l) * speed * dt));
       me.z = Math.max(BOUNDS.z0, Math.min(BOUNDS.z1, me.z + (dz / l) * speed * dt));
       // turn toward the way you are going, quickly but not instantly
-      const want = Math.atan2(dx, dz); let d = want - me.heading; d = Math.atan2(Math.sin(d), Math.cos(d));
+      const want = paint ? Math.atan2(-paint.spot.normal.x, -paint.spot.normal.z) : Math.atan2(dx, dz); let d = want - me.heading; d = Math.atan2(Math.sin(d), Math.cos(d));
       me.heading += d * Math.min(1, dt * 12);
       // push out of piers and walls (a body 0.35 m round)
       for (const b of city.blockers) {
@@ -147,7 +198,30 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
         }
       }
     }
-    if (me.airborne) {
+    if (paint) {
+      // stand square to the wall, an arm's length off it, within its ends
+      const sp = paint.spot, n = sp.normal, tx = n.z, tz = -n.x;
+      let off = (me.x - sp.center.x) * n.x + (me.z - sp.center.z) * n.z, along = (me.x - sp.center.x) * tx + (me.z - sp.center.z) * tz;
+      off = Math.max(0.55, Math.min(0.9, off)); along = Math.max(-sp.w / 2 + 0.3, Math.min(sp.w / 2 - 0.3, along));
+      me.x = sp.center.x + n.x * off + tx * along; me.z = sp.center.z + n.z * off + tz * along;
+      let dh = Math.atan2(-n.x, -n.z) - me.heading; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); me.heading += dh * Math.min(1, dt * 10);
+      // aim: where the mouse points on this wall, if the writer can reach it
+      ray.setFromCamera(mouse, cam);
+      const h = spray.hit(ray);
+      const reach = h && h.id === sp.id && h.point.y < me.y + 2.35 && h.point.y > 0.08 &&
+        Math.abs((h.point.x - me.x) * tx + (h.point.z - me.z) * tz) < 1.25;
+      reticle.visible = !!(h && h.id === sp.id);
+      if (h && h.id === sp.id) {
+        reticle.position.copy(h.point).addScaledVector(n, 0.02); reticle.lookAt(h.point.clone().add(n));
+        reticle.scale.setScalar(0.012 + can.dist * 0.45 * 0.6 + can.cap * 0.006);
+        (reticle.material as THREE.MeshBasicMaterial).color.set(reach ? '#ffffff' : '#555555');
+      }
+      if (spraying && reach && h) spray.spray(h.id, h.u, h.v, dt, can); else spray.lift();
+      hissOn(!!(spraying && reach));
+    } else { reticle.visible = false; hissOn(false); }
+    spray.update(dt);
+    if (paint && !moving) writer.play(spraying ? 'Spell_Simple_Idle_Loop' : 'Idle_Loop', 0.15);
+    else if (me.airborne) {
       me.vy -= 13 * dt; me.y += me.vy * dt;
       if (me.y <= 0) { me.y = 0; me.vy = 0; me.airborne = false; writer.play('Jump_Land', 0.06, true); landT = 0.28; }
       else if (me.vy < 2.5) writer.play('Jump_Loop', 0.15);
@@ -177,7 +251,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     grade.tick(t);
     comp.render(dt);
   };
-  say('');
+  say(''); hud();
   frame();
 
   return {
@@ -195,12 +269,17 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       if (o.yaw != null) camO.yaw = o.yaw; if (o.pitch != null) camO.pitch = o.pitch; if (o.dist != null) camO.dist = o.dist;
       if (o.heading != null) me.heading = o.heading; forceAnim = o.anim || '';
     },
+    /** Paint a stroke on a wall: points (u, v) 0..1 across and up it. */
+    paint: (id: string, pts: [number, number][], o: { colour?: string; cap?: 1 | 2 | 3; dist?: number } = {}) => spray.path(id, pts, { colour: o.colour || COLOURS[0], cap: o.cap || 2, dist: o.dist ?? 0.2 }),
+    clearPaint: (id?: string) => spray.clear(id),
+    piece: (id: string) => spray.png(id),
+    painting: () => (paint ? paint.id : ''),
     spots: () => city.spots.map((s) => ({ id: s.id, w: s.w, h: s.h, x: s.center.x, y: s.center.y, z: s.center.z })),
     goto: (x, z, yaw, pitch) => { me.x = x; me.z = z; if (yaw != null) { camO.yaw = yaw; me.heading = yaw + Math.PI; } if (pitch != null) camO.pitch = pitch; },
     stop: () => {
       stopped = true; cancelAnimationFrame(raf); ro.disconnect();
       canvas.removeEventListener('keydown', kd); canvas.removeEventListener('keyup', ku);
-      writer.dispose(); city.dispose(); look.dispose(); comp.dispose(); r.dispose(); canvas.remove();
+      hissOn(false); if (hiss) hiss.ctx.close(); spray.dispose(); writer.dispose(); city.dispose(); look.dispose(); comp.dispose(); r.dispose(); canvas.remove();
     },
   };
 }
