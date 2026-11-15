@@ -1814,7 +1814,7 @@
     .gm{display:flex;flex-direction:column;gap:6px;width:100%;height:100%;min-height:0}
     .gm-view{flex:1;min-height:0;background:#000;border:1px solid #1d1d1d;position:relative}
     .gm-view .gm-msg{position:absolute;inset:0;display:grid;place-items:center;text-align:center;font-size:10px;letter-spacing:.2em;color:#777;line-height:2}
-    .gm-bar{display:flex;justify-content:space-between;font-size:9px;letter-spacing:.2em;color:#666}
+    .gm-bar{display:flex;justify-content:space-between;align-items:center;font-size:9px;letter-spacing:.2em;color:#666}
     .ed-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
     .ed-title{flex:1;min-width:160px;font-family:'Michroma','IBM Plex Mono',sans-serif;font-size:18px;letter-spacing:.16em;outline:none}
     .ed-ic{font:inherit;font-size:14px;line-height:1;background:none;color:#ddd;border:1px solid #333;width:30px;height:28px;cursor:pointer;padding:0}.ed-ic:hover{border-color:#fff;color:#fff}.ed-ic:disabled{opacity:.3;cursor:default;border-color:#333}
@@ -2774,7 +2774,7 @@
     <!-- Wallet Tab: everything the connected bWalletX holds that the mixer can use -->
     <!-- GAME: the VexVoid game (game/src, built to vx/game/vexvoid-game.js), loaded the first time the tab opens -->
     <div class="tab-content" id="gameTab">
-      <div class="gm"><div class="gm-view" id="gmView"></div><div class="gm-bar"><span id="gmNote">WASD / ARROWS WALK · SHIFT RUNS · DRAG TO LOOK</span><span id="gmStatus"></span></div></div>
+      <div class="gm"><div class="gm-view" id="gmView"></div><div class="gm-bar"><span id="gmNote">WASD / ARROWS WALK · SHIFT RUNS · DRAG TO LOOK</span><span><span id="gmStatus"></span><button id="gmRec" class="midi-chip" title="Record the game and its sound to a video file (R)">REC</button></span></div></div>
     </div>
     <!-- TITLES: text layers in VexVoid fonts, animated, for the decks (2D now; 3D titles next) -->
     <div class="tab-content" id="titlesTab">
@@ -5752,21 +5752,26 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         const seconds = Math.round((Date.now() - rec.t0) / 1000);
         const buf = Buffer.from(await new Blob(rec.chunks).arrayBuffer());
         rec.mr = null; rec.chunks = []; recChip();
-        fs.mkdirSync(recDir, { recursive: true });
         const slug = rec.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'v3xv0id';
-        const base = path.join(recDir, `${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}-${slug}`);
+        const file = await recSave(`${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}-${slug}`, buf, 'scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,setsar=1');
+        return { file, seconds, mb: Math.round(fs.statSync(file).size / 1e6) };
+      }
+      // a finished take: the webm as recorded into the videos folder, an MP4 beside it when ffmpeg is here, then VIDEOS and the EDIT bin pick it up
+      async function recSave(name, buf, vf) {
+        const fs = require('fs'), base = require('path').join(recDir, name);
+        fs.mkdirSync(recDir, { recursive: true });
         fs.writeFileSync(base + '.webm', buf);
         let file = base + '.webm';
         const ff = ['/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/usr/bin/ffmpeg'].find(p => fs.existsSync(p));
         if (ff) {
           try {
-            await new Promise((res, rej) => require('child_process').execFile(ff, ['-y', '-i', base + '.webm', '-vf', 'scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,setsar=1', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '18', '-preset', 'medium',
+            await new Promise((res, rej) => require('child_process').execFile(ff, ['-y', '-i', base + '.webm', '-vf', vf, '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '18', '-preset', 'medium',
               '-c:a', 'aac', '-b:a', '256k', '-movflags', '+faststart', base + '.mp4'], { maxBuffer: 1 << 24 }, e => e ? rej(e) : res()));
             file = base + '.mp4';
           } catch (e) { console.warn('ffmpeg', e.message); }
         }
-        initializeVideosTab();
-        return { file, seconds, mb: Math.round(fs.statSync(file).size / 1e6) };
+        initializeVideosTab(); try { edBin(); } catch (e) {}
+        return file;
       }
       document.getElementById('recChip').addEventListener('click', async () => {
         try { if (rec.mr) { const r = await stopRecording(); alertNote(`Saved ${r.seconds}s to VIDEOS: ${r.file.split('/').pop()}`); } else await startRecording('V3XV0ID ' + new Date().toISOString().slice(0, 10)); }
@@ -6684,12 +6689,56 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           await gmLoad();
           if (!document.getElementById('gameTab').classList.contains('active')) { view.innerHTML = ''; return; }
           view.innerHTML = '';
-          gm.g = await VXGAME.mount(view, { base: 'vx/game/', high: true, onStatus: s => { st.textContent = s; }, onHud: s => { document.getElementById('gmNote').textContent = s; } });
+          gm.g = await VXGAME.mount(view, { base: 'vx/game/', high: true, onStatus: s => { st.textContent = s; }, onHud: s => { document.getElementById('gmNote').textContent = s; }, onRec: gmRecToggle });
           window.vxGameNow = gm.g; // for the agent's game tool and tests
           gm.g.canvas.focus();
         } catch (e) { view.innerHTML = `<div class="gm-msg"></div>`; view.firstChild.textContent = e.message; }
       }
-      function gmStop() { if (gm.g) { gm.g.stop(); gm.g = null; window.vxGameNow = null; } }
+      function gmStop() {
+        const g = gm.g; if (!g) return;
+        gm.g = null; window.vxGameNow = null;
+        // a take in progress is stopped and saved; the game goes only once the recorder has its last frames, or the take comes out empty
+        if (gmRec.mr) { const end = gmRec.done; gmRecStop().catch(e => gmRecNote('REC: ' + e.message)); end.then(() => g.stop()); } else g.stop();
+      }
+      // REC: the game's picture and its own sound (siren, can) to a video in the same folder as the mixer's recordings
+      const gmRec = { mr: null, chunks: [], t0: 0, tracks: [], done: null, untap: null, saving: null };
+      function gmRecChip() { const c = document.getElementById('gmRec'); c.classList.toggle('on', !!gmRec.mr); c.textContent = gmRec.mr ? '● REC ' + mmss((Date.now() - gmRec.t0) / 1000) : 'REC'; }
+      function gmRecNote(t) { document.getElementById('gmStatus').textContent = t.toUpperCase(); }
+      setInterval(() => { if (gmRec.mr) gmRecChip(); }, 500);
+      function gmRecStart() {
+        if (gmRec.mr) throw new Error('already recording');
+        if (!gm.g) throw new Error('the game is not running');
+        const tracks = gm.g.canvas.captureStream(30).getTracks(), a = gm.g.audio();
+        gmRec.untap = null;
+        if (a) { // silent until the siren or the can sounds, so sound that starts mid-take is still in it
+          void a.ctx.resume(); const d = a.ctx.createMediaStreamDestination(), hold = a.ctx.createConstantSource(); a.node.connect(d); tracks.push(...d.stream.getAudioTracks());
+          hold.offset.value = 0; hold.connect(d); hold.start(); // keeps the sound track running through silence: when it stops arriving, the recorder holds the picture back too
+          gmRec.untap = () => { try { hold.stop(); a.node.disconnect(d); } catch (e) {} };
+        }
+        const mime = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find(m => MediaRecorder.isTypeSupported(m));
+        const mr = gmRec.mr = new MediaRecorder(new MediaStream(tracks), { mimeType: mime, videoBitsPerSecond: 12e6, audioBitsPerSecond: 256e3 });
+        gmRec.chunks = []; gmRec.t0 = Date.now(); gmRec.tracks = tracks;
+        mr.ondataavailable = e => { if (e.data && e.data.size) gmRec.chunks.push(e.data); };
+        gmRec.done = new Promise(res => { mr.onstop = res; });
+        mr.start(1000); gmRecChip(); gmRecNote('');
+        return { recording: true, audio: !!a };
+      }
+      function gmRecStop() {
+        if (!gmRec.mr) return Promise.reject(new Error('not recording'));
+        const { mr, chunks, t0, tracks, done, untap } = gmRec;
+        mr.stop(); gmRec.mr = null; gmRecChip(); // stopped in this same step, so the game can close straight after and the take is whole
+        return gmRec.saving = (async () => {
+          await done; tracks.forEach(t => t.stop()); if (untap) untap();
+          const seconds = Math.round((Date.now() - t0) / 1000), d = new Date(), p = n => String(n).padStart(2, '0');
+          const buf = Buffer.from(await new Blob(chunks).arrayBuffer());
+          gmRecNote('Saving the take…');
+          const file = await recSave(`VEXVOID-GAME-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`, buf, 'scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1');
+          gmRecNote(`Saved ${seconds}s to VIDEOS: ${file.split('/').pop()}`);
+          return { file, seconds, mb: +(require('fs').statSync(file).size / 1e6).toFixed(1) };
+        })().finally(() => { gmRec.saving = null; });
+      }
+      function gmRecToggle() { try { if (gmRec.mr) gmRecStop().catch(e => gmRecNote('REC: ' + e.message)); else gmRecStart(); } catch (e) { gmRecNote('REC: ' + e.message); } }
+      document.getElementById('gmRec').addEventListener('click', () => { gmRecToggle(); if (gm.g) gm.g.canvas.focus(); });
       document.querySelectorAll('.tab-button').forEach(b => b.addEventListener('click', () => { if (b.dataset.tab === 'game') gmStart(); else gmStop(); }));
 
       // ===== VEXVOID title screen: plays the whole time the VEXVOID tab is open (a shader behind the chrome V3XV0ID)
@@ -6838,8 +6887,8 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
           { name: 'editor', description: 'The EDIT tab: cut a music video from clips to a track, then export an MP4. Actions: state (what the edit is); set_track (track: catalogue number or words, or a file path); map (the track\'s tempo, detected from the audio, and its loudness, one digit 0-9 per bar, to read intro, builds, drops and breakdowns); tempo (bpm: set it by hand when the detected one is half or double what you hear; 0 goes back to detected); auto_cut (pace fast|medium|slow; source all|catalogue|generated|recorded|wallet; filter words to pick clips by name, set, phase or notes, e.g. "crane" or "rough"), which cuts on the bars with the loudest parts getting the shortest and most moving shots; add (clip: words or a path or URL, seconds) appends a shot to V1; replace (index, clip) swaps one clip; remove (index) takes a clip out (on V1 the shots after it close up). The EDIT tab is a real timeline: V1 holds the shots, V2 sits full frame over V1 wherever it has clips, A1 is the music; times are seconds from the start, and the person can undo every edit you make (⌘Z) and change it by hand. Timeline actions: overlay (clip, at, seconds, in) puts a clip on V2; split (at) cuts every clip under that time; move (index, at) moves a clip, overwriting what it lands on; trim (index, in, seconds) sets where in the source a clip starts and how long it runs; marker (at, label) marks a moment for the person (a drop, a lyric); undo; text (text, at, seconds, font, style, mode 2d|3d) puts a title on T1, over everything, in the export too; transition (index, kind cut|cross|black|white, beats) sets how a V1 shot comes in: a crossfade starts on the cut and runs that many beats, a dip to black or white is centred on the cut (use them sparingly: hard cuts on the beat are the VexVoid default, a dip for a section change, a crossfade for a breakdown); speed (index, layer, speed 0.25-4, negative plays it backwards) changes how fast a clip plays without moving its cut: slow motion for a breakdown, 2x for energy; place (index of a V2 clip, size 0.1-1.5 where 1 is full frame, x and y the centre offset as a fraction of the frame, opacity 0-1) for picture-in-picture slabs and ghosted layers (fonts and styles as for text_layer; it moves on the beat of the song). index and layer (v1, default, v2 or t1) pick a clip as listed by state. title (title); look (look house|scope|raw; letterbox ratio e.g. 2.39 or 0; flashes off|hits|all): the grade, letterbox and white flash frames of the export; export (renders the MP4 with MLT, also saving a Shotcut project; finish true (default) adds the corner idents and matte flashes; takes a few minutes; the file lands in VIDEOS); frames (a contact sheet of the last export, or of path, to check it). Prefer this over record for a finished music video: it is a real edit, not a live take.',
             input_schema: { type: 'object', properties: { action: { type: 'string', enum: ['state', 'set_track', 'map', 'tempo', 'look', 'auto_cut', 'add', 'replace', 'remove', 'overlay', 'split', 'move', 'trim', 'marker', 'undo', 'text', 'transition', 'speed', 'place', 'title', 'export', 'frames'] }, track: { type: 'string' }, pace: { type: 'string', enum: ['fast', 'medium', 'slow'] },
               source: { type: 'string', enum: ['all', 'catalogue', 'generated', 'recorded', 'wallet'] }, filter: { type: 'string' }, clip: { type: 'string' }, seconds: { type: 'number' }, index: { type: 'number' }, title: { type: 'string' }, finish: { type: 'boolean' }, path: { type: 'string' }, bpm: { type: 'number' }, at: { type: 'number' }, in: { type: 'number' }, layer: { type: 'string', enum: ['v1', 'v2', 't1'] }, label: { type: 'string' }, text: { type: 'string' }, font: { type: 'string' }, style: { type: 'string' }, mode: { type: 'string', enum: ['2d', '3d'] }, kind: { type: 'string', enum: ['cut', 'cross', 'black', 'white'] }, beats: { type: 'number' }, speed: { type: 'number' }, size: { type: 'number' }, x: { type: 'number' }, y: { type: 'number' }, opacity: { type: 'number' }, look: { type: 'string', enum: ['house', 'scope', 'raw'] }, letterbox: { type: 'number' }, flashes: { type: 'string', enum: ['off', 'hits', 'all'] } }, required: ['action'], additionalProperties: false } },
-          { name: 'game', description: 'VexVoid the Game, in the GAME tab: a black-and-white night city where a hooded writer paints walls. Actions: open (start the game; it runs only while its tab is open), close, state (where the writer is, what they are doing, and the walls to paint: id, size, position), goto (x, z: put the writer there; yaw turns the camera, the writer faces away from it), inspect (yaw, pitch, dist, heading, anim: set the camera and hold a clip, e.g. Idle_Loop, Jog_Fwd_Loop, Sprint_Loop, Crouch_Idle_Loop, to look at the writer), look (a picture of the game screen), paint (spot: a wall id from state; points: [[u, v], ...] from 0 to 1 across and up the wall, painted as one steady stroke; colour white|grey|black|chrome; cap 1 skinny, 2 medium, 3 fat; dist 0.05-0.6 m from the wall: close is sharp, far is soft with overspray; several calls build a piece, letters are strokes; the walls are dark concrete, so lay fills in white or grey and use black for outlines over them), clear (spot, or every wall). Paint stays on the walls between sessions, so look before painting over a piece. The player paints by hand: F at a wall, mouse to spray. The street runs from z 24 down to the bridge at z -62 and the hall-of-fame wall at z -80; x from -25 to 25. The writer raises a can to the wall while the player sprays. The law: painting builds heat (state reports it, 0 to 1, with what the patrol is doing: calm, alerted, chase, searching, busted); a patrol car drives the street with a searchlight, and if it sees the writer painting two officers get out and give chase; break their line of sight and get away to escape, get caught and the wall is buffed and the writer starts again. cops (on true|false) turns the patrol on or off (the player uses P): turn it off to paint a piece in peace. Recording comes later.',
-            input_schema: { type: 'object', properties: { action: { type: 'string', enum: ['open', 'close', 'state', 'goto', 'inspect', 'look', 'paint', 'clear', 'cops'] }, on: { type: 'boolean' }, spot: { type: 'string' }, points: { type: 'array', items: { type: 'array', items: { type: 'number' } } }, colour: { type: 'string', enum: ['white', 'grey', 'black', 'chrome'] }, cap: { type: 'number' }, x: { type: 'number' }, z: { type: 'number' }, yaw: { type: 'number' }, pitch: { type: 'number' }, dist: { type: 'number' }, heading: { type: 'number' }, anim: { type: 'string' } }, required: ['action'], additionalProperties: false } },
+          { name: 'game', description: 'VexVoid the Game, in the GAME tab: a black-and-white night city where a hooded writer paints walls. Actions: open (start the game; it runs only while its tab is open), close, state (where the writer is, what they are doing, and the walls to paint: id, size, position), goto (x, z: put the writer there; yaw turns the camera, the writer faces away from it), inspect (yaw, pitch, dist, heading, anim: set the camera and hold a clip, e.g. Idle_Loop, Jog_Fwd_Loop, Sprint_Loop, Crouch_Idle_Loop, to look at the writer), look (a picture of the game screen), paint (spot: a wall id from state; points: [[u, v], ...] from 0 to 1 across and up the wall, painted as one steady stroke; colour white|grey|black|chrome; cap 1 skinny, 2 medium, 3 fat; dist 0.05-0.6 m from the wall: close is sharp, far is soft with overspray; several calls build a piece, letters are strokes; the walls are dark concrete, so lay fills in white or grey and use black for outlines over them), clear (spot, or every wall). Paint stays on the walls between sessions, so look before painting over a piece. The player paints by hand: F at a wall, mouse to spray. The street runs from z 24 down to the bridge at z -62 and the hall-of-fame wall at z -80; x from -25 to 25. The writer raises a can to the wall while the player sprays. The law: painting builds heat (state reports it, 0 to 1, with what the patrol is doing: calm, alerted, chase, searching, busted); a patrol car drives the street with a searchlight, and if it sees the writer painting two officers get out and give chase; break their line of sight and get away to escape, get caught and the wall is buffed and the writer starts again. cops (on true|false) turns the patrol on or off (the player uses P): turn it off to paint a piece in peace. record (on true: start recording the game screen and its sound, the siren and the can; on false: stop, and the answer gives the saved file): the take is saved to VIDEOS and is in the EDIT bin under recorded; closing the game or leaving its tab stops and saves it too. state says whether it is recording. The player records with the REC button or R.',
+            input_schema: { type: 'object', properties: { action: { type: 'string', enum: ['open', 'close', 'state', 'goto', 'inspect', 'look', 'paint', 'clear', 'cops', 'record'] }, on: { type: 'boolean' }, spot: { type: 'string' }, points: { type: 'array', items: { type: 'array', items: { type: 'number' } } }, colour: { type: 'string', enum: ['white', 'grey', 'black', 'chrome'] }, cap: { type: 'number' }, x: { type: 'number' }, z: { type: 'number' }, yaw: { type: 'number' }, pitch: { type: 'number' }, dist: { type: 'number' }, heading: { type: 'number' }, anim: { type: 'string' } }, required: ['action'], additionalProperties: false } },
           { name: 'text_layer', description: 'Put a text layer on a deck (the TITLES tab): words in a VexVoid font, animated, transparent over the deck\'s other layers. Fonts: ' + VXTEXT.FONTS.map(f => `${f.id} (${f.label.split(' · ')[1]})`).join(', ') + '. Styles: ' + VXTEXT.STYLES.map(s => `${s.id} (${s.about})`).join('; ') + '. Knobs 0-1: size, speed, intensity, height (0 top, 1 bottom). d3 true makes a 3D title instead: extruded letters with a material (chrome, black chrome, matte, wire) and a spin (none, sway, orbit, tumble), the same moves done in 3D, height then sets the extrude depth; keep 3D titles to a word or two. Use text for titles, lyric lines, idents and decorative type; keep words few.',
             input_schema: { type: 'object', properties: { text: { type: 'string', description: 'The words; \\n for a second line' }, font: { type: 'string', enum: VXTEXT.FONTS.map(f => f.id) }, style: { type: 'string', enum: VXTEXT.STYLES.map(s => s.id) },
               upper: { type: 'boolean' }, deck: { type: 'string', enum: ['A', 'B'] }, size: { type: 'number' }, speed: { type: 'number' }, intensity: { type: 'number' }, height: { type: 'number', description: '2D: where it sits, 0 top to 1 bottom. 3D: how deep the letters extrude' },
@@ -6880,7 +6929,10 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
         }
         if (name === 'game') {
           const a = input.action, tab = document.querySelector('[data-tab="game"]');
-          if (a === 'close') { if (document.getElementById('gameTab').classList.contains('active')) document.querySelector('[data-tab="edit"]').click(); return 'The game is closed.'; }
+          const took = r => `Saved the recording: ${r.file} (${r.seconds} s, ${r.mb} MB). It is in VIDEOS and the EDIT bin (recorded).`;
+          const take = async () => gmRec.mr ? took(await gmRecStop()) : gmRec.saving ? took(await gmRec.saving) : '';
+          if (a === 'close') { const t = await take(); if (document.getElementById('gameTab').classList.contains('active')) document.querySelector('[data-tab="edit"]').click(); return 'The game is closed.' + (t ? ' ' + t : ''); }
+          if (a === 'record' && input.on === false) { const t = await take(); if (!t) throw new Error('not recording'); return t; }
           if (!window.vxGameNow) {
             if (!document.getElementById('gameTab').classList.contains('active')) tab.click();
             for (let k = 0; k < 60 && !window.vxGameNow; k++) await new Promise(r => setTimeout(r, 500));
@@ -6889,8 +6941,10 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
           const g = window.vxGameNow, here = () => { const w = g.where(); return `Writer at x ${w.x.toFixed(1)}, z ${w.z.toFixed(1)}, ${w.anim}.`; };
           const law = () => { const L = g.law(); if (!L.on) return 'Patrol off.'; const out = L.cops.filter(c => c.out);
             return `Heat ${L.heat.toFixed(2)}, patrol ${L.chase}${L.seen ? ', they can see the writer' : ''}. ${L.car.onStreet ? `Patrol car at x ${L.car.x.toFixed(1)}, z ${L.car.z.toFixed(1)}` : 'No patrol car on the street'}${out.length ? '; officers on foot at ' + out.map(c => `x ${c.x.toFixed(1)} z ${c.z.toFixed(1)} (${c.doing})`).join(', ') : ''}.`; };
+          const recS = () => gmRec.mr ? ` Recording, ${mmss((Date.now() - gmRec.t0) / 1000)} so far.` : ' Not recording.';
           if (a === 'cops') { g.cops(input.on !== false); return law(); }
-          if (a === 'open') return 'The game is running. ' + here();
+          if (a === 'record') { if (gmRec.mr) return 'Already recording.' + recS(); const r = gmRecStart(); return `Recording the game${r.audio ? ' with its sound' : ', picture only'}. Call record with on false to stop and save.`; }
+          if (a === 'open') return 'The game is running. ' + here() + recS();
           if (a === 'paint') {
             const pts = (input.points || []).filter(p => Array.isArray(p) && p.length >= 2).map(p => [Math.max(0, Math.min(1, +p[0])), Math.max(0, Math.min(1, +p[1]))]);
             if (pts.length < 1) throw new Error('points: [[u, v], ...] from 0 to 1');
@@ -6905,7 +6959,7 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
             const shot = g.snap(768).split(',')[1];
             return [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: shot } }, { type: 'text', text: here() + ' ' + law() }];
           }
-          return here() + ' ' + law() + ' Walls to paint: ' + g.spots().map(w => `${w.id} ${w.w.toFixed(1)}x${w.h.toFixed(1)} m at x ${w.x.toFixed(1)} z ${w.z.toFixed(1)}`).join('; ') + '.';
+          return here() + ' ' + law() + recS() + ' Walls to paint: ' + g.spots().map(w => `${w.id} ${w.w.toFixed(1)}x${w.h.toFixed(1)} m at x ${w.x.toFixed(1)} z ${w.z.toFixed(1)}`).join('; ') + '.';
         }
         if (name === 'jobs') return jobTool(input);
         if (name === 'skill') return VEXVOID_BRAIN.skill(input.name, input.name === 'shaders' ? 'LIQUID CHROME:\n' + ((window.VXGEN_LIBRARY || []).find(x => x.name === 'LIQUID CHROME') || {}).code : '');

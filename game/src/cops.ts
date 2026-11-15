@@ -5,7 +5,7 @@
  * officers get out and run you down. Break their line of sight and get far enough away for a few seconds and they lose
  * you; they search where they last saw you, then give up and walk back (ESCAPED). If one gets within a metre: BUSTED.
  *
- *   const law = await makeLaw({ scene, high, base, blockers, bounds })
+ *   const law = await makeLaw({ scene, high, base, blockers, bounds, sound })
  *   const ev = law.update(dt, t, { x, z, y, crouch, painting, spraying })   // '' | 'alert' | 'busted' | 'escaped'
  *
  * The officers are the writer's own body on the same skeleton (./writer.ts), in dark uniform with a helmet and a
@@ -53,7 +53,7 @@ const RUN_SPEED = 5.5, JOG_SPEED = 3.4, WALK_SPEED = 1.6, BUST_R = 1.0, SIGHT = 
 type Cop = { w: Writer; helmet: THREE.Group; head: THREE.Object3D; x: number; z: number; h: number; out: boolean; doing: 'in' | 'run' | 'search' | 'return' | 'bust';
   wind: number; tired: number; side: number; goal: THREE.Vector2; look: number; door: number };
 
-export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: string; blockers: Blocker[]; bounds: { x: number; z0: number; z1: number } }): Promise<Law> {
+export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: string; blockers: Blocker[]; bounds: { x: number; z0: number; z1: number }; sound: () => { ctx: AudioContext; out: AudioNode } | null }): Promise<Law> {
   const { scene, high, blockers, bounds } = o;
   const car = makeCar(high);
   scene.add(car.group, car.search, car.search.target, car.beam);
@@ -152,13 +152,14 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
   let snd: { ctx: AudioContext; f: AudioParam[]; depth: GainNode; gain: GainNode } | null = null, level = 0;
   const audio = () => {
     if (snd) return snd;
+    const bus = o.sound(); if (!bus) return null;
     try {
-      const ctx = new AudioContext(), a = ctx.createOscillator(), b = ctx.createOscillator(), lp = ctx.createBiquadFilter(), gain = ctx.createGain(), lfo = ctx.createOscillator(), depth = ctx.createGain(), mix = ctx.createGain();
+      const ctx = bus.ctx, a = ctx.createOscillator(), b = ctx.createOscillator(), lp = ctx.createBiquadFilter(), gain = ctx.createGain(), lfo = ctx.createOscillator(), depth = ctx.createGain(), mix = ctx.createGain();
       a.type = 'sawtooth'; b.type = 'square'; b.detune.value = 12; mix.gain.value = 0.5;
       lp.type = 'lowpass'; lp.frequency.value = 2400; lp.Q.value = 0.8;
       // the wail: a slow triangle swinging both oscillators' pitch (depth 0 holds it still for the whoop)
       lfo.type = 'triangle'; lfo.frequency.value = 0.32; depth.gain.value = 0; lfo.connect(depth); depth.connect(a.frequency); depth.connect(b.frequency);
-      a.connect(lp); b.connect(mix).connect(lp); gain.gain.value = 0; lp.connect(gain).connect(ctx.destination);
+      a.connect(lp); b.connect(mix).connect(lp); gain.gain.value = 0; lp.connect(gain).connect(bus.out);
       a.start(); b.start(); lfo.start();
       snd = { ctx, f: [a.frequency, b.frequency], depth, gain };
     } catch { snd = null; }
@@ -357,8 +358,7 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
       for (const cp of cops) { scene.remove(cp.w.root, cp.helmet); cp.w.dispose(); }
       scene.remove(car.group, car.search, car.search.target, car.beam);
       car.dispose(); shellG.dispose(); visorG.dispose(); shellM.dispose(); visorM.dispose();
-      Object.values(mats).forEach((m) => m.dispose());
-      if (snd) void snd.ctx.close();
+      Object.values(mats).forEach((m) => m.dispose()); // the sound goes when main.ts closes its AudioContext
     },
   };
 }
