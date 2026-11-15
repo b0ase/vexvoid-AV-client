@@ -1752,7 +1752,7 @@
     .ai-in button{font:inherit;background:none;border:0;color:#fff;letter-spacing:.24em;font-size:10px;cursor:pointer;padding:8px 0}
     .ai-auto{font-size:9px;letter-spacing:.24em;color:#777;display:flex;align-items:center;gap:6px;cursor:pointer}.ai-auto input{accent-color:#fff;margin:0}.ai-auto:has(input:checked){color:#fff}
     /* TITLES */
-    .ti{display:grid;grid-template-columns:minmax(300px,420px) 1fr;gap:28px;height:100%;min-height:0;text-transform:none}
+    .ti{flex:1;min-width:0;width:100%;display:grid;grid-template-columns:minmax(300px,420px) minmax(0,1fr);gap:28px;height:100%;min-height:0;text-transform:none}
     .ti-left{display:flex;flex-direction:column;gap:10px;overflow-y:auto;padding-right:6px}
     .ti-mode{display:flex;gap:6px}.ti-mode button{font:inherit;font-size:9px;letter-spacing:.2em;background:none;border:1px solid #2a2a2a;color:#777;padding:7px 12px;cursor:pointer}
     .ti-mode button.on{color:#000;background:#fff;border-color:#fff}.ti-mode button:disabled{opacity:.45;cursor:default}
@@ -1769,13 +1769,13 @@
     .ti-chips{display:flex;gap:4px;flex-wrap:wrap}.ti-chips button{font:inherit;font-size:9px;letter-spacing:.14em;background:none;border:1px solid #222;color:#888;padding:8px 10px;cursor:pointer}.ti-chips button.on{background:#fff;color:#000;border-color:#fff}
     .ti-3d{display:none;flex-direction:column;gap:10px}.ti.d3 .ti-3d{display:flex}
     .ti-about{font-size:10px;color:#666;letter-spacing:.04em;min-height:16px}
-    .ti-right{display:flex;flex-direction:column;gap:12px;min-height:0}
-    .ti-view{position:relative;width:100%;aspect-ratio:16/9;max-height:62vh;background:#000 linear-gradient(90deg,#060606,#141414);border:1px solid #1d1d1d}
+    .ti-right{display:flex;flex-direction:column;gap:12px;min-height:0;min-width:0}
+    .ti-view{position:relative;width:100%;aspect-ratio:16/9;max-height:calc(100vh - 290px);background:#000 linear-gradient(90deg,#060606,#141414);border:1px solid #1d1d1d}
     .ti-knobs{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
     .ti-knobs label{display:flex;flex-direction:column;gap:6px;font-size:9px;letter-spacing:.24em;color:#777}.ti-knobs input{accent-color:#fff;width:100%}
     .ti-acts{display:flex;gap:8px}.ti-note{font-size:10px;color:#555}
     /* CODE */
-    .code{display:flex;flex-direction:column;height:100%;min-height:0;font-family:'IBM Plex Mono',monospace;text-transform:none}
+    .code{flex:1;min-width:0;display:flex;flex-direction:column;height:100%;min-height:0;font-family:'IBM Plex Mono',monospace;text-transform:none}
     .code-head{display:flex;align-items:center;gap:16px;padding-bottom:12px;border-bottom:1px solid #161616}
     .code-head>span:first-child{font-family:'Michroma','IBM Plex Mono',sans-serif;letter-spacing:.2em;font-size:14px}
     .code-meta{flex:1;font-size:10px;color:#666;letter-spacing:.04em}
@@ -1821,6 +1821,9 @@
     .pg{display:flex;flex-direction:column;gap:14px;width:100%;height:100%;min-height:0}
     .pg-head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;padding:6px 4px 0}
     .pg-title{font-family:'Michroma','IBM Plex Mono',sans-serif;font-size:28px;letter-spacing:.3em}
+    .pg-hero{position:relative;flex:none;height:34vh;min-height:220px;background:#000;border:1px solid #161616;overflow:hidden}
+    .pg-hero-bg,.pg-hero-fg{position:absolute;inset:0}.pg-hero-bg{opacity:.42}
+    .pg-hero-sub{position:absolute;left:18px;bottom:14px;font-size:9px;letter-spacing:.4em;color:#e0e0de;text-shadow:0 0 8px #000}
     .pg-sub{font-size:9px;letter-spacing:.3em;color:#666;margin-top:6px}
     .pg-ask{display:grid;grid-template-columns:1fr auto;gap:8px;width:min(560px,50%)}
     .pg-ask input{background:none;border:0;border-bottom:1px solid #333;color:#fff;font:inherit;font-size:13px;text-transform:none;padding:6px 0;outline:none}
@@ -2716,8 +2719,9 @@
     <!-- VEXVOID: the preset gallery. Every animation, live on hover, onto a deck in one click; or ask VexVoid. -->
     <div class="tab-content" id="vexvoidTab">
       <div class="pg">
+        <div class="pg-hero" id="pgHero" title="VEXVOID"><div class="pg-hero-bg" id="pgHeroBg"></div><div class="pg-hero-fg" id="pgHeroFg"></div><div class="pg-hero-sub">URBAN VISUAL ENGINE</div></div>
         <div class="pg-head">
-          <div><div class="pg-title">VEXVOID</div><div class="pg-sub" id="pgCount">PRESETS</div></div>
+          <div><div class="pg-sub" id="pgCount">PRESETS</div></div>
           <div class="pg-ask"><input id="pgAsk" placeholder="Ask VexVoid for a look..."><button id="pgAskGo">ASK</button><div class="pg-reply" id="pgReply"></div></div>
         </div>
         <div class="wb-filters" id="pgCats"></div>
@@ -5898,6 +5902,20 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       edEl('edClear').addEventListener('click', () => { ed.shots = []; ed.sel = -1; edSave(); edRender(); });
       edEl('edTitle').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
       edEl('edTitle').addEventListener('blur', e => { ed.title = e.target.textContent.trim().toUpperCase().slice(0, 60) || 'UNTITLED VIDEO'; edSave(); });
+
+      // ===== VEXVOID title screen: plays the whole time the VEXVOID tab is open (a shader behind the chrome V3XV0ID)
+      let pgHero = [];
+      function pgHeroStart() {
+        pgHeroStop();
+        const bg = (window.VXGEN_LIBRARY || []).find(x => x.name === 'CATHEDRAL');
+        try {
+          if (bg) pgHero.push(VXGEN.mount(document.getElementById('pgHeroBg'), bg.code, { scale: 0.5, params: { a: 0.5, b: 0.5, c: 0.15, d: 0.4 } }));
+          pgHero.push(VXGEN.mount(document.getElementById('pgHeroFg'), VXTEXT3D.code({ text: 'V3XV0ID', font: 'michroma', style: 'static', material: 'chrome', spin: 'sway', bevel: true }), { scale: 0.75, params: { a: 0.62, b: 0.35, c: 0.4, d: 0.45 } }));
+        } catch (e) { console.warn('title screen', e.message); }
+      }
+      function pgHeroStop() { pgHero.forEach(g => g.stop()); pgHero = []; ['pgHeroBg', 'pgHeroFg'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; }); }
+      document.querySelectorAll('.tab-button').forEach(b => b.addEventListener('click', () => { if (b.dataset.tab === 'vexvoid') pgHeroStart(); else pgHeroStop(); }));
+      if (document.getElementById('vexvoidTab').classList.contains('active')) pgHeroStart();
 
       // ===== TITLES: text layers (vx/text.js) in VexVoid fonts, animated; they go to a deck like any sketch =====
       const ti = Object.assign({ text: 'V3XV0ID', font: 'michroma', style: 'glitch', upper: true, a: 0.5, b: 0.5, c: 0.5, d: 0.5, mode: '2d', material: 'chrome', spin: 'sway', bevel: true },
