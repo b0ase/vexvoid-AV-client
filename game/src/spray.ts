@@ -6,6 +6,9 @@
  *
  *   const s = makeSpray(scene, city.spots); s.hit(raycaster); s.spray(id, u, v, dt, opts); s.update(dt)
  *   s.path(id, [[u, v], ...], opts)   paints a whole stroke at once (the agent's tool, tests)
+ *
+ * Walls keep their paint between sessions: each wall's canvas is saved as a PNG in IndexedDB (vexvoid-game / walls)
+ * a moment after the paint on it settles, and loaded back when the city is built.
  */
 import * as THREE from 'three';
 import type { Spot } from './city';
@@ -16,7 +19,22 @@ export const COLOUR_NAMES = ['WHITE', 'GREY', 'BLACK', 'CHROME'];
 const PX_PER_M = 100;
 
 type Layer = { spot: Spot; cv: HTMLCanvasElement; g: CanvasRenderingContext2D; tex: THREE.CanvasTexture; mesh: THREE.Mesh; W: number; H: number;
-  wet: Float32Array; cell: number; cols: number; dirty: boolean };
+  wet: Float32Array; cell: number; cols: number; dirty: boolean; unsaved: number };
+type Saved = { w: number; h: number; png: Blob };
+const DB = 'vexvoid-game', STORE = 'walls';
+let dbP: Promise<IDBDatabase | null> | null = null;
+const db = () => dbP || (dbP = new Promise((res) => {
+  try {
+    const q = indexedDB.open(DB, 1);
+    q.onupgradeneeded = () => q.result.createObjectStore(STORE);
+    q.onsuccess = () => res(q.result); q.onerror = () => res(null);
+  } catch { res(null); }
+}));
+const tx = async <T>(mode: IDBTransactionMode, f: (st: IDBObjectStore) => IDBRequest<T>) => {
+  const d = await db(); if (!d) return undefined;
+  return new Promise<T | undefined>((res) => { try { const q = f(d.transaction(STORE, mode).objectStore(STORE)); q.onsuccess = () => res(q.result); q.onerror = () => res(undefined); } catch { res(undefined); } });
+};
+
 type Drip = { L: Layer; x: number; y: number; w: number; left: number; colour: string; speed: number };
 
 export function makeSpray(scene: THREE.Scene, spots: Spot[]) {
@@ -34,8 +52,19 @@ export function makeSpray(scene: THREE.Scene, spots: Spot[]) {
     mesh.receiveShadow = true; mesh.userData.spot = spot.id; mesh.userData.noAO = true;
     scene.add(mesh);
     const cell = 24, cols = Math.ceil(W / cell);
-    layers.set(spot.id, { spot, cv, g, tex, mesh, W, H, wet: new Float32Array(cols * Math.ceil(H / cell)), cell, cols, dirty: false });
+    layers.set(spot.id, { spot, cv, g, tex, mesh, W, H, wet: new Float32Array(cols * Math.ceil(H / cell)), cell, cols, dirty: false, unsaved: 0 });
   }
+
+  // what was painted last time comes back (a wall whose size changed starts clean)
+  const loaded = Promise.all([...layers.values()].map(async (L) => {
+    const v = await tx<Saved>('readonly', (st) => st.get(L.spot.id));
+    if (!v || v.w !== L.W || v.h !== L.H) return;
+    try { const im = await createImageBitmap(v.png); L.g.drawImage(im, 0, 0); im.close(); L.dirty = true; } catch { /* a broken save: start clean */ }
+  }));
+  const save = (L: Layer) => new Promise<void>((res) => L.cv.toBlob(async (b) => {
+    if (b) await tx('readwrite', (st) => st.put({ w: L.W, h: L.H, png: b } as Saved, L.spot.id));
+    res();
+  }, 'image/png'));
 
   // one dab of paint: a soft disc, plus overspray speckle the further the can is from the wall
   const dab = (L: Layer, x: number, y: number, can: Can, flow: number) => {
@@ -55,7 +84,7 @@ export function makeSpray(scene: THREE.Scene, spots: Spot[]) {
       L.wet[ci] += a * (1.2 - can.dist);
       if (L.wet[ci] > 6 && drips.length < 400) { L.wet[ci] = 2; drips.push({ L, x: x + (Math.random() - 0.5) * r, y: y + r * 0.6, w: Math.max(1, r * 0.22), left: 20 + Math.random() * 70, colour: rgb, speed: 18 + Math.random() * 24 }); }
     }
-    L.dirty = true;
+    L.dirty = true; L.unsaved = 1.5;
   };
   let last: { id: string; x: number; y: number } | null = null;
 
@@ -85,7 +114,17 @@ export function makeSpray(scene: THREE.Scene, spots: Spot[]) {
       for (const [u, v] of pts) this.spray(id, u, v, 1 / 30, can);
       last = null;
     },
-    clear(id?: string) { for (const L of layers.values()) if (!id || L.spot.id === id) { L.g.clearRect(0, 0, L.W, L.H); L.wet.fill(0); L.dirty = true; } },
+    clear(id?: string) {
+      for (const L of layers.values()) if (!id || L.spot.id === id) {
+        L.g.clearRect(0, 0, L.W, L.H); L.wet.fill(0); L.dirty = true; L.unsaved = 0;
+        for (let i = drips.length - 1; i >= 0; i--) if (drips[i].L === L) drips.splice(i, 1);
+        void tx('readwrite', (st) => st.delete(L.spot.id));
+      }
+    },
+    /** Resolves once last session's paint is back on the walls. */
+    loaded,
+    /** Save every wall with paint not yet saved (also done by itself, a moment after the paint settles). */
+    async flush() { await Promise.all([...layers.values()].filter((L) => L.unsaved > 0).map((L) => { L.unsaved = 0; return save(L); })); },
     /** Drips run down, thinning, and the changed walls go to the GPU. */
     update(dt: number) {
       for (let i = drips.length - 1; i >= 0; i--) {
@@ -94,11 +133,19 @@ export function makeSpray(scene: THREE.Scene, spots: Spot[]) {
         d.y += dy; d.left -= dy; d.w = Math.max(0.6, d.w * (1 - dt * 0.25)); d.speed *= 1 - dt * 0.35; d.L.dirty = true;
         if (d.left <= 0 || d.speed < 2 || d.y > d.L.H) { d.L.g.beginPath(); d.L.g.arc(d.x, d.y, d.w * 0.9, 0, Math.PI * 2); d.L.g.fill(); drips.splice(i, 1); }
       }
-      for (const L of layers.values()) if (L.dirty) { L.tex.needsUpdate = true; L.dirty = false; }
+      for (const L of layers.values()) {
+        if (L.dirty) { L.tex.needsUpdate = true; L.dirty = false; }
+        // saved once the wall has had no new paint for a moment and nothing is still running down it
+        if (L.unsaved > 0 && (L.unsaved -= dt) <= 0) {
+          if (drips.some((d) => d.L === L)) L.unsaved = 0.5; else { L.unsaved = 0; void save(L); }
+        }
+      }
     },
     /** A wall's paint as a PNG data URL (to keep or post a piece). */
     png(id: string) { const L = layers.get(id); return L ? L.cv.toDataURL('image/png') : ''; },
     layers,
-    dispose() { for (const L of layers.values()) { scene.remove(L.mesh); L.mesh.geometry.dispose(); (L.mesh.material as THREE.Material).dispose(); L.tex.dispose(); } },
+    dispose() {
+      for (const L of layers.values()) if (L.unsaved > 0) void save(L);   // the canvases outlive the textures
+      for (const L of layers.values()) { scene.remove(L.mesh); L.mesh.geometry.dispose(); (L.mesh.material as THREE.Material).dispose(); L.tex.dispose(); } },
   };
 }

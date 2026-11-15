@@ -17,6 +17,10 @@ export type Writer = {
   height: number;
   play: (name: string, fade?: number, once?: boolean) => void;
   playing: () => string;
+  /** Raise the right arm with a can to spray: the hand goes to `hand`, the nozzle points at `at` (null lowers it). */
+  aim: (hand: THREE.Vector3 | null, at?: THREE.Vector3, weight?: number) => void;
+  /** The can in the hand (a scene-level object: add it to the scene once). */
+  can: THREE.Object3D;
   update: (dt: number) => void;
   dispose: () => void;
 };
@@ -294,16 +298,65 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
   // standing still is never quite still: a breath through the chest and a slow look round, over whatever idle plays
   const spine1 = B('Spine1'), neckB = B('Neck'), headB = B('Head');
   let life = 0, lt = 0;
+  // spraying: the right arm reaches for the wall (two-bone IK over whatever clip plays) with a can in the hand
+  const rArm = B('RightArm'), rFore = B('RightForeArm'), rHand = B('RightHand'), spine2 = B('Spine2');
+  const can = new THREE.Group();
+  {
+    const metal = new THREE.MeshPhysicalMaterial({ color: '#c4c6cc', roughness: 0.28, metalness: 0.9, clearcoat: 0.6, clearcoatRoughness: 0.25 });
+    const white = new THREE.MeshStandardMaterial({ color: '#f2f2f2', roughness: 0.5 });
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.033, 0.033, 0.19, 20), metal);
+    const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.033, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), metal); shoulder.position.y = 0.095;
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.01, 0.02, 12), white); cap.position.y = 0.135;
+    const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.012, 8), white); nozzle.rotation.x = Math.PI / 2; nozzle.position.set(0, 0.138, 0.01);
+    for (const m of [body, shoulder, cap, nozzle]) { m.castShadow = shadow; can.add(m); }
+    // the can is drawn upright with its nozzle facing +Z: lookAt points the nozzle at the wall; the grip sits low on the body
+    for (const m of can.children) m.position.y -= 0.07;
+    owned.push(body.geometry, shoulder.geometry, cap.geometry, nozzle.geometry, metal, white);
+  }
+  can.visible = false;
+  const iA = new THREE.Vector3(), iB = new THREE.Vector3(), iC = new THREE.Vector3(), iT = new THREE.Vector3(), iE = new THREE.Vector3(), iP = new THREE.Vector3();
+  const qa = new THREE.Quaternion(), qb = new THREE.Quaternion(), qp = new THREE.Quaternion();
+  // turn a bone in world space so its direction `from` becomes `to`, by weight w
+  const turn = (bone: THREE.Bone, from: THREE.Vector3, to: THREE.Vector3, w: number) => {
+    qa.setFromUnitVectors(from, to); bone.getWorldQuaternion(qb); bone.parent!.getWorldQuaternion(qp);
+    bone.quaternion.slerp(qp.invert().multiply(qa.multiply(qb)), w); bone.updateMatrixWorld(true);
+  };
+  const aimHand = new THREE.Vector3(), aimAt = new THREE.Vector3();
+  let aimOn = false, aimTo = 1, aimW = 0;
+  const ik = (w: number) => {
+    root.updateMatrixWorld(true);
+    rArm.getWorldPosition(iA); rFore.getWorldPosition(iB); rHand.getWorldPosition(iC);
+    const l1 = iA.distanceTo(iB), l2 = iB.distanceTo(iC);
+    iT.copy(aimHand).sub(iA); const d = Math.max(0.05, Math.min(iT.length(), (l1 + l2) * 0.995)); iT.normalize();
+    const cosA = Math.max(-1, Math.min(1, (l1 * l1 + d * d - l2 * l2) / (2 * l1 * d))), sinA = Math.sqrt(1 - cosA * cosA);
+    // the elbow drops down and out to the right of the body
+    spine2.getWorldPosition(iP); iP.subVectors(iA, iP).setY(0).normalize().multiplyScalar(0.7); iP.y = -1;
+    iP.addScaledVector(iT, -iP.dot(iT)).normalize();
+    iE.copy(iA).addScaledVector(iT, l1 * cosA).addScaledVector(iP, l1 * sinA);
+    turn(rArm, iB.clone().sub(iA).normalize(), iE.sub(iA).normalize(), w);
+    rFore.getWorldPosition(iB); rHand.getWorldPosition(iC);
+    iE.copy(iA).addScaledVector(iT, d);
+    turn(rFore, iC.clone().sub(iB).normalize(), iE.sub(iB).normalize(), w);
+    rHand.getWorldPosition(iC);
+  };
   return {
-    root, height: HEIGHT, play, playing: () => curName,
+    root, height: HEIGHT, play, playing: () => curName, can,
+    aim: (hand, at, weight = 1) => {
+      aimOn = !!hand; if (hand) { aimHand.copy(hand); aimAt.copy(at || hand); aimTo = weight; }
+    },
     update: (dt) => {
       mixer.update(dt);
-      lt += dt; life += ((/Idle/.test(curName) ? 1 : 0) - life) * Math.min(1, dt * 2);
+      lt += dt; life += ((/Idle/.test(curName) && !aimOn ? 1 : 0) - life) * Math.min(1, dt * 2);
       if (life > 0.01) {
         spine1.rotateX(Math.sin(lt * 1.6) * 0.018 * life);
         const look = Math.sin(lt * 0.23) * 0.5 + Math.sin(lt * 0.61 + 1.3) * 0.2;
         neckB.rotateY(look * 0.18 * life); headB.rotateY(look * 0.22 * life); headB.rotateX((Math.sin(lt * 0.37) * 0.06 + 0.03) * life);
       }
+      aimW += ((aimOn ? aimTo : 0) - aimW) * Math.min(1, dt * 9);
+      if (aimW > 0.01) {
+        ik(aimW);
+        can.visible = aimW > 0.3; can.position.copy(iC).lerp(iB, -0.15); can.lookAt(aimAt);
+      } else can.visible = false;
     },
     dispose: () => { mixer.stopAllAction(); owned.forEach((d) => d.dispose()); },
   };

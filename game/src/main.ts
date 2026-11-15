@@ -21,7 +21,7 @@ import { loadWriter } from './writer';
 import { makeSpray, COLOURS, COLOUR_NAMES, type Can } from './spray';
 
 export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) => void; onHud?: (s: string) => void };
-export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?: number) => string; inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string }) => void; where: () => { x: number; z: number; yaw: number; heading: number; anim: string }; spots: () => { id: string; w: number; h: number; x: number; y: number; z: number }[]; paint: (id: string, pts: [number, number][], o?: { colour?: string; cap?: 1 | 2 | 3; dist?: number }) => void; clearPaint: (id?: string) => void; piece: (id: string) => string; painting: () => string; goto: (x: number, z: number, yaw?: number, pitch?: number) => void };
+export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?: number) => string; inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string }) => void; where: () => { x: number; z: number; yaw: number; heading: number; anim: string }; spots: () => { id: string; w: number; h: number; x: number; y: number; z: number }[]; paint: (id: string, pts: [number, number][], o?: { colour?: string; cap?: 1 | 2 | 3; dist?: number }) => void; clearPaint: (id?: string) => void; piece: (id: string) => string; painting: () => string; flush: () => Promise<void>; goto: (x: number, z: number, yaw?: number, pitch?: number) => void };
 
 // VexVoid's grade: no colour at all, hard contrast, a heavy vignette
 const MONO = { shadow: [1, 1, 1] as [number, number, number], high: [1, 1, 1] as [number, number, number], sat: 0, contrast: 1.32, vignette: 0.72 };
@@ -50,7 +50,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   scene.add(city.group);
   say('Dressing the writer…');
   const writer = await loadWriter(opts.base + 'anims/ual.glb', high, opts.base + 'models/writer.glb');
-  scene.add(writer.root);
+  scene.add(writer.root, writer.can);
   const spray = makeSpray(scene, city.spots);
   // a soft light that rides with the writer so the hoodie reads against the dark street
   const rim = new THREE.PointLight('#ffffff', 9, 7, 2);
@@ -90,7 +90,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   // painting: F at a wall squares up to it; the mouse aims, holding it sprays; the wheel sets the can's distance
   const can: Can = { colour: COLOURS[0], cap: 2, dist: 0.22 };
   let paint: { id: string; spot: (typeof city.spots)[number] } | null = null, spraying = false, colourI = 0;
-  const mouse = new THREE.Vector2(), ray = new THREE.Raycaster();
+  const mouse = new THREE.Vector2(), ray = new THREE.Raycaster(), aimHand = new THREE.Vector3();
   const hud = () => opts.onHud && opts.onHud(paint
     ? `PAINTING ${paint.id.toUpperCase()} · HOLD MOUSE TO SPRAY · WHEEL DISTANCE ${Math.round(can.dist * 100)} CM · 1 2 3 CAP ${['', 'SKINNY', 'MEDIUM', 'FAT'][can.cap]} · TAB ${COLOUR_NAMES[colourI]} · A D MOVE · F DONE`
     : 'WASD MOVE · SHIFT SPRINT · C CROUCH · SPACE JUMP · DRAG LOOK · F AT A WALL TO PAINT');
@@ -217,10 +217,13 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
         (reticle.material as THREE.MeshBasicMaterial).color.set(reach ? '#ffffff' : '#555555');
       }
       if (spraying && reach && h) spray.spray(h.id, h.u, h.v, dt, can); else spray.lift();
+      // the arm goes up with the can wherever the aim is on the wall; the hand stops the can's distance off it
+      if (h && h.id === sp.id) writer.aim(aimHand.copy(h.point).addScaledVector(n, can.dist + 0.03), h.point, spraying ? 1 : 0.85);
+      else writer.aim(null);
       hissOn(!!(spraying && reach));
-    } else { reticle.visible = false; hissOn(false); }
+    } else { reticle.visible = false; hissOn(false); writer.aim(null); }
     spray.update(dt);
-    if (paint && !moving) writer.play(spraying ? 'Spell_Simple_Idle_Loop' : 'Idle_Loop', 0.15);
+    if (paint && !moving) writer.play('Idle_Loop', 0.15);
     else if (me.airborne) {
       me.vy -= 13 * dt; me.y += me.vy * dt;
       if (me.y <= 0) { me.y = 0; me.vy = 0; me.airborne = false; writer.play('Jump_Land', 0.06, true); landT = 0.28; }
@@ -274,6 +277,8 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     clearPaint: (id?: string) => spray.clear(id),
     piece: (id: string) => spray.png(id),
     painting: () => (paint ? paint.id : ''),
+    /** Save the walls' paint now (it saves itself a moment after each stroke settles). */
+    flush: async () => { await spray.loaded; await spray.flush(); },
     spots: () => city.spots.map((s) => ({ id: s.id, w: s.w, h: s.h, x: s.center.x, y: s.center.y, z: s.center.z })),
     goto: (x, z, yaw, pitch) => { me.x = x; me.z = z; if (yaw != null) { camO.yaw = yaw; me.heading = yaw + Math.PI; } if (pitch != null) camO.pitch = pitch; },
     stop: () => {
