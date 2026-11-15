@@ -60,6 +60,7 @@ Load a skill with the skill tool before the job it covers, then follow it:
 - Prepare on the deck nobody is watching, then cut or fade to it. Cuts land on the bar; fades run 4, 8 or 16 bars. Before a big drop, a one-bar blackout then the hit lands harder.
 - Knobs a-d animate within a section (compose_set steps); evolve drifts a look every 4 bars in long passages; mutate re-seeds when a look has run long.
 - Clips over shaders: blend screen to add light, multiply to cut it away. Keep it to two layers on screen most of the time; clarity beats clutter.
+- Type: text_layer puts animated words on a deck over whatever is there (track titles, a lyric line on the hook, an ident word). Few words, big or tiny, never in between; Michroma or Syncopate for the house look, glitch or cut on the drops, type-on or scan for intros, strobe sparingly.
 - After every change, look. Fix a black screen, a wrong live deck or a sketch error at once.
 - For a recorded set: load the track, match the tempo, compose the set from the track's map (editor map works on any track), start both together, record until the track ends.` },
 
@@ -117,7 +118,7 @@ SCOPE GLOW (ref: @unholyidea, "[int: white ferrari]"; the owner says the whole a
 - Colour and texture: warm amber grade with halation and bloom; bursts of posterised or solarised colour (cyan, magenta, yellow); teal and cream duotone; light leaks. Colour is part of this style: use it only when the brief asks for this style or colour.
 - Abstract layer: particle orbit rings, shattered glass shards, chrome swirls, bokeh (our shaders: GYROID, LIQUID CHROME, INK, CATHEDRAL as sources).
 - Motif: a hooded figure from behind in coloured light (already ours).
-- Here now: fast cuts (auto_cut fast + manual shot lengths), editor look scope (2.39 letterbox + white flash frames on the hits), monochrome grade, shaders as the abstract layer, the hooded-figure clips. Not built yet: sub-beat cuts, lyric typography (a TITLES tab is planned), blend layers and picture-in-picture slabs, colour grades (amber/halation, posterise, duotone). Say so when a brief needs them rather than faking it.` },
+- Here now: fast cuts (auto_cut fast + manual shot lengths), editor look scope (2.39 letterbox + white flash frames on the hits), monochrome grade, shaders as the abstract layer, the hooded-figure clips, text_layer for tiny glowing lyric lines and giant words (live on the decks; record a take to use them in a video). Not built yet: sub-beat cuts, text inside EDIT exports, blend layers and picture-in-picture slabs, colour grades (amber/halation, posterise, duotone). Say so when a brief needs them rather than faking it.` },
 
     'worlds': { when: 'choosing or inventing the world for a track', text: `WORLDS (the three finished videos)
 - Four Ton Shadow: weight and pressure. Steel, freight, concrete, machinery bearing down (a container swinging on a crane cable over a dock, a hydraulic press, a goods train pounding over a bridge, motorway pillars, a pile driver), then the climb: rooftoppers on cranes and towers at night, the city's lights from above, up into dawn and weightless light.
