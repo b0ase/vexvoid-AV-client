@@ -24,7 +24,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import type { Look } from './look';
 import { halo } from './halo';
-import { adAtlas, canvas, curtainWall, facadeTile, FACADE_H, FACADE_W, JP, lobbyTex, rng, ringTex, shopTile, SHOP, signAtlas, SIGNS, skylineTex, softGlow, tex, vendingTex, type FacadeKind } from './cityAssets';
+import { adAtlas, canvas, curtainWall, facadeTile, FACADE_H, FACADE_W, JP, lobbyTex, rng, ringTex, shopTile, shutterTile, SHOP, signAtlas, SIGNS, skylineTex, softGlow, tex, vendingTex, type FacadeKind } from './cityAssets';
 import { beamMaterial, eyeMaterial, glowMaterial, holoAdMaterial, makeShared, mistMaterial, patchWetGround, rainMaterial, rippleMaterial, signMaterial, steamMaterial, type GroundUniforms } from './cityShaders';
 import { buildHoloFigure } from './cityHolo';
 
@@ -34,8 +34,16 @@ export const EYE = 1.62;
 export type Window = { i: number; x: number; y: number; hp: number; broke: boolean; lit: number };
 export type Rack = { mesh: THREE.Mesh; hp: number; broke: boolean; t: number };
 
+/** A wall the writer can paint: a plane facing the street, w x h metres, centred at center, facing normal. */
+export type Spot = { id: string; mesh: THREE.Mesh; w: number; h: number; center: THREE.Vector3; normal: THREE.Vector3 };
+/** Something solid at street level the walker cannot pass through (x/z extents). */
+export type Blocker = { x0: number; x1: number; z0: number; z1: number };
+
 export type City = {
   group: THREE.Group;
+  /** VexVoid's walls to paint (empty in the TERRORNODE set). */
+  spots: Spot[];
+  blockers: Blocker[];
   windows: THREE.InstancedMesh;
   wins: Window[];
   racks: Rack[];
@@ -81,7 +89,10 @@ type Roof = { xa: number; xb: number; za: number; zb: number; y: number; kind: F
 type Bld = { sx: 1 | -1; za: number; zb: number; h: number; h1: number; kind: FacadeKind };
 type Bucket = THREE.BufferGeometry[];
 
-export function buildCity({ renderer, scene, high, look }: { renderer: THREE.WebGLRenderer; scene: THREE.Scene; high: boolean; look: Look }): City {
+/** vexvoid: VexVoid's city. The same streets, rain and light, without TERRORNODE's landmarks (the HQ tower and its eye,
+ *  the hologram idol, the holo billboards, the kanji signs); shutters and bare concrete instead of shopfronts, a rail
+ *  bridge and a wall closing the street, and walls to paint (spots). */
+export function buildCity({ renderer, scene, high, look, vexvoid = false }: { renderer: THREE.WebGLRenderer; scene: THREE.Scene; high: boolean; look: Look; vexvoid?: boolean }): City {
   const S = high ? 1 : 0.5; // texture scale
   const pick = <T,>(a: T, b: T) => (high ? a : b);
   const group = new THREE.Group();
@@ -295,9 +306,9 @@ export function buildCity({ renderer, scene, high, look }: { renderer: THREE.Web
     const [ro, me, ei, en] = facSpec[k];
     facMat[k] = track(new THREE.MeshStandardMaterial({ map: facTex[i].map, emissiveMap: facTex[i].em, emissive: '#ffffff', emissiveIntensity: ei, roughness: ro, metalness: me, envMapIntensity: en }));
   });
-  const shopT = shopTile(5, S);
+  const shopT = vexvoid ? shutterTile(5, S) : shopTile(5, S);
   disp.push(shopT.map, shopT.em);
-  const shopMat = track(new THREE.MeshStandardMaterial({ map: shopT.map, emissiveMap: shopT.em, emissive: '#ffffff', emissiveIntensity: 1.5, roughness: 0.55, metalness: 0.2 }));
+  const shopMat = track(new THREE.MeshStandardMaterial({ map: shopT.map, emissiveMap: shopT.em, emissive: '#ffffff', emissiveIntensity: vexvoid ? 2.2 : 1.5, roughness: vexvoid ? 0.62 : 0.55, metalness: vexvoid ? 0.35 : 0.2 }));
   const trimMat = track(new THREE.MeshStandardMaterial({ color: '#232733', roughness: 0.75, metalness: 0.25 }));
   const roofMat = track(new THREE.MeshStandardMaterial({ color: '#0e1018', roughness: 0.9, metalness: 0.1 }));
   const ironMat = track(new THREE.MeshStandardMaterial({ color: '#0c0e14', roughness: 0.55, metalness: 0.85 }));
@@ -564,6 +575,12 @@ export function buildCity({ renderer, scene, high, look }: { renderer: THREE.Web
   if (acs.length) instanced(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), track(new THREE.MeshStandardMaterial({ color: '#4a505e', roughness: 0.65, metalness: 0.4 })), acs);
   if (ants.length) instanced(new THREE.CylinderGeometry(0.05, 0.1, 1, 5), track(new THREE.MeshStandardMaterial({ color: '#15171d', roughness: 0.5, metalness: 0.9 })), ants);
 
+  // VexVoid's city keeps TERRORNODE's streets but not its landmarks: whatever these sections add is hidden at the end
+  const hidden: { c0: number; g0: number; c1: number; g1: number }[] = [];
+  const hideStart = () => hidden.push({ c0: group.children.length, g0: glows.length, c1: -1, g1: -1 });
+  const hideEnd = () => { const h = hidden[hidden.length - 1]; h.c1 = group.children.length; h.g1 = glows.length; };
+  if (vexvoid) hideStart();
+
   // ── Blade and flat neon signs: one instanced atlas draw ──
   const sAtlas = signAtlas(S);
   disp.push(sAtlas.texture);
@@ -713,6 +730,8 @@ export function buildCity({ renderer, scene, high, look }: { renderer: THREE.Web
     return new THREE.Mesh(track(mergeAll(parts)), trainWin.material);
   })();
   group.add(trainNose);
+
+  if (vexvoid) hideEnd();
 
   // ── Street furniture: lamps, cables, lanterns, vending machines, barriers, trash ──
   const poleMat = track(new THREE.MeshStandardMaterial({ color: '#1b1e25', roughness: 0.5, metalness: 0.8 }));
@@ -1103,6 +1122,7 @@ export function buildCity({ renderer, scene, high, look }: { renderer: THREE.Web
     group.add(im);
   }
 
+  if (vexvoid) hideStart();
   // ── TERRORNODE HQ tower ──
   const cwT = curtainWall(S);
   disp.push(cwT.map, cwT.em);
@@ -1415,6 +1435,8 @@ export function buildCity({ renderer, scene, high, look }: { renderer: THREE.Web
     }
   };
 
+  if (vexvoid) hideEnd();
+
   // ── Searchlights: crown pair (sweeping) and two street-level pillars, soft volumetric cones ──
   const beams: THREE.Group[] = [];
   const beamMat = track(beamMaterial('#bcd4ff', 0.16, 0.7, true, sh));
@@ -1435,6 +1457,49 @@ export function buildCity({ renderer, scene, high, look }: { renderer: THREE.Web
   if (high) {
     mkBeam(-21, 0.5, -48);
     mkBeam(21, 0.5, -58);
+  }
+
+  if (vexvoid) { beams[0].visible = beams[1].visible = false; redWash.intensity = 0; lobbyLight.intensity = 0; }
+
+  // ── VexVoid's end of the street: a rail bridge over it, a wall closing it, and walls to paint ──
+  const spots: Spot[] = [];
+  const blockers: Blocker[] = [];
+  if (vexvoid) {
+    const wallMat = (w: number, h: number, tint: string) => { const m = track(look.material('concrete_floor_02', [w / 5, h / 5], tint, 0.02)); m.roughness = 0.92; m.envMapIntensity = 0.5; return m; };
+    const slab = (w: number, h: number, d: number, x: number, y: number, z: number, tint = '#55585f') => {
+      const m = new THREE.Mesh(track(new THREE.BoxGeometry(w, h, d)), wallMat(Math.max(w, d), h, tint));
+      m.position.set(x, y, z); m.castShadow = high; m.receiveShadow = true; group.add(m); return m;
+    };
+    const spot = (id: string, w: number, h: number, x: number, y: number, z: number, nx: number, nz: number) => {
+      const mesh = new THREE.Mesh(track(new THREE.PlaneGeometry(w, h)), wallMat(w, h, '#8d9097'));
+      mesh.position.set(x, y, z); mesh.rotation.y = Math.atan2(nx, nz); mesh.receiveShadow = true; group.add(mesh);
+      spots.push({ id, mesh, w, h, center: new THREE.Vector3(x, y, z), normal: new THREE.Vector3(nx, 0, nz) });
+    };
+    // the rail bridge: a deck across the street on four piers, parapets, a lamp under each side
+    const BZ = -62;
+    slab(2 * X0 + 6, 2.2, 8, 0, 8.6, BZ);
+    for (const sx of [-1, 1]) {
+      slab(2 * X0 + 6, 1.1, 0.14, 0, 10.25, BZ + sx * 3.95, '#25272c'); // parapet
+      for (const zz of [BZ - 2.6, BZ + 2.6]) { slab(2.4, 7.5, 2.2, sx * 17.2, 3.75, zz); blockers.push({ x0: sx * 17.2 - 1.3, x1: sx * 17.2 + 1.3, z0: zz - 1.2, z1: zz + 1.2 }); }
+      // the piers' street-facing sides are walls to paint
+      spot(sx < 0 ? 'bridge-left' : 'bridge-right', 4.6, 6.6, sx * (17.2 - 1.22), 3.6, BZ, -sx, 0);
+      const l = new THREE.PointLight('#fff4e0', high ? 38 : 26, 20, 1.7); l.position.set(sx * 8, 7.2, BZ); group.add(l);
+      addGlow(sx * 8, 7.45, BZ, '#fff4e0', 1.2, 0, 2);
+    }
+    // the wall that closes the street: the hall of fame
+    const WZ = -80;
+    slab(2 * X0 + 2, 15, 2.4, 0, 7.5, WZ - 1.2, '#4a4d54');
+    blockers.push({ x0: -X0 - 1, x1: X0 + 1, z0: WZ - 2.4, z1: WZ + 0.3 });
+    spot('hall-of-fame', 30, 9, 0, 4.8, WZ + 0.03, 0, 1);
+    const fl = new THREE.SpotLight('#ffffff', high ? 260 : 160, 46, 0.95, 0.9, 1.2); fl.position.set(0, 14.2, WZ + 9); fl.target.position.set(0, 3, WZ); group.add(fl, fl.target);
+    addGlow(0, 14.2, WZ + 8.6, '#ffffff', 1.8, 0, 1.8);
+    // bare concrete panels on the shopfront pods, a few each side, on the stretch you can walk
+    let n = 0;
+    for (const b of firsts) {
+      if (b.za < -54 || b.za > 0 || b.za - b.zb < 9 || (n++ % 2)) continue;
+      const w = Math.min(10, b.za - b.zb - 3), zc = (b.za + b.zb) / 2;
+      spot(`wall-${b.sx < 0 ? 'l' : 'r'}${Math.round(-zc)}`, w, 3.7, b.sx * (X0 - 0.04), 2.1, zc, -b.sx, 0);
+    }
   }
 
   // ── Mist banks, drifting low across the street ──
@@ -1485,6 +1550,7 @@ export function buildCity({ renderer, scene, high, look }: { renderer: THREE.Web
     group.add(rain);
   }
 
+  if (vexvoid) for (const h of hidden.slice().reverse()) glows.splice(h.g0, h.g1 - h.g0);
   // ── Glow points: everything registered above becomes one Points draw ──
   {
     const n = glows.length;
@@ -1510,6 +1576,8 @@ export function buildCity({ renderer, scene, high, look }: { renderer: THREE.Web
   }
 
   scene.add(group);
+
+  if (vexvoid) for (const h of hidden) for (const o of group.children.slice(h.c0, h.c1)) o.visible = false;
 
   // ── Per-frame ──
   const tmp = new THREE.Vector3();
@@ -1594,6 +1662,8 @@ export function buildCity({ renderer, scene, high, look }: { renderer: THREE.Web
 
   return {
     group,
+    spots,
+    blockers,
     windows,
     wins,
     racks,

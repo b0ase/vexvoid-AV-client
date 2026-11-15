@@ -674,3 +674,49 @@ export function ringTex() {
   );
   return _ring;
 }
+
+/** VexVoid shopfronts (the same 16 x 4.5 m tile as shopTile): roller shutters down, one half up with light under it,
+ *  a steel door in bare concrete. No names, no signs: surfaces to paint. */
+export function shutterTile(seed: number, S = 1) {
+  const W = Math.round(1024 * S);
+  const H = Math.round(288 * S);
+  const r = rng(seed);
+  const bays = Array.from({ length: 4 }, () => { const k = r(); return { kind: k < 0.5 ? 'shutter' : k < 0.72 ? 'half' : k < 0.88 ? 'door' : 'blank', tone: 26 + Math.floor(r() * 18), grime: r() }; });
+  const draw = (g: CanvasRenderingContext2D, em: boolean) => {
+    g.fillStyle = em ? '#000' : '#1c1d21';
+    g.fillRect(0, 0, W, H);
+    const sw = W / 4;
+    bays.forEach((b, i) => {
+      const x = i * sw, pad = sw * 0.06;
+      if (em) {
+        // the only light: under a half-open shutter, and a caged bulb over a door
+        if (b.kind === 'half') { const gr = g.createLinearGradient(0, H * 0.72, 0, H); gr.addColorStop(0, 'rgba(255,240,215,0.15)'); gr.addColorStop(1, 'rgba(255,240,215,0.9)'); g.fillStyle = gr; g.fillRect(x + pad, H * 0.72, sw - pad * 2, H * 0.28); }
+        if (b.kind === 'door') { g.fillStyle = '#fff'; g.fillRect(x + sw * 0.47, H * 0.08, sw * 0.06, H * 0.05); }
+        return;
+      }
+      const c = b.tone;
+      g.fillStyle = `rgb(${c},${c},${c + 3})`;
+      g.fillRect(x + 2, 0, sw - 4, H);
+      if (b.kind === 'shutter' || b.kind === 'half') {
+        const top = H * 0.12, bot = b.kind === 'half' ? H * 0.72 : H;
+        g.fillStyle = '#0e0f12'; g.fillRect(x + pad - 4, top - 6, sw - pad * 2 + 8, 8); // the shutter box
+        for (let y = top; y < bot; y += 7 * S) { // the slats
+          g.fillStyle = `rgb(${c + 22},${c + 22},${c + 24})`; g.fillRect(x + pad, y, sw - pad * 2, 4 * S);
+          g.fillStyle = `rgb(${c + 6},${c + 6},${c + 8})`; g.fillRect(x + pad, y + 4 * S, sw - pad * 2, 3 * S);
+        }
+        g.fillStyle = '#08090b'; g.fillRect(x + pad, bot - 3, sw - pad * 2, 3);
+        if (b.kind === 'half') { g.fillStyle = '#2b2620'; g.fillRect(x + pad, bot, sw - pad * 2, H - bot); }
+        else { g.fillStyle = '#0a0a0c'; g.fillRect(x + sw * 0.48, bot - 16, 10, 12); } // a padlock
+      } else if (b.kind === 'door') {
+        g.fillStyle = '#121316'; g.fillRect(x + sw * 0.36, H * 0.18, sw * 0.28, H * 0.82);
+        g.strokeStyle = '#2c2e33'; g.lineWidth = 2; g.strokeRect(x + sw * 0.38, H * 0.22, sw * 0.24, H * 0.36); g.strokeRect(x + sw * 0.38, H * 0.62, sw * 0.24, H * 0.32);
+      }
+      // grime: soot streaks from the top, splash from the ground
+      const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, `rgba(0,0,0,${0.25 + b.grime * 0.3})`); gr.addColorStop(0.3, 'rgba(0,0,0,0)'); gr.addColorStop(0.85, 'rgba(0,0,0,0)'); gr.addColorStop(1, `rgba(0,0,0,${0.35 + b.grime * 0.3})`);
+      g.fillStyle = gr; g.fillRect(x, 0, sw, H);
+      for (let k = 0; k < 6; k++) { g.fillStyle = `rgba(0,0,0,${0.05 + r() * 0.12})`; g.fillRect(x + r() * sw, 0, 1 + r() * 3, H * (0.2 + r() * 0.6)); }
+      g.fillStyle = '#060607'; g.fillRect(x, 0, 3, H); // the pier between bays
+    });
+  };
+  return { map: tex(canvas(W, H, (g) => draw(g, false)), { repeat: true }), em: tex(canvas(W, H, (g) => draw(g, true)), { repeat: true }) };
+}

@@ -5,7 +5,8 @@
  *   const g = await VXGAME.mount(host, { base: 'vx/game/', high: true, onStatus })
  *   g.stop();  g.canvas  (to record)
  *
- * Stage 1: walk the street (WASD or arrows, Shift runs, drag to look). The writer, the paint and the cops come next.
+ * Stage 1: walk VexVoid's street (WASD or arrows, Shift runs, drag to look) to the bridge and the wall at its end;
+ * city.spots are the walls to paint. The writer, the paint and the cops come next.
  * Built by scripts/build-game.sh into vx/game/vexvoid-game.js (window.VXGAME).
  */
 import * as THREE from 'three';
@@ -18,12 +19,12 @@ import { buildCity, EYE } from './city';
 import { loadLook, makeGradePass } from './look';
 
 export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) => void };
-export type Game = { canvas: HTMLCanvasElement; stop: () => void; where: () => { x: number; z: number; yaw: number } };
+export type Game = { canvas: HTMLCanvasElement; stop: () => void; where: () => { x: number; z: number; yaw: number }; spots: () => { id: string; w: number; h: number; x: number; y: number; z: number }[]; goto: (x: number, z: number, yaw?: number, pitch?: number) => void };
 
 // VexVoid's grade: no colour at all, hard contrast, a heavy vignette
 const MONO = { shadow: [1, 1, 1] as [number, number, number], high: [1, 1, 1] as [number, number, number], sat: 0, contrast: 1.32, vignette: 0.72 };
 // where you can walk: the road and both pavements, short of the tower
-const BOUNDS = { x: 25.5, z0: -58, z1: 24 };
+const BOUNDS = { x: 25.5, z0: -79, z1: 24 };
 
 export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const high = opts.high !== false;
@@ -43,7 +44,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const scene = new THREE.Scene();
   const cam = new THREE.PerspectiveCamera(62, 16 / 9, 0.05, 900);
   const look = await loadLook(r, opts.base + 'tex/');
-  const city = buildCity({ renderer: r, scene, high, look });
+  const city = buildCity({ renderer: r, scene, high, look, vexvoid: true });
   scene.add(city.group);
 
   const size = () => { const b = host.getBoundingClientRect(); return { w: Math.max(2, Math.round(b.width)), h: Math.max(2, Math.round(b.height)) }; };
@@ -117,6 +118,14 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       const k = run * dt / Math.hypot(ax, az);
       me.x = Math.max(-BOUNDS.x, Math.min(BOUNDS.x, me.x + (fwd.x * az + side.x * ax) * k));
       me.z = Math.max(BOUNDS.z0, Math.min(BOUNDS.z1, me.z + (fwd.z * az + side.z * ax) * k));
+      // push out of piers and walls (a body 0.35 m round)
+      for (const b of city.blockers) {
+        const x0 = b.x0 - 0.35, x1 = b.x1 + 0.35, z0 = b.z0 - 0.35, z1 = b.z1 + 0.35;
+        if (me.x > x0 && me.x < x1 && me.z > z0 && me.z < z1) {
+          const d = [me.x - x0, x1 - me.x, me.z - z0, z1 - me.z], m = Math.min(...d);
+          if (m === d[0]) me.x = x0; else if (m === d[1]) me.x = x1; else if (m === d[2]) me.z = z0; else me.z = z1;
+        }
+      }
       me.bob += dt * (run > 4 ? 13 : 8.5);
     }
     cam.position.set(me.x, EYE + Math.sin(me.bob) * (ax || az ? 0.035 : 0), me.z);
@@ -132,6 +141,8 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   return {
     canvas,
     where: () => ({ x: me.x, z: me.z, yaw: me.yaw }),
+    spots: () => city.spots.map((s) => ({ id: s.id, w: s.w, h: s.h, x: s.center.x, y: s.center.y, z: s.center.z })),
+    goto: (x, z, yaw, pitch) => { me.x = x; me.z = z; if (yaw != null) me.yaw = yaw; if (pitch != null) me.pitch = pitch; },
     stop: () => {
       stopped = true; cancelAnimationFrame(raf); ro.disconnect();
       canvas.removeEventListener('keydown', kd); canvas.removeEventListener('keyup', ku);
