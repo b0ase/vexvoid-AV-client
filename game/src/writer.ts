@@ -25,16 +25,18 @@ const HEIGHT = 1.78;
 
 // the game's own materials for the model's named slots
 const LOOK: Record<string, () => THREE.Material> = {
-  Hoodie: () => new THREE.MeshStandardMaterial({ color: '#45464c', roughness: 0.86, metalness: 0 }),
-  Trousers: () => new THREE.MeshStandardMaterial({ color: '#5a5b61', roughness: 0.8, metalness: 0 }),
+  // cotton and canvas: a soft sheen at grazing angles, the thing that makes cloth read as cloth
+  Hoodie: () => new THREE.MeshPhysicalMaterial({ color: '#45464c', roughness: 0.88, metalness: 0, sheen: 0.6, sheenRoughness: 0.6, sheenColor: new THREE.Color('#8a8a90') }),
+  Trousers: () => new THREE.MeshPhysicalMaterial({ color: '#56575d', roughness: 0.82, metalness: 0, sheen: 0.5, sheenRoughness: 0.65, sheenColor: new THREE.Color('#7c7c82') }),
   Gloves: () => new THREE.MeshStandardMaterial({ color: '#6a6a6e', roughness: 0.65, metalness: 0 }),
   Trim: () => new THREE.MeshStandardMaterial({ color: '#2e2f34', roughness: 0.9, metalness: 0 }),
   Shoes: () => new THREE.MeshStandardMaterial({ color: '#f4f4f4', roughness: 0.4, metalness: 0, emissive: '#202020' }),
   Sole: () => new THREE.MeshStandardMaterial({ color: '#8c8c8e', roughness: 0.6, metalness: 0 }),
   Void: () => new THREE.MeshBasicMaterial({ color: '#000000' }),
-  Mask: () => new THREE.MeshStandardMaterial({ color: '#232326', roughness: 0.95, metalness: 0 }),
+  // the bandana is near-black: inside the hood there is only darkness (no faces, not even the suggestion of one)
+  Mask: () => new THREE.MeshPhysicalMaterial({ color: '#0b0b0d', roughness: 0.95, metalness: 0, sheen: 0.25, sheenRoughness: 0.8, sheenColor: new THREE.Color('#2a2a2e') }),
   Pack: () => new THREE.MeshStandardMaterial({ color: '#36373c', roughness: 0.5, metalness: 0.05 }), // nylon, a little sheen
-  Can: () => new THREE.MeshStandardMaterial({ color: '#d6d6da', roughness: 0.28, metalness: 0.85 }),
+  Can: () => new THREE.MeshStandardMaterial({ color: '#b8b8bc', roughness: 0.35, metalness: 0.8 }),
   Cap: () => new THREE.MeshStandardMaterial({ color: '#f2f2f2', roughness: 0.5, metalness: 0 }),
 };
 

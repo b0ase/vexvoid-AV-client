@@ -15,6 +15,7 @@ Materials are named for the game (Hoodie, Trousers, Gloves, Shoes, Sole, Void, T
 Improve the character here: change a radius, a shape, a detail, rerun, rebuild the game.
 """
 import bpy, bmesh, sys, math
+from mathutils.bvhtree import BVHTree
 from mathutils import Vector, Matrix
 
 argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
@@ -73,38 +74,101 @@ chain += [head, top]
 edges += list(zip(chain[:-1], chain[1:]))
 for s in ('Left', 'Right'):
     a = chain[3]
-    for n, r in [('Shoulder', m(0.078)), ('Arm', m(0.066)), ('ForeArm', m(0.057)), ('Hand', m(0.042))]:
+    # the arm starts halfway along the shoulder bone: a joint inside the chest folds the hull over into a flap
+    b = P(s + 'Shoulder', J[s + 'Shoulder'].lerp(J[s + 'Arm'], 0.55), (m(0.074), m(0.074))); edges.append((a, b)); a = b
+    for n, r in [('Arm', m(0.066)), ('ForeArm', m(0.057)), ('Hand', m(0.042))]:
         b = P(s + n, J[s + n], (r, r)); edges.append((a, b)); a = b
     d = (J[s + 'Hand'] - J[s + 'ForeArm']).normalized()
     # the palm faces the body, so the fingers fan out front to back and the thumb points forward
     side = fwd - d * fwd.dot(d); side.normalize()
     palm = P(s + 'Palm', J[s + 'Hand'] + d * m(0.065), (m(0.038), m(0.03))); edges.append((a, palm))
+    inward = Vector((-1 if s == 'Left' else 1, 0, 0)); inward -= d * inward.dot(d); inward.normalize()   # the palm's side
     for k, off in enumerate((-1.5, -0.5, 0.5, 1.5)):
-        base = J[s + 'Hand'] + d * m(0.09) + side * (off * m(0.019))
-        f1 = P(s + f'F{k}a', base, (m(0.0105), m(0.0105))); edges.append((palm, f1))
-        f2 = P(s + f'F{k}b', base + d * m(0.06 - abs(off) * 0.008) - side * m(0.004) * off, (m(0.009), m(0.009))); edges.append((f1, f2))
+        ln = m(0.085 - abs(off) * 0.012)
+        base = J[s + 'Hand'] + d * m(0.088) + side * (off * m(0.023))
+        f1 = P(s + f'F{k}a', base, (m(0.012), m(0.011))); edges.append((palm, f1))                    # the knuckle
+        f2 = P(s + f'F{k}b', base + d * ln * 0.55 + inward * m(0.006) + side * (off * m(0.003)), (m(0.0098), m(0.0098))); edges.append((f1, f2))
+        f3 = P(s + f'F{k}c', base + d * ln + inward * m(0.018) + side * (off * m(0.005)), (m(0.0088), m(0.0088))); edges.append((f2, f3))
     t1 = P(s + 'Th1', J[s + 'Hand'] + d * m(0.035) + side * m(0.035), (m(0.013), m(0.013))); edges.append((a, t1))
-    t2 = P(s + 'Th2', J[s + 'Hand'] + d * m(0.07) + side * m(0.06), (m(0.0105), m(0.0105))); edges.append((t1, t2))
+    t2 = P(s + 'Th2', J[s + 'Hand'] + d * m(0.072) + side * m(0.062) + inward * m(0.01), (m(0.0105), m(0.0105))); edges.append((t1, t2))
     a = hips
     for n, r in [('UpLeg', m(0.09)), ('Leg', m(0.07)), ('Foot', m(0.042))]:
         b = P(s + n, J[s + n], (r, r)); edges.append((a, b)); a = b
     b = P(s + 'ToeBase', J[s + 'ToeBase'] + up * m(0.035), (m(0.028), m(0.022))); edges.append((a, b))  # kept inside the trainer
 me = bpy.data.meshes.new('body'); me.from_pydata([tuple(p) for p in pts], edges, [])
 body = bpy.data.objects.new('SM_Char_Writer_Body', me); bpy.context.collection.objects.link(body)
-sk = body.modifiers.new('skin', 'SKIN'); sk.branch_smoothing = 0.6; sk.use_smooth_shade = True
+sk = body.modifiers.new('skin', 'SKIN'); sk.branch_smoothing = 0.6; sk.use_smooth_shade = True; sk.use_x_symmetry = True  # symmetric hulls at the branches
 for i, r in enumerate(rad): me.skin_vertices[0].data[i].radius = (r[0] * SHRINK, r[1] * SHRINK)
 me.skin_vertices[0].data[hips].use_root = True
 sub = body.modifiers.new('sub', 'SUBSURF'); sub.levels = 2; sub.render_levels = 2
+rlx = body.modifiers.new('relax', 'SMOOTH'); rlx.factor = 0.6; rlx.iterations = 6   # relax the hull's creases before the cloth goes on
 # cloth: soft noise, so the cotton isn't a perfect surface
 tx = bpy.data.textures.new('cloth', 'CLOUDS'); tx.noise_scale = m(0.06); tx.noise_depth = 2
 dp = body.modifiers.new('cloth', 'DISPLACE'); dp.texture = tx; dp.strength = m(0.006); dp.mid_level = 0.5
 apply_all(body); smooth(body)
-add_mat(body, 'Hoodie', 'Trousers', 'Gloves')
+
+# ---- cloth: sculpt the folds into the surface, by where each point sits on the figure ----
+# every vertex finds its nearest bone segment (its limb, how far along, which way round), then moves along its normal
+def ss(a, b, x): t = max(0.0, min(1.0, (x - a) / (b - a))); return t * t * (3 - 2 * t)
+SEGS = [('torso', 'Hips', 'Spine'), ('torso', 'Spine', 'Spine1'), ('torso', 'Spine1', 'Spine2'), ('torso', 'Spine2', 'Neck')]
+for s_ in ('Left', 'Right'):
+    SEGS += [('shoulder', s_ + 'Shoulder', s_ + 'Arm'), ('upper', s_ + 'Arm', s_ + 'ForeArm'), ('fore', s_ + 'ForeArm', s_ + 'Hand'),
+             ('thigh', s_ + 'UpLeg', s_ + 'Leg'), ('shin', s_ + 'Leg', s_ + 'Foot'), ('foot', s_ + 'Foot', s_ + 'ToeBase')]
+def cloth_offset(co, n):
+    best = None
+    for kind, A, B in SEGS:
+        a, b = J[A], J[B]; ab = b - a; L = ab.length; t = max(0.0, min(1.0, (co - a).dot(ab) / (L * L)))
+        d = (co - (a + ab * t)).length
+        if best is None or d < best[0]: best = (d, kind, a, b, t, L)
+    d, kind, a, b, t, L = best
+    ax = (b - a).normalized(); ref = fwd - ax * fwd.dot(ax)
+    if ref.length < 1e-6: ref = up - ax * up.dot(ax)
+    ref.normalize(); r = co - (a + (b - a) * t); r -= ax * r.dot(ax)
+    ang = math.atan2(r.dot(ax.cross(ref)), r.dot(ref)) if r.length > 1e-9 else 0.0
+    front = r.normalized().dot(fwd) if r.length > 1e-9 else 0.0
+    along = t * L / m(1.0)   # metres along the limb
+    off = 0.0
+    if kind == 'upper':
+        off += 0.006 * math.sin(math.pi * t)                                                     # a loose sleeve
+        e = ss(0.6, 1.0, t)                                                                      # creases into the elbow, deeper inside it
+        off += 0.006 * e * math.sin(along / 0.032 * 2 * math.pi + ang * 1.3) * (1 + max(0.0, front))
+    elif kind == 'fore':
+        off += 0.006 * (1 - ss(0.0, 0.35, t)) * math.sin(along / 0.03 * 2 * math.pi + ang * 1.3) * (1 + max(0.0, front))
+        g = ss(0.55, 0.88, t)                                                                    # the sleeve gathers above the cuff
+        off += g * (0.007 + 0.007 * math.sin(along / 0.026 * 2 * math.pi + ang * 0.8))
+    elif kind == 'shoulder':
+        off += 0.006 * math.sin(math.pi * t)
+    elif kind == 'torso':
+        z = co.z
+        drop = ss(J['Spine2'].z, J['Spine'].z, z)                                                # folds hang from the chest, fuller lower down
+        off += 0.004 * drop * math.sin(ang * 6 + 1.7 * math.sin(z / m(0.05)))
+        bel = math.exp(-((z - (J['Spine'].z + J['Spine1'].z) / 2) / m(0.09)) ** 2)               # the belly of the hoodie
+        off += 0.01 * bel * max(0.0, front) ** 1.5
+        off += 0.012 * math.exp(-((z - J['Spine2'].z) / m(0.06)) ** 2) * (1 - abs(front)) ** 2  # shoulders and chest breadth
+        off += 0.012 * ss(hem + m(0.06), hem, z)                                                 # the hem flares
+    elif kind == 'thigh':
+        off += 0.004 * math.sin(ang * 4 + along * 6) * ss(0.2, 0.5, t) * (1 - ss(0.75, 0.95, t))
+        k = ss(0.7, 1.0, t)                                                                      # knee creases, deeper behind
+        off += 0.006 * k * math.sin(along / 0.03 * 2 * math.pi + ang) * (1 + max(0.0, -front))
+    elif kind == 'shin':
+        off += 0.005 * (1 - ss(0.0, 0.25, t)) * math.sin(along / 0.03 * 2 * math.pi + ang) * (1 + max(0.0, -front))
+        g = ss(0.45, 0.78, t) * (1 - ss(0.86, 0.97, t))                                          # trousers stack above the trainers
+        off += g * (0.01 + 0.011 * math.sin(along / 0.034 * 2 * math.pi + ang * 0.9))
+    elif kind == 'foot':
+        off -= 0.012                                                                             # the foot stays inside the trainer
+    if n.z < -0.5: off *= 0.15   # undersides (the crotch, under the arms) stay put
+    return n * m(off)
 hem = J['Hips'].z - m(0.09)
+bm = bmesh.new(); bm.from_mesh(body.data); bm.normal_update()
+moves = [cloth_offset(v.co, v.normal) for v in bm.verts]
+for v, dv in zip(bm.verts, moves): v.co += dv
+bm.to_mesh(body.data); bm.free(); body.data.update()
+add_mat(body, 'Hoodie', 'Trousers', 'Gloves', 'Void')
 for p in body.data.polygons:
     c = p.center
     near_hand = min((c - J['LeftHand']).length, (c - J['RightHand']).length) < m(0.135) and c.z < J['Spine2'].z - m(0.1)
-    p.material_index = 2 if near_hand else (0 if c.z > hem else 1)
+    # the figure's own head is black: inside the hood there is only darkness (no faces)
+    p.material_index = 3 if c.z > J['Neck'].z + m(0.045) else 2 if near_hand else (0 if c.z > hem + m(0.012) else 1)
 
 parts = []
 # ---- rib bands and the pocket, fitted onto the body (shrinkwrap), so they sit on it instead of floating ----
@@ -166,40 +230,26 @@ for s in (-1, 1):
     bmesh.ops.transform(bm, matrix=Matrix.Translation((a + b) / 2) @ rot, verts=bm.verts)
     st = obj_from(bm, 'SM_Char_Writer_String'); smooth(st); add_mat(st, 'Trim'); parts.append((st, 'Spine2'))
 
-# a bandana over the lower face, a point at the chin
-bm = bmesh.new(); bmesh.ops.create_uvsphere(bm, u_segments=28, v_segments=18, radius=1.0)
-bmesh.ops.delete(bm, geom=[v for v in bm.verts if not (v.co.y < -0.25 and v.co.z < 0.08)], context='VERTS')
-for v in bm.verts:
-    if v.co.z < -0.3: v.co.z -= 0.35 * (1 - min(1.0, abs(v.co.x) * 2.2)) * (-v.co.z - 0.3) * 2
-    v.co = Vector((v.co.x * m(0.108), v.co.y * m(0.122), v.co.z * m(0.12)))
+# a bandana over the lower face, a point at the chin: a clean patch laid onto an ellipsoid (a sphere cut leaves a jagged
+# edge that reads like teeth inside the hood, and this game has no faces)
+bm = bmesh.new(); NU, NV = 24, 12; grid = []
+for j in range(NV + 1):
+    row = []
+    for i in range(NU + 1):
+        u = -1.0 + 2.0 * i / NU                                   # across the face
+        top = 0.02 - 0.08 * u * u                                 # the upper edge dips gently toward the cheeks
+        bot = -0.62 - 0.32 * max(0.0, 1 - abs(u) * 1.6)           # the point at the chin
+        v = top + (bot - top) * j / NV
+        az = u * 0.95; el = v * 1.35
+        x, y, z = math.sin(az) * math.cos(el), -math.cos(az) * math.cos(el), math.sin(el)
+        row.append(bm.verts.new((x * m(0.108), y * m(0.122), z * m(0.12))))
+    grid.append(row)
+for j in range(NV):
+    for i in range(NU): bm.faces.new((grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]))
+bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
 bmesh.ops.translate(bm, vec=hc + Vector((0, -m(0.004), -m(0.02))), verts=bm.verts)
 mk = obj_from(bm, 'SM_Char_Writer_Mask'); sol = mk.modifiers.new('sol', 'SOLIDIFY'); sol.thickness = m(0.006)
 s6 = mk.modifiers.new('sub', 'SUBSURF'); s6.levels = 1; apply_all(mk); smooth(mk); add_mat(mk, 'Mask'); parts.append((mk, 'Head'))
-
-# baggy fit: trousers stack over the trainers, sleeves bunch above the cuffs
-def fold(center, normal, r, name, bone, material, depth=0.045, puff=0.014):
-    # a soft roll of cloth: a short sleeve fitted to the body, fattest in its middle
-    bm = bmesh.new(); bmesh.ops.create_cone(bm, cap_ends=False, segments=32, radius1=r, radius2=r, depth=m(depth))
-    bmesh.ops.subdivide_edges(bm, edges=[e for e in bm.edges if abs(e.verts[0].co.z - e.verts[1].co.z) > 1e-6], cuts=4)
-    rot = Vector((0, 0, 1)).rotation_difference(normal).to_matrix().to_4x4()
-    bmesh.ops.transform(bm, matrix=Matrix.Translation(center) @ rot, verts=bm.verts)
-    o = obj_from(bm, name)
-    sw = o.modifiers.new('fit', 'SHRINKWRAP'); sw.target = body; sw.wrap_method = 'NEAREST_SURFACEPOINT'; sw.offset = m(0.002)
-    apply_all(o)
-    # push each ring out by a bump across its height, so it rolls instead of standing proud like a hoop
-    me2 = o.data; zs = [normal.dot(v.co - center) for v in me2.vertices]; lo, hi = min(zs), max(zs)
-    for v, z in zip(me2.vertices, zs):
-        k = math.sin(math.pi * (z - lo) / max(1e-9, hi - lo)); out = (v.co - center); out -= normal * normal.dot(out)
-        if out.length > 1e-9: v.co += out.normalized() * m(puff) * k
-    sol = o.modifiers.new('sol', 'SOLIDIFY'); sol.thickness = m(0.006); sol.offset = -1
-    s7 = o.modifiers.new('sub', 'SUBSURF'); s7.levels = 1; apply_all(o); smooth(o); add_mat(o, material); parts.append((o, bone))
-for s in ('Left', 'Right'):
-    lg = (J[s + 'Foot'] - J[s + 'Leg']).normalized()
-    for k, h in enumerate((0.085, 0.15)):
-        tilt = (lg + Vector((0.14 * (1 if k else -1), 0.12 * (1 if k else -1), 0))).normalized()
-        fold(J[s + 'Foot'] - lg * m(h), tilt, m(0.08), f'SM_Char_Writer_Stack{s}{k}', s + 'Leg', 'Trousers', 0.05, 0.016)
-    d = (J[s + 'Hand'] - J[s + 'ForeArm']).normalized()
-    fold(J[s + 'Hand'] - d * m(0.12), (d + Vector((0.12, 0.1, 0))).normalized(), m(0.066), f'SM_Char_Writer_Bunch{s}', s + 'ForeArm', 'Hoodie', 0.05, 0.012)
 
 # the writer's backpack: a rounded pack on the back, straps over the shoulders, cans out of the top
 back = Vector((0, 1, 0))
@@ -220,17 +270,27 @@ s9 = pp.modifiers.new('sub', 'SUBSURF'); s9.levels = 1; apply_all(pp); smooth(pp
 for sx in (-1, 1):
     sh = J['LeftArm' if sx > 0 else 'RightArm']
     # a flat strap from the top of the pack, over the shoulder, down the chest to under the arm
-    pts3 = [pcen + Vector((sx * m(0.08), -m(0.06), m(0.18))), Vector((sx * m(0.1), J['Spine2'].y + m(0.05), sh.z + m(0.055))),
-            Vector((sx * m(0.11), J['Spine2'].y - m(0.12), sh.z - m(0.03))), Vector((sx * m(0.13), J['Spine2'].y - m(0.13), J['Spine2'].z - m(0.12))),
-            Vector((sx * m(0.17), J['Spine1'].y - m(0.06), J['Spine1'].z))]
-    cu = bpy.data.curves.new('strap', 'CURVE'); cu.dimensions = '3D'; cu.extrude = m(0.022); cu.bevel_depth = m(0.004); cu.bevel_resolution = 1; cu.resolution_u = 10
-    cu.twist_mode = 'MINIMUM'
+    pts3 = [pcen + Vector((sx * m(0.08), -m(0.05), m(0.19))), Vector((sx * m(0.1), J['Spine2'].y + m(0.1), sh.z + m(0.07))),
+            Vector((sx * m(0.105), J['Spine2'].y - m(0.02), sh.z + m(0.085))), Vector((sx * m(0.11), J['Spine2'].y - m(0.165), sh.z - m(0.02))),
+            Vector((sx * m(0.125), J['Spine2'].y - m(0.175), J['Spine2'].z - m(0.12)))]
+    # densify the route and lay every point onto the body, just off its surface
+    tree = BVHTree.FromObject(body, bpy.context.evaluated_depsgraph_get())
+    dense = []
+    for i2 in range(len(pts3) - 1):
+        for k in range(6): dense.append(pts3[i2].lerp(pts3[i2 + 1], k / 6))
+    dense.append(pts3[-1])
+    laid = [dense[0]]
+    for q in dense[1:]:
+        loc, nrm, _, _ = tree.find_nearest(q)
+        laid.append(loc + nrm * m(0.016) if loc is not None and (loc - q).length < m(0.12) else q)
+    pts3 = laid
+    cu = bpy.data.curves.new('strap', 'CURVE'); cu.dimensions = '3D'; cu.bevel_depth = m(0.012); cu.bevel_resolution = 2; cu.resolution_u = 10
     sp = cu.splines.new('NURBS'); sp.points.add(len(pts3) - 1); sp.use_endpoint_u = True; sp.order_u = 3
     for i2, q in enumerate(pts3): sp.points[i2].co = (q.x, q.y, q.z, 1)
     co = bpy.data.objects.new('strap', cu); bpy.context.collection.objects.link(co)
     bpy.context.view_layer.objects.active = co; co.select_set(True); bpy.ops.object.convert(target='MESH'); co.select_set(False)
     co.scale = (1.0, 1.0, 1.0); co.data.transform(Matrix.Scale(1, 4))
-    co = fit(co, m(0.012)); apply_all(co); smooth(co); add_mat(co, 'Pack'); co.name = 'SM_Char_Writer_Strap'; parts.append((co, 'Spine2'))
+    apply_all(co); smooth(co); add_mat(co, 'Pack'); co.name = 'SM_Char_Writer_Strap'; parts.append((co, 'Spine2'))
 # three cans out of the top of the pack, caps on
 for k, (ox, tl) in enumerate(((-0.08, -12), (0.0, 4), (0.075, 15))):
     base = pcen + Vector((m(ox), m(0.01), m(0.17)))
@@ -242,39 +302,44 @@ for k, (ox, tl) in enumerate(((-0.08, -12), (0.0, 4), (0.075, 15))):
         cn = obj_from(bm, f'SM_Char_Writer_{kind}{k}'); bv = cn.modifiers.new('bev', 'BEVEL'); bv.width = m(0.006); bv.segments = 2
         apply_all(cn); smooth(cn); add_mat(cn, kind); parts.append((cn, 'Spine2'))
 
-# ---- trainers: a chunky white upper on a darker sole, along each foot ----
+# ---- trainers: built from a side profile (heel collar, tongue, toe box with spring) on a separate midsole ----
+def prism(profile, width, name, material, bone, taper, at, yaw, bevel):
+    bm = bmesh.new()
+    vs = [bm.verts.new((-width / 2, y, z)) for y, z in profile]
+    face = bm.faces.new(vs)
+    ext = bmesh.ops.extrude_face_region(bm, geom=[face])
+    bmesh.ops.translate(bm, vec=(width, 0, 0), verts=[e for e in ext['geom'] if isinstance(e, bmesh.types.BMVert)])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    ys = [y for y, z in profile]; y0, y1 = min(ys), max(ys)
+    for v in bm.verts: v.co.x *= taper((y1 - v.co.y) / (y1 - y0))   # 0 at the heel, 1 at the toe
+    bmesh.ops.rotate(bm, verts=bm.verts, cent=Vector(), matrix=Matrix.Rotation(yaw, 3, 'Z'))
+    bmesh.ops.translate(bm, vec=at, verts=bm.verts)
+    o = obj_from(bm, name)
+    bv = o.modifiers.new('bev', 'BEVEL'); bv.width = bevel; bv.segments = 4; bv.limit_method = 'ANGLE'
+    s5 = o.modifiers.new('sub', 'SUBSURF'); s5.levels = 2
+    apply_all(o); smooth(o); add_mat(o, material); parts.append((o, bone)); return o
 for s in ('Left', 'Right'):
     f, t = J[s + 'Foot'], J[s + 'ToeBase']
     d = (t - f); d.z = 0; flat = d.length; d.normalize()
-    L, W = flat + m(0.17), m(0.115)
+    L, W = flat + m(0.17), m(0.108)
     c = Vector(((f.x + t.x) / 2, (f.y + t.y) / 2, foot)) + d * m(0.035)
     yaw = math.atan2(d.x, -d.y)
-    ankle = max(m(0.1), f.z - foot + m(0.02))
-    for kind, h, z0, wk in [('Shoes', min(ankle - m(0.02), m(0.095)), m(0.03), 1.0), ('Sole', m(0.035), 0.0, 1.07)]:
-        bm = bmesh.new(); bmesh.ops.create_cube(bm, size=1.0)
-        bmesh.ops.scale(bm, vec=(W * wk, L * wk, h), verts=bm.verts)
-        for v in bm.verts:   # a rounder, narrower toe; the toe box lower than the heel collar
-            f2 = -v.co.y / (L * 0.5 * wk)            # 1 at the toe, -1 at the heel
-            if f2 > 0: v.co.x *= 1 - 0.18 * f2
-            if v.co.z > 0 and kind == 'Shoes': v.co.z -= h * 0.42 * max(0.0, f2 + 0.1)
-        bmesh.ops.translate(bm, vec=Vector((0, 0, z0 + h / 2)), verts=bm.verts)
-        bmesh.ops.rotate(bm, verts=bm.verts, cent=Vector((0, 0, 0)), matrix=Matrix.Rotation(yaw, 3, 'Z'))  # local -Y (the toe) along the foot
-        bmesh.ops.translate(bm, vec=c, verts=bm.verts)
-        sh = obj_from(bm, 'SM_Char_Writer_' + kind + s)
-        bv = sh.modifiers.new('bev', 'BEVEL'); bv.width = m(0.02 if kind == 'Shoes' else 0.008); bv.segments = 3
-        s5 = sh.modifiers.new('sub', 'SUBSURF'); s5.levels = 2
-        apply_all(sh); smooth(sh); add_mat(sh, kind); parts.append((sh, s + 'Foot'))
-    # laces across the instep, a padded collar round the ankle
-    top = c + Vector((0, 0, m(0.03) + min(ankle - m(0.02), m(0.095))))
+    h = L / 2   # local y: +h at the heel, -h at the toe (the toe is local -Y)
+    # the shape of a trainer: wide at the ball of the foot, narrow at the heel, round at the toe
+    def shape(u): return (0.82 + 0.26 * math.sin(math.pi * min(1.0, u * 1.35))) * (1 - 0.35 * ss(0.8, 1.0, u))
+    mid = [(h + m(0.006), 0), (h + m(0.008), m(0.036)), (-h * 0.2, m(0.03)), (-h + m(0.004), m(0.026)), (-h - m(0.004), m(0.016)), (-h + m(0.02), 0)]
+    prism(mid, W * 1.08, 'SM_Char_Writer_Sole' + s, 'Sole', s + 'Foot', shape, c, yaw, m(0.008))
+    up_z = m(0.03)
+    upper = [(h - m(0.004), up_z), (h + m(0.002), up_z + m(0.045)), (h - m(0.012), up_z + m(0.078)), (h - m(0.055), up_z + m(0.062)),
+             (h * 0.05, up_z + m(0.088)), (-h * 0.25, up_z + m(0.066)), (-h * 0.6, up_z + m(0.046)), (-h + m(0.015), up_z + m(0.03)), (-h + m(0.004), up_z + m(0.004))]
+    prism(upper, W, 'SM_Char_Writer_Shoes' + s, 'Shoes', s + 'Foot', lambda u: shape(u) * 0.98, c, yaw, m(0.016))
+    # laces down the tongue
     for k in range(4):
-        q = top + d * m(0.02 + k * 0.03) - Vector((0, 0, m(0.012) + k * m(0.009)))
-        bm = bmesh.new(); bmesh.ops.create_cone(bm, cap_ends=True, segments=8, radius1=m(0.005), radius2=m(0.005), depth=m(0.06))
-        rt = Matrix.Rotation(math.radians(90), 4, 'Y'); bmesh.ops.transform(bm, matrix=Matrix.Translation(q) @ Matrix.Rotation(yaw, 4, 'Z') @ rt, verts=bm.verts)
+        yy = h * 0.05 - k * m(0.028); zz = up_z + m(0.088) - k * m(0.008)
+        q = c + Matrix.Rotation(yaw, 3, 'Z') @ Vector((0, yy, zz))
+        bm = bmesh.new(); bmesh.ops.create_cone(bm, cap_ends=True, segments=8, radius1=m(0.0045), radius2=m(0.0045), depth=W * 0.55)
+        bmesh.ops.transform(bm, matrix=Matrix.Translation(q) @ Matrix.Rotation(yaw, 4, 'Z') @ Matrix.Rotation(math.radians(90), 4, 'Y'), verts=bm.verts)
         la = obj_from(bm, f'SM_Char_Writer_Lace{s}{k}'); smooth(la); add_mat(la, 'Trim'); parts.append((la, s + 'Foot'))
-    bm = bmesh.new(); bmesh.ops.create_cone(bm, cap_ends=False, segments=24, radius1=m(0.058), radius2=m(0.052), depth=m(0.03))
-    bmesh.ops.transform(bm, matrix=Matrix.Translation(Vector((f.x, f.y, top.z - m(0.005))) - d * m(0.025)), verts=bm.verts)
-    cl = obj_from(bm, f'SM_Char_Writer_Collar{s}'); sol = cl.modifiers.new('sol', 'SOLIDIFY'); sol.thickness = m(0.014)
-    s10 = cl.modifiers.new('sub', 'SUBSURF'); s10.levels = 1; apply_all(cl); smooth(cl); add_mat(cl, 'Shoes'); parts.append((cl, s + 'Foot'))
 
 # ---- the rig: bones of the game's names at the same joints ----
 arm_d = bpy.data.armatures.new('ARM_Writer'); arm = bpy.data.objects.new('ARM_Writer', arm_d)
@@ -303,7 +368,13 @@ for o, bone in parts:
     md = o.modifiers.new('arm', 'ARMATURE'); md.object = arm
     g = o.vertex_groups.new(name=NAMES[bone]); g.add(list(range(len(o.data.vertices))), 1.0, 'REPLACE')
 
-bpy.ops.object.select_all(action='SELECT')
+# export the writer only: its meshes and its rig (the glTF importer can leave helpers behind, e.g. a bone-shape Icosphere)
+bpy.ops.object.select_all(action='DESELECT')
+stray = []
+for o in bpy.data.objects:
+    if o.name.startswith('SM_Char_Writer') or o.name == 'ARM_Writer': o.select_set(True)
+    else: stray.append(o.name)
+if stray: print('WRITER skipped', stray)
 bpy.ops.export_scene.gltf(filepath=OUT, export_format='GLB', use_selection=True, export_animations=False, export_skins=True,
                           export_yup=True, export_materials='EXPORT', export_apply=False)
 tris = sum(len(o.data.polygons) for o in bpy.data.objects if o.type == 'MESH')

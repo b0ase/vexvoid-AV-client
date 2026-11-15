@@ -20,7 +20,7 @@ import { loadLook, makeGradePass } from './look';
 import { loadWriter } from './writer';
 
 export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) => void };
-export type Game = { canvas: HTMLCanvasElement; stop: () => void; where: () => { x: number; z: number; yaw: number; heading: number; anim: string }; spots: () => { id: string; w: number; h: number; x: number; y: number; z: number }[]; goto: (x: number, z: number, yaw?: number, pitch?: number) => void };
+export type Game = { canvas: HTMLCanvasElement; stop: () => void; inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string }) => void; where: () => { x: number; z: number; yaw: number; heading: number; anim: string }; spots: () => { id: string; w: number; h: number; x: number; y: number; z: number }[]; goto: (x: number, z: number, yaw?: number, pitch?: number) => void };
 
 // VexVoid's grade: no colour at all, hard contrast, a heavy vignette
 const MONO = { shadow: [1, 1, 1] as [number, number, number], high: [1, 1, 1] as [number, number, number], sat: 0, contrast: 1.32, vignette: 0.72 };
@@ -51,8 +51,8 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const writer = await loadWriter(opts.base + 'anims/ual.glb', high, opts.base + 'models/writer.glb');
   scene.add(writer.root);
   // a soft light that rides with the writer so the hoodie reads against the dark street
-  const rim = new THREE.PointLight('#ffffff', 26, 7, 1.8);
-  const back = new THREE.PointLight('#ffffff', 14, 5, 1.8); // a kicker behind, to edge the hood and shoulders
+  const rim = new THREE.PointLight('#ffffff', 9, 7, 2);
+  const back = new THREE.PointLight('#ffffff', 6, 5, 2); // a kicker behind, to edge the hood and shoulders
   scene.add(rim, back);
 
   const size = () => { const b = host.getBoundingClientRect(); return { w: Math.max(2, Math.round(b.width)), h: Math.max(2, Math.round(b.height)) }; };
@@ -107,7 +107,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const endDrag = () => { drag = null; canvas.style.cursor = 'grab'; };
   canvas.addEventListener('pointerup', endDrag);
   canvas.addEventListener('pointercancel', endDrag);
-  canvas.addEventListener('wheel', (e) => { e.preventDefault(); camO.dist = Math.max(1.8, Math.min(7, camO.dist * Math.exp(e.deltaY * 0.001))); }, { passive: false });
+  canvas.addEventListener('wheel', (e) => { e.preventDefault(); camO.dist = Math.max(1.2, Math.min(7, camO.dist * Math.exp(e.deltaY * 0.001))); }, { passive: false });
 
   const ro = new ResizeObserver(() => {
     ({ w, h } = size());
@@ -119,7 +119,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const clock = new THREE.Clock();
   let raf = 0, t = 0, stopped = false;
   const fwd = new THREE.Vector3(), side = new THREE.Vector3(), camPos = new THREE.Vector3(0, 2, 12), camLook = new THREE.Vector3();
-  let landT = 0;
+  let landT = 0, forceAnim = '';
   cam.position.copy(camPos);
   const frame = () => {
     if (stopped) return;
@@ -152,6 +152,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       if (me.y <= 0) { me.y = 0; me.vy = 0; me.airborne = false; writer.play('Jump_Land', 0.06, true); landT = 0.28; }
       else if (me.vy < 2.5) writer.play('Jump_Loop', 0.15);
     } else if (landT > 0) landT -= dt;
+    else if (forceAnim) writer.play(forceAnim, 0.2);
     else writer.play(me.crouch ? (moving ? 'Crouch_Fwd_Loop' : 'Crouch_Idle_Loop') : moving ? (sprint ? 'Sprint_Loop' : 'Jog_Fwd_Loop') : 'Idle_Loop', 0.22);
     writer.root.position.set(me.x, me.y, me.z);
     writer.root.rotation.y = me.heading;
@@ -177,6 +178,11 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   return {
     canvas,
     where: () => ({ x: me.x, z: me.z, yaw: camO.yaw, heading: me.heading, anim: writer.playing() }),
+    // look at the writer: camera yaw/pitch/distance, which way they face, a clip to hold (for judging the model)
+    inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string }) => {
+      if (o.yaw != null) camO.yaw = o.yaw; if (o.pitch != null) camO.pitch = o.pitch; if (o.dist != null) camO.dist = o.dist;
+      if (o.heading != null) me.heading = o.heading; forceAnim = o.anim || '';
+    },
     spots: () => city.spots.map((s) => ({ id: s.id, w: s.w, h: s.h, x: s.center.x, y: s.center.y, z: s.center.z })),
     goto: (x, z, yaw, pitch) => { me.x = x; me.z = z; if (yaw != null) { camO.yaw = yaw; me.heading = yaw + Math.PI; } if (pitch != null) camO.pitch = pitch; },
     stop: () => {
