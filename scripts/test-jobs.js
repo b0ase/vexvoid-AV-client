@@ -10,7 +10,7 @@ const mk = (f, s) => J.create(Object.assign({ customer: 'Ana', brief: 'Night dri
 check('defaults: three tiers in dollars, prices not approved, house style on, paymail', () => {
   const s = S();
   assert.deepStrictEqual(s.tiers.map(t => [t.name, t.usd, t.grok, t.changes]), [['EDIT', 10, 0, 0], ['STUDIO', 100, 12, 1], ['DIRECTOR', 300, 24, 2]]);
-  assert.strictEqual(s.pricesApproved, false); assert.strictEqual(s.houseStyleDefault, true); assert.strictEqual(s.payTo, 'vexvoid@bwalletx.com');
+  assert.strictEqual(s.pricesApproved, true); assert.strictEqual(J.settings({ v: 1, pricesApproved: false }).pricesApproved, true); assert.strictEqual(J.settings({ v: 2, pricesApproved: false }).pricesApproved, false); assert.strictEqual(s.houseStyleDefault, true); assert.strictEqual(s.payTo, 'vexvoid@bwalletx.com');
   assert.strictEqual(J.tierPrice(s.tiers[2]), '$300+'); assert.strictEqual(J.usd(12.5), '$12.50'); assert.strictEqual(J.usd(10), '$10');
 });
 check('saved settings are filled out, not replaced', () => {
@@ -96,8 +96,8 @@ check('quote text: dollars first, paymail, terms version', () => {
   assert.ok(t.includes('STUDIO: $100 (US dollars)') && t.includes('vexvoid@bwalletx.com (NPG Ltd)') && t.includes('Terms version 1'));
 });
 check('offer draft: bJobsX fields, every tier priced in dollars, draft marker until approved', () => {
-  const s = S(), t = J.offerText(s);
-  assert.ok(/^\[DRAFT: prices not approved/.test(t));
+  const s = S(); s.pricesApproved = false; const t = J.offerText(s);
+  assert.ok(/^\[DRAFT: prices not approved/.test(t)); assert.ok(!J.offerText(S()).includes('[DRAFT'));
   ['TITLE: ', 'LOCATION: Remote', 'REMOTE: yes', 'SKILLS: ', 'BUDGET: from $10', 'DESCRIPTION:', '- EDIT $10:', '- STUDIO $100:', '- DIRECTOR $300+:', 'vexvoid@bwalletx.com', 'Terms (version 1)']
     .forEach(x => assert.ok(t.includes(x), 'missing ' + x));
   assert.ok(t.split('\n').find(l => l.startsWith('TITLE: ')).length - 7 <= 120);

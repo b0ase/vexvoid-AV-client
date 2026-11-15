@@ -5,7 +5,7 @@
  *
  * Nothing here takes money, posts or lists anything. Payment is marked by hand (mark_paid) once the owner sees it
  * arrive at the paymail. Prices, turnaround, rights and the house-style default are the owner's open decisions: they
- * live in the settings below as defaults, and pricesApproved stays false until the owner ticks it.
+ * live in the settings below as defaults, and pricesApproved says the owner has approved them (ticked 15 Nov 2026).
  *
  *   VXJOBS.defaults()                      fresh settings
  *   VXJOBS.settings(saved)                 saved settings filled out with defaults
@@ -46,11 +46,11 @@
 
   function defaults() {
     return {
-      v: 1,
+      v: 2,
       payTo: 'vexvoid@bwalletx.com',
       payee: 'NPG Ltd',
-      // the owner has not approved these prices yet (VexVoid suggested them, 15 Nov 2026)
-      pricesApproved: false,
+      // VexVoid suggested these prices and the owner approved them (15 Nov 2026)
+      pricesApproved: true,
       houseStyleDefault: true,
       tiers: [
         { id: 'edit', name: 'EDIT', usd: 10, from: false, grok: 0, changes: 0, days: 3,
@@ -68,6 +68,8 @@
   var clone = function (o) { return JSON.parse(JSON.stringify(o)); };
   function settings(saved) {
     var d = defaults(), s = saved && typeof saved === 'object' ? clone(saved) : {};
+    // settings saved before the owner approved the prices (15 Nov 2026) pick the approval up
+    if (s.v === 1) { s.pricesApproved = true; s.v = 2; }
     Object.keys(d).forEach(function (k) { if (s[k] == null) s[k] = d[k]; });
     if (!Array.isArray(s.tiers) || !s.tiers.length) s.tiers = d.tiers;
     if (!s.terms || typeof s.terms.text !== 'string') s.terms = d.terms;
