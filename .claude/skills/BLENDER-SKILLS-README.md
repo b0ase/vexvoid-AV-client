@@ -10,11 +10,15 @@ Skills: blender-director blender-modeler rigging character-artist materials ligh
 ## Install
 Copy .claude/skills/* into the project .claude/skills/ (project level only, never user level: 94 global skills is noise).
 
-## Blender MCP (enable only on the machine that has Blender)
-- Needs uv (brew install uv) and Blender with the BlenderMCP add-on (addon.py from github.com/ahujasid/blender-mcp;
-  take the file from the tag matching the pinned server version).
-- Use blender.mcp.json as the project .mcp.json. It is the upstream config fixed for macOS (upstream uses Windows
-  cmd /c) and PINNED to blender-mcp==2.0.0: upstream runs an unpinned latest, which would run any future release
-  unseen. Bump the pin deliberately after reading the release.
-- The add-on lets the agent run arbitrary Python in Blender with your user permissions. Connect it only while
-  working in Blender, save the .blend first, and never open untrusted .blend files or assets while it is connected.
+## Blender MCP (set up on this Mac 15 Nov 2026)
+- Blender 5.1.1 lives on the external drive: /Volumes/2026/Apps/Blender.app (copy on Seagate/sandisk-2026/Apps). uv via Homebrew.
+- Server: the project was renamed. PyPI blender-mcp stopped at 2.0.0 (Sept), which lacks the 4 Nov fix stopping
+  generation image inputs reading arbitrary files or the local network. Pinned instead: mcp-for-blender==2.2.9
+  (github.com/ahujasid/mcp-for-blender, commit f2f75abd6a). Bump only on purpose, after reading the release.
+- Add-on: addon/mcp_for_blender.py from that same commit (sha256 in addon/SHA256-f2f75abd6a.txt), installed and
+  enabled in Blender's user preferences. In Blender: sidebar (N) > BlenderMCP > Connect to start the listener on :9876.
+- Telemetry is OFF via DISABLE_TELEMETRY / BLENDER_MCP_DISABLE_TELEMETRY / MCP_DISABLE_TELEMETRY (left on, it uploads
+  prompts and executed code). Paid generators in the add-on (Rodin, Tripo, Meshy, World Labs, fal) stay unconfigured.
+- The add-on lets the agent run arbitrary Python in Blender with your user permissions. Connect only while working,
+  save the .blend first, never open untrusted .blend files or assets while it is connected.
+- blender.mcp.json is the project .mcp.json to use.
