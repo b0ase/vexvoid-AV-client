@@ -62,10 +62,22 @@ function tools({ remote = false } = {}) {
 const REMOTE_COMMANDS = ['state', 'fade', 'cut', 'sketches', 'sketch', 'cue', 'knobs', 'mutate', 'evolve', 'clips', 'images', 'load', 'layers', 'layer',
   'remove', 'clear', 'tracks', 'play', 'pause', 'next', 'prev', 'bpm', 'tap', 'audio', 'vx', 'vx-next', 'vx-clean', 'blackout', 'vx-reset', 'snapshot'];
 
-const INSTRUCTIONS = 'Controls the V3XV0ID VJ mixer live. Check mixer_state first; use mixer_snapshot to see the output. The look is strictly monochrome (white on black). Prefer cueing on the hidden deck and crossfading over changing what is on air abruptly.';
+const INSTRUCTIONS = 'Controls the V3XV0ID VJ mixer live. Check mixer_state first; use mixer_snapshot to see the output. The look is strictly monochrome (white on black). Prefer cueing on the hidden deck and crossfading over changing what is on air abruptly. Locally you also have the VexVoid agent\'s own tools (editor for music videos on the EDIT timeline, text_layer, write_sketch, compose_set, record, skill and more): load the relevant skill first (skill music-video before cutting a video), as VexVoid does.';
 
-/** Answer one MCP JSON-RPC message. Returns the response object, or null for notifications. */
-async function handleRpc(msg, toolList, io, serverInfo) {
+// The in-app agent's tools (editor, text_layer, write_sketch, compose_set, load_track, record, skill, library, look,
+// project, generate), read from the running app so MCP always has exactly what VexVoid has. Local only: they can read
+// and write files on this computer, so the claude.ai relay does not offer them.
+async function agentTools(io) {
+  const r = await io.cmd('agent-tools');
+  if (!r || !r.ok || !Array.isArray(r.result)) return [];
+  return r.result.map(t => ({ name: t.name, description: '[VexVoid agent tool] ' + t.description, inputSchema: t.input_schema,
+    run: (a, io2) => io2.cmd('agent', { tool: t.name, input: a }) }));
+}
+
+/** Answer one MCP JSON-RPC message. Returns the response object, or null for notifications.
+ *  toolList is an array, or an async function returning one (the local server adds the agent's tools that way). */
+async function handleRpc(msg, toolListOrFn, io, serverInfo) {
+  const toolList = typeof toolListOrFn === 'function' ? await toolListOrFn() : toolListOrFn;
   const { id, method, params } = msg || {};
   const ok = result => ({ jsonrpc: '2.0', id, result });
   const err = (code, message) => ({ jsonrpc: '2.0', id: id === undefined ? null : id, error: { code, message } });
@@ -80,6 +92,8 @@ async function handleRpc(msg, toolList, io, serverInfo) {
     try {
       const r = await tool.run((params && params.arguments) || {}, io);
       if (r && r.image) return ok({ content: [{ type: 'image', data: r.image.toString('base64'), mimeType: 'image/jpeg' }] });
+      if (r && r.ok && r.result && Array.isArray(r.result.content)) return ok({ content: r.result.content });
+      if (r && r.ok && typeof r.result === 'string') return ok({ content: [{ type: 'text', text: r.result }] });
       return ok({ content: [{ type: 'text', text: r.ok ? JSON.stringify(r.result, null, 2) : 'Error: ' + r.error }], isError: !r.ok });
     } catch (e) {
       return ok({ content: [{ type: 'text', text: 'Error: ' + e.message }], isError: true });
@@ -89,4 +103,4 @@ async function handleRpc(msg, toolList, io, serverInfo) {
   return err(-32601, 'method not found: ' + method);
 }
 
-module.exports = { tools, handleRpc, REMOTE_COMMANDS, INSTRUCTIONS };
+module.exports = { tools, agentTools, handleRpc, REMOTE_COMMANDS, INSTRUCTIONS };

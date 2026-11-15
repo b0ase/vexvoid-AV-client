@@ -6615,7 +6615,21 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       // It never mints, spends from the wallet, or goes live: those stay with the performer.
       const aiEl = id => document.getElementById(id);
       const AI_STORE = 'vx.agent.v1';
-      const AI_SKIP = new Set(['help', 'state', 'layers', 'sketches', 'clips', 'images', 'tracks', 'write', 'set-doc']);
+      const AI_SKIP = new Set(['help', 'state', 'layers', 'sketches', 'clips', 'images', 'tracks', 'write', 'set-doc', 'agent', 'agent-tools']);
+      // the agent's own tools, for outside agents too (MCP: bin/vexvoid-mcp.js lists them from agent-tools and runs them
+      // through agent), so Claude Code or Claude Desktop can work every part of the client VexVoid can. mixer and state
+      // are left out: MCP has its own tools for those.
+      const AI_MCP_SKIP = new Set(['mixer', 'state']);
+      VXCMD['agent-tools'] = { doc: 'The AI agent\'s tools (name, description, input schema), for MCP', run: () => aiTools().filter(t => !AI_MCP_SKIP.has(t.name)).map(t => ({ name: t.name, description: t.description, input_schema: t.input_schema })) };
+      VXCMD.agent = { args: '{tool, input}', doc: 'Run one of the AI agent\'s tools (editor, text_layer, write_sketch, compose_set, record, ...)', run: async ({ tool, input }) => {
+        if (AI_MCP_SKIP.has(tool) || !aiTools().some(t => t.name === tool)) throw new Error('unknown agent tool ' + tool);
+        // shown like VexVoid's own calls: in the CODE log, and with AUTO on the tab comes to the front
+        try { codeLine('call', `mcp ${tool}  ${JSON.stringify(input || {})}`.slice(0, 1200)); aiFollow(tool, input || {}); } catch (e) {}
+        const r = await aiRun(tool, input || {});
+        // images come back as base64 JPEG/PNG next to the text, as MCP content
+        if (Array.isArray(r)) return { content: r.map(c => c.type === 'image' ? { type: 'image', data: c.source.data, mimeType: c.source.media_type } : { type: 'text', text: String(c.text || '') }) };
+        return typeof r === 'string' ? r : r;
+      } };
       const aiCommands = () => Object.keys(VXCMD).filter(k => !AI_SKIP.has(k));
       const AI_SYSTEM = () => `You are VEXVOID: VJ, music-video director and the intelligence inside the V3XV0ID AV Client (written V3XV0ID on screen). You have directed a lot of music videos and you know the VexVoid look cold. You talk like a director on a shoot: short, sure, specific about shots, light and timing; no hype, no emoji, no exclamation marks. The person you're working with is a VJ or artist; they tell you what they want, and you make it happen on the output screen with your tools, or prepare it ahead of the show. They may also be moving controls by hand at the same time.
 

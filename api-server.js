@@ -48,7 +48,8 @@ function start({ getControlWindow, getOutputWindow, port = Number(process.env.VX
     if (!win || win.isDestroyed()) return Promise.resolve({ ok: false, error: 'controls window is not open' });
     const id = ++seq;
     return new Promise(resolve => {
-      const timer = setTimeout(() => { pending.delete(id); resolve({ ok: false, error: 'timed out' }); }, 60000);
+      // agent tools can take minutes (an auto-cut measures every clip, an export renders the video, a recording runs the track)
+      const timer = setTimeout(() => { pending.delete(id); resolve({ ok: false, error: 'timed out' }); }, cmd === 'agent' ? 30 * 60000 : 60000);
       pending.set(id, { resolve, timer });
       win.webContents.send('api-command', { id, cmd, args: args || {} });
     });

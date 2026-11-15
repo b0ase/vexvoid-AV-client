@@ -6,6 +6,9 @@
  *   item     { id, src, name, start, in, dur }   seconds: where it sits, where in the source it starts, how long it runs
  *            a title on the text track has no src; it carries its TITLES settings instead (text, font, style, mode ...),
  *            and its in is how far into the title's animation it starts
+ *            tr { kind: 'cross'|'black'|'white', dur }: the transition into this clip from the one before it on the track.
+ *            A crossfade starts at the cut (the outgoing clip runs on and fades out over this one), so nothing moves
+ *            off the beat; a dip to black or white is centred on the cut.
  *
  * Text and video tracks overwrite: an item dropped onto others trims, splits or removes what it covers, as in an NLE.
  * The design (items with start/trim/duration, pixel snap threshold, ruler intervals) follows OpenCut classic's
@@ -56,7 +59,7 @@
     t.items.forEach(function (it) {
       if (it.id === keep || end(it) <= a + EPS || it.start >= b - EPS) { out.push(it); return; }
       if (it.start < a - EPS) out.push(Object.assign({}, it, { dur: r3(a - it.start) }));
-      if (end(it) > b + EPS) out.push(Object.assign({}, it, { id: it.start < a - EPS ? id() : it.id, start: r3(b), in: r3(it.in + (b - it.start)), dur: r3(end(it) - b) }));
+      if (end(it) > b + EPS) out.push(Object.assign({}, it, { id: it.start < a - EPS ? id() : it.id, start: r3(b), in: r3(it.in + (b - it.start)), dur: r3(end(it) - b), tr: undefined }));
     });
     t.items = out;
   }
@@ -76,7 +79,7 @@
       t.items.slice().forEach(function (it) {
         if (ids && ids.indexOf(it.id) < 0) return;
         if (time <= it.start + 1 / FPS || time >= end(it) - 1 / FPS) return;
-        var right = Object.assign({}, it, { id: id(), start: r3(time), in: r3(it.in + (time - it.start)), dur: r3(end(it) - time) });
+        var right = Object.assign({}, it, { id: id(), start: r3(time), in: r3(it.in + (time - it.start)), dur: r3(end(it) - time), tr: undefined });
         it.dur = r3(time - it.start);
         t.items.push(right); made.push(right.id);
       });
@@ -105,6 +108,26 @@
       });
     });
   }
+  // the transitions that apply on a track: each into a clip that butts against the one before it (a crossfade needs that
+  // outgoing clip; a dip just needs a cut). Durations are clamped so neighbouring transitions never overlap.
+  function transitions(t) {
+    var L = sorted(t), out = [];
+    L.forEach(function (it, i) {
+      if (!it.tr || !it.tr.kind || it.tr.kind === 'cut' || i === 0) return;
+      var prev = L[i - 1]; if (Math.abs(end(prev) - it.start) > 0.02) return;
+      var d = Math.min(it.tr.dur || 0.5, it.dur * (it.tr.kind === 'cross' ? 0.9 : 1.8), it.tr.kind === 'cross' ? Infinity : prev.dur * 1.8);
+      var a = it.tr.kind === 'cross' ? it.start : it.start - d / 2, b = a + d, last = out[out.length - 1];
+      if (last && a < last.b) return;
+      out.push({ kind: it.tr.kind, a: r3(a), b: r3(b), cut: it.start, from: prev, to: it });
+    });
+    return out;
+  }
+  // what a transition shows at time x: p 0..1 through it; for a crossfade the outgoing clip's opacity, for a dip the colour's
+  function transitionAt(list, x) {
+    for (var i = 0; i < list.length; i++) { var T = list[i]; if (x >= T.a && x < T.b) { var p = (x - T.a) / (T.b - T.a); return { T: T, p: p, alpha: T.kind === 'cross' ? 1 - p : 1 - Math.abs(p * 2 - 1) }; } }
+    return null;
+  }
+
   // every edit point, sorted (cuts on visible video tracks, plus 0 and the end)
   function edits(p) {
     var s = { 0: 0 };
@@ -158,7 +181,7 @@
   History.prototype.redo = function (cur) { if (!this.future.length) return null; this.past.push(JSON.stringify(cur)); return JSON.parse(this.future.pop()); };
 
   root.VXTL = { FPS: FPS, id: id, newProject: newProject, track: track, sorted: sorted, find: find, length: length, itemAt: itemAt, item: item,
-    fromShots: fromShots, clear: clear, place: place, split: split, trim: trim, remove: remove, edits: edits,
+    fromShots: fromShots, clear: clear, place: place, split: split, trim: trim, remove: remove, edits: edits, transitions: transitions, transitionAt: transitionAt,
     snapPoints: snapPoints, snap: snap, snapSpan: snapSpan, ruler: ruler, timecode: timecode, History: History };
   if (typeof module !== 'undefined') module.exports = root.VXTL;
 })(typeof window !== 'undefined' ? window : this);

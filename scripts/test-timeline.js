@@ -89,4 +89,12 @@ check('titles keep their settings through place, split and length', () => {
   assert.deepStrictEqual(L.map(i => [i.start, i.in, i.dur, i.text, i.font]), [[2, 0, 1, 'V3XV0ID', 'doto'], [3, 1, 3, 'V3XV0ID', 'doto']]);
   assert.strictEqual(L[0].name, 'V3XV0ID'); assert.strictEqual(T.length(p), 6); assert.deepStrictEqual(T.edits(p), [0, 2, 3, 6]);
 });
+check('transitions: crossfade from the cut, dips centred, split halves start clean', () => {
+  const p = T.newProject(); v1(p).items = T.fromShots([{ src: 'a', dur: 4 }, { src: 'b', dur: 4 }, { src: 'c', dur: 4 }]);
+  const [, b, c] = T.sorted(v1(p)); b.tr = { kind: 'cross', dur: 1 }; c.tr = { kind: 'black', dur: 1 };
+  const L = T.transitions(v1(p)); assert.deepStrictEqual(L.map(x => [x.kind, x.a, x.b]), [['cross', 4, 5], ['black', 7.5, 8.5]]);
+  assert.strictEqual(T.transitionAt(L, 4.25).alpha, 0.75); assert.strictEqual(T.transitionAt(L, 8).alpha, 1); assert.strictEqual(T.transitionAt(L, 6), null);
+  T.split(p, 6); assert.strictEqual(T.sorted(v1(p))[2].tr, undefined);
+  b.start = 4.5; assert.strictEqual(T.transitions(v1(p)).filter(x => x.kind === 'cross').length, 0); // a gap: no crossfade
+});
 console.log(`${n} timeline checks passed`);

@@ -10,7 +10,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const http = require('http');
-const { tools, handleRpc } = require('../mcp/tools');
+const { tools, agentTools, handleRpc } = require('../mcp/tools');
 
 function conf() {
   return JSON.parse(fs.readFileSync((process.env.VX_API_FILE || path.join(os.homedir(), '.v3xv0id', 'api.json')), 'utf8'));
@@ -39,6 +39,13 @@ const io = {
   snapshot: width => call('GET', '/api/snapshot?width=' + width, null, true)
 };
 const TOOLS = tools({ remote: false });
+// the mixer tools plus the agent's own, read from the running app each time the list is asked for (and cached for a
+// call), so a tool added to the agent shows up here without touching this file
+let agentCache = [];
+async function toolList() {
+  try { agentCache = await agentTools(io); } catch (e) { /* mixer not running: the mixer tools explain that themselves */ }
+  return TOOLS.concat(agentCache.filter(t => !TOOLS.some(x => x.name === t.name)));
+}
 const INFO = { name: 'vexvoid-mixer', version: '3.1.0' };
 
 let buf = '';
@@ -50,6 +57,6 @@ process.stdin.on('data', d => {
     if (!line) continue;
     let msg;
     try { msg = JSON.parse(line); } catch (e) { process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'parse error' } }) + '\n'); continue; }
-    handleRpc(msg, TOOLS, io, INFO).then(r => { if (r) process.stdout.write(JSON.stringify(r) + '\n'); });
+    handleRpc(msg, msg && msg.method === 'tools/call' && agentCache.length ? TOOLS.concat(agentCache) : toolList, io, INFO).then(r => { if (r) process.stdout.write(JSON.stringify(r) + '\n'); });
   }
 });
