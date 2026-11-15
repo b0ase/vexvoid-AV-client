@@ -1750,6 +1750,17 @@
     .ai-in{display:flex;gap:12px;align-items:flex-end;padding:18px 24px 18px 0;border-top:1px solid #161616}
     .ai-in textarea{flex:1;resize:none;background:none;color:#fff;border:0;padding:6px 0;font:inherit;font-size:14px;text-transform:none;letter-spacing:.01em;outline:none;max-height:140px}
     .ai-in button{font:inherit;background:none;border:0;color:#fff;letter-spacing:.24em;font-size:10px;cursor:pointer;padding:8px 0}
+    .ai-auto{font-size:9px;letter-spacing:.24em;color:#777;display:flex;align-items:center;gap:6px;cursor:pointer}.ai-auto input{accent-color:#fff;margin:0}.ai-auto:has(input:checked){color:#fff}
+    /* CODE */
+    .code{display:flex;flex-direction:column;height:100%;min-height:0;font-family:'IBM Plex Mono',monospace;text-transform:none}
+    .code-head{display:flex;align-items:center;gap:16px;padding-bottom:12px;border-bottom:1px solid #161616}
+    .code-head>span:first-child{font-family:'Michroma','IBM Plex Mono',sans-serif;letter-spacing:.2em;font-size:14px}
+    .code-meta{flex:1;font-size:10px;color:#666;letter-spacing:.04em}
+    .code-log{flex:1;overflow-y:auto;padding:12px 0;font-size:11.5px;line-height:1.65;white-space:pre-wrap;word-break:break-word}
+    .code-log .ln{display:flex;gap:12px}.code-log .t{color:#444;flex:none}.code-log .call{color:#e8e8e6}.code-log .ok{color:#6f6f6d}.code-log .bad{color:#ff5a4f}
+    .code-log .note{color:#9a9a98;font-style:italic}.code-log .me{color:#fff}.code-log .sys{color:#555}
+    .code-in{display:flex;gap:10px;align-items:center;border-top:1px solid #161616;padding:10px 0;font-size:12px}
+    .code-in input{flex:1;background:none;border:0;color:#fff;font:inherit;outline:none}
     /* EDIT */
     .ed{display:flex;flex-direction:column;gap:10px;width:100%;height:100%;min-height:0}
     .ed-top{display:flex;gap:8px;align-items:center}
@@ -2025,6 +2036,7 @@
     <button class="tab-button" data-tab="edit">EDIT</button>
     <button class="tab-button" data-tab="wallet">WALLET</button>
     <button class="tab-button" data-tab="market">MARKET</button>
+    <button class="tab-button" data-tab="code">CODE</button>
     <button class="tab-button vexvoid-tab" data-tab="vexvoid">VEXVOID</button>
   </div>
   
@@ -2037,7 +2049,7 @@
         <div class="ai-room">
           <div class="ai-head">
             <div><div class="ai-gig-title" id="aiGigTitle" contenteditable="true" spellcheck="false">NEW GIG</div><div class="ai-gig-when" id="aiGigWhen"></div></div>
-            <div class="ai-head-r"><span class="ai-status" id="aiStatus"></span><div class="ai-mini" id="aiMini" title="What the audience sees. Click to hide."><img id="aiMonitor" alt=""></div></div>
+            <div class="ai-head-r"><label class="ai-auto" title="AUTO: the app follows VexVoid tab by tab while it works, and every step goes to the CODE tab"><input type="checkbox" id="aiAuto"> AUTO</label><span class="ai-status" id="aiStatus"></span><div class="ai-mini" id="aiMini" title="What the audience sees. Click to hide."><img id="aiMonitor" alt=""></div></div>
           </div>
           <div class="ai-log" id="aiLog"></div>
           <div class="ai-in"><textarea id="aiInput" rows="1" placeholder="What are we making?"></textarea><button id="aiSend">SEND</button></div>
@@ -2609,6 +2621,15 @@
 
     <!-- VEXVOID Tab Content -->
     <!-- Wallet Tab: everything the connected bWalletX holds that the mixer can use -->
+    <!-- CODE: every step VexVoid takes, as it happens, and a command line for mixer commands -->
+    <div class="tab-content" id="codeTab">
+      <div class="code">
+        <div class="code-head"><span>CODE</span><span class="code-meta" id="codeMeta">VexVoid's steps appear here as it works. Type a mixer command below (help lists them).</span><button class="gen-btn" id="codeClear">CLEAR</button></div>
+        <div class="code-log" id="codeLog"></div>
+        <div class="code-in"><span>&gt;</span><input id="codeInput" spellcheck="false" autocomplete="off" placeholder="e.g. fade value=100 over=8   ·   sketch name=CATHEDRAL deck=B   ·   help"></div>
+      </div>
+    </div>
+
     <div class="tab-content" id="walletTab">
       <div class="wb">
         <div class="video-browser-header">
@@ -5809,6 +5830,7 @@ How the mixer works:
 
 How to work:
 - Act; don't ask before visual changes. The performer may be mid-show, so keep replies to one or two short sentences.
+- The app has an AUTO switch and a CODE tab: with AUTO on, the app brings each tab you use to the front as you work and logs every tool call and its result in CODE, so the person can watch you make the piece. You don't control that; just work in clear steps, and write a short line before each stage (what you're about to do and why) so the log reads like a director's notes.
 - After you change the screen, use look to check it, and fix anything that's wrong (wrong deck live, black screen, a sketch error).
 - Prefer library sketches and clips. Write a new sketch (write_sketch) when nothing in the library fits. Use generate only when the performer asks for new footage or images, or clearly wants something the library can't give: it costs real money and the performer approves every one. If they decline, carry on without it.
 - For a timed show (an intro, a build, a whole track), use compose_set: steps on bars, played against the tempo.
@@ -6047,8 +6069,45 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
         });
       }
       function aiSaveLog() { if (gig) { gig.log = aiLog.innerHTML.slice(-200000); gigSave(); } }
-      let aiUsage = { in: 0, out: 0 };
+      let aiUsage = { in: 0, out: 0, cost: 0 };
+      // ===== CODE + AUTO: every agent step is written to the CODE tab; with AUTO on, the app shows the tab each step uses
+      const codeLog = aiEl('codeLog');
+      function codeLine(kind, text) {
+        if (!codeLog) return;
+        const d = document.createElement('div'); d.className = 'ln';
+        const t = document.createElement('span'); t.className = 't'; t.textContent = new Date().toTimeString().slice(0, 8);
+        const m = document.createElement('span'); m.className = kind; m.textContent = text;
+        d.append(t, m); codeLog.appendChild(d);
+        while (codeLog.children.length > 2000) codeLog.firstChild.remove();
+        codeLog.scrollTop = codeLog.scrollHeight;
+      }
+      const aiAuto = () => aiEl('aiAuto') && aiEl('aiAuto').checked;
+      try { aiEl('aiAuto').checked = localStorage.getItem('vx.auto') === '1'; } catch (e) {}
+      aiEl('aiAuto').addEventListener('change', e => { try { localStorage.setItem('vx.auto', e.target.checked ? '1' : '0'); } catch (x) {} });
+      function aiTabFor(name, input) {
+        if (name === 'editor') return 'edit';
+        if (name === 'write_sketch' || name === 'record' || name === 'look') return 'layers';
+        if (name === 'mixer') return /^(bpm|tap)$/.test(input.command) ? null : 'layers';
+        if (name === 'compose_set') return 'composer';
+        if (name === 'generate') return 'images';
+        if (name === 'load_track') return 'music';
+        if (name === 'skill') return 'code';
+        if (name === 'library') return { clips: 'videos', images: 'images', tracks: 'music', sketches: 'vexvoid', generated: 'images', wallet: 'wallet' }[input.kind] || null;
+        return null;
+      }
+      function aiFollow(name, input) {
+        if (!aiAuto()) return;
+        const tab = aiTabFor(name, input || {}), btn = tab && document.querySelector(`[data-tab="${tab}"]`);
+        if (btn && !btn.classList.contains('active')) btn.click();
+      }
       function aiEvent(e) {
+        if (e.type === 'tool') { codeLine('call', `${e.name}  ${JSON.stringify(e.input || {})}`.slice(0, 1200)); aiFollow(e.name, e.input); }
+        else if (e.type === 'tool-done') codeLine(e.ok ? 'ok' : 'bad', (e.ok ? '  <- ' : '  !! ') + String(e.summary || (e.ok ? 'done' : 'failed')).replace(/\s+/g, ' ').slice(0, 600));
+        else if (e.type === 'text') codeLine('note', '# ' + e.text.replace(/\n+/g, ' ').slice(0, 1500));
+        else if (e.type === 'error') codeLine('bad', '!! ' + e.message);
+        else if (e.type === 'usage' && e.usage) { const u = e.usage; aiUsage.cost += (u.input_tokens || 0) * 4e-6 + (u.output_tokens || 0) * 20e-6 + (u.cache_read_input_tokens || 0) * 0.2e-6 + (u.cache_creation_input_tokens || 0) * 5e-6; aiEl('codeMeta').textContent = `this session: about $${aiUsage.cost.toFixed(2)} of Claude`; }
+        else if (e.type === 'busy') { codeLine('sys', e.on ? '-- VexVoid is working --' : '-- done --'); if (!e.on && aiAuto()) { const b = document.querySelector('[data-tab="ai"]'); if (b) b.click(); } }
+
         if (e.type === 'text') aiLine('bot', e.text);
         else if (e.type === 'tool') aiLine('tool', aiToolText(e.name, e.input));
         else if (e.type === 'tool-done' && !e.ok) aiLine('tool bad', e.summary);
@@ -6114,9 +6173,25 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
         if (!anthropicKey()) { aiNeedKey(); return; }
         aiEl('aiInput').value = '';
         if (gig && /^(NEW|NEW GIG|UNTITLED GIG)$/.test(gig.title || '')) { gig.title = text.replace(/\s+/g, ' ').slice(0, 34).toUpperCase(); gigSave(); renderGigs(); }
-        aiLine('me', text);
+        aiLine('me', text); codeLine('me', 'you: ' + text.replace(/\n+/g, ' '));
         await agent.send(text).catch(e => aiLine('err', e.message));
       }
+      // the CODE tab's command line: the same mixer commands the controls, MIDI, CLI and MCP use (cmd key=value ...)
+      aiEl('codeInput').addEventListener('keydown', async e => {
+        e.stopPropagation();
+        if (e.key !== 'Enter') return;
+        const line = e.target.value.trim(); if (!line) return;
+        e.target.value = ''; codeLine('me', '> ' + line);
+        const [cmd, ...rest] = line.split(/\s+/);
+        if (cmd === 'help') { codeLine('ok', Object.keys(VXCMD).map(k => `${k}${VXCMD[k].args ? ' ' + VXCMD[k].args : ''}`).join('\n')); return; }
+        if (cmd === 'clear') { codeLog.innerHTML = ''; return; }
+        if (!VXCMD[cmd]) { codeLine('bad', `!! no command "${cmd}" (help lists them)`); return; }
+        const args = {};
+        rest.join(' ').replace(/(\w+)=("[^"]*"|\S+)/g, (_, k, v) => { v = v.replace(/^"|"$/g, ''); args[k] = /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : v === 'true' ? true : v === 'false' ? false : v; return ''; });
+        try { const r = await window.vxCommand(cmd, args); codeLine('ok', '  <- ' + (typeof r === 'string' ? r : JSON.stringify(r ?? 'ok')).slice(0, 1200)); }
+        catch (x) { codeLine('bad', '  !! ' + x.message); }
+      });
+      aiEl('codeClear').addEventListener('click', () => { codeLog.innerHTML = ''; });
       aiEl('aiSend').addEventListener('click', aiSendNow);
       aiEl('aiInput').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); aiSendNow(); } });
       aiEl('aiNew').addEventListener('click', newGig);
