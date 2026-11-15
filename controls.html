@@ -6652,10 +6652,11 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           if (!document.getElementById('gameTab').classList.contains('active')) { view.innerHTML = ''; return; }
           view.innerHTML = '';
           gm.g = await VXGAME.mount(view, { base: 'vx/game/', high: true, onStatus: s => { st.textContent = s; } });
+          window.vxGameNow = gm.g; // for the agent's game tool and tests
           gm.g.canvas.focus();
         } catch (e) { view.innerHTML = `<div class="gm-msg"></div>`; view.firstChild.textContent = e.message; }
       }
-      function gmStop() { if (gm.g) { gm.g.stop(); gm.g = null; } }
+      function gmStop() { if (gm.g) { gm.g.stop(); gm.g = null; window.vxGameNow = null; } }
       document.querySelectorAll('.tab-button').forEach(b => b.addEventListener('click', () => { if (b.dataset.tab === 'game') gmStart(); else gmStop(); }));
 
       // ===== VEXVOID title screen: plays the whole time the VEXVOID tab is open (a shader behind the chrome V3XV0ID)
