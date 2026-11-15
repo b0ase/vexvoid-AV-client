@@ -1766,6 +1766,8 @@
     .ti-styles{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
     .ti-styles button{font:inherit;font-size:9px;letter-spacing:.14em;background:none;border:1px solid #222;color:#888;padding:9px 2px;cursor:pointer}
     .ti-styles button:hover{color:#fff;border-color:#555}.ti-styles button.on{background:#fff;color:#000;border-color:#fff}
+    .ti-chips{display:flex;gap:4px;flex-wrap:wrap}.ti-chips button{font:inherit;font-size:9px;letter-spacing:.14em;background:none;border:1px solid #222;color:#888;padding:8px 10px;cursor:pointer}.ti-chips button.on{background:#fff;color:#000;border-color:#fff}
+    .ti-3d{display:none;flex-direction:column;gap:10px}.ti.d3 .ti-3d{display:flex}
     .ti-about{font-size:10px;color:#666;letter-spacing:.04em;min-height:16px}
     .ti-right{display:flex;flex-direction:column;gap:12px;min-height:0}
     .ti-view{position:relative;width:100%;aspect-ratio:16/9;max-height:62vh;background:#000 linear-gradient(90deg,#060606,#141414);border:1px solid #1d1d1d}
@@ -2647,11 +2649,12 @@
     <div class="tab-content" id="titlesTab">
       <div class="ti">
         <div class="ti-left">
-          <div class="ti-mode"><button class="on" data-m="2d">2D TEXT</button><button data-m="3d" disabled title="3D titles with extrude, camera and light controls are next">3D · NEXT</button></div>
+          <div class="ti-mode" id="tiMode"><button data-m="2d">2D TEXT</button><button data-m="3d" title="Extruded letters, lit and reflecting a studio, with material, spin and depth">3D TITLE</button></div>
           <textarea id="tiText" class="ti-text" rows="2" spellcheck="false" placeholder="Words. Enter for a second line."></textarea>
           <label class="ti-upper"><input type="checkbox" id="tiUpper" checked> CAPITALS</label>
           <div class="ti-h">FONT</div><div id="tiFonts" class="ti-fonts"></div>
           <div class="ti-h">MOVE</div><div id="tiStyles" class="ti-styles"></div>
+          <div id="ti3d" class="ti-3d"><div class="ti-h">MATERIAL</div><div id="tiMats" class="ti-chips"></div><div class="ti-h">SPIN</div><div id="tiSpins" class="ti-chips"></div><label class="ti-upper"><input type="checkbox" id="tiBevel" checked> BEVEL</label></div>
           <div class="ti-about" id="tiAbout"></div>
         </div>
         <div class="ti-right">
@@ -5897,13 +5900,15 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       edEl('edTitle').addEventListener('blur', e => { ed.title = e.target.textContent.trim().toUpperCase().slice(0, 60) || 'UNTITLED VIDEO'; edSave(); });
 
       // ===== TITLES: text layers (vx/text.js) in VexVoid fonts, animated; they go to a deck like any sketch =====
-      const ti = Object.assign({ text: 'V3XV0ID', font: 'michroma', style: 'glitch', upper: true, a: 0.5, b: 0.5, c: 0.5, d: 0.5 },
+      const ti = Object.assign({ text: 'V3XV0ID', font: 'michroma', style: 'glitch', upper: true, a: 0.5, b: 0.5, c: 0.5, d: 0.5, mode: '2d', material: 'chrome', spin: 'sway', bevel: true },
         (() => { try { return JSON.parse(localStorage.getItem('vx.titles.v1') || '{}'); } catch (e) { return {}; } })());
       const tiEl = id => document.getElementById(id);
       let tiPrev = null, tiTimer = 0;
       function tiSave() { try { localStorage.setItem('vx.titles.v1', JSON.stringify(ti)); } catch (e) {} }
-      const tiCode = () => VXTEXT.code({ text: ti.text, font: ti.font, style: ti.style, upper: ti.upper });
-      const tiName = () => ('TEXT · ' + ti.text.replace(/\s+/g, ' ').trim()).toUpperCase().slice(0, 28);
+      const tiCode = () => ti.mode === '3d' ? VXTEXT3D.code({ text: ti.text, font: ti.font, style: ti.style, upper: ti.upper, material: ti.material, spin: ti.spin, bevel: ti.bevel })
+        : VXTEXT.code({ text: ti.text, font: ti.font, style: ti.style, upper: ti.upper });
+      const tiKnobs = () => ti.mode === '3d' ? VXTEXT3D.KNOBS : VXTEXT.KNOBS;
+      const tiName = () => ((ti.mode === '3d' ? '3D · ' : 'TEXT · ') + ti.text.replace(/\s+/g, ' ').trim()).toUpperCase().slice(0, 28);
       function tiPreview() {
         clearTimeout(tiTimer);
         tiTimer = setTimeout(() => {
@@ -5914,7 +5919,10 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         }, 200);
       }
       function tiRender() {
-        tiEl('tiText').value = ti.text; tiEl('tiUpper').checked = ti.upper;
+        tiEl('tiText').value = ti.text; tiEl('tiUpper').checked = ti.upper; tiEl('tiBevel').checked = ti.bevel;
+        document.querySelector('#titlesTab .ti').classList.toggle('d3', ti.mode === '3d');
+        tiEl('tiMode').querySelectorAll('button').forEach(b => { b.className = b.dataset.m === ti.mode ? 'on' : ''; b.onclick = () => { ti.mode = b.dataset.m; tiSave(); tiRender(); tiPreview(); }; });
+        [['tiMats', VXTEXT3D.MATERIALS, 'material'], ['tiSpins', VXTEXT3D.SPINS, 'spin']].forEach(([id, list, key]) => { const box = tiEl(id); box.innerHTML = ''; list.forEach(x => { const b = document.createElement('button'); b.textContent = x.label; b.className = ti[key] === x.id ? 'on' : ''; b.onclick = () => { ti[key] = x.id; tiSave(); tiRender(); tiPreview(); }; box.appendChild(b); }); });
         const fonts = tiEl('tiFonts'); fonts.innerHTML = '';
         VXTEXT.FONTS.forEach(f => {
           const b = document.createElement('button'); b.className = f.id === ti.font ? 'on' : '';
@@ -5931,7 +5939,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         });
         tiEl('tiAbout').textContent = (VXTEXT.STYLES.find(x => x.id === ti.style) || {}).about || '';
         const kn = tiEl('tiKnobs'); kn.innerHTML = '';
-        VXTEXT.KNOBS.forEach((k, i) => {
+        tiKnobs().forEach((k, i) => {
           const key = 'abcd'[i], l = document.createElement('label'); l.textContent = k;
           const r = document.createElement('input'); r.type = 'range'; r.min = 0; r.max = 1; r.step = 0.01; r.value = ti[key];
           r.oninput = () => { ti[key] = +r.value; tiSave(); if (tiPrev) tiPrev.setParams({ [key]: ti[key] }); };
@@ -5939,7 +5947,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         });
       }
       async function tiSend(deck) {
-        const r = await window.vxCommand('sketch', { name: tiName(), code: tiCode(), knobs: VXTEXT.KNOBS, deck });
+        const r = await window.vxCommand('sketch', { name: tiName(), code: tiCode(), knobs: tiKnobs(), deck });
         await window.vxCommand('knobs', { a: ti.a, b: ti.b, c: ti.c, d: ti.d });
         tiEl('tiNote').textContent = `${tiName()} is on deck ${deck}.`;
         return r;
@@ -5949,7 +5957,8 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       tiEl('tiUpper').addEventListener('change', e => { ti.upper = e.target.checked; tiSave(); tiPreview(); });
       tiEl('tiA').addEventListener('click', () => tiSend('A').catch(e => { tiEl('tiNote').textContent = e.message; }));
       tiEl('tiB').addEventListener('click', () => tiSend('B').catch(e => { tiEl('tiNote').textContent = e.message; }));
-      tiEl('tiCode').addEventListener('click', async () => { await window.vxCommand('sketch', { name: tiName(), code: tiCode(), knobs: VXTEXT.KNOBS, send: false }); document.querySelector('[data-tab="patterns"]').click(); });
+      tiEl('tiBevel').addEventListener('change', e => { ti.bevel = e.target.checked; tiSave(); tiPreview(); });
+      tiEl('tiCode').addEventListener('click', async () => { await window.vxCommand('sketch', { name: tiName(), code: tiCode(), knobs: tiKnobs(), send: false }); document.querySelector('[data-tab="patterns"]').click(); });
       document.querySelector('[data-tab="titles"]').addEventListener('click', () => { tiRender(); tiPreview(); });
       document.querySelectorAll('.tab-button').forEach(b => { if (b.dataset.tab !== 'titles') b.addEventListener('click', () => { if (tiPrev) { tiPrev.stop(); tiPrev = null; } }); });
 
@@ -6007,9 +6016,10 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
           { name: 'editor', description: 'The EDIT tab: cut a music video from clips to a track, then export an MP4. Actions: state (what the edit is); set_track (track: catalogue number or words, or a file path); map (the track\'s tempo, detected from the audio, and its loudness, one digit 0-9 per bar, to read intro, builds, drops and breakdowns); tempo (bpm: set it by hand when the detected one is half or double what you hear; 0 goes back to detected); auto_cut (pace fast|medium|slow; source all|catalogue|generated|recorded|wallet; filter words to pick clips by name, set, phase or notes, e.g. "crane" or "rough"), which cuts on the bars with the loudest parts getting the shortest and most moving shots; add (clip: words or a path or URL, seconds); replace (index, clip: words or a path or URL) swaps one shot\'s clip; remove (index); title (title); look (look house|scope|raw; letterbox ratio e.g. 2.39 or 0; flashes off|hits|all): the grade, letterbox and white flash frames of the export; export (renders the MP4 with MLT, also saving a Shotcut project; finish true (default) adds the corner idents and matte flashes; takes a few minutes; the file lands in VIDEOS); frames (a contact sheet of the last export, or of path, to check it). Prefer this over record for a finished music video: it is a real edit, not a live take.',
             input_schema: { type: 'object', properties: { action: { type: 'string', enum: ['state', 'set_track', 'map', 'tempo', 'look', 'auto_cut', 'add', 'replace', 'remove', 'title', 'export', 'frames'] }, track: { type: 'string' }, pace: { type: 'string', enum: ['fast', 'medium', 'slow'] },
               source: { type: 'string', enum: ['all', 'catalogue', 'generated', 'recorded', 'wallet'] }, filter: { type: 'string' }, clip: { type: 'string' }, seconds: { type: 'number' }, index: { type: 'number' }, title: { type: 'string' }, finish: { type: 'boolean' }, path: { type: 'string' }, bpm: { type: 'number' }, look: { type: 'string', enum: ['house', 'scope', 'raw'] }, letterbox: { type: 'number' }, flashes: { type: 'string', enum: ['off', 'hits', 'all'] } }, required: ['action'], additionalProperties: false } },
-          { name: 'text_layer', description: 'Put a text layer on a deck (the TITLES tab): words in a VexVoid font, animated, transparent over the deck\'s other layers. Fonts: ' + VXTEXT.FONTS.map(f => `${f.id} (${f.label.split(' · ')[1]})`).join(', ') + '. Styles: ' + VXTEXT.STYLES.map(s => `${s.id} (${s.about})`).join('; ') + '. Knobs 0-1: size, speed, intensity, height (0 top, 1 bottom). Use it for titles, lyric lines, idents and decorative type; keep words few.',
+          { name: 'text_layer', description: 'Put a text layer on a deck (the TITLES tab): words in a VexVoid font, animated, transparent over the deck\'s other layers. Fonts: ' + VXTEXT.FONTS.map(f => `${f.id} (${f.label.split(' · ')[1]})`).join(', ') + '. Styles: ' + VXTEXT.STYLES.map(s => `${s.id} (${s.about})`).join('; ') + '. Knobs 0-1: size, speed, intensity, height (0 top, 1 bottom). d3 true makes a 3D title instead: extruded letters with a material (chrome, black chrome, matte, wire) and a spin (none, sway, orbit, tumble), the same moves done in 3D, height then sets the extrude depth; keep 3D titles to a word or two. Use text for titles, lyric lines, idents and decorative type; keep words few.',
             input_schema: { type: 'object', properties: { text: { type: 'string', description: 'The words; \\n for a second line' }, font: { type: 'string', enum: VXTEXT.FONTS.map(f => f.id) }, style: { type: 'string', enum: VXTEXT.STYLES.map(s => s.id) },
-              upper: { type: 'boolean' }, deck: { type: 'string', enum: ['A', 'B'] }, size: { type: 'number' }, speed: { type: 'number' }, intensity: { type: 'number' }, height: { type: 'number' } }, required: ['text', 'deck'], additionalProperties: false } },
+              upper: { type: 'boolean' }, deck: { type: 'string', enum: ['A', 'B'] }, size: { type: 'number' }, speed: { type: 'number' }, intensity: { type: 'number' }, height: { type: 'number', description: '2D: where it sits, 0 top to 1 bottom. 3D: how deep the letters extrude' },
+              d3: { type: 'boolean', description: 'A 3D title: extruded letters, lit, with material and spin' }, material: { type: 'string', enum: VXTEXT3D.MATERIALS.map(m => m.id) }, spin: { type: 'string', enum: VXTEXT3D.SPINS.map(m => m.id) } }, required: ['text', 'deck'], additionalProperties: false } },
           { name: 'skill', description: 'Load one of your playbooks before the job it covers: ' + Object.entries(VEXVOID_BRAIN.skills).map(([k, v]) => `${k} (${v.when})`).join('; ') + '.',
             input_schema: { type: 'object', properties: { name: { type: 'string', enum: Object.keys(VEXVOID_BRAIN.skills) } }, required: ['name'], additionalProperties: false } },
           { name: 'project', description: 'Update this piece of work\'s details (only the fields you give change): a short title, the brief (what it is, for whom, the look, the length, anything agreed), and for a show only, its date (YYYY-MM-DD) and venue.',
@@ -6032,11 +6042,11 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
         }
         if (name === 'state') return short(vxSnapshot());
         if (name === 'text_layer') {
-          Object.assign(ti, { text: String(input.text || 'V3XV0ID').slice(0, 200), font: input.font || ti.font, style: input.style || ti.style, upper: input.upper !== false });
+          Object.assign(ti, { text: String(input.text || 'V3XV0ID').slice(0, 200), font: input.font || ti.font, style: input.style || ti.style, upper: input.upper !== false, mode: input.d3 ? '3d' : '2d', material: input.material || ti.material, spin: input.spin || ti.spin });
           ['size', 'speed', 'intensity', 'height'].forEach((k, i) => { if (input[k] != null) ti['abcd'[i]] = Math.max(0, Math.min(1, +input[k])); });
           tiSave(); if (tiEl('titlesTab').classList.contains('active')) { tiRender(); tiPreview(); }
           await tiSend(input.deck || 'A');
-          return `Text layer "${tiName()}" (${ti.style}, ${ti.font}) is on deck ${input.deck || 'A'}. Use look to check it.`;
+          return `${ti.mode === '3d' ? '3D title' : 'Text layer'} "${tiName()}" (${ti.style}, ${ti.font}${ti.mode === '3d' ? ', ' + ti.material + ', spin ' + ti.spin : ''}) is on deck ${input.deck || 'A'}. Use look to check it.`;
         }
         if (name === 'skill') return VEXVOID_BRAIN.skill(input.name, input.name === 'shaders' ? 'LIQUID CHROME:\n' + ((window.VXGEN_LIBRARY || []).find(x => x.name === 'LIQUID CHROME') || {}).code : '');
         if (name === 'library') {
@@ -7419,6 +7429,8 @@ Reply with only the JSON array in one \`\`\`json code block.`;
   <script src="./vx/editor.js"></script>
   <script src="./vx/mlt.js"></script>
   <script src="./vx/text.js"></script>
+  <script src="./vx/lib/three.global.js"></script>
+  <script src="./vx/text3d.js"></script>
   <script src="./vx/brain.js"></script>
   <script src="./vx/mint.js"></script>
   <script src="./vx/vx-keys.js"></script>

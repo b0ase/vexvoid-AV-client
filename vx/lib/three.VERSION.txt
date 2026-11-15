@@ -1,0 +1,4 @@
+three 0.182.0 (MIT), npm sha512-GbHabT+Irv+ihI1/f5kIIsZ+Ef9Sl5A1Y7imvS5RQjWgtTPfPnZ43JmlYI7NtCRDK9zir20lQpfg8/9Yd02OvQ==
+(tarball verified against the registry, 14 Nov 2026). three.global.js = esbuild 0.27.2 IIFE bundle of build/three.module.js
++ examples/jsm TextGeometry, FontLoader, TTFLoader (with its bundled opentype.js, MIT) and RoomEnvironment, exposed as
+window.THREE. sha256 1d3c515bf39fc950557e11feae2a6b80a4342cd2fa9e92b3967772e22ebb5b1e
