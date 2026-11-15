@@ -1,6 +1,7 @@
 /* The EDIT tab's engine: a music video as a list of shots cut to a track. Pure logic; the page does the UI.
  *
- *   VXEDIT.envelope(bytes) -> { rms: Float32Array (one value per STEP seconds, 0..1), step, seconds }
+ *   VXEDIT.envelope(bytes) -> { rms: Float32Array (one value per STEP seconds, 0..1), step, seconds, bpm, bar0, tempoConf }
+ *   VXEDIT.tempo(channels, sampleRate) -> { bpm, beat0, bar0, conf }: the track's tempo and where its bars start
  *   VXEDIT.autoCut({ seconds, env, bpm, pool, pace }) -> shots [{ src, name, in, dur }]
  *   VXEDIT.layout(shots) -> shots with start times;   VXEDIT.at(shots, t) -> { i, shot, offset }
  *   VXEDIT.ffmpegArgs({ shots (local files), track (local file), out, w, h, fps }) -> argv for ffmpeg
@@ -35,7 +36,52 @@
     }
     var sorted = Array.from(rms).sort(function (a, b) { return a - b; }), lo = sorted[Math.floor(n * 0.05)] || 0, hi = sorted[Math.floor(n * 0.97)] || 1;
     for (i = 0; i < n; i++) rms[i] = Math.max(0, Math.min(1, (rms[i] - lo) / ((hi - lo) || 1)));
-    return { rms: rms, step: STEP, seconds: ab.duration };
+    var tp = tempo(chans, sr);
+    return { rms: rms, step: STEP, seconds: ab.duration, bpm: tp.bpm, bar0: tp.bar0, tempoConf: tp.conf };
+  }
+
+  // Tempo from the audio: an onset curve (rises in loudness, full band plus a kick band), autocorrelated over
+  // 60-200 BPM with a comb across four beat multiples and a mild preference for 85-175 BPM. Then the beat phase
+  // that best lines up with the onsets, and the downbeat: of the four beats in a bar, the one with the most kick.
+  function tempo(chans, sr) {
+    var hop = 512, len = chans[0].length, n = Math.floor(len / hop), fps = sr / hop;
+    var full = new Float32Array(n), low = new Float32Array(n), lp = 0, a = 1 - Math.exp(-2 * Math.PI * 150 / sr), nc = chans.length;
+    for (var i = 0; i < n; i++) {
+      var ef = 0, el = 0;
+      for (var j = i * hop; j < (i + 1) * hop; j++) { var v = 0; for (var c = 0; c < nc; c++) v += chans[c][j]; v /= nc; lp += a * (v - lp); ef += v * v; el += lp * lp; }
+      full[i] = Math.log(1 + 1000 * ef); low[i] = Math.log(1 + 1000 * el);
+    }
+    var o = new Float32Array(n);
+    for (i = 1; i < n; i++) o[i] = Math.max(0, full[i] - full[i - 1]) + Math.max(0, low[i] - low[i - 1]);
+    // take away the local average so sustained loud passages do not swamp the beat
+    var w = Math.round(fps * 0.4), acc = 0, avg = new Float32Array(n);
+    for (i = 0; i < n; i++) { acc += o[i]; if (i >= w) acc -= o[i - w]; avg[i] = acc / Math.min(i + 1, w); }
+    for (i = 0; i < n; i++) o[i] = Math.max(0, o[i] - avg[i]);
+    function ac(L) { var s = 0, k = 0, fl = Math.floor(L), fr = L - fl; for (var x = 0; x + fl + 1 < n; x++) { s += o[x] * (o[x + fl] * (1 - fr) + o[x + fl + 1] * fr); k++; } return k ? s / k : 0; }
+    var best = 0, bestL = fps / 2, minL = fps * 60 / 200, maxL = fps * 60 / 60;
+    var scores = [];
+    for (var L = minL; L <= maxL; L += 0.25) {
+      var bpm = 60 * fps / L, comb = ac(L) + 0.6 * ac(2 * L) + 0.4 * ac(3 * L) + 0.5 * ac(4 * L);
+      var pr = Math.log2(bpm / 125) / 0.8, score = comb * Math.exp(-0.5 * pr * pr);
+      scores.push(score);
+      if (score > best) { best = score; bestL = L; }
+    }
+    var mean = scores.reduce(function (p, q) { return p + q; }, 0) / scores.length;
+    var bpmOut = 60 * fps / bestL;
+    while (bpmOut < 80) bpmOut *= 2;
+    while (bpmOut > 180) bpmOut /= 2;
+    // refine: the tempo whose beat grid lines up best with the onsets across the whole track (a 0.5 BPM error
+    // drifts a whole beat in two minutes); DAW tracks sit on whole numbers, so snap when close
+    function fit(bpmTry) { var Pp = 60 * fps / bpmTry, bs = -1, bp = 0; for (var p = 0; p < Pp; p += 0.5) { var s2 = 0; for (var t = p; t < n; t += Pp) s2 += o[Math.round(t)] || 0; if (s2 > bs) { bs = s2; bp = p; } } return { s: bs, p: bp }; }
+    var coarse = bpmOut, bestFit = fit(coarse);
+    for (var tb = coarse - 1.5; tb <= coarse + 1.5; tb += 0.05) { var fr = fit(tb); if (fr.s > bestFit.s) { bestFit = fr; bpmOut = tb; } }
+    bpmOut = Math.abs(bpmOut - Math.round(bpmOut)) < 0.2 ? Math.round(bpmOut) : Math.round(bpmOut * 10) / 10;
+    var P = 60 * fps / bpmOut, bestP = fit(bpmOut).p, t;
+    var bestB = 0, bestK = -1;
+    for (var b = 0; b < 4; b++) { var k2 = 0; for (t = bestP + b * P; t < n; t += 4 * P) k2 += Math.max(0, (low[Math.round(t)] || 0) - (low[Math.round(t) - 2] || 0)); if (k2 > bestK) { bestK = k2; bestB = b; } }
+    var barLen = 240 / bpmOut, bar0 = ((bestP + bestB * P) / fps) % barLen;
+    if (bar0 > barLen - 0.15) bar0 = 0; // a downbeat a hair under a bar in is really bar 1 at the start
+    return { bpm: bpmOut, beat0: bestP / fps, bar0: Math.round(bar0 * 1000) / 1000, conf: Math.round(Math.min(1, (best / (mean || 1) - 1) / 2) * 100) / 100 };
   }
   function energy(env, from, to) {
     var a = Math.floor(from / env.step), b = Math.max(a + 1, Math.ceil(to / env.step)), s = 0, k = 0;
@@ -46,7 +92,7 @@
   // pace: how many bars a shot holds at full, mid and low energy
   var PACE = { fast: [1, 2, 4], medium: [2, 4, 8], slow: [4, 8, 16] };
   function autoCut(o) {
-    var bar = 240 / (o.bpm || 120), pace = PACE[o.pace] || PACE.medium, pool = (o.pool || []).filter(function (p) { return p && p.src; });
+    var bar = 240 / (o.bpm || 120), off = o.offset || 0, pace = PACE[o.pace] || PACE.medium, pool = (o.pool || []).filter(function (p) { return p && p.src; });
     if (!pool.length) throw new Error('no clips to cut with');
     var shots = [], recent = [], t = 0, seed = 1, cautionUsed = false;
     function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
@@ -68,7 +114,7 @@
     var peak = -1, peakPick = null;
     if (o.env) {
       var best = 0;
-      for (var x = bar * 4; x < o.seconds - bar * 4; x += bar) { var rise = energy(o.env, x, x + bar * 2) - energy(o.env, x - bar * 2, x); if (rise > best) { best = rise; peak = x; } }
+      for (var x = off + bar * 4; x < o.seconds - bar * 4; x += bar) { var rise = energy(o.env, x, x + bar * 2) - energy(o.env, x - bar * 2, x); if (rise > best) { best = rise; peak = x; } }
       peakPick = pool.filter(function (p) { return !p.caution; }).sort(function (a, b) { return (b.peak ? 2 : 0) + (b.energy || 0) - ((a.peak ? 2 : 0) + (a.energy || 0)); })[0] || null;
       if (!noted) peakPick = null;
     }
@@ -78,7 +124,7 @@
       // a big rise inside the shot (a drop) gets its own cut, on the bar
       if (o.env) for (var b = 1; b < bars; b++) { if (energy(o.env, t + b * bar, t + (b + 1) * bar) - energy(o.env, t + (b - 1) * bar, t + b * bar) > 0.3) { bars = b; break; } }
       if (peak > t + 0.01 && peak < t + bars * bar - 0.01) bars = Math.max(1, Math.round((peak - t) / bar)); // the drop always gets a cut
-      var dur = Math.min(bars * bar, o.seconds - t);
+      var dur = Math.min(bars * bar + (shots.length ? 0 : off), o.seconds - t); // the first shot absorbs any pickup before bar 1
       var choices = pool.filter(function (p) { return recent.indexOf(p.src) < 0 && (!p.dur || p.dur >= Math.min(dur, 3)) && !(p.caution && (cautionUsed || !shots.length)); });
       if (!choices.length) choices = pool.filter(function (p) { return recent[recent.length - 1] !== p.src && !(p.caution && (cautionUsed || !shots.length)); });
       if (!choices.length) choices = pool;
@@ -110,9 +156,9 @@
     return args;
   }
 
-  function energyMap(env, bpm) {
+  function energyMap(env, bpm, offset) {
     var bar = 240 / (bpm || 120), out = '';
-    for (var t = 0; t < env.seconds; t += bar) out += Math.min(9, Math.round(energy(env, t, t + bar) * 9));
+    for (var t = offset || 0; t < env.seconds; t += bar) out += Math.min(9, Math.round(energy(env, t, t + bar) * 9));
     return out;
   }
 
@@ -161,5 +207,5 @@
   }
 
   root.VXEDIT = { STEP: STEP, envelope: envelope, autoCut: autoCut, layout: layout, at: at, ffmpegArgs: ffmpegArgs, PACE: PACE,
-    energyMap: energyMap, finishPlan: finishPlan, matteArgs: matteArgs, finishArgs: finishArgs, IDENT_NAMES: IDENT_NAMES };
+    energyMap: energyMap, tempo: tempo, finishPlan: finishPlan, matteArgs: matteArgs, finishArgs: finishArgs, IDENT_NAMES: IDENT_NAMES };
 })(typeof window !== 'undefined' ? window : this);
