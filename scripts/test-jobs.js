@@ -103,4 +103,13 @@ check('offer draft: bJobsX fields, every tier priced in dollars, draft marker un
   assert.ok(t.split('\n').find(l => l.startsWith('TITLE: ')).length - 7 <= 120);
   s.pricesApproved = true; assert.ok(!J.offerText(s).includes('[DRAFT'));
 });
+check('terms: decided, no faces whatever the brief, old draft moves to the next version', () => {
+  const s = S();
+  assert.ok(!s.terms.text.includes('[OWNER TO DECIDE') && s.terms.text.includes('never shows faces'));
+  const off = mk({ tier: 'edit', houseStyle: false }, s); J.act(off, 'mark_paid', s);
+  assert.ok(J.startBrief(off).includes('No faces still stands'));
+  const old = J.settings({ terms: { version: 1, text: 'VEXVOID COMMISSION TERMS (DRAFT: NOT APPROVED BY THE OWNER)\n3. [OWNER TO DECIDE: x]' }, turnaround: 'x [OWNER TO DECIDE]' });
+  assert.strictEqual(old.terms.version, 2); assert.ok(!old.turnaround.includes('OWNER'));
+  const mine = J.settings({ terms: { version: 4, text: 'my own terms' } }); assert.strictEqual(mine.terms.version, 4);
+});
 console.log(n, 'checks passed');

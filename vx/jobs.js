@@ -34,15 +34,15 @@
   // before payment the deal can still move; after it the quote is frozen
   var OPEN = ['quote', 'awaiting_payment'];
 
-  var TERMS = 'VEXVOID COMMISSION TERMS (DRAFT: NOT APPROVED BY THE OWNER)\n' +
+  var TERMS = 'VEXVOID COMMISSION TERMS\n' +
     '1. Price. In US dollars, paid in full before work starts, to the paymail on your quote (NPG Ltd).\n' +
     '2. Your track. You confirm you own it or have the right to have a video made for it.\n' +
-    '3. The finished video. [OWNER TO DECIDE: you own it outright / NPG Ltd owns it and licenses it to you / shared.]\n' +
-    '4. Catalogue footage. VexVoid catalogue clips used in your video stay NPG Ltd\'s and [OWNER TO DECIDE: may / may not] appear in other artists\' videos. New clips made for your video [OWNER TO DECIDE: are used in your video only / may be reused].\n' +
-    '5. House style. VexVoid works in its house look (no faces, never retro, monochrome) unless your quote says your brief overrides it.\n' +
+    '3. The finished video. NPG Ltd keeps the copyright and gives you a perpetual, worldwide licence to use the finished video however you like, including commercially and monetised on any platform. NPG Ltd will not sell or license your finished video to anyone else.\n' +
+    '4. Footage. VexVoid catalogue clips used in your video stay NPG Ltd\'s and may appear in other videos. New clips made for your video are paid for by you and are used in your video only.\n' +
+    '5. House style. VexVoid works in its house look (monochrome, never retro) unless your quote says your brief comes first. VexVoid never shows faces, whatever the brief.\n' +
     '6. Changes. The rounds of changes in your tier are included; more are quoted separately.\n' +
-    '7. Turnaround. Days on the quote count from payment and are estimates. [OWNER TO DECIDE]\n' +
-    '8. Portfolio. VexVoid [OWNER TO DECIDE: may / may not] show the finished video in its own portfolio.';
+    '7. Turnaround. Days on the quote count from payment and are estimates, not promises. If VexVoid cannot deliver, you get your money back.\n' +
+    '8. Portfolio. VexVoid may show the finished video in its own portfolio unless you ask it not to before paying.';
 
   function defaults() {
     return {
@@ -61,7 +61,7 @@
           includes: 'A world built from scratch, 20+ new clips, a new GPU shader for your track, alternate cuts (square and teaser) and two rounds of changes.' }
       ],
       terms: { version: 1, text: TERMS },
-      turnaround: 'Days per tier count from payment. Estimates, not promises. [OWNER TO DECIDE]'
+      turnaround: 'Days per tier count from payment. Estimates, not promises.'
     };
   }
 
@@ -71,6 +71,9 @@
     Object.keys(d).forEach(function (k) { if (s[k] == null) s[k] = d[k]; });
     if (!Array.isArray(s.tiers) || !s.tiers.length) s.tiers = d.tiers;
     if (!s.terms || typeof s.terms.text !== 'string') s.terms = d.terms;
+    // the first draft had the owner's decisions left open; once decided, saved copies of that draft move on
+    if (s.terms.text.indexOf('[OWNER TO DECIDE') >= 0 && s.terms.text.indexOf('(DRAFT: NOT APPROVED') >= 0) setTerms(s, TERMS);
+    if (String(s.turnaround).indexOf('[OWNER TO DECIDE]') >= 0) s.turnaround = d.turnaround;
     return s;
   }
   // editing the terms text makes a new version, so a job always knows which terms it was sold under
@@ -181,7 +184,7 @@
   function houseLine(job) {
     return job.houseStyle !== false
       ? 'House style is ON: the VexVoid house rules stand (no faces, never retro, monochrome) even where the brief asks otherwise. If the brief conflicts, say so in one line and keep the house look.'
-      : 'House style is OFF: the customer\'s brief comes first, over the house look (colour, other styles). Load the styles skill and match their brief.';
+      : 'House style is OFF: the customer\'s brief comes first, over the house look (colour, other styles). Load the styles skill and match their brief. No faces still stands: never show a face, whatever the brief.';
   }
   function grokLine(q) {
     return q.grok ? 'Grok allowance: up to ' + q.grok + ' new Grok video clips for this job (stills to animate them are fine). Ask the fewest that do the job; each one still needs the person\'s approval.'
