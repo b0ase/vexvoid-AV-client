@@ -37,13 +37,18 @@ export type Rack = { mesh: THREE.Mesh; hp: number; broke: boolean; t: number };
 /** A wall the writer can paint: a plane facing the street, w x h metres, centred at center, facing normal. */
 export type Spot = { id: string; mesh: THREE.Mesh; w: number; h: number; center: THREE.Vector3; normal: THREE.Vector3 };
 /** Something solid at street level the walker cannot pass through (x/z extents). */
-export type Blocker = { x0: number; x1: number; z0: number; z1: number };
+/** Something solid at street level. `low`: you can see over it standing (a parked car, a barrier), not crouched. */
+export type Blocker = { x0: number; x1: number; z0: number; z1: number; low?: boolean };
+/** The pavements stand this far above the road, from this far out from the centre line. */
+export const KERB = { x: 16, h: 0.245 };
 
 export type City = {
   group: THREE.Group;
   /** VexVoid's walls to paint (empty in the TERRORNODE set). */
   spots: Spot[];
   blockers: Blocker[];
+  /** How high the ground is here: the road, or a pavement. */
+  groundY: (x: number, z: number) => number;
   windows: THREE.InstancedMesh;
   wins: Window[];
   racks: Rack[];
@@ -734,6 +739,9 @@ export function buildCity({ renderer, scene, high, look, vexvoid = false }: { re
   if (vexvoid) hideEnd();
 
   // ── Street furniture: lamps, cables, lanterns, vending machines, barriers, trash ──
+  // what a body cannot walk through (the writer, the officers): filled in as the street is dressed
+  const blockers: Blocker[] = [];
+  const solid = (x: number, z: number, hx: number, hz: number, low = false) => blockers.push({ x0: x - hx, x1: x + hx, z0: z - hz, z1: z + hz, low });
   const poleMat = track(new THREE.MeshStandardMaterial({ color: '#1b1e25', roughness: 0.5, metalness: 0.8 }));
   const lampBulb = track(neon('#ffcf8a', 3));
   const lamps: THREE.PointLight[] = [];
@@ -746,6 +754,7 @@ export function buildCity({ renderer, scene, high, look, vexvoid = false }: { re
       const z = -10 - i * 14 - (sx > 0 ? 7 : 0);
       const p = new THREE.CylinderGeometry(0.12, 0.17, 8, 8);
       p.translate(sx * 16.5, 4, z);
+      solid(sx * 16.5, z, 0.17, 0.17, true);
       const a = new THREE.BoxGeometry(2.6, 0.15, 0.15);
       a.translate(sx * 15.3, 8, z);
       poleGeos.push(p, a);
@@ -842,6 +851,7 @@ export function buildCity({ renderer, scene, high, look, vexvoid = false }: { re
   const addVend = (x: number, z: number, ry: number) => {
     const t = ri(3);
     vendMats[t].push(M(x, 0.25, z, 1, 1, 1, ry));
+    solid(x, z, 0.46, 0.46);
     addPool(x + Math.sin(ry) * 1.6, z + Math.cos(ry) * 1.6, 4.5, 4.5, VC[t], 0.9, 0.27);
     addGlow(x + Math.sin(ry) * 0.5, 1.4, z + Math.cos(ry) * 0.5, VC[t], 1.2, 0, 0.25);
   };
@@ -890,9 +900,10 @@ export function buildCity({ renderer, scene, high, look, vexvoid = false }: { re
     const x = 6.6 + i * 1.7;
     const z = -27 - i * 0.6;
     barM.push(M(x, 0.5, z, 1, 1, 1, 0.12 + i * 0.01));
+    solid(x, z, 0.8, 0.2, true);
     if (i % 2 === 0) addGlow(x, 1.2, z, '#ffb000', 0.9, 1, 3);
   }
-  for (const sx of [-1, 1]) for (let i = 0; i < 4; i++) barM.push(M(sx * 14.6, 0.5, -34 - i * 1.7 - (sx > 0 ? 40 : 0), 1, 1, 1, Math.PI / 2));
+  for (const sx of [-1, 1]) for (let i = 0; i < 4; i++) { const z = -34 - i * 1.7 - (sx > 0 ? 40 : 0); barM.push(M(sx * 14.6, 0.5, z, 1, 1, 1, Math.PI / 2)); solid(sx * 14.6, z, 0.14, 0.8, true); }
   instanced(new THREE.BoxGeometry(1.6, 0.8, 0.22), track(new THREE.MeshStandardMaterial({ map: bcv, roughness: 0.5, metalness: 0.1 })), barM, undefined, high);
 
   // trash: bags, bins, cardboard stacks, clustered at the alley mouths and shop fronts
@@ -908,7 +919,9 @@ export function buildCity({ renderer, scene, high, look, vexvoid = false }: { re
       bagC.push(new THREE.Color(['#10131a', '#1a1226', '#0f1a1a', '#2a2a30'][ri(4)]));
     }
     if (R() < 0.6) {
-      binM.push(M(x + rr(-1.2, 1.2), 0.25, z + rr(-1, 1)));
+      const bx = x + rr(-1.2, 1.2), bz = z + rr(-1, 1);
+      binM.push(M(bx, 0.25, bz));
+      solid(bx, bz, 0.36, 0.36, true);
       binC.push(new THREE.Color(['#2a3d48', '#3a2a48', '#2f4a36', '#4a3a2a'][ri(4)]));
     }
     const nx = ri(4);
@@ -1043,6 +1056,7 @@ export function buildCity({ renderer, scene, high, look, vexvoid = false }: { re
     const sx = i % 2 ? 1 : -1;
     const z = -14 - i * rr(9, 12);
     parkM.push(M(sx * 13.3, 0.45, z, 1, 1, 1, R() < 0.5 ? 0 : Math.PI));
+    solid(sx * 13.3, z, 1.2, 2.45, true);
     parkC.push(new THREE.Color(PAINT[ri(PAINT.length)]));
     const gc = GLOWC[ri(GLOWC.length)];
     parkG.push(new THREE.Color(gc));
@@ -1463,7 +1477,6 @@ export function buildCity({ renderer, scene, high, look, vexvoid = false }: { re
 
   // ── VexVoid's end of the street: a rail bridge over it, a wall closing it, and walls to paint ──
   const spots: Spot[] = [];
-  const blockers: Blocker[] = [];
   if (vexvoid) {
     const wallMat = (w: number, h: number, tint: string) => { const m = track(look.material('concrete_floor_02', [w / 5, h / 5], tint, 0.02)); m.roughness = 0.92; m.envMapIntensity = 0.5; return m; };
     const slab = (w: number, h: number, d: number, x: number, y: number, z: number, tint = '#55585f') => {
@@ -1664,6 +1677,7 @@ export function buildCity({ renderer, scene, high, look, vexvoid = false }: { re
     group,
     spots,
     blockers,
+    groundY: (x) => (Math.abs(x) >= KERB.x ? KERB.h : 0),
     windows,
     wins,
     racks,

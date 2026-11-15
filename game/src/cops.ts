@@ -53,7 +53,7 @@ const RUN_SPEED = 5.5, JOG_SPEED = 3.4, WALK_SPEED = 1.6, BUST_R = 1.0, SIGHT = 
 type Cop = { w: Writer; helmet: THREE.Group; head: THREE.Object3D; x: number; z: number; h: number; out: boolean; doing: 'in' | 'run' | 'search' | 'return' | 'bust';
   wind: number; tired: number; side: number; goal: THREE.Vector2; look: number; door: number };
 
-export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: string; blockers: Blocker[]; bounds: { x: number; z0: number; z1: number }; sound: () => { ctx: AudioContext; out: AudioNode } | null }): Promise<Law> {
+export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: string; blockers: Blocker[]; groundY: (x: number, z: number) => number; bounds: { x: number; z0: number; z1: number }; sound: () => { ctx: AudioContext; out: AudioNode } | null }): Promise<Law> {
   const { scene, high, blockers, bounds } = o;
   const car = makeCar(high);
   scene.add(car.group, car.search, car.search.target, car.beam);
@@ -128,9 +128,10 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
     pushOut(p, r);
   };
   // line of sight at street level: does the segment cross a pier or the wall?
-  const clear = (ax: number, az: number, bx: number, bz: number) => {
+  const clear = (ax: number, az: number, bx: number, bz: number, crouch = false) => {
     const dx = bx - ax, dz = bz - az;
     for (const b of blockers) {
+      if (b.low && !crouch) continue; // you can be seen over a car or a barrier, unless you get down behind it
       let t0 = 0, t1 = 1;
       for (const [p, d, lo, hi] of [[ax, dx, b.x0, b.x1], [az, dz, b.z0, b.z1]]) {
         if (Math.abs(d) < 1e-6) { if (p < lo || p > hi) { t0 = 2; break; } continue; }
@@ -145,7 +146,7 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
     const dx = me.x - ox, dz = me.z - oz, d = Math.hypot(dx, dz);
     if (d > range || d < 0.01) return d < 0.01;
     if (Math.abs(ang(Math.atan2(dx, dz) - h)) > half) return false;
-    return clear(ox, oz, me.x, me.z);
+    return clear(ox, oz, me.x, me.z, me.crouch);
   };
 
   // ── sound: a siren made from oscillators (nothing to download); a whoop on alert, a wail while they hunt ──
@@ -255,7 +256,7 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
     const lit = carS.onStreet && (() => {
       const dx = me.x - mount.x, dz = me.z - mount.z, dy = me.y + 1 - mount.y, d = Math.hypot(dx, dy, dz);
       const bx = aimS.x - mount.x, by = aimS.y - mount.y, bz = aimS.z - mount.z, bl = Math.hypot(bx, by, bz);
-      return d < 48 && (dx * bx + dy * by + dz * bz) / (d * bl) > Math.cos(0.17) && clear(mount.x, mount.z, me.x, me.z);
+      return d < 48 && (dx * bx + dy * by + dz * bz) / (d * bl) > Math.cos(0.17) && clear(mount.x, mount.z, me.x, me.z, me.crouch);
     })();
     const fromCar = carS.onStreet && (lit || sees(carS.x + Math.sin(carS.h) * 2.4, carS.z + Math.cos(carS.h) * 2.4, carS.h, 0.62, me.crouch ? 14 : 26, me));
     let fromCops = false;
@@ -328,7 +329,7 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
     }
     for (const cp of cops) {
       if (!cp.out) continue;
-      cp.w.root.position.set(cp.x, 0, cp.z); cp.w.root.rotation.y = cp.h;
+      cp.w.root.position.set(cp.x, o.groundY(cp.x, cp.z), cp.z); cp.w.root.rotation.y = cp.h;
       cp.w.update(dt); helmetAt(cp);
     }
 

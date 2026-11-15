@@ -61,7 +61,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     return bus;
   };
   say('Calling the law…');
-  const law = await makeLaw({ scene, high, base: opts.base, blockers: city.blockers, bounds: BOUNDS, sound });
+  const law = await makeLaw({ scene, high, base: opts.base, blockers: city.blockers, groundY: city.groundY, bounds: BOUNDS, sound });
   // a soft light that rides with the writer so the hoodie reads against the dark street
   const rim = new THREE.PointLight('#ffffff', 9, 7, 2);
   const back = new THREE.PointLight('#ffffff', 6, 5, 2); // a kicker behind, to edge the hood and shoulders
@@ -93,7 +93,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   comp.addPass(grade.pass);
 
   // the writer on the ground; the camera orbits behind and over the right shoulder
-  const me = { x: 0, z: 8, y: 0, vy: 0, heading: Math.PI, crouch: false, airborne: false };
+  const me = { x: 0, z: 8, y: 0, gy: 0, vy: 0, heading: Math.PI, crouch: false, airborne: false };
   const camO = { yaw: 0, pitch: 0.12, dist: 3.4 };
   const keys = new Set<string>();
   const MOVE = ['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Shift', ' ', 'c', 'f', 'p', 'r', '1', '2', '3', 'Tab', 'Escape'];
@@ -234,7 +234,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       // aim: where the mouse points on this wall, if the writer can reach it
       ray.setFromCamera(mouse, cam);
       const h = spray.hit(ray);
-      const reach = h && h.id === sp.id && h.point.y < me.y + 2.35 && h.point.y > 0.08 &&
+      const reach = h && h.id === sp.id && h.point.y < me.gy + me.y + 2.35 && h.point.y > me.gy + 0.08 &&
         Math.abs((h.point.x - me.x) * tx + (h.point.z - me.z) * tz) < 1.25;
       reticle.visible = !!(h && h.id === sp.id);
       if (h && h.id === sp.id) {
@@ -286,13 +286,16 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       const idle = idleT % 16 > 9 ? 'Idle_FoldArms_Loop' : 'Idle_Loop';
       writer.play(me.crouch ? (moving ? 'Crouch_Fwd_Loop' : 'Crouch_Idle_Loop') : moving ? (sprint ? 'Sprint_Loop' : 'Jog_Fwd_Loop') : idle, idle === 'Idle_FoldArms_Loop' ? 0.6 : 0.22);
     }
-    writer.root.position.set(me.x, me.y, me.z);
+    // the ground under the writer: up a kerb is a quick step, not a pop
+    me.gy += (city.groundY(me.x, me.z) - me.gy) * Math.min(1, dt * 16);
+    const py = me.gy + me.y;
+    writer.root.position.set(me.x, py, me.z);
     writer.root.rotation.y = me.heading;
     writer.update(dt);
-    rim.position.set(me.x + Math.sin(camO.yaw) * 1.8 + Math.cos(camO.yaw) * 0.9, me.y + 2.4, me.z + Math.cos(camO.yaw) * 1.8 - Math.sin(camO.yaw) * 0.9);
-    back.position.set(me.x - Math.sin(camO.yaw) * 1.4, me.y + 2.1, me.z - Math.cos(camO.yaw) * 1.4);
+    rim.position.set(me.x + Math.sin(camO.yaw) * 1.8 + Math.cos(camO.yaw) * 0.9, py + 2.4, me.z + Math.cos(camO.yaw) * 1.8 - Math.sin(camO.yaw) * 0.9);
+    back.position.set(me.x - Math.sin(camO.yaw) * 1.4, py + 2.1, me.z - Math.cos(camO.yaw) * 1.4);
     // the camera: behind, above, over the right shoulder, kept inside the street
-    const tgtY = me.y + (me.crouch ? 1.05 : 1.45);
+    const tgtY = py + (me.crouch ? 1.05 : 1.45);
     const cx = me.x + Math.sin(camO.yaw) * Math.cos(camO.pitch) * camO.dist + Math.cos(camO.yaw) * 0.55;
     const cz = me.z + Math.cos(camO.yaw) * Math.cos(camO.pitch) * camO.dist - Math.sin(camO.yaw) * 0.55;
     camPos.set(Math.max(-26.5, Math.min(26.5, cx)), Math.max(0.35, tgtY + Math.sin(camO.pitch) * camO.dist), Math.max(BOUNDS.z0 - 0.5, Math.min(BOUNDS.z1 + 4, cz)));
