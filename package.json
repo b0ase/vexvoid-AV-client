@@ -10,6 +10,7 @@
     "start": "electron ./main.js",
     "build": "electron-builder",
     "build-mac": "electron-builder --mac --publish=never",
+    "build-mac:unsigned": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --publish=never -c.mac.identity=null -c.mac.notarize=false",
     "build-win": "electron-builder --win --publish=never",
     "build-linux": "electron-builder --linux --publish=never",
     "dist": "electron-builder --mac --win --linux --publish=never",
@@ -72,7 +73,6 @@
     "mac": {
       "category": "public.app-category.graphics-design",
       "icon": "vexvoid-icon.png",
-      "identity": "Richard Boase (ZQ4NX9NJ89)",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
