@@ -1785,27 +1785,71 @@
     .code-in{display:flex;gap:10px;align-items:center;border-top:1px solid #161616;padding:10px 0;font-size:12px}
     .code-in input{flex:1;background:none;border:0;color:#fff;font:inherit;outline:none}
     /* EDIT */
-    .ed{display:flex;flex-direction:column;gap:10px;width:100%;height:100%;min-height:0}
-    .ed-top{display:flex;gap:8px;align-items:center}
-    .ed-title{flex:1;font-family:'Michroma','IBM Plex Mono',sans-serif;font-size:18px;letter-spacing:.16em;outline:none}
-    .ed-mid{flex:1;min-height:0;display:grid;grid-template-columns:1fr 300px;gap:12px}
-    .ed-view{background:#000;border:1px solid #1d1d1d;display:flex;align-items:center;justify-content:center;min-height:0}
-    .ed-view video{width:100%;height:100%;object-fit:contain}
-    .ed-shot{border:1px solid #1d1d1d;padding:12px;display:flex;flex-direction:column;gap:8px;font-size:11px;overflow:auto}
-    .ed-btns{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-    .ed-finish{font-size:9px;letter-spacing:.16em;color:#999;display:inline-flex;align-items:center;gap:5px;margin:0 8px;cursor:pointer}.ed-finish input{accent-color:#fff;margin:0}
-    .ed-btns button{font:inherit;font-size:9px;letter-spacing:.16em;background:none;color:#ddd;border:1px solid #333;padding:7px 4px;cursor:pointer}.ed-btns button:hover{border-color:#fff;color:#fff}
-    .ed-bar{display:flex;justify-content:space-between;font-size:9px;letter-spacing:.2em;color:#777}
-    .ed-tl{position:relative;height:96px;border:1px solid #1d1d1d;background:#050505;cursor:pointer;flex:none}
-    .ed-env{position:absolute;left:0;bottom:0;width:100%;height:46px}
-    .ed-shots{position:absolute;left:0;right:0;top:4px;height:42px}
-    .ed-shots > div{position:absolute;top:0;height:100%;box-sizing:border-box;border:1px solid #444;border-left-color:#999;background:#141414;color:#bbb;font-size:8px;letter-spacing:.06em;padding:3px;overflow:hidden;white-space:nowrap}
-    .ed-shots > div.on{background:#fff;color:#000;border-color:#fff}
-    .ed-head{position:absolute;top:0;bottom:0;width:1px;background:#fff;left:0;pointer-events:none}
-    .ed-bin{display:flex;gap:8px;overflow-x:auto;flex:none;padding-bottom:4px}
-    .ed-clip{flex:none;width:128px;cursor:pointer;font-size:8px;letter-spacing:.06em;color:#999}
-    .ed-clip video{width:128px;height:72px;object-fit:cover;background:#111;display:block;filter:grayscale(1)}.ed-clip:hover video{filter:none}
+    .ed{display:flex;flex-direction:column;gap:8px;width:100%;height:100%;min-height:0}
+    .ed-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .ed-title{flex:1;min-width:160px;font-family:'Michroma','IBM Plex Mono',sans-serif;font-size:18px;letter-spacing:.16em;outline:none}
+    .ed-ic{font:inherit;font-size:14px;line-height:1;background:none;color:#ddd;border:1px solid #333;width:30px;height:28px;cursor:pointer;padding:0}.ed-ic:hover{border-color:#fff;color:#fff}.ed-ic:disabled{opacity:.3;cursor:default;border-color:#333}
+    .ed-finish{font-size:9px;letter-spacing:.16em;color:#999;display:inline-flex;align-items:center;gap:5px;margin:0 4px;cursor:pointer}.ed-finish input{accent-color:#fff;margin:0}
+    .ed-main{flex:1;min-height:0;display:grid;grid-template-columns:40px 210px minmax(0,1fr) 230px;gap:8px}
+    .ed-rail{display:flex;flex-direction:column;align-items:center;gap:4px;border:1px solid #1d1d1d;padding:4px 0}
+    .ed-rail button{width:30px;height:30px;display:grid;place-items:center;background:none;border:1px solid transparent;color:#888;cursor:pointer;padding:0}
+    .ed-rail button:hover{color:#fff;border-color:#333}.ed-rail button.on{color:#000;background:#fff;border-color:#fff}
+    .ed-rail svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.4}
+    .ed-rail hr{border:0;border-top:1px solid #222;margin:4px 0;width:24px}
+    .ed-media{border:1px solid #1d1d1d;display:flex;flex-direction:column;min-height:0;min-width:0}
+    .ed-mhead{display:flex;gap:4px;padding:6px;border-bottom:1px solid #1d1d1d}
+    .ed-mhead input{flex:1;min-width:0;background:#000;border:1px solid #333;color:#ddd;font:inherit;font-size:9px;letter-spacing:.12em;padding:5px;outline:none}.ed-mhead input:focus{border-color:#fff}
+    .ed-mhead select{width:84px;font-size:8px}
+    .ed-bin{flex:1;overflow:auto;display:grid;grid-template-columns:1fr 1fr;gap:8px 6px;padding:6px;align-content:start}
+    .ed-clip{cursor:grab;font-size:8px;letter-spacing:.06em;color:#999;min-width:0}
+    .ed-clip video{width:100%;aspect-ratio:16/9;object-fit:cover;background:#111;display:block;filter:grayscale(1);pointer-events:none}.ed-clip:hover video{filter:none}.ed-clip:hover{color:#fff}
     .ed-clip span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px}
+    .ed-hint{font-size:7px;letter-spacing:.14em;line-height:1.6;color:#555;padding:6px;border-top:1px solid #1d1d1d}
+    .ed-view{display:flex;flex-direction:column;min-height:0;min-width:0;border:1px solid #1d1d1d}
+    .ed-stage{flex:1;min-height:0;container-type:size;display:grid;place-items:center;background:#030303}
+    .ed-frame{position:relative;width:min(100cqw,calc(100cqh * 16 / 9));aspect-ratio:16/9;background:#000;overflow:hidden}
+    .ed-frame[data-look="house"] .ed-layer,.ed-frame[data-look="scope"] .ed-layer{filter:grayscale(1) contrast(1.12)}
+    .ed-layer{position:absolute;inset:0}.ed-layer video{width:100%;height:100%;object-fit:cover;display:block}
+    .ed-lbox{position:absolute;inset:0;pointer-events:none}
+    .ed-lbox::before,.ed-lbox::after{content:'';position:absolute;left:0;right:0;height:var(--lb,0%);background:#000}.ed-lbox::before{top:0}.ed-lbox::after{bottom:0}
+    .ed-transport{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-top:1px solid #1d1d1d;gap:10px}
+    .ed-tc{font-size:12px;letter-spacing:.08em;color:#fff;min-width:170px;white-space:nowrap}.ed-tc small{color:#777;font-size:9px;margin-left:8px;letter-spacing:.16em}
+    .ed-tc.dim{color:#666;text-align:right}
+    .ed-tbtns{display:flex;gap:4px}.ed-tbtns button{background:none;border:1px solid #333;color:#ddd;width:32px;height:26px;cursor:pointer;display:grid;place-items:center;padding:0}.ed-tbtns button:hover{border-color:#fff;color:#fff}.ed-tbtns svg{width:11px;height:11px;fill:currentColor}
+    .ed-insp{border:1px solid #1d1d1d;padding:10px;display:flex;flex-direction:column;gap:8px;font-size:10px;overflow:auto;min-height:0}
+    .ed-ih{font-size:8px;letter-spacing:.24em;color:#666}
+    .ed-insp b{font-size:11px;letter-spacing:.06em;word-break:break-word;font-weight:500}
+    .ed-isub{font-size:9px;color:#888;line-height:1.5}
+    .ed-fields{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}.ed-fields label{display:flex;flex-direction:column;gap:3px;font-size:8px;letter-spacing:.16em;color:#777}
+    .ed-fields input,.ed-mks input{background:#000;border:1px solid #333;color:#fff;font:inherit;font-size:10px;padding:4px;width:100%;box-sizing:border-box;outline:none}.ed-fields input:focus,.ed-mks input:focus{border-color:#fff}
+    .ed-btns{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+    .ed-btns button{font:inherit;font-size:9px;letter-spacing:.16em;background:none;color:#ddd;border:1px solid #333;padding:7px 4px;cursor:pointer}.ed-btns button:hover{border-color:#fff;color:#fff}
+    .ed-mks{display:flex;flex-direction:column;gap:4px}.ed-mks div{display:grid;grid-template-columns:62px 1fr 22px;gap:4px;align-items:center;font-size:9px;color:#999;cursor:pointer}
+    .ed-mks button{background:none;border:1px solid #333;color:#888;cursor:pointer;padding:2px 0}.ed-mks button:hover{color:#fff;border-color:#fff}
+    .ed-keys{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:9px;color:#888}.ed-keys kbd{font:inherit;color:#fff;white-space:nowrap}
+    .ed-tlw{flex:none;display:flex;flex-direction:column;border:1px solid #1d1d1d;background:#050505}
+    .ed-tlbar{display:flex;align-items:center;gap:14px;padding:5px 8px;font-size:9px;letter-spacing:.18em;color:#777;border-bottom:1px solid #161616}
+    .ed-tlbar #edStatus{flex:1;text-align:right;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+    .ed-zoom{display:flex;align-items:center;gap:6px}.ed-zoom input{width:110px;accent-color:#fff}
+    .ed-tlgrid{display:grid;grid-template-columns:96px minmax(0,1fr)}
+    .ed-heads{border-right:1px solid #1d1d1d}
+    .ed-hd{display:flex;align-items:center;justify-content:space-between;padding:0 6px;border-bottom:1px solid #121212;box-sizing:border-box;font-size:9px;letter-spacing:.18em;color:#aaa}
+    .ed-hd span{display:flex;gap:2px}.ed-hd button{background:none;border:0;color:#555;cursor:pointer;padding:2px;display:grid;place-items:center}.ed-hd button:hover{color:#ccc}.ed-hd button.on{color:#fff}
+    .ed-hd svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.4}
+    .ed-scroll{overflow-x:auto;overflow-y:hidden;position:relative}
+    .ed-content{position:relative;user-select:none;touch-action:none}
+    .ed-cv{position:absolute;top:0;left:0;pointer-events:none}
+    .ed-row{position:absolute;left:0;right:0;box-sizing:border-box}
+    .ed-row.off .ed-it{opacity:.3}
+    .ed-it{position:absolute;top:3px;bottom:3px;box-sizing:border-box;background:#161616 repeat-x left center/auto 100%;border:1px solid #3a3a3a;overflow:hidden;cursor:grab;z-index:1}
+    .ed-it span{position:absolute;left:5px;top:3px;right:5px;font-size:8px;letter-spacing:.06em;color:#fff;text-shadow:0 0 3px #000,0 0 2px #000;white-space:nowrap;overflow:hidden;pointer-events:none}
+    .ed-it i{position:absolute;top:0;bottom:0;width:5px;cursor:ew-resize}.ed-it i.l{left:0}.ed-it i.r{right:0}.ed-it:hover i{background:#ffffff38}
+    .ed-it.on{border:2px solid #fff}
+    .ed-content.razor .ed-it,.ed-content.razor .ed-it i{cursor:crosshair}
+    .ed-music{position:absolute;top:3px;bottom:3px;left:0;border:1px solid #2a2a2a;box-sizing:border-box;pointer-events:none}.ed-music span{position:absolute;left:5px;top:3px;font-size:8px;letter-spacing:.1em;color:#888;white-space:nowrap}
+    .ed-ph{position:absolute;top:0;left:0;width:1px;background:#fff;pointer-events:none;z-index:3}.ed-ph::before{content:'';position:absolute;top:0;left:-5px;border:5px solid transparent;border-top:7px solid #fff;border-bottom:0}
+    .ed-mk{position:absolute;top:3px;width:9px;height:12px;margin-left:-4px;background:#fff;clip-path:polygon(0 0,100% 0,100% 62%,50% 100%,0 62%);cursor:pointer;z-index:2}
+    .ed-ghost{position:absolute;border:1px dashed #fff;background:#ffffff14;pointer-events:none;z-index:2;box-sizing:border-box}
     /* MUSIC release carousel */
     .mc{display:grid;grid-template-columns:28px 1fr 28px;align-items:center;gap:6px;margin:6px 0 10px}
     .mc-arrow{font:inherit;font-size:22px;background:none;border:0;color:#777;cursor:pointer;height:100%}.mc-arrow:hover{color:#fff}
@@ -2575,19 +2619,51 @@
     </div>
 
     <!-- Composer Tab Content -->
-    <!-- EDIT: cut a music video from clips to a track -->
+    <!-- EDIT: a timeline editor for music videos (vx/timeline.js) -->
     <div class="tab-content" id="editTab">
       <div class="ed">
         <div class="ed-top">
           <div class="ed-title" id="edTitle" contenteditable="true" spellcheck="false">UNTITLED VIDEO</div>
+          <button class="ed-ic" id="edUndo" title="Undo (⌘Z)">↶</button><button class="ed-ic" id="edRedo" title="Redo (⇧⌘Z)">↷</button>
           <select id="edTrack" class="gen-select"></select>
           <select id="edPace" class="gen-select"><option value="fast">FAST CUTS</option><option value="medium" selected>MEDIUM</option><option value="slow">SLOW</option></select>
-          <button id="edAuto" class="gen-btn hot">AUTO-CUT</button><button id="edPlay" class="gen-btn">PLAY</button><button id="edClear" class="gen-btn">CLEAR</button><label class="ed-finish" title="Faint V3X idents in the corners every ~19 s and matte flashes on the two biggest hits, as on the finished VexVoid videos"><input type="checkbox" id="edFinish" checked> FINISH</label><select id="edLook" class="gen-select" title="The look of the export: grade, letterbox and flash frames (rendered with MLT)"><option value="house">HOUSE · MONO</option><option value="scope">SCOPE · 2.39 + FLASHES</option><option value="raw">RAW · AS SHOT</option></select><button id="edExport" class="gen-btn">EXPORT MP4</button><button id="edShotcut" class="gen-btn" title="Open the last export as a Shotcut project, to finish it by hand" disabled>OPEN IN SHOTCUT</button>
+          <button id="edAuto" class="gen-btn hot" title="Cut the whole track from your clips on V1 (undo with ⌘Z)">AUTO-CUT</button><button id="edClear" class="gen-btn">CLEAR</button><label class="ed-finish" title="Faint V3X idents in the corners every ~19 s and matte flashes on the two biggest hits, as on the finished VexVoid videos"><input type="checkbox" id="edFinish" checked> FINISH</label><select id="edLook" class="gen-select" title="The look of the export: grade, letterbox and flash frames (rendered with MLT); the preview shows the grade and letterbox"><option value="house">HOUSE · MONO</option><option value="scope">SCOPE · 2.39 + FLASHES</option><option value="raw">RAW · AS SHOT</option></select><button id="edExport" class="gen-btn">EXPORT MP4</button><button id="edShotcut" class="gen-btn" title="Open the last export as a Shotcut project, to finish it by hand" disabled>OPEN IN SHOTCUT</button>
         </div>
-        <div class="ed-mid"><div class="ed-view"><video id="edVideo" muted playsinline></video></div><div class="ed-shot" id="edShot"></div></div>
-        <div class="ed-bar"><span id="edLen"></span><span id="edStatus"></span></div>
-        <div class="ed-tl" id="edTl"></div>
-        <div class="ed-bin" id="edBin"></div>
+        <div class="ed-main">
+          <div class="ed-rail" id="edRail">
+            <button data-tool="select" title="Select: move clips, drag their edges to trim (V)"><svg viewBox="0 0 16 16"><path d="M4 2l9 6-4 1 2.5 4.5-1.8 1L7.2 10 4 13z"/></svg></button>
+            <button data-tool="razor" title="Razor: click a clip to cut it there (C)"><svg viewBox="0 0 16 16"><circle cx="4" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><path d="M5.5 10.5L12 2M10.5 10.5L4 2"/></svg></button>
+            <hr>
+            <button data-act="snap" title="Snap to clip edges, markers, the playhead and the beat (N)"><svg viewBox="0 0 16 16"><path d="M3 2v6a5 5 0 0010 0V2h-3v6a2 2 0 01-4 0V2z"/></svg></button>
+            <button data-act="split" title="Split at the playhead (S)"><svg viewBox="0 0 16 16"><path d="M8 1v14M3 4h3v8H3M13 4h-3v8h3"/></svg></button>
+            <button data-act="marker" title="Marker at the playhead (M)"><svg viewBox="0 0 16 16"><path d="M4 14V2h8l-2 3 2 3H4"/></svg></button>
+            <button data-act="fit" title="Fit the edit to the timeline (\)"><svg viewBox="0 0 16 16"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg></button>
+          </div>
+          <div class="ed-media">
+            <div class="ed-mhead"><input id="edFind" placeholder="SEARCH CLIPS" spellcheck="false"><select id="edSrc" class="gen-select"><option value="all">ALL</option><option value="catalogue">CATALOGUE</option><option value="generated">GROK</option><option value="recorded">RECORDED</option><option value="wallet">WALLET</option></select></div>
+            <div class="ed-bin" id="edBin"></div>
+            <div class="ed-hint">DRAG CLIPS ONTO THE TIMELINE · DOUBLE-CLICK DROPS ONE AT THE PLAYHEAD · FILES FROM FINDER WORK TOO</div>
+          </div>
+          <div class="ed-view">
+            <div class="ed-stage"><div class="ed-frame" id="edStage"><div class="ed-layer" data-track="v1"></div><div class="ed-layer" data-track="v2"></div><div class="ed-lbox"></div></div></div>
+            <div class="ed-transport">
+              <span class="ed-tc" id="edTc">00:00:00</span>
+              <div class="ed-tbtns">
+                <button data-t="start" title="Start (Home)"><svg viewBox="0 0 16 16"><path d="M3 3h2v10H3zM13 3v10L6 8z"/></svg></button>
+                <button data-t="prev" title="Previous edit (↑)"><svg viewBox="0 0 16 16"><path d="M8 3v10L2 8zM14 3v10L8 8z"/></svg></button>
+                <button data-t="play" id="edPlay" title="Play / pause (space)"></button>
+                <button data-t="next" title="Next edit (↓)"><svg viewBox="0 0 16 16"><path d="M2 3v10l6-5zM8 3v10l6-5z"/></svg></button>
+                <button data-t="end" title="End (End)"><svg viewBox="0 0 16 16"><path d="M3 3v10l7-5zM11 3h2v10h-2z"/></svg></button>
+              </div>
+              <span class="ed-tc dim" id="edDur">00:00:00</span>
+            </div>
+          </div>
+          <div class="ed-insp" id="edShot"></div>
+        </div>
+        <div class="ed-tlw">
+          <div class="ed-tlbar"><span id="edLen"></span><span id="edStatus"></span><label class="ed-zoom">ZOOM <input type="range" id="edZoom" min="0" max="1" step="0.001"></label></div>
+          <div class="ed-tlgrid"><div class="ed-heads" id="edHeads"></div><div class="ed-scroll" id="edScroll"><div class="ed-content" id="edContent"></div></div></div>
+        </div>
       </div>
     </div>
 
@@ -5646,17 +5722,35 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       });
       function alertNote(t) { const c = document.getElementById('recChip'); c.title = t; if (typeof aiLine === 'function' && document.getElementById('aiTab').classList.contains('active')) aiLine('tool', t); }
 
-      // ===== EDIT: cut a music video from clips to a track (vx/editor.js). VexVoid drives it with the editor tool. =====
-      const ED_STORE = 'vx.edit.v1';
-      const ed = { title: 'UNTITLED VIDEO', track: null, shots: [], env: null, sel: -1, playing: false, audio: null, raf: 0, cur: -1, rendering: false };
-      try { Object.assign(ed, JSON.parse(localStorage.getItem(ED_STORE) || '{}'), { env: null, playing: false, audio: null, cur: -1, rendering: false }); } catch (e) {}
+      // ===== EDIT: a timeline editor for music videos. vx/timeline.js holds the project and every edit; vx/editor.js cuts to the
+      // music; vx/mlt.js renders. The mouse, the keyboard and VexVoid (the editor tool) all make the same edits, and all can be undone.
+      const ED_STORE = 'vx.edit.v2';
+      const ed = { title: 'UNTITLED VIDEO', track: null, proj: VXTL.newProject(), sel: [], t: 0, pps: 0, tool: 'select', snap: true, look: 'house', lookOver: null,
+        env: null, playing: false, rate: 1, clk: null, audio: null, raf: 0, rendering: false, lastExport: null, lastProject: null, snapAt: null };
+      const edHist = new VXTL.History();
+      (function edLoad() {
+        try {
+          const s = JSON.parse(localStorage.getItem(ED_STORE) || 'null');
+          if (s) { ['title', 'track', 'proj', 'pps', 'snap', 'look', 'lookOver', 't'].forEach(k => { if (s[k] != null) ed[k] = s[k]; }); return; }
+          const old = JSON.parse(localStorage.getItem('vx.edit.v1') || '{}'); // the first EDIT kept a plain list of shots
+          ['title', 'track', 'look', 'lookOver'].forEach(k => { if (old[k] != null) ed[k] = old[k]; });
+          if (old.shots) VXTL.track(ed.proj, 'v1').items = VXTL.fromShots(old.shots);
+        } catch (e) {}
+      })();
       const edEl = id => document.getElementById(id);
-      function edSave() { try { localStorage.setItem(ED_STORE, JSON.stringify({ title: ed.title, track: ed.track, shots: ed.shots, sel: ed.sel, look: ed.look, lookOver: ed.lookOver })); } catch (e) {} }
+      const edTrk = id => VXTL.track(ed.proj, id);
+      const edShots = () => VXTL.sorted(edTrk('v1'));
+      const edLength = () => VXTL.length(ed.proj);
+      const edEnd = () => edLength() || (ed.track && ed.track.seconds) || 0;
+      function edSave() { try { localStorage.setItem(ED_STORE, JSON.stringify({ title: ed.title, track: ed.track, proj: ed.proj, pps: ed.pps, snap: ed.snap, look: ed.look, lookOver: ed.lookOver, t: ed.t })); } catch (e) {} }
       function edSay(t) { edEl('edStatus').textContent = t; }
+      // every change to the edit goes through edDo, so it can be undone
+      function edDo(fn) { edHist.push(ed.proj); const r = fn(); edSave(); edRender(); return r; }
+      function edRestore(p) { if (!p) return; ed.proj = p; ed.sel = ed.sel.filter(i => VXTL.find(p, i)); edSave(); edRender(); }
+      const edUndo = () => edRestore(edHist.undo(ed.proj)), edRedo = () => edRestore(edHist.redo(ed.proj));
       // the edit's tempo: one set by hand, else the track's own (detected when it loads), else the mixer's
       function edBpm() { return (ed.track && (ed.track.tempo || ed.track.bpm)) || (VXGEN.signals && VXGEN.signals.bpm) || 120; }
       const edBar0 = () => (ed.track && !ed.track.tempo && ed.track.bar0) || 0;
-      function edLength() { return ed.shots.reduce((n, s) => n + s.dur, 0); }
       // notes on what is in each catalogue clip (scripts/caption-clips.js writes vx/clip-notes.json, keyed by URL)
       let clipNotesCache = null;
       function clipNotes() {
@@ -5684,7 +5778,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       // logos, glyphs and ident cards belong in titles and the finish, never in the shot pool (studio rule)
       const isIdent = p => /\bIDENT\b|\bLOGO\b|\bGLYPH\b/i.test(p.name) || p.subject === 'glyph';
       async function edLocal(src) { return /^(\/|file:)/.test(src) ? src.replace(/^file:\/\//, '') : cacheMedia({ name: 'clip', url: src }); }
-      async function edDurations(pool) { // how long each clip is (a hidden video element per clip, a few at a time)
+      async function edDurations(pool) { // how long each clip is (a hidden video element per clip, a few at a time); sets p.dur
         const out = [], q = pool.slice(0, 80);
         await Promise.all(Array.from({ length: 6 }, async () => { while (q.length) { const p = q.shift();
           const v = document.createElement('video'); v.preload = 'metadata'; v.muted = true; v.src = /^\//.test(p.src) ? 'file://' + encodeURI(p.src) : p.src;
@@ -5700,6 +5794,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           ed.track.bpm = ed.env.bpm; ed.track.bar0 = ed.env.bar0; ed.track.tempoConf = ed.env.tempoConf; edSave();
           edSay(`${t.name} · ${mmss(ed.env.seconds)} · ${edBpm()} BPM`);
         } catch (e) { edSay('Could not read the track: ' + e.message); }
+        if (!edLength()) ed.pps = 0;
         edRender();
       }
       async function edEnsureEnv() { if (!ed.env && ed.track) await edSetTrack(ed.track); return ed.env; }
@@ -5719,86 +5814,488 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         }
         const pool = (await edDurations(cands)).filter(p => p.dur > 0.5);
         if (!pool.length) throw new Error('no clips match');
-        ed.shots = VXEDIT.autoCut({ seconds: ed.env.seconds, env: ed.env, bpm: edBpm(), offset: edBar0(), pool, pace });
-        ed.sel = -1; edSave(); edRender();
-        edSay(`${ed.shots.length} shots cut to ${ed.track.name} at ${edBpm()} BPM (${pace})`);
-        return ed.shots.length;
+        const shots = VXEDIT.autoCut({ seconds: ed.env.seconds, env: ed.env, bpm: edBpm(), offset: edBar0(), pool, pace });
+        ed.sel = []; ed.pps = 0;
+        edDo(() => { edTrk('v1').items = VXTL.fromShots(shots); });
+        edSay(`${shots.length} shots cut to ${ed.track.name} at ${edBpm()} BPM (${pace}). ⌘Z undoes it.`);
+        return shots.length;
       }
-      // preview: the track plays, the video follows the edit
-      function edStop() { ed.playing = false; cancelAnimationFrame(ed.raf); if (ed.audio) ed.audio.pause(); const v = edEl('edVideo'); if (v) v.pause(); edEl('edPlay') && (edEl('edPlay').textContent = 'PLAY'); }
-      async function edPlay(from) {
-        if (!ed.track) { edSay('Pick a track first.'); return; }
-        if (!ed.audio) { ed.audio = new Audio(); ed.audio.addEventListener('ended', edStop); }
+
+      // ----- preview: one video element per clip (a small pool), V1 under V2, seeked to the frame; the music is the clock
+      const edVids = new Map();
+      function edVid(src) {
+        let v = edVids.get(src);
+        if (v) { edVids.delete(src); edVids.set(src, v); return v; } // most recently used goes last
+        v = document.createElement('video'); v.muted = true; v.playsInline = true; v.preload = 'auto';
+        edLocal(src).then(f => { v.addEventListener('loadedmetadata', () => edShowAt(ed.t, ed.playing && ed.rate > 0), { once: true }); v.src = 'file://' + encodeURI(f); }).catch(() => {});
+        edVids.set(src, v);
+        if (edVids.size > 10) for (const [k, old] of edVids) { if (edVids.size <= 10) break; if (!old.isConnected) { old.removeAttribute('src'); old.load(); edVids.delete(k); } }
+        return v;
+      }
+      function edShowAt(t, playing) {
+        const stage = edEl('edStage'); if (!stage) return;
+        const used = new Set();
+        ['v1', 'v2'].forEach(tid => {
+          const tr = edTrk(tid), slot = stage.querySelector(`.ed-layer[data-track="${tid}"]`);
+          const it = tr && !tr.hidden ? VXTL.itemAt(tr, t) : null;
+          if (!it) { if (slot.firstChild) slot.firstChild.remove(); return; }
+          const v = edVid(it.src); used.add(v);
+          if (slot.firstChild !== v) { if (slot.firstChild) slot.firstChild.remove(); slot.appendChild(v); }
+          if (!v.duration) return;
+          const pos = (it.in + t - it.start) % v.duration; // a clip shorter than its shot loops, as it does in the export
+          if (playing) { v.playbackRate = Math.max(0.25, ed.rate); if (v.paused) { v.currentTime = pos; v.play().catch(() => {}); } else if (Math.abs(v.currentTime - pos) > 0.2) v.currentTime = pos; }
+          else { if (!v.paused) v.pause(); if (Math.abs(v.currentTime - pos) > 0.5 / VXTL.FPS) v.currentTime = pos; }
+        });
+        // the next clip on each track is loaded and parked on its first frame a second early, so cuts land clean
+        if (playing) ['v1', 'v2'].forEach(tid => {
+          const tr = edTrk(tid), now = VXTL.itemAt(tr, t), nx = VXTL.itemAt(tr, t + 1);
+          if (!nx || (now && now.id === nx.id)) return;
+          const v = edVid(nx.src); if (used.has(v) || !v.duration) return;
+          if (Math.abs(v.currentTime - nx.in % v.duration) > 0.1) v.currentTime = nx.in % v.duration;
+        });
+        edVids.forEach(v => { if (!used.has(v) && !v.paused) v.pause(); });
+      }
+      function edAudio() {
+        if (!ed.track) return null;
+        if (!ed.audio) ed.audio = new Audio();
         const want = ed.track.source === 'local' ? 'file://' + encodeURI(ed.track.url) : ed.track.url;
         if (ed.audio.dataset.src !== want) { ed.audio.src = want; ed.audio.dataset.src = want; }
-        if (from != null) ed.audio.currentTime = from;
-        ed.playing = true; ed.cur = -1; edEl('edPlay').textContent = 'PAUSE';
-        await ed.audio.play().catch(() => {});
-        const v = edEl('edVideo');
-        const tick = async () => {
+        ed.audio.muted = !!edTrk('a1').muted;
+        return ed.audio;
+      }
+      function edStop() { ed.playing = false; cancelAnimationFrame(ed.raf); if (ed.audio) ed.audio.pause(); edShowAt(ed.t, false); edDrawHead(); }
+      // play at a rate: 1 normal, 2 and 4 fast (L), negative backwards (J); the music runs only going forwards
+      async function edPlay(rate = 1) {
+        const end = edEnd(); if (!end) { edSay('Pick a track, or drop some clips on the timeline.'); return; }
+        if (rate > 0 && ed.t >= end - 0.05) ed.t = 0;
+        cancelAnimationFrame(ed.raf); ed.playing = true; ed.rate = rate; ed.clk = { t: ed.t, at: performance.now() };
+        const a = rate > 0 && ed.t < (ed.track && ed.track.seconds || 0) ? edAudio() : null;
+        if (ed.audio && !a) ed.audio.pause();
+        // the music becomes the clock once it is really playing; until then (or if it never starts) a clock holds the time
+        let live = false, waiting = !!a; const asked = performance.now();
+        if (a) { a.currentTime = ed.t; a.playbackRate = rate; a.play().then(() => { if (!ed.playing || ed.rate !== rate) return; if (!waiting) a.currentTime = ed.t; live = true; waiting = false; }, () => { waiting = false; }); }
+        const tick = () => {
           if (!ed.playing) return;
-          const t = ed.audio.currentTime, a = VXEDIT.at(ed.shots, t);
-          if (a) {
-            const want = a.shot.in + a.offset;
-            if (a.i !== ed.cur) { ed.cur = a.i; const f = await edLocal(a.shot.src).catch(() => null); if (f && ed.cur === a.i) { v.src = 'file://' + encodeURI(f); v.currentTime = want % (v.duration || 1e9); v.play().catch(() => {}); } }
-            else if (v.readyState >= 1 && v.duration && Math.abs(v.currentTime - want % v.duration) > 0.15) v.currentTime = want % v.duration;
-          }
-          edDrawHead(t);
+          const now = performance.now();
+          if (waiting && now - asked > 600) waiting = false;
+          let t = live && !a.paused && !a.ended ? a.currentTime : waiting ? ed.clk.t : ed.clk.t + (now - ed.clk.at) / 1000 * ed.rate;
+          ed.clk = { t, at: now };
+          if (t >= end || (rate < 0 && t <= 0)) { ed.t = Math.max(0, Math.min(t, end)); edStop(); return; }
+          ed.t = t; edShowAt(t, rate > 0); edDrawHead(true);
           ed.raf = requestAnimationFrame(tick);
         };
-        tick();
+        edDrawHead(); tick();
       }
-      // timeline
+      function edSeek(t) {
+        ed.t = Math.max(0, Math.min(t, Math.max(edEnd(), 0)));
+        if (ed.playing) { ed.clk = { t: ed.t, at: performance.now() }; if (ed.audio && !ed.audio.paused && ed.rate > 0) ed.audio.currentTime = ed.t; }
+        else edShowAt(ed.t, false);
+        edDrawHead(true);
+      }
+
+      // ----- timeline
+      const ED_H = { ruler: 26, video: 50, audio: 38 };
+      const ED_IC = {
+        eye: '<svg viewBox="0 0 16 16"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/></svg>',
+        eyeOff: '<svg viewBox="0 0 16 16"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5zM2 2l12 12"/></svg>',
+        lock: '<svg viewBox="0 0 16 16"><rect x="3" y="7" width="10" height="7"/><path d="M5 7V5a3 3 0 016 0v2"/></svg>',
+        open: '<svg viewBox="0 0 16 16"><rect x="3" y="7" width="10" height="7"/><path d="M5 7V5a3 3 0 016 0"/></svg>',
+        sound: '<svg viewBox="0 0 16 16"><path d="M2 6h3l4-3v10L5 10H2zM11 5a4 4 0 010 6"/></svg>',
+        mute: '<svg viewBox="0 0 16 16"><path d="M2 6h3l4-3v10L5 10H2zM11 6l4 4M15 6l-4 4"/></svg>',
+        play: '<svg viewBox="0 0 16 16"><path d="M4 2l10 6-10 6z"/></svg>', pause: '<svg viewBox="0 0 16 16"><path d="M4 2h3v12H4zM9 2h3v12H9z"/></svg>'
+      };
+      function edRows() { let y = ED_H.ruler; return ed.proj.tracks.map(tr => { const r = { tr, y, h: ED_H[tr.kind] }; y += r.h; return r; }); }
+      const edFitPps = () => Math.max(1, Math.min(400, ((edEl('edScroll').clientWidth || 900) - 24) / Math.max(edEnd(), 10)));
       function edRender() {
-        const tl = edEl('edTl'); if (!tl) return;
-        edEl('edTitle').textContent = ed.title;
-        const total = Math.max(edLength(), ed.track && ed.track.seconds || 0, 1), W = tl.clientWidth || 1200;
-        tl.innerHTML = '<canvas class="ed-env"></canvas><div class="ed-shots"></div><div class="ed-head"></div>';
-        const cv = tl.querySelector('canvas'); cv.width = W; cv.height = 46;
-        if (ed.env) { const x = cv.getContext('2d'); x.fillStyle = '#3a3a3a'; ed.env.rms.forEach((r, i) => { const px = i * ed.env.step / total * W; x.fillRect(px, 46 - r * 44, Math.max(1, ed.env.step / total * W - 0.5), r * 44); }); }
-        const row = tl.querySelector('.ed-shots'); let start = 0;
-        ed.shots.forEach((s, i) => {
-          const b = document.createElement('div'); b.className = 'ed-cut' + (i === ed.sel ? ' on' : '');
-          b.style.left = (start / total * 100) + '%'; b.style.width = (s.dur / total * 100) + '%';
-          b.textContent = s.name.replace(/^(GROK|RECORDED|WALLET) · /, ''); b.title = `${s.name} · ${s.dur.toFixed(2)}s from ${s.in}s`;
-          b.onclick = e => { e.stopPropagation(); ed.sel = i; edSave(); edRender(); edPlay(start + 0.01); edStop(); edShowShot(); };
-          row.appendChild(b); start += s.dur;
+        const content = edEl('edContent'); if (!content) return;
+        if (document.activeElement !== edEl('edTitle')) edEl('edTitle').textContent = ed.title;
+        if (!ed.pps) ed.pps = edFitPps();
+        const rows = edRows(), H = rows[rows.length - 1].y + rows[rows.length - 1].h, sc = edEl('edScroll');
+        content.style.width = Math.max((edEnd() + 30) * ed.pps, sc.clientWidth) + 'px'; content.style.height = H + 'px';
+        content.classList.toggle('razor', ed.tool === 'razor');
+        content.innerHTML = '<canvas class="ed-cv"></canvas>';
+        const heads = edEl('edHeads');
+        heads.innerHTML = `<div class="ed-hd" style="height:${ED_H.ruler}px"></div>`;
+        rows.forEach(({ tr, y, h }) => {
+          const hd = document.createElement('div'); hd.className = 'ed-hd'; hd.style.height = h + 'px';
+          hd.innerHTML = `<b>${tr.kind === 'audio' ? 'A1 MUSIC' : tr.name}</b><span>${tr.kind === 'video' ? `<button data-k="hidden" class="${tr.hidden ? '' : 'on'}" title="Show / hide">${tr.hidden ? ED_IC.eyeOff : ED_IC.eye}</button>`
+            : `<button data-k="muted" class="${tr.muted ? '' : 'on'}" title="Sound on / off">${tr.muted ? ED_IC.mute : ED_IC.sound}</button>`}<button data-k="locked" class="${tr.locked ? 'on' : ''}" title="Lock">${tr.locked ? ED_IC.lock : ED_IC.open}</button></span>`;
+          hd.querySelectorAll('button').forEach(b => b.onclick = () => { edDo(() => { tr[b.dataset.k] = !tr[b.dataset.k]; }); if (b.dataset.k === 'muted' && ed.audio) ed.audio.muted = tr.muted; });
+          heads.appendChild(hd);
+          const row = document.createElement('div'); row.className = 'ed-row' + (tr.hidden ? ' off' : ''); row.dataset.track = tr.id;
+          row.style.top = y + 'px'; row.style.height = h + 'px';
+          if (tr.kind === 'video') tr.items.forEach(it => row.appendChild(edItemEl(it)));
+          else if (ed.track) { const m = document.createElement('div'); m.className = 'ed-music'; m.style.width = (ed.track.seconds || 0) * ed.pps + 'px'; const s = document.createElement('span'); s.textContent = `${ed.track.name} · ${edBpm()} BPM`; m.appendChild(s); row.appendChild(m); }
+          content.appendChild(row);
         });
-        tl.onclick = e => { const r = tl.getBoundingClientRect(), t = (e.clientX - r.left) / r.width * total; ed.playing ? edPlay(t) : (edPlay(t), setTimeout(edStop, 120)); };
-        edEl('edLen').textContent = `${ed.shots.length} SHOTS · ${mmss(edLength())}${ed.track ? ' / ' + mmss(ed.track.seconds || 0) : ''}`;
-        edShowShot(); edBin();
+        ed.proj.markers.forEach(m => { const k = document.createElement('div'); k.className = 'ed-mk'; k.dataset.id = m.id; k.style.left = m.t * ed.pps + 'px'; k.title = `${m.label} · ${VXTL.timecode(m.t)} (drag to move, right-click to delete)`; content.appendChild(k); });
+        const ph = document.createElement('div'); ph.className = 'ed-ph'; ph.style.height = H + 'px'; content.appendChild(ph);
+        edDrawCanvas(); edDrawHead(); edInspector(); edLabels(); edBin(); edTools();
+        edEl('edZoom').value = Math.log(ed.pps) / Math.log(400);
+        edEl('edUndo').disabled = !edHist.past.length; edEl('edRedo').disabled = !edHist.future.length;
+        const L = edLookNow(), fr = edEl('edStage'); fr.dataset.look = ed.look || 'house';
+        fr.querySelector('.ed-lbox').style.setProperty('--lb', L.letterbox > 16 / 9 ? ((1 - 16 / 9 / L.letterbox) / 2 * 100).toFixed(2) + '%' : '0%');
+        if (!ed.playing) edShowAt(ed.t, false);
       }
-      function edDrawHead(t) { const tl = edEl('edTl'), h = tl && tl.querySelector('.ed-head'); if (!h) return; const total = Math.max(edLength(), ed.track && ed.track.seconds || 0, 1); h.style.left = (t / total * 100) + '%'; }
-      function edShowShot() {
-        const box = edEl('edShot'), s = ed.shots[ed.sel];
-        if (!s) { box.innerHTML = '<div class="wb-note">Pick a shot on the timeline to trim, move or swap it. AUTO-CUT builds a whole edit from your clips; VexVoid can do it all from the AI tab.</div>'; return; }
-        const bar = 240 / edBpm();
-        box.innerHTML = `<b></b><div class="wb-note"></div><div class="ed-btns"><button data-a="short">− BEAT</button><button data-a="long">+ BEAT</button><button data-a="left">← MOVE</button><button data-a="right">MOVE →</button><button data-a="later">LATER IN CLIP</button><button data-a="swap">SWAP CLIP</button><button data-a="del">DELETE</button></div>`;
-        box.querySelector('b').textContent = s.name; box.querySelector('.wb-note').textContent = `${s.dur.toFixed(2)} s, from ${s.in.toFixed(1)} s into the clip`;
-        box.querySelectorAll('button').forEach(b => b.onclick = () => {
-          const i = ed.sel, a = b.dataset.a;
-          if (a === 'short') s.dur = Math.max(bar / 4, s.dur - bar / 4); else if (a === 'long') s.dur += bar / 4;
-          else if (a === 'left' && i > 0) { [ed.shots[i - 1], ed.shots[i]] = [ed.shots[i], ed.shots[i - 1]]; ed.sel--; }
-          else if (a === 'right' && i < ed.shots.length - 1) { [ed.shots[i + 1], ed.shots[i]] = [ed.shots[i], ed.shots[i + 1]]; ed.sel++; }
-          else if (a === 'later') s.in = Math.round((s.in + s.dur) * 100) / 100;
-          else if (a === 'swap') { const p = edPool(); const n = p[Math.floor(Math.random() * p.length)]; if (n) { s.src = n.src; s.name = n.name; s.in = 0; } }
-          else if (a === 'del') { ed.shots.splice(i, 1); ed.sel = Math.min(i, ed.shots.length - 1); }
-          edSave(); edRender();
+      function edItemEl(it) {
+        const el = document.createElement('div'); el.className = 'ed-it' + (ed.sel.includes(it.id) ? ' on' : '');
+        el.dataset.id = it.id; el.dataset.src = it.src;
+        el.style.left = it.start * ed.pps + 'px'; el.style.width = Math.max(2, it.dur * ed.pps) + 'px';
+        const th = edThumbs.get(it.src); if (th) el.style.backgroundImage = `url(${th})`; else edThumb(it.src);
+        const n = document.createElement('span'); n.textContent = it.name.replace(/^(GROK|RECORDED|WALLET) · /, '');
+        el.title = `${it.name}\n${VXTL.timecode(it.start)} · ${it.dur.toFixed(2)} s · from ${it.in.toFixed(2)} s into the clip`;
+        const l = document.createElement('i'), r = document.createElement('i'); l.className = 'l'; r.className = 'r';
+        el.append(n, l, r);
+        return el;
+      }
+      // the canvas covers only the visible part of the timeline: ruler, beat grid, music waveform, marker lines, snap line
+      function edDrawCanvas() {
+        const content = edEl('edContent'), sc = edEl('edScroll'), cv = content && content.querySelector('.ed-cv'); if (!cv) return;
+        const w = sc.clientWidth, H = parseFloat(content.style.height) || 160, sl = sc.scrollLeft, pps = ed.pps, dpr = window.devicePixelRatio || 1;
+        cv.style.left = sl + 'px'; cv.style.width = w + 'px'; cv.style.height = H + 'px'; cv.width = w * dpr; cv.height = H * dpr;
+        const x = cv.getContext('2d'); x.scale(dpr, dpr);
+        const rows = edRows(), t0 = sl / pps, t1 = (sl + w) / pps, X = t => t * pps - sl;
+        x.fillStyle = '#0a0a0a'; x.fillRect(0, 0, w, ED_H.ruler);
+        rows.forEach(({ tr, y, h }) => { x.fillStyle = tr.kind === 'video' ? '#070707' : '#040404'; x.fillRect(0, y, w, h); x.fillStyle = '#121212'; x.fillRect(0, y + h - 1, w, 1); });
+        // the beat grid: bars brighter than beats, beats only when they are far enough apart to read
+        const beat = 60 / edBpm(), b0 = edBar0(), top = ED_H.ruler, bot = rows.filter(r => r.tr.kind === 'video').reduce((m, r) => Math.max(m, r.y + r.h), top);
+        if (beat * pps * 4 >= 6) for (let k = Math.floor((t0 - b0) / beat); k * beat + b0 <= t1; k++) {
+          const isBar = ((k % 4) + 4) % 4 === 0; if (!isBar && beat * pps < 7) continue;
+          x.fillStyle = isBar ? '#1f1f1f' : '#121212'; x.fillRect(Math.round(X(k * beat + b0)), top, 1, bot - top);
+        }
+        // the ruler
+        const R = VXTL.ruler(pps); x.fillStyle = '#444';
+        for (let t = Math.floor(t0 / R.tick) * R.tick; t <= t1; t += R.tick) x.fillRect(Math.round(X(t)), ED_H.ruler - 5, 1, 5);
+        x.font = '9px "IBM Plex Mono", monospace'; x.textBaseline = 'top';
+        for (let t = Math.floor(t0 / R.label) * R.label; t <= t1; t += R.label) {
+          const px = Math.round(X(t)); x.fillStyle = '#666'; x.fillRect(px, ED_H.ruler - 10, 1, 10);
+          x.fillStyle = '#999'; x.fillText(R.label < 1 ? VXTL.timecode(t) : VXTL.timecode(t).slice(0, 5), px + 4, 4);
+        }
+        // the music's loudness on A1
+        const a1 = rows.find(r => r.tr.kind === 'audio');
+        if (a1 && ed.env && ed.track) {
+          x.fillStyle = a1.tr.muted ? '#242424' : '#5b5b5b'; const mid = a1.y + a1.h / 2 + 4, amp = a1.h / 2 - 7;
+          for (let px = Math.max(0, X(0)); px < Math.min(w, X(ed.env.seconds)); px += 2) { const r = ed.env.rms[Math.floor((px + sl) / pps / ed.env.step)] || 0; x.fillRect(px, mid - r * amp, 1.5, Math.max(1, r * amp * 2)); }
+        }
+        x.strokeStyle = '#ffffff55'; x.setLineDash([2, 3]);
+        ed.proj.markers.forEach(m => { const px = Math.round(X(m.t)) + 0.5; if (px < 0 || px > w) return; x.beginPath(); x.moveTo(px, ED_H.ruler); x.lineTo(px, H); x.stroke(); });
+        x.setLineDash([]);
+        if (ed.snapAt != null) { x.fillStyle = '#fff'; x.fillRect(Math.round(X(ed.snapAt)), 0, 1, H); }
+      }
+      function edBarBeat(t) {
+        const beat = 60 / edBpm(), k = Math.floor((t - edBar0()) / beat + 1e-6);
+        return k < 0 ? 'PICKUP' : `BAR ${Math.floor(k / 4) + 1}.${(k % 4) + 1}`;
+      }
+      function edDrawHead(follow) {
+        const ph = document.querySelector('#edContent .ed-ph'); if (ph) ph.style.transform = `translateX(${ed.t * ed.pps}px)`;
+        edEl('edTc').innerHTML = `${VXTL.timecode(ed.t)}<small>${edBarBeat(ed.t)}</small>`;
+        edEl('edPlay').innerHTML = ed.playing && ed.rate > 0 ? ED_IC.pause : ED_IC.play;
+        if (follow) { const sc = edEl('edScroll'), px = ed.t * ed.pps; if (px > sc.scrollLeft + sc.clientWidth - 30 || px < sc.scrollLeft) sc.scrollLeft = Math.max(0, px - (ed.playing ? 30 : sc.clientWidth / 2)); }
+      }
+      function edLabels() {
+        const n1 = edTrk('v1').items.length, n2 = edTrk('v2').items.length;
+        edEl('edLen').textContent = `V1 ${n1} CLIPS${n2 ? ` · V2 ${n2}` : ''} · ${mmss(edLength())}${ed.track ? ' / TRACK ' + mmss(ed.track.seconds || 0) : ''} · ${edBpm()} BPM${ed.snap ? ' · SNAP' : ''}`;
+        edEl('edDur').textContent = VXTL.timecode(edEnd());
+      }
+      function edMarkSel() { document.querySelectorAll('#edContent .ed-it').forEach(el => el.classList.toggle('on', ed.sel.includes(el.dataset.id))); edInspector(); }
+      function edTools() {
+        edEl('edRail').querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === ed.tool));
+        edEl('edRail').querySelector('[data-act="snap"]').classList.toggle('on', ed.snap);
+      }
+      function edZoom(pps, at = ed.t, px) {
+        const sc = edEl('edScroll'); if (px == null) px = at * ed.pps - sc.scrollLeft;
+        ed.pps = Math.max(1, Math.min(400, pps)); edSave(); edRender();
+        sc.scrollLeft = Math.max(0, at * ed.pps - px); edDrawCanvas();
+      }
+
+      // thumbnails: one grey frame per clip, repeated along the clip like a filmstrip
+      const edThumbs = new Map(), edThumbQ = []; let edThumbBusy = 0;
+      function edThumb(src) { if (edThumbs.has(src)) return; edThumbs.set(src, null); edThumbQ.push(src); edThumbRun(); }
+      async function edThumbRun() {
+        if (edThumbBusy >= 2 || !edThumbQ.length) return;
+        edThumbBusy++; const src = edThumbQ.shift();
+        try {
+          const f = await edLocal(src);
+          const url = await new Promise(res => {
+            const v = document.createElement('video'); v.muted = true; v.preload = 'auto';
+            v.onloadedmetadata = () => { v.currentTime = Math.min(1, (v.duration || 2) / 2); };
+            v.onseeked = () => {
+              const c = document.createElement('canvas'); c.width = 96; c.height = 54; const x = c.getContext('2d'), s = Math.max(96 / v.videoWidth, 54 / v.videoHeight);
+              x.filter = 'grayscale(1)'; x.drawImage(v, (96 - v.videoWidth * s) / 2, (54 - v.videoHeight * s) / 2, v.videoWidth * s, v.videoHeight * s);
+              let u = null; try { u = c.toDataURL('image/jpeg', 0.7); } catch (e) {}
+              v.removeAttribute('src'); v.load(); res(u);
+            };
+            v.onerror = () => res(null); setTimeout(() => res(null), 12000);
+            v.src = 'file://' + encodeURI(f);
+          });
+          edThumbs.set(src, url);
+          if (url) document.querySelectorAll('#edContent .ed-it').forEach(el => { if (el.dataset.src === src) el.style.backgroundImage = `url(${url})`; });
+        } catch (e) {}
+        edThumbBusy--; edThumbRun();
+      }
+
+      // ----- the inspector: the selected clip, or the project, its markers and the keys
+      function edInspector() {
+        const box = edEl('edShot'); if (!box) return;
+        const sel = ed.sel.map(i => VXTL.find(ed.proj, i)).filter(Boolean);
+        const beat = 60 / edBpm();
+        if (sel.length === 1) {
+          const { track: tr, item: it } = sel[0], c = catalogue().clips.find(x => x.url === it.src), tr8 = c ? clipTraits(c.url, c.set) : {};
+          box.innerHTML = `<div class="ed-ih">CLIP · ${tr.name}${tr.locked ? ' · LOCKED' : ''}</div><b></b><div class="ed-isub"></div>
+            <div class="ed-fields"><label>START<input data-f="start" type="number" step="0.01" min="0"></label><label>LENGTH<input data-f="dur" type="number" step="0.01" min="0.04"></label><label>IN<input data-f="in" type="number" step="0.01" min="0"></label></div>
+            <div class="ed-isub">${(it.dur / beat).toFixed(2)} BEATS · ${VXTL.timecode(it.start)} → ${VXTL.timecode(it.start + it.dur)}</div>
+            <div class="ed-btns"><button data-a="short">− BEAT</button><button data-a="long">+ BEAT</button><button data-a="later">LATER IN CLIP</button><button data-a="swap">SWAP CLIP</button><button data-a="split">SPLIT · S</button><button data-a="layer">TO ${tr.id === 'v1' ? 'V2' : 'V1'}</button><button data-a="del">DELETE · ⌫</button><button data-a="ripple">RIPPLE · ⇧⌫</button></div>`;
+          box.querySelector('b').textContent = it.name;
+          box.querySelector('.ed-isub').textContent = [tr8.phase, tr8.energy != null ? 'energy ' + Math.round(tr8.energy * 9) : '', tr8.desc].filter(Boolean).join(' · ') || it.src.split('/').pop();
+          box.querySelectorAll('input').forEach(inp => {
+            inp.value = it[inp.dataset.f].toFixed(2);
+            inp.onchange = () => { const v = Math.max(0, +inp.value || 0); if (tr.locked) return edInspector(); edDo(() => { it[inp.dataset.f] = inp.dataset.f === 'dur' ? Math.max(1 / VXTL.FPS, v) : v; VXTL.place(tr, it); }); };
+          });
+          box.querySelectorAll('button').forEach(b => b.onclick = () => {
+            if (tr.locked) return;
+            const a = b.dataset.a;
+            if (a === 'split') return edSplit();
+            if (a === 'del' || a === 'ripple') return edDelete(a === 'ripple');
+            edDo(() => {
+              // − / + BEAT ripple the rest of the track, so a run of shots stays on the beat
+              if (a === 'short' || a === 'long') { const d = a === 'long' ? beat : -Math.min(beat, it.dur - 1 / VXTL.FPS), e0 = it.start + it.dur; tr.items.forEach(x => { if (x !== it && x.start >= e0 - 1e-3) x.start = Math.max(0, x.start + d); }); it.dur += d; if (d > 0) VXTL.place(tr, it); }
+              else if (a === 'later') it.in = Math.round((it.in + it.dur) * 100) / 100;
+              else if (a === 'swap') { const p = edPool().filter(x => !isIdent(x) && x.src !== it.src); const n = p[Math.floor(Math.random() * p.length)]; if (n) { it.src = n.src; it.name = n.name; it.in = 0; } }
+              else if (a === 'layer') { tr.items = tr.items.filter(x => x !== it); VXTL.place(edTrk(tr.id === 'v1' ? 'v2' : 'v1'), it); }
+            });
+          });
+          return;
+        }
+        if (sel.length > 1) {
+          box.innerHTML = `<div class="ed-ih">${sel.length} CLIPS</div><div class="ed-isub">${mmss(sel.reduce((n, s) => n + s.item.dur, 0))} in all. Drag one to move them together.</div><div class="ed-btns"><button data-a="split">SPLIT · S</button><button data-a="del">DELETE · ⌫</button><button data-a="ripple">RIPPLE · ⇧⌫</button></div>`;
+          box.querySelectorAll('button').forEach(b => b.onclick = () => b.dataset.a === 'split' ? edSplit() : edDelete(b.dataset.a === 'ripple'));
+          return;
+        }
+        const tk = ed.track;
+        box.innerHTML = `<div class="ed-ih">EDIT</div><b></b><div class="ed-isub">${tk ? `${tk.name}<br>${mmss(tk.seconds || 0)} · ${edBpm()} BPM ${tk.tempo ? '(set by hand)' : '(detected)'} · bar 1 at ${edBar0().toFixed(2)} s` : 'Pick a track, then AUTO-CUT or drag clips in.'}</div>
+          <div class="ed-ih">MARKERS</div><div class="ed-mks"></div>
+          <div class="ed-ih">KEYS</div><div class="ed-keys"><kbd>SPACE</kbd><span>play / pause</span><kbd>J K L</kbd><span>back · stop · forward (again = faster)</span><kbd>← →</kbd><span>one frame (⇧ one beat)</span><kbd>↑ ↓</kbd><span>previous / next edit</span><kbd>V C</kbd><span>select · razor</span><kbd>S</kbd><span>split at the playhead</span><kbd>M</kbd><span>marker</span><kbd>N</kbd><span>snap on / off</span><kbd>⌫ ⇧⌫</kbd><span>delete · ripple delete</span><kbd>⌘Z ⇧⌘Z</kbd><span>undo · redo</span><kbd>⌘D</kbd><span>duplicate</span><kbd>⌥ DRAG</kbd><span>copy a clip</span><kbd>⌘ SCROLL</kbd><span>zoom (= − \\)</span><kbd>⇧ DRAG RULER</kbd><span>scrub snapped</span></div>`;
+        box.querySelector('b').textContent = ed.title;
+        const mks = box.querySelector('.ed-mks');
+        if (!ed.proj.markers.length) mks.innerHTML = '<div class="ed-isub" style="display:block">Press M to drop one at the playhead.</div>';
+        ed.proj.markers.slice().sort((a, b) => a.t - b.t).forEach(m => {
+          const row = document.createElement('div'), tc = document.createElement('span'), inp = document.createElement('input'), del = document.createElement('button');
+          tc.textContent = VXTL.timecode(m.t); tc.onclick = () => edSeek(m.t);
+          inp.value = m.label; inp.onchange = () => edDo(() => { m.label = inp.value.slice(0, 40); });
+          del.textContent = '✕'; del.onclick = () => edDo(() => { ed.proj.markers = ed.proj.markers.filter(x => x.id !== m.id); });
+          row.append(tc, inp, del); mks.appendChild(row);
         });
       }
-      function edBin() {
-        const bin = edEl('edBin'); if (!bin || bin.dataset.n === String(edPool().length)) return;
-        bin.dataset.n = edPool().length; bin.innerHTML = '';
-        edPool().slice(0, 300).forEach(p => {
-          const c = document.createElement('div'); c.className = 'ed-clip';
-          const v = document.createElement('video'); v.muted = true; v.preload = 'metadata'; v.src = (/^\//.test(p.src) ? 'file://' + encodeURI(p.src) : p.src) + '#t=1';
-          c.onmouseenter = () => v.play().catch(() => {}); c.onmouseleave = () => v.pause();
-          const n = document.createElement('span'); n.textContent = p.name;
-          c.append(v, n); c.title = 'Click to add at the end (4 beats)';
-          c.onclick = () => { ed.shots.push({ src: p.src, name: p.name, in: 0, dur: 240 / edBpm() }); ed.sel = ed.shots.length - 1; edSave(); edRender(); };
+
+      // ----- edits from the keyboard and the rail
+      function edSplit() {
+        const ids = ed.sel.length ? ed.sel : null;
+        const under = ed.proj.tracks.some(tr => tr.kind === 'video' && !tr.locked && tr.items.some(it => (!ids || ids.includes(it.id)) && ed.t > it.start + 1 / VXTL.FPS && ed.t < it.start + it.dur - 1 / VXTL.FPS));
+        if (!under) { edSay('Nothing under the playhead to split.'); return; }
+        edDo(() => VXTL.split(ed.proj, ed.t, ids || undefined));
+      }
+      function edDelete(ripple) { if (!ed.sel.length) return; const ids = ed.sel.slice(); ed.sel = []; edDo(() => VXTL.remove(ed.proj, ids, ripple)); }
+      function edMarker() { edDo(() => ed.proj.markers.push({ id: VXTL.id('m'), t: Math.round(ed.t * 1000) / 1000, label: 'M' + (ed.proj.markers.length + 1) })); }
+      function edDuplicate() {
+        if (!ed.sel.length) return;
+        const made = [];
+        edDo(() => ed.sel.forEach(i => { const f = VXTL.find(ed.proj, i); if (!f || f.track.locked) return; const it = VXTL.place(f.track, Object.assign({}, f.item, { id: VXTL.id(), start: f.item.start + f.item.dur })); made.push(it.id); }));
+        ed.sel = made; edMarkSel();
+      }
+      function edTool(t) { ed.tool = t; edTools(); edEl('edContent').classList.toggle('razor', t === 'razor'); }
+
+      // ----- the mouse on the timeline: scrub the ruler, select, move (⌥ copies), trim edges, razor, drag markers
+      let edDrag = null;
+      const edTimeAt = e => Math.max(0, (e.clientX - edEl('edContent').getBoundingClientRect().left) / ed.pps);
+      function edRowAt(e) { const y = e.clientY - edEl('edContent').getBoundingClientRect().top; return edRows().find(R => y >= R.y && y < R.y + R.h) || null; }
+      const edPts = exclude => VXTL.snapPoints(ed.proj, { exclude, playhead: ed.playing ? null : ed.t, bpm: edBpm(), bar0: edBar0(), until: edEnd() + 60 });
+      const edTol = () => 8 / ed.pps;
+      function edScrub(t, e) { if (e.shiftKey) t = VXTL.snap(t, VXTL.snapPoints(ed.proj, { bpm: edBpm(), bar0: edBar0(), until: edEnd() + 60 }), 10 / ed.pps).t; edSeek(t); }
+      edEl('edContent').addEventListener('pointerdown', e => {
+        if (e.button !== 0) return;
+        const content = edEl('edContent'), t = edTimeAt(e), row = edRowAt(e), itEl = e.target.closest('.ed-it'), mk = e.target.closest('.ed-mk');
+        content.setPointerCapture(e.pointerId);
+        if (mk) { edDrag = { mode: 'marker', id: mk.dataset.id, x0: e.clientX, el: mk }; return; }
+        const f = itEl && VXTL.find(ed.proj, itEl.dataset.id);
+        if (!f) { // the ruler or an empty stretch: move the playhead (and keep scrubbing while the button is down)
+          if (row && !e.shiftKey && ed.sel.length) { ed.sel = []; edMarkSel(); }
+          edDrag = { mode: 'scrub' }; edScrub(t, e); return;
+        }
+        if (ed.tool === 'razor' && !f.track.locked) { const at = ed.snap && !e.altKey ? VXTL.snap(t, edPts([f.item.id]), edTol()).t : t; edDrag = null; edDo(() => VXTL.split(ed.proj, at, [f.item.id])); return; }
+        if (e.shiftKey || e.metaKey) ed.sel = ed.sel.includes(f.item.id) ? ed.sel.filter(i => i !== f.item.id) : ed.sel.concat(f.item.id);
+        else if (!ed.sel.includes(f.item.id)) ed.sel = [f.item.id];
+        edMarkSel();
+        if (f.track.locked) return;
+        const r = itEl.getBoundingClientRect(), x = e.clientX - r.left, zone = Math.min(7, r.width / 4);
+        const mode = x < zone ? 'in' : x > r.width - zone ? 'out' : 'move';
+        const group = (mode === 'move' ? ed.sel : [f.item.id]).map(i => VXTL.find(ed.proj, i)).filter(g => g && !g.track.locked);
+        edDrag = { mode, id: f.item.id, track: f.track.id, to: f.track.id, x0: e.clientX, t0: t, moved: false, copy: e.altKey, t00: ed.t,
+          group: group.map(g => ({ id: g.item.id, track: g.track.id, start: g.item.start, in: g.item.in, dur: g.item.dur })) };
+      });
+      edEl('edContent').addEventListener('pointermove', e => {
+        const d = edDrag; if (!d) return;
+        const content = edEl('edContent'), t = edTimeAt(e);
+        if (d.mode === 'scrub') { edScrub(t, e); return; }
+        if (!d.moved) { if (Math.abs(e.clientX - d.x0) < 3 && (d.mode !== 'move' || (edRowAt(e) || {}).tr === edTrk(d.track))) return; edHist.push(ed.proj); d.moved = true; }
+        ed.snapAt = null;
+        if (d.mode === 'marker') {
+          const m = ed.proj.markers.find(x => x.id === d.id); if (!m) return;
+          let mt = t; if (ed.snap && !e.altKey) { const s = VXTL.snap(t, edPts([]).filter(p => Math.abs(p.t - m.t) > 1e-6), edTol()); if (s.point) { mt = s.t; ed.snapAt = s.t; } }
+          m.t = Math.round(mt * 1000) / 1000; d.el.style.left = m.t * ed.pps + 'px'; edDrawCanvas(); return;
+        }
+        const g0 = d.group.find(g => g.id === d.id), it0 = VXTL.find(ed.proj, d.id).item, dt = t - d.t0;
+        if (d.mode === 'move') {
+          let start = Math.max(0, g0.start + dt);
+          if (ed.snap) { const s = VXTL.snapSpan(start, g0.dur, edPts(d.group.map(g => g.id)), edTol()); if (s.point) { start = s.start; ed.snapAt = s.point.t; } }
+          const shift = Math.max(start - g0.start, -Math.min(...d.group.map(g => g.start)));
+          const row = edRowAt(e); d.to = d.group.length === 1 && row && row.tr.kind === 'video' && !row.tr.locked ? row.tr.id : d.track;
+          d.group.forEach(g => { const f = VXTL.find(ed.proj, g.id), el = content.querySelector(`.ed-it[data-id="${g.id}"]`); f.item.start = Math.round((g.start + shift) * 1000) / 1000; if (el) el.style.left = f.item.start * ed.pps + 'px'; });
+          const el = content.querySelector(`.ed-it[data-id="${d.id}"]`), rowEl = content.querySelector(`.ed-row[data-track="${d.to}"]`);
+          if (el && rowEl && el.parentNode !== rowEl) rowEl.appendChild(el);
+        } else {
+          let edge = d.mode === 'in' ? g0.start + dt : g0.start + g0.dur + dt;
+          if (ed.snap) { const s = VXTL.snap(edge, edPts([g0.id]), edTol()); if (s.point) { edge = s.t; ed.snapAt = s.t; } }
+          if (d.mode === 'in') { edge = Math.min(Math.max(edge, g0.start - g0.in, 0), g0.start + g0.dur - 1 / VXTL.FPS); it0.start = edge; it0.in = g0.in + (edge - g0.start); it0.dur = g0.start + g0.dur - edge; }
+          else { edge = Math.max(edge, g0.start + 1 / VXTL.FPS); it0.dur = edge - g0.start; }
+          const el = content.querySelector(`.ed-it[data-id="${d.id}"]`); if (el) { el.style.left = it0.start * ed.pps + 'px'; el.style.width = it0.dur * ed.pps + 'px'; }
+          // show the frame being trimmed to
+          ed.t = d.mode === 'in' ? it0.start : it0.start + it0.dur - 1 / VXTL.FPS; edShowAt(ed.t, false); edDrawHead();
+        }
+        edDrawCanvas();
+      });
+      function edDragEnd(e, cancel) {
+        const d = edDrag; edDrag = null; ed.snapAt = null; if (!d) return;
+        if (d.mode === 'scrub') { edSave(); return; }
+        if (!d.moved) { if (d.mode === 'marker') { const m = ed.proj.markers.find(x => x.id === d.id); if (m) edSeek(m.t); } edDrawCanvas(); return; }
+        if (cancel) { ed.proj = JSON.parse(edHist.past.pop()); ed.t = d.t00 != null ? d.t00 : ed.t; edRender(); return; }
+        if (d.mode === 'move') {
+          const made = [];
+          d.group.forEach(g => {
+            const f = VXTL.find(ed.proj, g.id); if (!f) return;
+            const it = Object.assign({}, f.item);
+            f.track.items = f.track.items.filter(x => x.id !== g.id);
+            if (d.copy) { VXTL.place(f.track, Object.assign({}, it, { start: g.start })); it.id = VXTL.id(); }
+            made.push(VXTL.place(d.group.length === 1 ? edTrk(d.to) : f.track, it).id);
+          });
+          if (d.copy) ed.sel = made;
+        } else if (d.mode !== 'marker') { const f = VXTL.find(ed.proj, d.id); if (f) VXTL.place(f.track, f.item); ed.t = d.t00; }
+        edSave(); edRender();
+      }
+      edEl('edContent').addEventListener('pointerup', e => edDragEnd(e, false));
+      edEl('edContent').addEventListener('pointercancel', e => edDragEnd(e, true));
+      edEl('edContent').addEventListener('contextmenu', e => { const mk = e.target.closest('.ed-mk'); if (!mk) return; e.preventDefault(); edDo(() => { ed.proj.markers = ed.proj.markers.filter(m => m.id !== mk.dataset.id); }); });
+      edEl('edContent').addEventListener('pointerover', e => { if (!edDrag) edEl('edContent').style.cursor = edRowAt(e) && !e.target.closest('.ed-it') ? 'text' : ''; });
+      edEl('edScroll').addEventListener('scroll', edDrawCanvas);
+      edEl('edScroll').addEventListener('wheel', e => {
+        const sc = edEl('edScroll');
+        if (e.ctrlKey || e.metaKey) { e.preventDefault(); edZoom(ed.pps * Math.exp(-e.deltaY * 0.01), edTimeAt(e), e.clientX - sc.getBoundingClientRect().left); }
+        else if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { e.preventDefault(); sc.scrollLeft += e.deltaY; }
+      }, { passive: false });
+      new ResizeObserver(() => { if (edEl('editTab').classList.contains('active')) edDrawCanvas(); }).observe(edEl('edScroll'));
+
+      // ----- dropping clips: from the media panel, or video files from the Finder
+      let edGhost = null;
+      function edDropRow(e) { const row = edRowAt(e); return row && row.tr.kind === 'video' && !row.tr.locked ? row : null; }
+      edEl('edContent').addEventListener('dragover', e => {
+        const types = [...e.dataTransfer.types]; if (!types.includes('text/vx-clip') && !types.includes('Files')) return;
+        const row = edDropRow(e); if (!row) { if (edGhost) edGhost.style.display = 'none'; return; }
+        e.preventDefault(); e.dataTransfer.dropEffect = 'copy';
+        let t = edTimeAt(e); ed.snapAt = null; if (ed.snap) { const s = VXTL.snap(t, edPts([]), edTol()); if (s.point) { t = s.t; ed.snapAt = s.t; } }
+        if (!edGhost || !edGhost.isConnected) { edGhost = document.createElement('div'); edGhost.className = 'ed-ghost'; edEl('edContent').appendChild(edGhost); }
+        Object.assign(edGhost.style, { display: 'block', left: t * ed.pps + 'px', top: row.y + 3 + 'px', height: row.h - 6 + 'px', width: Math.max(8, 240 / edBpm() * ed.pps) + 'px' });
+        edDrawCanvas();
+      });
+      edEl('edContent').addEventListener('dragleave', e => { if (!edEl('edContent').contains(e.relatedTarget) && edGhost) { edGhost.style.display = 'none'; ed.snapAt = null; edDrawCanvas(); } });
+      edEl('edContent').addEventListener('drop', e => {
+        e.preventDefault(); if (edGhost) edGhost.style.display = 'none';
+        const row = edDropRow(e); let t = edTimeAt(e); ed.snapAt = null;
+        if (!row) return;
+        if (ed.snap) t = VXTL.snap(t, edPts([]), edTol()).t;
+        const raw = e.dataTransfer.getData('text/vx-clip');
+        const clips = raw ? [JSON.parse(raw)] : [...e.dataTransfer.files].filter(f => /^video\//.test(f.type) || /\.(mp4|mov|m4v|webm)$/i.test(f.name)).map(f => ({ src: (require('electron').webUtils ? require('electron').webUtils.getPathForFile(f) : f.path), name: f.name.replace(/\.[^.]+$/, '').toUpperCase() }));
+        if (clips.length) edDropClips(clips, row.tr.id, t);
+      });
+      async function edDropClips(clips, tid, t) {
+        edSay('Reading the clip…');
+        const list = clips.map(c => ({ src: c.src, name: c.name })); await edDurations(list);
+        const made = [];
+        edDo(() => { let at = t; list.forEach(c => { const it = VXTL.place(edTrk(tid), { src: c.src, name: c.name, start: at, in: 0, dur: c.dur > 0.2 ? c.dur : 240 / edBpm() }); made.push(it.id); at = it.start + it.dur; }); });
+        ed.sel = made; edMarkSel(); edSay(`${list.length === 1 ? list[0].name : list.length + ' clips'} on ${edTrk(tid).name} at ${VXTL.timecode(t)}.`);
+      }
+      // the media panel: every clip the mixer knows, searchable; thumbnails load as they scroll into view
+      const edBinSeen = new IntersectionObserver(es => es.forEach(x => { if (x.isIntersecting && !x.target.src && x.target.dataset.src) { x.target.src = x.target.dataset.src; edBinSeen.unobserve(x.target); } }), { root: edEl('edBin') });
+      function edBin(force) {
+        const bin = edEl('edBin'); if (!bin) return;
+        // shots first; idents (for titles and the finish), old recordings and exports at the end
+        const rank = p => p.kind === 'recorded' ? 3 : isIdent(p) ? 2 : p.kind === 'wallet' ? 1 : 0;
+        const src = edEl('edSrc').value, q = edEl('edFind').value, list = edPool(src, q).map((p, i) => [p, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(x => x[0]), key = `${src}|${q}|${list.length}`;
+        if (!force && bin.dataset.key === key) return;
+        bin.dataset.key = key; bin.innerHTML = '';
+        list.slice(0, 400).forEach(p => {
+          const c = document.createElement('div'); c.className = 'ed-clip'; c.draggable = true; c.title = `${p.name}${p.desc ? '\n' + p.desc : ''}\nDrag onto the timeline, or double-click to drop it at the playhead on V1.`;
+          const v = document.createElement('video'); v.muted = true; v.preload = 'metadata'; v.loop = true; v.dataset.src = (/^\//.test(p.src) ? 'file://' + encodeURI(p.src) : p.src) + '#t=1';
+          const n = document.createElement('span'); n.textContent = p.name.replace(/^(GROK|RECORDED|WALLET) · /, '');
+          c.append(v, n); edBinSeen.observe(v);
+          c.onmouseenter = () => v.src && v.play().catch(() => {}); c.onmouseleave = () => v.pause();
+          c.addEventListener('dragstart', e => { e.dataTransfer.setData('text/vx-clip', JSON.stringify({ src: p.src, name: p.name })); e.dataTransfer.effectAllowed = 'copy'; });
+          c.addEventListener('dblclick', () => edDropClips([{ src: p.src, name: p.name }], 'v1', ed.t));
           bin.appendChild(c);
         });
+        if (!list.length) bin.innerHTML = '<div class="ed-hint" style="border:0;grid-column:1/-1">NO CLIPS MATCH</div>';
       }
+      edEl('edFind').addEventListener('input', () => edBin());
+      edEl('edFind').addEventListener('keydown', e => e.stopPropagation());
+      edEl('edSrc').addEventListener('change', () => edBin());
+
+      // ----- keys (only while EDIT is open, and never while typing)
+      window.addEventListener('keydown', e => {
+        if (!edEl('editTab').classList.contains('active')) return;
+        const tag = (e.target && e.target.tagName) || ''; if (/INPUT|TEXTAREA|SELECT/.test(tag) || (e.target && e.target.isContentEditable)) return;
+        const k = e.key.length === 1 ? e.key.toLowerCase() : e.key, mod = e.metaKey || e.ctrlKey, beat = 60 / edBpm();
+        let done = true;
+        if (mod && k === 'z') e.shiftKey ? edRedo() : edUndo();
+        else if (mod && k === 'y') edRedo();
+        else if (mod && k === 'a') { ed.sel = ed.proj.tracks.filter(tr => tr.kind === 'video' && !tr.locked).flatMap(tr => tr.items.map(i => i.id)); edMarkSel(); }
+        else if (mod && k === 'd') edDuplicate();
+        else if (mod || e.altKey) done = false;
+        else if (k === ' ') ed.playing ? edStop() : edPlay(1);
+        else if (k === 'k') edStop();
+        else if (k === 'l') edPlay(ed.playing && ed.rate > 0 ? Math.min(4, ed.rate * 2) : 1);
+        else if (k === 'j') edPlay(ed.playing && ed.rate < 0 ? Math.max(-4, ed.rate * 2) : -1);
+        else if (k === 'ArrowLeft' || k === 'ArrowRight') { if (ed.playing) edStop(); edSeek(ed.t + (k === 'ArrowLeft' ? -1 : 1) * (e.shiftKey ? beat : 1 / VXTL.FPS)); }
+        else if (k === 'ArrowUp' || k === 'ArrowDown') { const pts = VXTL.edits(ed.proj).concat(ed.proj.markers.map(m => m.t)).sort((a, b) => a - b); edSeek(k === 'ArrowUp' ? (pts.filter(x => x < ed.t - 1e-3).pop() || 0) : (pts.find(x => x > ed.t + 1e-3) ?? edEnd())); }
+        else if (k === 'Home') edSeek(0);
+        else if (k === 'End') edSeek(edEnd());
+        else if (k === 's') edSplit();
+        else if (k === 'v') edTool('select');
+        else if (k === 'c') edTool('razor');
+        else if (k === 'n') { ed.snap = !ed.snap; edSave(); edTools(); edLabels(); }
+        else if (k === 'm') edMarker();
+        else if (k === 'Delete' || k === 'Backspace') edDelete(e.shiftKey);
+        else if (k === '=' || k === '+') edZoom(ed.pps * 1.5);
+        else if (k === '-') edZoom(ed.pps / 1.5);
+        else if (k === '\\') edZoom(edFitPps(), 0, 0);
+        else if (k === 'Escape') { if (edDrag && edDrag.moved) edDragEnd(e, true); else { edDrag = null; ed.sel = []; edMarkSel(); } }
+        else done = false;
+        if (done) { e.preventDefault(); e.stopPropagation(); }
+      }, true);
+      edEl('edRail').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+        if (b.dataset.tool) return edTool(b.dataset.tool);
+        const a = b.dataset.act;
+        if (a === 'snap') { ed.snap = !ed.snap; edSave(); edTools(); edLabels(); }
+        else if (a === 'split') edSplit(); else if (a === 'marker') edMarker(); else if (a === 'fit') edZoom(edFitPps(), 0, 0);
+      }));
+      document.querySelectorAll('#editTab .ed-tbtns button').forEach(b => b.addEventListener('click', () => {
+        const a = b.dataset.t, pts = VXTL.edits(ed.proj).concat(ed.proj.markers.map(m => m.t)).sort((x, y) => x - y);
+        if (a === 'play') ed.playing && ed.rate > 0 ? edStop() : edPlay(1);
+        else if (a === 'start') edSeek(0); else if (a === 'end') edSeek(edEnd());
+        else if (a === 'prev') edSeek(pts.filter(x => x < ed.t - 1e-3).pop() || 0);
+        else if (a === 'next') edSeek(pts.find(x => x > ed.t + 1e-3) ?? edEnd());
+      }));
+      edEl('edZoom').addEventListener('input', e => edZoom(Math.pow(400, +e.target.value)));
+      edEl('edUndo').addEventListener('click', edUndo); edEl('edRedo').addEventListener('click', edRedo);
+
+      // ----- export
       function ffmpegRun(ff, args, total, label) {
         return new Promise((res, rej) => {
           const p = require('child_process').spawn(ff, args);
@@ -5816,12 +6313,13 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         raw: { grade: null, letterbox: 0, flashes: 'off' }
       };
       function edLookNow() { return Object.assign({}, ED_LOOKS[ed.look || 'house'] || ED_LOOKS.house, ed.lookOver || {}); }
-      // flash frames: off, on the cuts at the two biggest hits, or on every cut
+      // flash frames: off, on the V1 cuts at the two biggest hits, or on every V1 cut
       function edFlashTimes(mode) {
-        if (!mode || mode === 'off' || ed.shots.length < 2) return [];
-        const cuts = VXEDIT.layout(ed.shots).slice(1).map(s => s.start);
+        const sh = edShots();
+        if (!mode || mode === 'off' || sh.length < 2) return [];
+        const cuts = sh.slice(1).map(s => s.start);
         if (mode === 'all') return cuts;
-        const hits = VXEDIT.finishPlan({ shots: ed.shots, env: ed.env, seconds: edLength() }).mattes.map(m => m.t0 + 0.4);
+        const hits = VXEDIT.finishPlan({ shots: sh, env: ed.env, seconds: edLength() }).mattes.map(m => m.t0 + 0.4);
         return cuts.filter(c => hits.some(h => Math.abs(h - c) < 0.05));
       }
       function meltRun(melt, args, frames, label) {
@@ -5837,38 +6335,45 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         if (identDurs[file]) return identDurs[file];
         try { return (identDurs[file] = parseFloat(require('child_process').execFileSync(edFfmpeg().replace(/ffmpeg$/, 'ffprobe'), ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file], { encoding: 'utf8' })) || 4); } catch (e) { return 4; }
       }
+      // what the export sees: the visible video tracks and, unless A1 is muted, the music
       async function edExport(title, finish = edEl('edFinish').checked) {
         if (ed.rendering) throw new Error('already rendering');
-        if (!ed.track || !ed.shots.length) throw new Error('needs a track and some shots');
+        const vis = id => edTrk(id).hidden ? [] : VXTL.sorted(edTrk(id)), v1 = vis('v1'), v2 = vis('v2');
+        if (!v1.length && !v2.length) throw new Error('the timeline is empty');
         const fs = require('fs'), path = require('path');
-        const ff = edFfmpeg();
-        if (!ff) throw new Error('ffmpeg is not on this computer: play the edit and use REC instead');
+        const ff = edFfmpeg(), melt = edMelt();
+        if (!ff && !melt) throw new Error('ffmpeg is not on this computer: play the edit and use REC instead');
         ed.rendering = true; edEl('edExport').disabled = true;
         try {
           edSay('Gathering clips…');
-          const shots = [];
-          for (const s of ed.shots) shots.push({ ...s, file: await edLocal(s.src) });
-          const track = ed.track.source === 'local' ? ed.track.url : await cacheMedia({ name: ed.track.name, url: ed.track.url });
+          const shots = [], overlay = [];
+          for (const s of v1) shots.push({ ...s, file: await edLocal(s.src) });
+          for (const s of v2) overlay.push({ ...s, file: await edLocal(s.src) });
+          const music = ed.track && !edTrk('a1').muted;
+          const track = !music ? null : ed.track.source === 'local' ? ed.track.url : await cacheMedia({ name: ed.track.name, url: ed.track.url });
           fs.mkdirSync(recDir, { recursive: true });
           const slug = String(title || ed.title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'video';
           const out = path.join(recDir, `${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}-${slug}.mp4`);
-          const total = edLength(), melt = edMelt();
+          const total = edLength();
           if (melt) {
             // MLT: one render with every layer on its own track; the project stays beside the MP4 for Shotcut
             const kit = path.join(__dirname, 'vx', 'assets', 'finish'), look = edLookNow();
-            const plan = finish ? VXEDIT.finishPlan({ shots: ed.shots, env: ed.env, seconds: total }) : { idents: [], mattes: [] };
+            const plan = finish ? VXEDIT.finishPlan({ shots: v1, env: ed.env, seconds: total }) : { idents: [], mattes: [] };
             const idents = plan.idents.map(d => { const file = path.join(kit, `V3X-ident-${d.name}.mp4`); return { t: d.t, corner: d.corner, file, dur: probeDur(file) }; });
             const mltFile = out.replace(/\.mp4$/, '.mlt');
-            fs.writeFileSync(mltFile, VXMLT.project({ title: String(title || ed.title), seconds: total, track, shots, flashes: edFlashTimes(look.flashes),
+            fs.writeFileSync(mltFile, VXMLT.project({ title: String(title || ed.title), seconds: total, track, shots, overlay, flashes: edFlashTimes(look.flashes),
               idents, mattes: plan.mattes, mask: path.join(kit, 'V3X-matte-mask.mp4'), letterbox: look.letterbox, grade: look.grade }));
             await meltRun(melt, VXMLT.renderArgs(mltFile, out), Math.round(total * 30), 'Rendering');
             ed.lastProject = mltFile; edEl('edShotcut').disabled = false;
           } else {
+          // without MLT: V1 only, its shots end to end (gaps and V2 need MLT), the finish in extra ffmpeg passes
+          if (!track) throw new Error('without MLT (brew install mlt) the export needs the music on A1');
+          const flat = shots.map(s => ({ ...s, start: undefined })), seconds0 = flat.reduce((n, s) => n + s.dur, 0);
           const base = finish ? out.replace(/\.mp4$/, '-base.mp4') : out;
-          await ffmpegRun(ff, VXEDIT.ffmpegArgs({ shots, track, out: base }), total, 'Rendering');
+          await ffmpegRun(ff, VXEDIT.ffmpegArgs({ shots: flat, track, out: base }), seconds0, 'Rendering');
           if (finish) {
-            const kit = path.join(__dirname, 'vx', 'assets', 'finish'), seconds = Math.min(total, ed.track.seconds || total);
-            const plan = VXEDIT.finishPlan({ shots: ed.shots, env: ed.env, seconds });
+            const kit = path.join(__dirname, 'vx', 'assets', 'finish'), seconds = Math.min(seconds0, ed.track.seconds || seconds0);
+            const plan = VXEDIT.finishPlan({ shots: flat, env: ed.env, seconds });
             const mattes = [];
             for (let i = 0; i < plan.mattes.length; i++) {
               edSay(`Matte flash ${i + 1} of ${plan.mattes.length}…`);
@@ -5891,16 +6396,15 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         const sel = edEl('edTrack');
         const fill = () => { sel.innerHTML = '<option value="">PICK A TRACK…</option>' + musicLibraryTracks.map(t => `<option value="${t.id}">${t.name.replace(/</g, '')}</option>`).join(''); if (ed.track) { const t = musicLibraryTracks.find(x => x.url === ed.track.url); if (t) sel.value = t.id; } };
         if (!musicLibraryTracks.length) initializeMusicTab().then(fill); else fill();
-        edRender();
+        requestAnimationFrame(() => { edRender(); if (ed.track && !ed.env) edEnsureEnv(); });
       }
       edEl('edTrack').addEventListener('change', e => { const t = musicLibraryTracks[Number(e.target.value)]; if (t) edSetTrack(t); });
       edEl('edAuto').addEventListener('click', () => edAutoCut({ pace: edEl('edPace').value }).catch(e => edSay(e.message)));
-      edEl('edPlay').addEventListener('click', () => ed.playing ? edStop() : edPlay());
       edEl('edExport').addEventListener('click', () => edExport().catch(e => edSay(e.message)));
       edEl('edLook').value = ed.look || 'house';
-      edEl('edLook').addEventListener('change', e => { ed.look = e.target.value; ed.lookOver = null; edSave(); });
+      edEl('edLook').addEventListener('change', e => { ed.look = e.target.value; ed.lookOver = null; edSave(); edRender(); });
       edEl('edShotcut').addEventListener('click', () => { if (ed.lastProject && require('fs').existsSync('/Applications/Shotcut.app')) require('child_process').execFile('open', ['-a', 'Shotcut', ed.lastProject]); else edSay('Shotcut is not installed (brew install --cask shotcut).'); });
-      edEl('edClear').addEventListener('click', () => { ed.shots = []; ed.sel = -1; edSave(); edRender(); });
+      edEl('edClear').addEventListener('click', () => { if (!edLength() && !ed.proj.markers.length) return; ed.sel = []; edDo(() => { ed.proj.tracks.forEach(tr => { tr.items = []; }); ed.proj.markers = []; }); edSay('Cleared. ⌘Z brings it back.'); });
       edEl('edTitle').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
       edEl('edTitle').addEventListener('blur', e => { ed.title = e.target.textContent.trim().toUpperCase().slice(0, 60) || 'UNTITLED VIDEO'; edSave(); });
 
@@ -6032,9 +6536,9 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
             input_schema: { type: 'object', properties: { path: { type: 'string' }, play: { type: 'boolean' } }, required: ['path'], additionalProperties: false } },
           { name: 'record', description: 'Make a music video: record the output screen together with the playing music into a video file (MP4). Start the track and your set first, then call record with until="track_end" (it returns when the track finishes and the file is saved) or seconds=N. action="stop" ends a recording early. The file lands in VIDEOS. Takes as long as the music.',
             input_schema: { type: 'object', properties: { action: { type: 'string', enum: ['record', 'stop'] }, title: { type: 'string' }, until: { type: 'string', enum: ['track_end'] }, seconds: { type: 'number' } }, additionalProperties: false } },
-          { name: 'editor', description: 'The EDIT tab: cut a music video from clips to a track, then export an MP4. Actions: state (what the edit is); set_track (track: catalogue number or words, or a file path); map (the track\'s tempo, detected from the audio, and its loudness, one digit 0-9 per bar, to read intro, builds, drops and breakdowns); tempo (bpm: set it by hand when the detected one is half or double what you hear; 0 goes back to detected); auto_cut (pace fast|medium|slow; source all|catalogue|generated|recorded|wallet; filter words to pick clips by name, set, phase or notes, e.g. "crane" or "rough"), which cuts on the bars with the loudest parts getting the shortest and most moving shots; add (clip: words or a path or URL, seconds); replace (index, clip: words or a path or URL) swaps one shot\'s clip; remove (index); title (title); look (look house|scope|raw; letterbox ratio e.g. 2.39 or 0; flashes off|hits|all): the grade, letterbox and white flash frames of the export; export (renders the MP4 with MLT, also saving a Shotcut project; finish true (default) adds the corner idents and matte flashes; takes a few minutes; the file lands in VIDEOS); frames (a contact sheet of the last export, or of path, to check it). Prefer this over record for a finished music video: it is a real edit, not a live take.',
-            input_schema: { type: 'object', properties: { action: { type: 'string', enum: ['state', 'set_track', 'map', 'tempo', 'look', 'auto_cut', 'add', 'replace', 'remove', 'title', 'export', 'frames'] }, track: { type: 'string' }, pace: { type: 'string', enum: ['fast', 'medium', 'slow'] },
-              source: { type: 'string', enum: ['all', 'catalogue', 'generated', 'recorded', 'wallet'] }, filter: { type: 'string' }, clip: { type: 'string' }, seconds: { type: 'number' }, index: { type: 'number' }, title: { type: 'string' }, finish: { type: 'boolean' }, path: { type: 'string' }, bpm: { type: 'number' }, look: { type: 'string', enum: ['house', 'scope', 'raw'] }, letterbox: { type: 'number' }, flashes: { type: 'string', enum: ['off', 'hits', 'all'] } }, required: ['action'], additionalProperties: false } },
+          { name: 'editor', description: 'The EDIT tab: cut a music video from clips to a track, then export an MP4. Actions: state (what the edit is); set_track (track: catalogue number or words, or a file path); map (the track\'s tempo, detected from the audio, and its loudness, one digit 0-9 per bar, to read intro, builds, drops and breakdowns); tempo (bpm: set it by hand when the detected one is half or double what you hear; 0 goes back to detected); auto_cut (pace fast|medium|slow; source all|catalogue|generated|recorded|wallet; filter words to pick clips by name, set, phase or notes, e.g. "crane" or "rough"), which cuts on the bars with the loudest parts getting the shortest and most moving shots; add (clip: words or a path or URL, seconds) appends a shot to V1; replace (index, clip) swaps one clip; remove (index) takes a clip out (on V1 the shots after it close up). The EDIT tab is a real timeline: V1 holds the shots, V2 sits full frame over V1 wherever it has clips, A1 is the music; times are seconds from the start, and the person can undo every edit you make (⌘Z) and change it by hand. Timeline actions: overlay (clip, at, seconds, in) puts a clip on V2; split (at) cuts every clip under that time; move (index, at) moves a clip, overwriting what it lands on; trim (index, in, seconds) sets where in the source a clip starts and how long it runs; marker (at, label) marks a moment for the person (a drop, a lyric); undo. index and layer (v1, default, or v2) pick a clip as listed by state. title (title); look (look house|scope|raw; letterbox ratio e.g. 2.39 or 0; flashes off|hits|all): the grade, letterbox and white flash frames of the export; export (renders the MP4 with MLT, also saving a Shotcut project; finish true (default) adds the corner idents and matte flashes; takes a few minutes; the file lands in VIDEOS); frames (a contact sheet of the last export, or of path, to check it). Prefer this over record for a finished music video: it is a real edit, not a live take.',
+            input_schema: { type: 'object', properties: { action: { type: 'string', enum: ['state', 'set_track', 'map', 'tempo', 'look', 'auto_cut', 'add', 'replace', 'remove', 'overlay', 'split', 'move', 'trim', 'marker', 'undo', 'title', 'export', 'frames'] }, track: { type: 'string' }, pace: { type: 'string', enum: ['fast', 'medium', 'slow'] },
+              source: { type: 'string', enum: ['all', 'catalogue', 'generated', 'recorded', 'wallet'] }, filter: { type: 'string' }, clip: { type: 'string' }, seconds: { type: 'number' }, index: { type: 'number' }, title: { type: 'string' }, finish: { type: 'boolean' }, path: { type: 'string' }, bpm: { type: 'number' }, at: { type: 'number' }, in: { type: 'number' }, layer: { type: 'string', enum: ['v1', 'v2'] }, label: { type: 'string' }, look: { type: 'string', enum: ['house', 'scope', 'raw'] }, letterbox: { type: 'number' }, flashes: { type: 'string', enum: ['off', 'hits', 'all'] } }, required: ['action'], additionalProperties: false } },
           { name: 'text_layer', description: 'Put a text layer on a deck (the TITLES tab): words in a VexVoid font, animated, transparent over the deck\'s other layers. Fonts: ' + VXTEXT.FONTS.map(f => `${f.id} (${f.label.split(' · ')[1]})`).join(', ') + '. Styles: ' + VXTEXT.STYLES.map(s => `${s.id} (${s.about})`).join('; ') + '. Knobs 0-1: size, speed, intensity, height (0 top, 1 bottom). d3 true makes a 3D title instead: extruded letters with a material (chrome, black chrome, matte, wire) and a spin (none, sway, orbit, tumble), the same moves done in 3D, height then sets the extrude depth; keep 3D titles to a word or two. Use text for titles, lyric lines, idents and decorative type; keep words few.',
             input_schema: { type: 'object', properties: { text: { type: 'string', description: 'The words; \\n for a second line' }, font: { type: 'string', enum: VXTEXT.FONTS.map(f => f.id) }, style: { type: 'string', enum: VXTEXT.STYLES.map(s => s.id) },
               upper: { type: 'boolean' }, deck: { type: 'string', enum: ['A', 'B'] }, size: { type: 'number' }, speed: { type: 'number' }, intensity: { type: 'number' }, height: { type: 'number', description: '2D: where it sits, 0 top to 1 bottom. 3D: how deep the letters extrude' },
@@ -6126,7 +6630,17 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
         }
         if (name === 'editor') {
           const a = input.action;
-          const st = () => { let t0 = 0; return `Edit "${ed.title}": track ${ed.track ? ed.track.name + ' (' + mmss(ed.track.seconds || 0) + ')' : 'none'}, ${ed.shots.length} shots, ${mmss(edLength())}.` + (ed.shots.length ? ' Shots (index start name length [phase energy]):\n' + ed.shots.slice(0, 80).map((s, i) => { const c = catalogue().clips.find(x => x.url === s.src), tr = c ? clipTraits(c.url, c.set) : {}; const line = `${i} ${mmss(t0)} ${s.name.slice(0, 28)} ${s.dur.toFixed(1)}s` + (tr.phase || tr.energy != null ? ` [${tr.phase || '-'} ${tr.energy != null ? Math.round(tr.energy * 9) : '-'}]` : '') + (tr.desc ? ' ' + tr.desc.slice(0, 60) : ''); t0 += s.dur; return line; }).join('\n') : ''); };
+          const st = () => {
+            const sh = edShots(), ov = VXTL.sorted(edTrk('v2'));
+            const row = (s, i) => { const c = catalogue().clips.find(x => x.url === s.src), tr = c ? clipTraits(c.url, c.set) : {}; return `${i} ${mmss(s.start)} ${s.name.slice(0, 28)} ${s.dur.toFixed(1)}s` + (s.in ? ` from ${s.in.toFixed(1)}s` : '') + (tr.phase || tr.energy != null ? ` [${tr.phase || '-'} ${tr.energy != null ? Math.round(tr.energy * 9) : '-'}]` : '') + (tr.desc ? ' ' + tr.desc.slice(0, 60) : ''); };
+            return `Edit "${ed.title}": track ${ed.track ? ed.track.name + ' (' + mmss(ed.track.seconds || 0) + ')' : 'none'}, V1 ${sh.length} shots, V2 ${ov.length} overlays, ${mmss(edLength())}.` +
+              (sh.length ? '\nV1 shots (index start name length [phase energy]):\n' + sh.slice(0, 80).map(row).join('\n') : '') +
+              (ov.length ? '\nV2 overlays (index start name length):\n' + ov.slice(0, 40).map(row).join('\n') : '') +
+              (ed.proj.markers.length ? '\nMarkers: ' + ed.proj.markers.map(m => `${m.label} ${mmss(m.t)}`).join(', ') : '');
+          };
+          const layer = () => edTrk(input.layer === 'v2' ? 'v2' : 'v1');
+          const nth = () => { const it = VXTL.sorted(layer())[Number(input.index)]; if (!it) throw new Error(`no clip ${input.index} on ${layer().name}`); return it; };
+          const clipFor = (q, not) => /^(\/|https?:)/.test(q) ? { src: q, name: q.split('/').pop() } : edPool('all', q).find(x => x.src !== not && (/ident|logo|glyph/i.test(q) || !isIdent(x)));
           if (a === 'state') return st();
           if (a === 'title') { ed.title = String(input.title || ed.title).toUpperCase().slice(0, 60); edSave(); edRender(); return st(); }
           if (a === 'set_track') {
@@ -6139,11 +6653,22 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
           }
           if (a === 'auto_cut') { await edAutoCut({ pace: input.pace, source: input.source, filter: input.filter }); return st(); }
           if (a === 'add') {
-            const q = String(input.clip || ''); const p = /^(\/|https?:)/.test(q) ? { src: q, name: q.split('/').pop() } : edPool('all', q)[0];
+            const q = String(input.clip || ''), p = clipFor(q);
             if (!p) throw new Error('no clip matches ' + q);
-            ed.shots.push({ src: p.src, name: p.name, in: 0, dur: Number(input.seconds) || 240 / edBpm() }); edSave(); edRender(); return st();
+            const v1 = edTrk('v1'), at = v1.items.reduce((m, x) => Math.max(m, x.start + x.dur), 0);
+            edDo(() => VXTL.place(v1, { src: p.src, name: p.name, start: at, in: 0, dur: Number(input.seconds) || 240 / edBpm() })); return st();
           }
-          if (a === 'remove') { ed.shots.splice(Number(input.index), 1); edSave(); edRender(); return st(); }
+          if (a === 'remove') { const it = nth(), tr = layer(); ed.sel = []; edDo(() => VXTL.remove(ed.proj, [it.id], tr.id === 'v1')); return st(); }
+          if (a === 'overlay') {
+            const q = String(input.clip || ''), p = clipFor(q);
+            if (!p) throw new Error('no clip matches ' + q);
+            edDo(() => VXTL.place(edTrk('v2'), { src: p.src, name: p.name, start: Number(input.at) || 0, in: Number(input.in) || 0, dur: Number(input.seconds) || 240 / edBpm() })); return st();
+          }
+          if (a === 'split') { const n = edDo(() => VXTL.split(ed.proj, Number(input.at) || 0)); return `Split ${n.length} clip${n.length === 1 ? '' : 's'} at ${mmss(Number(input.at) || 0)}.\n` + st(); }
+          if (a === 'move') { const it = nth(), tr = layer(); edDo(() => { it.start = Math.max(0, Number(input.at) || 0); VXTL.place(tr, it); }); return st(); }
+          if (a === 'trim') { const it = nth(), tr = layer(); edDo(() => { if (input.in != null) it.in = Math.max(0, Number(input.in)); if (input.seconds) it.dur = Math.max(1 / VXTL.FPS, Number(input.seconds)); VXTL.place(tr, it); }); return st(); }
+          if (a === 'marker') { edDo(() => ed.proj.markers.push({ id: VXTL.id('m'), t: Math.max(0, Number(input.at) || 0), label: String(input.label || 'M' + (ed.proj.markers.length + 1)).slice(0, 40) })); return st(); }
+          if (a === 'undo') { edUndo(); return 'Undone.\n' + st(); }
           if (a === 'map') {
             if (!ed.track) throw new Error('pick a track first');
             await edEnsureEnv(); if (!ed.env) throw new Error('could not read the track');
@@ -6166,10 +6691,9 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
             return ed.track.tempo ? `Tempo set by hand to ${v} BPM (bars from 0 s). Run auto_cut again to recut.` : `Back to the detected tempo, ${edBpm()} BPM.`;
           }
           if (a === 'replace') {
-            const i = Number(input.index), s = ed.shots[i]; if (!s) throw new Error('no shot ' + input.index);
-            const q = String(input.clip || ''); const p = /^(\/|https?:)/.test(q) ? { src: q, name: q.split('/').pop() } : edPool('all', q).find(x => x.src !== s.src && (/ident|logo|glyph/i.test(q) || !isIdent(x)));
+            const it = nth(), q = String(input.clip || ''), p = clipFor(q, it.src);
             if (!p) throw new Error('no clip matches ' + q);
-            s.src = p.src; s.name = p.name; s.in = 0; edSave(); edRender(); return st();
+            edDo(() => { it.src = p.src; it.name = p.name; it.in = 0; }); return st();
           }
           if (a === 'frames') {
             const file = String(input.path || ed.lastExport || ''), fs = require('fs'), ff = edFfmpeg();
@@ -7446,6 +7970,7 @@ Reply with only the JSON array in one \`\`\`json code block.`;
   <script src="./vx/market.js"></script>
   <script src="./vx/agent.js"></script>
   <script src="./vx/editor.js"></script>
+  <script src="./vx/timeline.js"></script>
   <script src="./vx/mlt.js"></script>
   <script src="./vx/text.js"></script>
   <script src="./vx/lib/three.global.js"></script>

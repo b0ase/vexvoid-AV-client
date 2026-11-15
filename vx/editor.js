@@ -203,10 +203,11 @@
     }
     return shots;
   }
-  function layout(shots) { var t = 0; return shots.map(function (s) { var r = Object.assign({}, s, { start: t }); t += s.dur; return r; }); }
+  // shots with a start keep it (timeline items, gaps allowed); without one they run end to end
+  function layout(shots) { var t = 0; return shots.map(function (s) { var r = Object.assign({}, s, { start: s.start != null ? s.start : t }); t = r.start + s.dur; return r; }); }
   function at(shots, t) {
-    var start = 0;
-    for (var i = 0; i < shots.length; i++) { if (t < start + shots[i].dur) return { i: i, shot: shots[i], offset: t - start, start: start }; start += shots[i].dur; }
+    var L = layout(shots);
+    for (var i = 0; i < L.length; i++) { if (t >= L[i].start && t < L[i].start + L[i].dur) return { i: i, shot: shots[i], offset: t - L[i].start, start: L[i].start }; }
     return null;
   }
 

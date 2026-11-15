@@ -17,7 +17,8 @@
     "mix": "node bin/vexvoid-mix.js",
     "sync-catalogue": "node scripts/sync-catalogue.js",
     "relay": "node relay/server.js",
-    "test:tempo": "node scripts/test-tempo.js"
+    "test:tempo": "node scripts/test-tempo.js",
+    "test:timeline": "node scripts/test-timeline.js"
   },
   "keywords": [
     "animation",
