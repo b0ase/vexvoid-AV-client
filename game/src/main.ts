@@ -22,8 +22,8 @@ import { loadWriter } from './writer';
 import { makeSpray, COLOURS, COLOUR_NAMES, type Can } from './spray';
 import { makeLaw, type LawState } from './cops';
 
-export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) => void; onHud?: (s: string) => void };
-export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?: number) => string; inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string }) => void; where: () => { x: number; z: number; yaw: number; heading: number; anim: string }; spots: () => { id: string; w: number; h: number; x: number; y: number; z: number }[]; paint: (id: string, pts: [number, number][], o?: { colour?: string; cap?: 1 | 2 | 3; dist?: number }) => void; clearPaint: (id?: string) => void; piece: (id: string) => string; painting: () => string; flush: () => Promise<void>; goto: (x: number, z: number, yaw?: number, pitch?: number) => void; law: () => LawState; cops: (on: boolean) => void };
+export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) => void; onHud?: (s: string) => void; onRec?: () => void };
+export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?: number) => string; inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string }) => void; where: () => { x: number; z: number; yaw: number; heading: number; anim: string }; spots: () => { id: string; w: number; h: number; x: number; y: number; z: number }[]; paint: (id: string, pts: [number, number][], o?: { colour?: string; cap?: 1 | 2 | 3; dist?: number }) => void; clearPaint: (id?: string) => void; piece: (id: string) => string; painting: () => string; flush: () => Promise<void>; goto: (x: number, z: number, yaw?: number, pitch?: number) => void; law: () => LawState; cops: (on: boolean) => void; audio: () => { ctx: AudioContext; node: AudioNode } | null };
 
 // VexVoid's grade: no colour at all, hard contrast, a heavy vignette
 const MONO = { shadow: [1, 1, 1] as [number, number, number], high: [1, 1, 1] as [number, number, number], sat: 0, contrast: 1.32, vignette: 0.72 };
@@ -54,8 +54,14 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const writer = await loadWriter(opts.base + 'anims/ual.glb', high, opts.base + 'models/writer.glb');
   scene.add(writer.root, writer.can);
   const spray = makeSpray(scene, city.spots);
+  // every sound the game makes goes through one node, so a recorder can tap it (made the first time something needs it)
+  let bus: { ctx: AudioContext; out: GainNode } | null = null;
+  const sound = () => {
+    if (!bus) try { const ctx = new AudioContext(), out = ctx.createGain(); out.connect(ctx.destination); bus = { ctx, out }; } catch { bus = null; }
+    return bus;
+  };
   say('Calling the law…');
-  const law = await makeLaw({ scene, high, base: opts.base, blockers: city.blockers, bounds: BOUNDS });
+  const law = await makeLaw({ scene, high, base: opts.base, blockers: city.blockers, bounds: BOUNDS, sound });
   // a soft light that rides with the writer so the hoodie reads against the dark street
   const rim = new THREE.PointLight('#ffffff', 9, 7, 2);
   const back = new THREE.PointLight('#ffffff', 6, 5, 2); // a kicker behind, to edge the hood and shoulders
@@ -90,7 +96,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const me = { x: 0, z: 8, y: 0, vy: 0, heading: Math.PI, crouch: false, airborne: false };
   const camO = { yaw: 0, pitch: 0.12, dist: 3.4 };
   const keys = new Set<string>();
-  const MOVE = ['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Shift', ' ', 'c', 'f', 'p', '1', '2', '3', 'Tab', 'Escape'];
+  const MOVE = ['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Shift', ' ', 'c', 'f', 'p', 'r', '1', '2', '3', 'Tab', 'Escape'];
   // painting: F at a wall squares up to it; the mouse aims, holding it sprays; the wheel sets the can's distance
   const can: Can = { colour: COLOURS[0], cap: 2, dist: 0.22 };
   let paint: { id: string; spot: (typeof city.spots)[number] } | null = null, spraying = false, colourI = 0;
@@ -105,7 +111,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     const lawS = L.on ? `HEAT ${'▮'.repeat(cells)}${'▯'.repeat(5 - cells)} ${what} · P PATROL OFF` : 'PATROL OFF · P PATROL ON';
     return (paint
       ? `PAINTING ${paint.id.toUpperCase()} · HOLD MOUSE TO SPRAY · WHEEL ${Math.round(can.dist * 100)} CM · 1 2 3 CAP ${['', 'SKINNY', 'MEDIUM', 'FAT'][can.cap]} · TAB ${COLOUR_NAMES[colourI]} · A D MOVE · F DONE`
-      : 'WASD MOVE · SHIFT SPRINT · C CROUCH · SPACE JUMP · DRAG LOOK · F AT A WALL TO PAINT') + ' · ' + lawS;
+      : 'WASD MOVE · SHIFT SPRINT · C CROUCH · SPACE JUMP · DRAG LOOK · F AT A WALL TO PAINT') + ' · ' + lawS + (opts.onRec ? ' · R RECORD' : '');
   };
   const hud = () => { const s = hudText(); if (s !== lastHud) { lastHud = s; if (opts.onHud) opts.onHud(s); } };
   const nearestWall = () => {
@@ -127,12 +133,13 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   // the hiss of the can (made from noise, so nothing to download)
   let hiss: { ctx: AudioContext; gain: GainNode } | null = null;
   const hissOn = (on: boolean) => {
-    if (!hiss && on) {
-      const ctx = new AudioContext(), buf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate), d = buf.getChannelData(0);
+    const b = !hiss && on ? sound() : null;
+    if (b) {
+      const ctx = b.ctx, buf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate), d = buf.getChannelData(0);
       for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
       const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
       const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 3800; bp.Q.value = 0.7;
-      const gain = ctx.createGain(); gain.gain.value = 0; src.connect(bp).connect(gain).connect(ctx.destination); src.start();
+      const gain = ctx.createGain(); gain.gain.value = 0; src.connect(bp).connect(gain).connect(b.out); src.start();
       hiss = { ctx, gain };
     }
     if (hiss) hiss.gain.gain.setTargetAtTime(on ? 0.12 : 0, hiss.ctx.currentTime, 0.03);
@@ -143,6 +150,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
     if (!MOVE.includes(k)) return;
     e.preventDefault(); e.stopPropagation();
+    if (down && !e.repeat && k === 'r') { if (opts.onRec) opts.onRec(); return; } // recording belongs to whoever mounted the game
     if (bust) return; // nothing to do while you are being nicked
     if (down && !e.repeat && k === 'f') togglePaint();
     if (down && !e.repeat && k === 'p') { const on = !law.state().on; law.setOn(on); say2(on ? 'PATROL ON · WATCH FOR THE CAR' : 'PATROL OFF · PAINT IN PEACE', 2); }
@@ -326,11 +334,13 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     /** The law: heat 0..1, chase (off, calm, alerted, chase, searching, busted), the patrol car and the officers. */
     law: () => law.state(),
     cops: (on: boolean) => law.setOn(on),
+    /** The game's sound, for a recorder: connect node to a MediaStreamDestination made on ctx. */
+    audio: () => { const b = sound(); return b ? { ctx: b.ctx, node: b.out } : null; },
     goto: (x, z, yaw, pitch) => { me.x = x; me.z = z; if (yaw != null) { camO.yaw = yaw; me.heading = yaw + Math.PI; } if (pitch != null) camO.pitch = pitch; },
     stop: () => {
       stopped = true; cancelAnimationFrame(raf); ro.disconnect();
       canvas.removeEventListener('keydown', kd); canvas.removeEventListener('keyup', ku);
-      hissOn(false); if (hiss) hiss.ctx.close(); law.dispose(); spray.dispose(); writer.dispose(); city.dispose(); look.dispose(); comp.dispose(); r.dispose(); canvas.remove();
+      hissOn(false); law.dispose(); if (bus) void bus.ctx.close(); spray.dispose(); writer.dispose(); city.dispose(); look.dispose(); comp.dispose(); r.dispose(); canvas.remove();
     },
   };
 }
