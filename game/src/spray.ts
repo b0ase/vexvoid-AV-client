@@ -48,6 +48,7 @@ type Drip = { L: Layer; x: number; y: number; w: number; left: number; colour: s
 export function makeSpray(scene: THREE.Scene, spots: Spot[], store: WallStore = local) {
   const layers = new Map<string, Layer>();
   const drips: Drip[] = [];
+  const frames: THREE.LineLoop[] = [];
   for (const spot of spots) {
     const W = Math.round(spot.w * PX_PER_M), H = Math.round(spot.h * PX_PER_M);
     const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
@@ -59,6 +60,12 @@ export function makeSpray(scene: THREE.Scene, spots: Spot[], store: WallStore = 
     mesh.quaternion.copy(spot.mesh.quaternion);
     mesh.receiveShadow = true; mesh.userData.spot = spot.id; mesh.userData.noAO = true;
     scene.add(mesh);
+    // a thin white frame marks the wall as one you can paint (most of the city's walls are not)
+    const hw = spot.w / 2, hh = spot.h / 2;
+    const frame = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-hw, -hh, 0), new THREE.Vector3(hw, -hh, 0), new THREE.Vector3(hw, hh, 0), new THREE.Vector3(-hw, hh, 0)]),
+      new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.55 }));
+    frame.position.copy(spot.center).addScaledVector(spot.normal, 0.03); frame.quaternion.copy(mesh.quaternion); frame.userData.noAO = true;
+    scene.add(frame); frames.push(frame);
     const cell = 24, cols = Math.ceil(W / cell);
     layers.set(spot.id, { spot, cv, g, tex, mesh, W, H, wet: new Float32Array(cols * Math.ceil(H / cell)), cell, cols, dirty: false, unsaved: 0 });
   }
@@ -157,6 +164,7 @@ export function makeSpray(scene: THREE.Scene, spots: Spot[], store: WallStore = 
     layers,
     dispose() {
       for (const L of layers.values()) if (L.unsaved > 0) void save(L);   // the canvases outlive the textures
-      for (const L of layers.values()) { scene.remove(L.mesh); L.mesh.geometry.dispose(); (L.mesh.material as THREE.Material).dispose(); L.tex.dispose(); } },
+      for (const L of layers.values()) { scene.remove(L.mesh); L.mesh.geometry.dispose(); (L.mesh.material as THREE.Material).dispose(); L.tex.dispose(); }
+      for (const f of frames) { scene.remove(f); f.geometry.dispose(); (f.material as THREE.Material).dispose(); } },
   };
 }

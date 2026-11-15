@@ -53,7 +53,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   tip.style.cssText = 'position:absolute;left:50%;bottom:9%;transform:translateX(-50%);padding:9px 16px;background:rgba(0,0,0,.72);border:1px solid rgba(255,255,255,.55);color:#fff;font:600 13px/1 ui-monospace,Menlo,monospace;letter-spacing:.22em;text-transform:uppercase;white-space:nowrap;pointer-events:none;display:none';
   if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
   host.appendChild(tip);
-  let tipNow = '', sprayed = false, follow = 0;
+  let tipNow = '', sprayed = false, follow = 0, tipHold = 0;
   const prompt = (s: string) => { if (s !== tipNow) { tipNow = s; tip.textContent = s; tip.style.display = s ? 'block' : 'none'; } };
 
   const scene = new THREE.Scene();
@@ -136,7 +136,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   };
   const togglePaint = () => {
     if (paint) { paint = null; spraying = false; spray.lift(); hud(); return; }
-    const w = nearestWall(); if (!w) { say2('GET CLOSER TO A WALL TO PAINT (F)', 1.6); return; }
+    const w = nearestWall(); if (!w) { say2('NO WALL TO PAINT HERE', 2.5); tipHold = t + 2.5; prompt('NOT THIS WALL · PAINT THE ONES WITH A WHITE FRAME'); return; }
     paint = w; me.crouch = false;
     camO.yaw = Math.atan2(w.spot.normal.x, w.spot.normal.z); camO.pitch = 0.1; camO.dist = 2.6;
     hud();
@@ -263,7 +263,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       if (h && h.id === sp.id) writer.aim(aimHand.copy(h.point).addScaledVector(n, can.dist + 0.03), h.point, spraying ? 1 : 0.85);
       else writer.aim(null);
       hissOn(!!(spraying && reach));
-    } else { reticle.visible = false; hissOn(false); writer.aim(null); follow = 0; prompt(!bust && nearestWall() ? 'PRESS F TO PAINT THIS WALL' : ''); }
+    } else { reticle.visible = false; hissOn(false); writer.aim(null); follow = 0; const nw = !bust && nearestWall(); if (nw || t > tipHold) prompt(nw ? 'PRESS F TO PAINT THIS WALL' : ''); }
     spray.update(dt);
     law.pushOut(me, 0.35);
     const ev = law.update(dt, t, { x: me.x, z: me.z, y: me.y, crouch: me.crouch, painting: !!paint, spraying: !!(paint && spraying && reticle.visible) });
