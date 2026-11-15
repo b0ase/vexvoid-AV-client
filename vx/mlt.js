@@ -8,13 +8,17 @@
  *                                         short clips loop rather than leave a gap
  *   overlay [{ file, name, in, dur, start }]  V2, full frame over V1 where it has items
  *   titles  [{ file, start, dur }]           rendered titles (video with alpha, e.g. QuickTime RLE), over everything
+ *   trans   [{ kind, a, b, file, in }]       transitions on V1 cuts, a..b in seconds: 'cross' plays file (the outgoing
+ *                                         shot, from its source time in) over V1 and fades it out, under V2; 'black' and
+ *                                         'white' dip the whole picture (over V2 and the mattes, under idents and titles)
  *   flashes [seconds]                     a two-frame white flash frame on each of these cuts
  *   idents  [{ t, file, dur, corner }]     faint corner idents (tl tr bl br), screen-blended at 55%
  *   mattes  [{ t0, t1 }]                   8 s at t0 showing the edit's own moment t1 through the moving mask
  *   letterbox  aspect ratio, e.g. 2.39 (0 = none)
  *   grade   { contrast, brightness, saturation, gamma, lut, vignette }   (avfilter eq / lut3d / vignette)
  *
- * Tracks, in Shotcut's order: 0 black background, 1 shots, 2 overlay, 3 mattes, 4 idents, 5 titles, 6 music. Video tracks composite onto
+ * Tracks, in Shotcut's order: 0 black background, 1 shots, 2 crossfades, 3 overlay, 4 mattes, 5 dips, 6 idents,
+ * 7 titles, 8 music. Video tracks composite onto
  * track 0 with qtblend; the music joins with mix. Times are frames (MLT's out points are inclusive).
  */
 (function (root) {
@@ -42,6 +46,7 @@
     out.push('<playlist id="main_bin">' + prop('xml_retain', 1) + '</playlist>');
     out.push('<producer id="black" in="0" out="' + (total - 1) + '">' + prop('length', total) + prop('eof', 'pause') + prop('resource', '0') + prop('mlt_service', 'color') + prop('mlt_image_format', 'rgba') + prop('set.test_audio', 0) + '</producer>');
     out.push('<producer id="flash">' + prop('length', 1e7) + prop('resource', '#ffffff') + prop('mlt_service', 'color') + '</producer>');
+    out.push('<producer id="dip">' + prop('length', 1e7) + prop('resource', '#000000') + prop('mlt_service', 'color') + '</producer>');
 
     // the cut, laid out on frames from cumulative times so rounding never drifts
     function lay(list) { var t = 0; return (list || []).map(function (s) { var st = s.start != null ? s.start : t; t = st + s.dur; return { s: s, start: st }; }).sort(function (a, b) { return a.start - b.start; }); }
@@ -61,6 +66,21 @@
       return pl;
     }
     var v1 = entries(layout, true), ov = entries(lay(o.overlay), false);
+    // transitions: crossfades on one track over V1, dips on another over everything but idents and titles; each track's
+    // opacity is keyframed (linear) through its transitions
+    function transTrack(list) {
+      var pl = [], at = 0, keys = [], R = '0 0 ' + w + ' ' + h + ' ';
+      list.slice().sort(function (p, q) { return p.a - q.a; }).forEach(function (T) {
+        var f0 = Math.max(F(T.a), at), n = F(T.b) - f0;
+        if (n < 2) return;
+        if (f0 > at) pl.push('<blank length="' + (f0 - at) + '"/>');
+        if (T.kind === 'cross') { var inF = F(T.in || 0); pl.push('<entry producer="' + producer(T.file, true) + '" in="' + inF + '" out="' + (inF + n - 1) + '"/>'); keys.push(f0 + '=' + R + '1', (f0 + n - 1) + '=' + R + '0'); }
+        else { pl.push('<entry producer="' + (T.kind === 'white' ? 'flash' : 'dip') + '" in="0" out="' + (n - 1) + '"/>'); keys.push(f0 + '=' + R + '0', (f0 + Math.floor(n / 2)) + '=' + R + '1', (f0 + n - 1) + '=' + R + '0'); }
+        at = f0 + n;
+      });
+      return { pl: pl, keys: keys };
+    }
+    var TX = transTrack((o.trans || []).filter(function (T) { return T.kind === 'cross'; })), DP = transTrack((o.trans || []).filter(function (T) { return T.kind !== 'cross'; }));
     // titles: each its own file, already the right length, never looped or cropped
     var tt = [], att = 0;
     lay(o.titles).forEach(function (L) {
@@ -110,6 +130,8 @@
     out.push.apply(out, mattePl);
     out.push('<playlist id="background">' + prop('shotcut:video', 1) + '<entry producer="black" in="0" out="' + (total - 1) + '"/></playlist>');
     out.push('<playlist id="v1">' + prop('shotcut:video', 1) + prop('shotcut:name', 'V1 shots') + v1.join('') + '</playlist>');
+    out.push('<playlist id="tx">' + prop('shotcut:video', 1) + prop('shotcut:name', 'V1 crossfades') + TX.pl.join('') + '</playlist>');
+    out.push('<playlist id="dp">' + prop('shotcut:video', 1) + prop('shotcut:name', 'dips') + DP.pl.join('') + '</playlist>');
     out.push('<playlist id="ov">' + prop('shotcut:video', 1) + prop('shotcut:name', 'V2 overlay') + ov.join('') + '</playlist>');
     out.push('<playlist id="v2">' + prop('shotcut:video', 1) + prop('shotcut:name', 'V3 mattes') + v2.join('') + '</playlist>');
     out.push('<playlist id="v3">' + prop('shotcut:video', 1) + prop('shotcut:name', 'V4 idents') + v3.join('') + '</playlist>');
@@ -131,11 +153,14 @@
     }
 
     out.push('<tractor id="tractor0" title="' + esc(o.title || 'V3XV0ID edit') + '">' + prop('shotcut', 1) +
-      '<track producer="background"/><track producer="v1" hide="audio"/><track producer="ov" hide="audio"/><track producer="v2" hide="audio"/><track producer="v3" hide="audio"/><track producer="tt" hide="audio"/><track producer="a1" hide="video"/>' +
-      '<transition mlt_service="mix">' + prop('a_track', 0) + prop('b_track', 6) + prop('always_active', 1) + prop('sum', 1) + '</transition>' +
-      [1, 2, 3].map(function (b) { return '<transition mlt_service="qtblend">' + prop('a_track', 0) + prop('b_track', b) + prop('compositing', 0) + prop('distort', 0) + '</transition>'; }).join('') +
-      '<transition mlt_service="qtblend">' + prop('a_track', 0) + prop('b_track', 4) + prop('compositing', 14) + prop('distort', 0) + (rect.length ? prop('rect', rect.join(';')) : '') + '</transition>' +
-      '<transition mlt_service="qtblend">' + prop('a_track', 0) + prop('b_track', 5) + prop('compositing', 0) + prop('distort', 0) + '</transition>' +
+      '<track producer="background"/><track producer="v1" hide="audio"/><track producer="tx" hide="audio"/><track producer="ov" hide="audio"/><track producer="v2" hide="audio"/><track producer="dp" hide="audio"/><track producer="v3" hide="audio"/><track producer="tt" hide="audio"/><track producer="a1" hide="video"/>' +
+      '<transition mlt_service="mix">' + prop('a_track', 0) + prop('b_track', 8) + prop('always_active', 1) + prop('sum', 1) + '</transition>' +
+      '<transition mlt_service="qtblend">' + prop('a_track', 0) + prop('b_track', 1) + prop('compositing', 0) + prop('distort', 0) + '</transition>' +
+      '<transition mlt_service="qtblend">' + prop('a_track', 0) + prop('b_track', 2) + prop('compositing', 0) + prop('distort', 0) + (TX.keys.length ? prop('rect', TX.keys.join(';')) : '') + '</transition>' +
+      [3, 4].map(function (b) { return '<transition mlt_service="qtblend">' + prop('a_track', 0) + prop('b_track', b) + prop('compositing', 0) + prop('distort', 0) + '</transition>'; }).join('') +
+      '<transition mlt_service="qtblend">' + prop('a_track', 0) + prop('b_track', 5) + prop('compositing', 0) + prop('distort', 0) + (DP.keys.length ? prop('rect', DP.keys.join(';')) : '') + '</transition>' +
+      '<transition mlt_service="qtblend">' + prop('a_track', 0) + prop('b_track', 6) + prop('compositing', 14) + prop('distort', 0) + (rect.length ? prop('rect', rect.join(';')) : '') + '</transition>' +
+      '<transition mlt_service="qtblend">' + prop('a_track', 0) + prop('b_track', 7) + prop('compositing', 0) + prop('distort', 0) + '</transition>' +
       filters.join('') + '</tractor>');
 
     return '<?xml version="1.0" standalone="no"?>\n<mlt LC_NUMERIC="C" version="7.42.0" title="' + esc(o.title || 'V3XV0ID edit') + '" producer="main_bin">\n' + out.join('\n') + '\n</mlt>\n';
