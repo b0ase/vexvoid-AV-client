@@ -1751,6 +1751,31 @@
     .ai-in textarea{flex:1;resize:none;background:none;color:#fff;border:0;padding:6px 0;font:inherit;font-size:14px;text-transform:none;letter-spacing:.01em;outline:none;max-height:140px}
     .ai-in button{font:inherit;background:none;border:0;color:#fff;letter-spacing:.24em;font-size:10px;cursor:pointer;padding:8px 0}
     .ai-auto{font-size:9px;letter-spacing:.24em;color:#777;display:flex;align-items:center;gap:6px;cursor:pointer}.ai-auto input{accent-color:#fff;margin:0}.ai-auto:has(input:checked){color:#fff}
+    /* JOBS: paid commissions. Jobs down the left like the AI tab's gigs; the open job, a new one, the offer or the settings on the right */
+    .jb{display:grid;grid-template-columns:200px 1fr;width:100%;height:100%;min-height:0;text-transform:none}
+    .jb-main{overflow-y:auto;padding:22px 24px 24px 56px;max-width:980px;display:flex;flex-direction:column;gap:14px;font-size:12px;min-height:0}
+    .jb-title{font-family:'Michroma','IBM Plex Mono',sans-serif;font-size:26px;letter-spacing:.14em;color:#fff;text-transform:uppercase;word-break:break-word}
+    .jb-sub{margin-top:10px;font-size:10px;letter-spacing:.24em;color:#666;text-transform:uppercase}
+    .jb-h{font-size:9px;letter-spacing:.3em;color:#555;text-transform:uppercase;margin-top:8px}
+    .jb-price{display:flex;align-items:center;gap:18px;border:1px solid #1d1d1d;padding:14px 16px;flex-wrap:wrap}
+    .jb-pay{font-size:10px;letter-spacing:.18em;color:#777;line-height:1.8;text-transform:uppercase}.jb-pay b{font-weight:400;color:#fff;text-transform:none;letter-spacing:.06em}
+    .jb-warn{margin-left:auto;font-size:9px;letter-spacing:.2em;color:#000;background:#fff;padding:4px 7px;text-transform:uppercase}
+    .jb-meta{display:grid;grid-template-columns:130px 1fr;gap:7px 12px;font-size:9px;letter-spacing:.22em;color:#555;text-transform:uppercase}
+    .jb-meta b{font-weight:400;font-size:11px;color:#ddd;letter-spacing:.02em;text-transform:none;word-break:break-word}
+    .jb-text{white-space:pre-wrap;color:#ccc;line-height:1.6;border-left:1px solid #333;padding-left:14px;word-break:break-word}
+    .jb-acts{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+    .jb-row{display:flex;gap:6px;align-items:center}
+    .jb-form{display:grid;grid-template-columns:130px 1fr;gap:8px 12px;align-items:center}
+    .jb-form>label{font-size:9px;letter-spacing:.24em;color:#666;text-transform:uppercase}
+    .jb-in{background:#000;color:#fff;border:1px solid #2a2a2a;padding:7px 8px;font:12px 'IBM Plex Mono',monospace;outline:none;min-width:0;box-sizing:border-box}
+    .jb-in:focus{border-color:#777}.jb-in:disabled{color:#666;border-color:#1a1a1a}
+    textarea.jb-in{resize:vertical;line-height:1.5}
+    .jb-tiers{display:grid;grid-template-columns:100px 70px 44px 60px 60px 50px 1fr;gap:6px;align-items:start;font-size:9px;letter-spacing:.2em;color:#555;text-transform:uppercase}
+    .jb-tiers input[type=checkbox]{accent-color:#fff;margin:8px 0 0}
+    .jb-files{display:flex;flex-direction:column;gap:4px}.jb-files div{display:flex;gap:10px;align-items:center;font-size:11px;color:#bbb;word-break:break-all}
+    .jb-files .gen-btn{padding:3px 8px;flex:none}
+    .jb-hist{font-size:10px;color:#666;letter-spacing:.06em;display:flex;flex-direction:column;gap:3px}
+    .jb-quote{font-size:10px;letter-spacing:.18em;color:#999;text-transform:uppercase;border-left:1px solid #fff;padding:4px 0 4px 14px;line-height:1.8}
     /* TITLES */
     .ti{flex:1;min-width:0;width:100%;display:grid;grid-template-columns:minmax(300px,420px) minmax(0,1fr);gap:28px;height:100%;min-height:0;text-transform:none}
     .ti-left{display:flex;flex-direction:column;gap:10px;overflow-y:auto;padding-right:6px}
@@ -2110,6 +2135,7 @@
   <!-- Tab Navigation -->
   <div class="tab-navigation">
     <button class="tab-button active" data-tab="ai">AI</button>
+    <button class="tab-button" data-tab="jobs">JOBS</button>
     <button class="tab-button" data-tab="layers">MIXING DESK</button>
     <button class="tab-button" data-tab="patterns">PATTERNS</button>
     <button class="tab-button" data-tab="music">MUSIC</button>
@@ -2139,6 +2165,13 @@
           <div class="ai-log" id="aiLog"></div>
           <div class="ai-in"><textarea id="aiInput" rows="1" placeholder="What are we making?"></textarea><button id="aiSend">SEND</button></div>
         </div>
+      </div>
+    </div>
+    <!-- JOBS: paid commissions (vx/jobs.js). Quotes, hand-marked payment, START hands the brief to VexVoid, deliveries. Nothing posts or takes money. -->
+    <div class="tab-content" id="jobsTab">
+      <div class="jb">
+        <div class="ai-rail"><div class="ai-rail-h">JOBS</div><div id="jbList"></div><button id="jbNew" class="ai-newgig">+ NEW JOB</button><button id="jbOffer" class="ai-newgig">BJOBSX OFFER</button><button id="jbSettings" class="ai-newgig">TIERS + TERMS</button></div>
+        <div class="jb-main" id="jbMain"></div>
       </div>
     </div>
 
@@ -6819,7 +6852,13 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
             input_schema: { type: 'object', properties: { kind: { type: 'string', enum: ['image', 'video'] }, prompt: { type: 'string', description: 'What to show. The VexVoid look is added for you.' },
               look: { type: 'string', enum: Object.keys(GROK_LOOK), description: 'smooth: calm, razor-sharp; rough: flash, grain; bridge: concrete and one hard light; fast; slow; abstract' },
               people: { type: 'string', enum: ['nobody', 'figure'], description: 'figure: one person seen from behind, hood up' }, deck: { type: 'string', enum: ['A', 'B'] } },
-              required: ['kind', 'prompt'], additionalProperties: false } }
+              required: ['kind', 'prompt'], additionalProperties: false } },
+          { name: 'jobs', description: 'Paid commissions, in the JOBS tab: music videos people pay VexVoid to make, priced in US dollars, paid to the paymail on the quote. Nothing here posts, lists, sends or takes money; the person does that by hand. Actions: list; show (id); create (customer or handle, brief, tier ' + jobSet.tiers.map(t => `${t.id} ${VXJOBS.tierPrice(t)}`).join(' / ') + ', optional contact, track, price_usd, house_style; makes a quote); update (id and any of those fields or notes; tier, price and house style only before payment); quote (id; or tier and price_usd for a price without a job); quote_text (id: a quote the person can copy to the customer); quote_given (id: the person gave the customer the quote, now awaiting payment); mark_paid (id, note: only when the person tells you the money has arrived at the paymail; you cannot see payments); start (id: opens the job\'s conversation and hands VexVoid the brief, the tier\'s Grok allowance and the house-style setting; send false only puts the brief in the input); deliver (id, files: export paths; with none, the job\'s latest export); changes (id, note: one round of the customer\'s changes, handed to VexVoid); cancel (id); offer_text (a bJobsX listing draft to copy, built from the tiers and terms); settings (show the tier table, terms and turnaround; to change them, tier with price_usd, grok_clips, rounds, days or includes, or terms, or turnaround: only when the person asks, they are the owner\'s decisions). In a job\'s own conversation id may be left out.',
+            input_schema: { type: 'object', properties: { action: { type: 'string', enum: ['list', 'show', 'create', 'update', 'quote', 'quote_text', 'quote_given', 'mark_paid', 'start', 'deliver', 'changes', 'cancel', 'offer_text', 'settings'] },
+              id: { type: 'string', description: 'The job id (from list), or words from the customer\'s name' }, customer: { type: 'string' }, handle: { type: 'string', description: 'Their $handle, @x or paymail' }, contact: { type: 'string' },
+              track: { type: 'string', description: 'An audio file path, a URL or a catalogue track' }, brief: { type: 'string' }, tier: { type: 'string' }, price_usd: { type: 'number' }, house_style: { type: 'boolean', description: 'true: the VexVoid house rules stand over the brief; false: the brief comes first' },
+              notes: { type: 'string' }, note: { type: 'string' }, files: { type: 'array', items: { type: 'string' } }, send: { type: 'boolean' },
+              grok_clips: { type: 'number' }, rounds: { type: 'number' }, days: { type: 'number' }, includes: { type: 'string' }, terms: { type: 'string' }, turnaround: { type: 'string' } }, required: ['action'], additionalProperties: false } }
         ];
       }
       const short = (o, n) => { const t = typeof o === 'string' ? o : JSON.stringify(o); return t.length > (n || 3000) ? t.slice(0, n || 3000) + '…' : t; };
@@ -6865,6 +6904,7 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
           }
           return here() + ' Walls to paint: ' + g.spots().map(w => `${w.id} ${w.w.toFixed(1)}x${w.h.toFixed(1)} m at x ${w.x.toFixed(1)} z ${w.z.toFixed(1)}`).join('; ') + '.';
         }
+        if (name === 'jobs') return jobTool(input);
         if (name === 'skill') return VEXVOID_BRAIN.skill(input.name, input.name === 'shaders' ? 'LIQUID CHROME:\n' + ((window.VXGEN_LIBRARY || []).find(x => x.name === 'LIQUID CHROME') || {}).code : '');
         if (name === 'library') {
           const k = input.kind;
@@ -7022,19 +7062,32 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
         }
         if (name === 'generate') {
           if (!xaiKey()) throw new Error('No xAI key. Ask the performer to add one in IMAGES > GROK IMAGINE.');
-          const video = input.kind === 'video', est = grokRecentCost(video);
-          const ok = await aiApprove(input, est);
+          const video = input.kind === 'video', est = grokRecentCost(video), job = jobOfGig();
+          const ok = await aiApprove(input, est, job);
           if (!ok) return 'The performer declined this generation. Carry on without it.';
           const line = aiLine('tool', `Grok ${video ? 'video' : 'image'}: starting…`);
           const r = await grokRun({ prompt: String(input.prompt), mode: video ? 'video' : 'image', look: input.look || 'smooth', people: input.people || 'nobody',
             onTick: s => { line.textContent = `Grok ${video ? 'video' : 'image'}: ${s}s…`; } });
           line.textContent = `Grok ${video ? 'video' : 'image'} done in ${r.seconds}s · $${r.cost.toFixed(3)}`;
           if (gig) { (gig.assets = gig.assets || []).push(r.file); gigSave(); }
+          // a paid job counts its Grok clips against the tier's allowance and keeps what they cost the owner
+          let jobNote = '';
+          if (job) { const c = VXJOBS.recordGrok(job, input.kind, r.cost); jobSave(); jobRender(); jobNote = ` Job ${job.quote.name}: ${c.used} of ${c.allowance} Grok clips used${c.over ? ': OVER the allowance, stop and tell the person' : ''}.`; }
           if (input.deck) await loadMediaItem({ name: 'GROK · ' + String(input.prompt).slice(0, 30), url: r.file, source: 'local' }, input.deck, { textContent: '' });
-          return `Made ${video ? 'a video' : 'an image'} ($${r.cost.toFixed(3)}), saved as ${r.file}${input.deck ? ' and loaded onto deck ' + input.deck : ''}.`;
+          return `Made ${video ? 'a video' : 'an image'} ($${r.cost.toFixed(3)}), saved as ${r.file}${input.deck ? ' and loaded onto deck ' + input.deck : ''}.` + jobNote;
         }
         throw new Error('unknown tool ' + name);
       }
+
+      // ----- JOBS: paid commissions (vx/jobs.js holds the rules). A job is its own record, not a kind of gig: the gig is the
+      // conversation VexVoid makes the video in, the job is the deal (customer, price, payment, terms, deliveries). They
+      // point at each other (job.gigId, gig.jobId), so a job's conversation carries its tier, allowance and house style.
+      const JOB_STORE = 'vx.jobs.v1';
+      let jobs = [], jobSet = VXJOBS.settings(null);
+      try { jobs = JSON.parse(localStorage.getItem(JOB_STORE) || '[]'); } catch (e) { jobs = []; }
+      try { jobSet = VXJOBS.settings(JSON.parse(localStorage.getItem(JOB_STORE + '.settings') || 'null')); } catch (e) {}
+      function jobSave() { try { localStorage.setItem(JOB_STORE, JSON.stringify(jobs)); localStorage.setItem(JOB_STORE + '.settings', JSON.stringify(jobSet)); } catch (e) { aiLine('err', 'Could not save the jobs: ' + e.message); } }
+      const jobOfGig = () => (gig && gig.jobId && jobs.find(j => j.id === gig.jobId)) || null;
 
       // ----- GIGS: each gig is one ongoing conversation with the agent, from booking to the show itself -----
       // A gig keeps its details (title, date, venue, brief), the conversation (API messages, append-only), what the
@@ -7050,7 +7103,7 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
       function gigSave() { try { localStorage.setItem(GIG_STORE, JSON.stringify(gigs)); } catch (e) { aiLine('err', 'Could not save this gig: ' + e.message); } }
       function gigContext() {
         if (!gig) return '';
-        return `\n\nThis conversation is one piece of work (a music video, a set, a show, an idea; whatever the person makes of it):\n- Title: ${gig.title || 'untitled'}${gig.date ? '\n- Date: ' + gig.date : ''}${gig.venue ? '\n- Venue: ' + gig.venue : ''}\n- Brief: ${gig.brief || 'none yet'}\n- Made for it so far: ${(gig.assets || []).map(a => a.split('/').pop()).join(', ') || 'nothing'}\nKeep the title and brief current with the project tool once you know what it is. Only set a date or venue if it's a show.`;
+        return `\n\nThis conversation is one piece of work (a music video, a set, a show, an idea; whatever the person makes of it):\n- Title: ${gig.title || 'untitled'}${gig.date ? '\n- Date: ' + gig.date : ''}${gig.venue ? '\n- Venue: ' + gig.venue : ''}\n- Brief: ${gig.brief || 'none yet'}\n- Made for it so far: ${(gig.assets || []).map(a => a.split('/').pop()).join(', ') || 'nothing'}\nKeep the title and brief current with the project tool once you know what it is. Only set a date or venue if it's a show.` + (jobOfGig() ? VXJOBS.context(jobOfGig()) : '');
       }
       const aiLog = aiEl('aiLog');
       function aiLine(kind, text) {
@@ -7074,14 +7127,21 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
         if (name === 'editor') return 'edit: ' + input.action.replace('_', ' ') + (input.track ? ' ' + input.track : '') + (input.filter ? ' ' + input.filter : '');
         if (name === 'load_track') return 'loading ' + String(input.path || '').split('/').pop();
         if (name === 'record') return input.action === 'stop' ? 'stopping the recording' : 'recording';
+        if (name === 'jobs') return 'job: ' + String(input.action || '').replace('_', ' ') + (input.id ? ' ' + input.id : '');
         return name;
       }
-      function aiApprove(input, est) {
+      function aiApprove(input, est, job) {
         return new Promise(resolve => {
           const c = document.createElement('div'); c.className = 'ai-card';
           c.innerHTML = '<b></b><div></div><div class="row"><button class="gen-btn hot">GENERATE</button><button class="gen-btn">SKIP</button></div>';
           c.querySelector('b').textContent = `Make ${input.kind === 'video' ? 'a 6-second video' : 'an image'} with Grok Imagine?`;
           c.querySelector('div').textContent = `"${input.prompt}" · ${est ? 'recent ones cost about $' + est.toFixed(2) : 'xAI bills your key'}`;
+          if (job) {
+            const used = (job.grok && job.grok.video) || 0, al = job.quote.grok, over = input.kind === 'video' && used >= al;
+            const j = document.createElement('div'); j.className = over ? 'jb-warn' : 'jb-sub'; j.style.margin = '0'; j.style.alignSelf = 'flex-start';
+            j.textContent = input.kind === 'video' ? `JOB ${job.quote.name}: CLIP ${used + 1} OF ${al}${over ? ', OVER THE ALLOWANCE: NOT PAID FOR BY THE JOB' : ''}` : `JOB ${job.quote.name}: A STILL (ALLOWANCE COUNTS CLIPS: ${used} OF ${al})`;
+            c.insertBefore(j, c.querySelector('.row'));
+          }
           const [go, skip] = c.querySelectorAll('button');
           const done = v => { go.disabled = skip.disabled = true; c.querySelector('.row').textContent = v ? 'Approved.' : 'Skipped.'; aiSaveLog(); resolve(v); };
           go.onclick = () => done(true); skip.onclick = () => done(false);
@@ -7114,6 +7174,7 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
         if (name === 'generate') return 'images';
         if (name === 'load_track') return 'music';
         if (name === 'skill') return 'code';
+        if (name === 'jobs') return input.action === 'start' || input.action === 'changes' ? 'ai' : 'jobs';
         if (name === 'library') return { clips: 'videos', images: 'images', tracks: 'music', sketches: 'vexvoid', generated: 'images', wallet: 'wallet' }[input.kind] || null;
         return null;
       }
@@ -7145,6 +7206,8 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
         aiLog.innerHTML = gig.log || '';
         aiLog.querySelectorAll('.ai-card button').forEach(b => { b.disabled = true; });
         if (!aiLog.children.length) aiLine('bot', 'VexVoid. What are we making?');
+        // a job's brief that could not be sent straight away (VexVoid was busy, or no key yet) waits in the input
+        if (gig.pending) { aiEl('aiInput').value = gig.pending; delete gig.pending; gigSave(); }
         aiLog.scrollTop = aiLog.scrollHeight;
         renderGigs();
         try { localStorage.setItem(GIG_STORE + '.open', gig.id); } catch (e) {}
@@ -7160,7 +7223,8 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
           const b = document.createElement('button'); b.className = 'ai-gig' + (g === gig ? ' on' : '');
           b.innerHTML = '<span></span><small></small>';
           b.firstChild.textContent = g.title || 'UNTITLED GIG';
-          b.lastChild.textContent = [g.date, g.venue].filter(Boolean).join(' · ');
+          const gj = g.jobId && jobs.find(j => j.id === g.jobId);
+          b.lastChild.textContent = gj ? `JOB · ${gj.quote.name} · ${VXJOBS.LABELS[gj.status]}` : [g.date, g.venue].filter(Boolean).join(' · ');
           b.onclick = () => openGig(g);
           list.appendChild(b);
         });
@@ -7226,6 +7290,288 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
       }, 250);
       aiEl('aiMini').addEventListener('click', () => { const off = aiEl('aiMini').classList.toggle('off'); try { localStorage.setItem(AI_STORE + '.mini', off ? 'off' : 'on'); } catch (e) {} });
       try { if (localStorage.getItem(AI_STORE + '.mini') === 'off') aiEl('aiMini').classList.add('off'); } catch (e) {}
+
+      // ===== JOBS tab: create a job from a brief, quote it, mark it paid by hand, START hands the brief to VexVoid in the
+      // job's own gig, attach the export and mark it delivered. The bJobsX offer is a draft to copy. Nothing here posts,
+      // lists, sends or takes money, and nothing touches the wallet (that belongs to the wallet session).
+      const jbEl = id => document.getElementById(id);
+      const jbEsc = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+      const jbWho = j => j.customer || j.handle || 'customer';
+      let jbView = jobs.length ? { kind: 'job', id: jobs[0].id } : { kind: 'offer' };
+      // the gig a job is made in, made the first time it is needed
+      function jobGig(j) {
+        let g = j.gigId && gigs.find(x => x.id === j.gigId);
+        if (!g) {
+          g = { id: 'g' + Date.now().toString(36), title: ('JOB · ' + jbWho(j)).toUpperCase().slice(0, 34), date: '', venue: '', brief: j.brief, created: new Date().toISOString(), messages: [], log: '', assets: [], jobId: j.id };
+          gigs.unshift(g); j.gigId = g.id; gigSave(); jobSave();
+        }
+        return g;
+      }
+      // open the job's conversation and give VexVoid the text. If it is busy (it may be the one calling), or there is no
+      // Anthropic key yet, the text waits in that conversation's input instead.
+      function jobHandOff(j, text, send) {
+        const g = jobGig(j);
+        if (agent && agent.busy) { g.pending = text; gigSave(); renderGigs(); return `The brief is waiting in the job's conversation ("${g.title}"); it goes to VexVoid when that conversation is opened and sent.`; }
+        openGig(g);
+        const tab = document.querySelector('[data-tab="ai"]'); if (tab && !tab.classList.contains('active')) tab.click();
+        aiEl('aiInput').value = text;
+        if (send === false || !anthropicKey()) return `The job's conversation ("${g.title}") is open with the brief in the input; press SEND.`;
+        aiSendNow();
+        return `VexVoid has the brief in the job's conversation ("${g.title}") and is starting.`;
+      }
+      function jobStart(j, send) { VXJOBS.act(j, 'start', jobSet); jobSave(); jobRender(); return jobHandOff(j, VXJOBS.startBrief(j), send); }
+      function jobChanges(j, note, send) { VXJOBS.act(j, 'changes', jobSet, { note }); jobSave(); jobRender(); return jobHandOff(j, VXJOBS.changesBrief(j, note), send); }
+      // videos made in the job's conversation, newest first, plus the EDIT tab's last export: what can be attached
+      function jobExports(j) {
+        const g = j.gigId && gigs.find(x => x.id === j.gigId), fs = require('fs');
+        const all = ((g && g.assets) || []).filter(f => /\.(mp4|mov|webm|m4v)$/i.test(f)).reverse();
+        if (ed.lastExport && !all.includes(ed.lastExport)) all.push(ed.lastExport);
+        return all.filter(f => { try { return fs.existsSync(f); } catch (e) { return false; } });
+      }
+      function jobAttach(j, file) {
+        const f = String(file || '').trim().replace(/^~(?=\/)/, require('os').homedir());
+        if (!f) throw new Error('give the path of the exported video');
+        if (!require('fs').existsSync(f)) throw new Error('no such file: ' + f);
+        if (!j.deliverables.includes(f)) j.deliverables.push(f);
+        jobSave(); return f;
+      }
+      function jobText(j) {
+        const q = j.quote;
+        return VXJOBS.summary(j) + `\nPrice: ${q.label} USD${q.custom ? ' (custom)' : ''}, pay to ${q.payTo} (${q.payee})${jobSet.pricesApproved ? '' : '. Prices are not approved by the owner yet'}.` +
+          `\nCustomer: ${j.customer || '-'}${j.handle ? ' ' + j.handle : ''}${j.contact ? ', contact ' + j.contact : ''}\nTrack: ${j.track || 'not given'}\nBrief: ${j.brief}` +
+          `\nIncluded: ${q.includes}\nGrok clips: ${(j.grok && j.grok.video) || 0} of ${q.grok} (stills ${(j.grok && j.grok.image) || 0}, $${((j.grok && j.grok.usd) || 0).toFixed(2)} spent)\nChanges: ${j.changesUsed || 0} of ${q.changes}\nHouse style: ${q.houseStyle ? 'on' : 'off (brief first)'}\nTerms: version ${j.termsVersion}` +
+          (j.deliverables.length ? '\nDelivered files: ' + j.deliverables.join(', ') : '') + (j.notes ? '\nNotes: ' + j.notes : '') +
+          `\nNext steps: ${VXJOBS.allowed(j).join(', ') || 'none'}`;
+      }
+      function jobSettingsText() {
+        return `Tiers (US dollars${jobSet.pricesApproved ? '' : '; NOT approved by the owner yet'}):\n` + jobSet.tiers.map(t => `- ${t.id}: ${t.name} ${VXJOBS.tierPrice(t)}, ${t.grok} Grok clips, ${t.changes} rounds of changes, ~${t.days} days. ${t.includes}`).join('\n') +
+          `\nPay to: ${jobSet.payTo} (${jobSet.payee})\nHouse style default: ${jobSet.houseStyleDefault !== false ? 'on' : 'off'}\nTurnaround: ${jobSet.turnaround}\nTerms version ${jobSet.terms.version}:\n${jobSet.terms.text}`;
+      }
+      // the jobs agent tool (and over MCP): the same steps as the buttons
+      async function jobTool(input) {
+        const a = input.action, s = jobSet;
+        const pick = () => {
+          const q = String(input.id || '').trim().toLowerCase();
+          const j = q ? jobs.find(x => x.id === q) || jobs.find(x => `${x.customer} ${x.handle}`.toLowerCase().includes(q)) : jobOfGig();
+          if (!j) throw new Error(q ? 'no job ' + input.id + ' (jobs list)' : 'which job? give its id (jobs list)');
+          return j;
+        };
+        const fields = () => {
+          const f = {}; ['customer', 'handle', 'contact', 'track', 'brief', 'tier', 'notes'].forEach(k => { if (input[k] !== undefined) f[k] = input[k]; });
+          if (input.price_usd !== undefined) f.priceUsd = input.price_usd; if (input.house_style !== undefined) f.houseStyle = input.house_style; return f;
+        };
+        const shown = j => { jbView = { kind: 'job', id: j.id }; jobSave(); jobRender(); renderGigs(); return jobText(j); };
+        if (a === 'list') return jobs.length ? jobs.map(VXJOBS.summary).join('\n') : 'No jobs yet.';
+        if (a === 'show') return shown(pick());
+        if (a === 'create') { const j = VXJOBS.create(fields(), s); jobs.unshift(j); return 'Job created, a quote for now. ' + shown(j); }
+        if (a === 'update') { const j = VXJOBS.update(pick(), fields(), s); return shown(j); }
+        if (a === 'quote') {
+          if (!input.id && !jobOfGig()) { const q = VXJOBS.quote({ tier: input.tier || 'edit', priceUsd: input.price_usd, houseStyle: true }, s); return `${q.name}: ${q.label} USD. ${q.includes} Grok clips ${q.grok}, ${q.changes} rounds of changes, ~${q.days} days. Pay to ${q.payTo}.${s.pricesApproved ? '' : ' Prices not approved by the owner yet.'}`; }
+          return shown(pick());
+        }
+        if (a === 'quote_text') return VXJOBS.quoteText(pick(), s);
+        if (a === 'offer_text') return VXJOBS.offerText(s);
+        if (a === 'quote_given' || a === 'mark_paid' || a === 'cancel') { const j = pick(); VXJOBS.act(j, a, s, { note: input.note || (a === 'mark_paid' ? 'marked paid by hand' : '') }); return shown(j); }
+        if (a === 'start') return jobStart(pick(), input.send);
+        if (a === 'changes') { if (!input.note) throw new Error('give the changes the customer wants (note)'); return jobChanges(pick(), input.note, input.send); }
+        if (a === 'deliver') {
+          const j = pick(), files = [].concat(input.files || []).filter(Boolean);
+          if (!files.length) { const last = jobExports(j)[0]; if (last) files.push(last); }
+          files.forEach(f => jobAttach(j, f));
+          VXJOBS.act(j, 'deliver', s, { note: input.note });
+          return 'Delivered (marked; nothing was sent). ' + shown(j);
+        }
+        if (a === 'settings') {
+          let changed = false;
+          if (input.tier) {
+            const t = VXJOBS.tierOf(s, input.tier);
+            if (input.price_usd != null) { if (!(Number(input.price_usd) > 0)) throw new Error('price_usd must be above 0'); t.usd = Number(input.price_usd); }
+            if (input.grok_clips != null) t.grok = Math.max(0, Math.round(Number(input.grok_clips) || 0));
+            if (input.rounds != null) t.changes = Math.max(0, Math.round(Number(input.rounds) || 0));
+            if (input.days != null) t.days = Math.max(0, Math.round(Number(input.days) || 0));
+            if (input.includes != null) t.includes = String(input.includes).slice(0, 600);
+            changed = true;
+          }
+          if (input.terms != null) { VXJOBS.setTerms(s, String(input.terms).slice(0, 12000)); changed = true; }
+          if (input.turnaround != null) { s.turnaround = String(input.turnaround).slice(0, 400); changed = true; }
+          if (changed) { jobSave(); jobRender(); }
+          return (changed ? 'Saved. ' : '') + jobSettingsText();
+        }
+        throw new Error('unknown jobs action ' + a);
+      }
+
+      function jbList() {
+        const list = jbEl('jbList'); list.innerHTML = '';
+        jobs.forEach(j => {
+          const b = document.createElement('button'); b.className = 'ai-gig' + (jbView.kind === 'job' && jbView.id === j.id ? ' on' : '');
+          b.innerHTML = '<span></span><small></small>';
+          b.firstChild.textContent = jbWho(j).toUpperCase();
+          b.lastChild.textContent = `${j.quote.name} ${j.quote.label} · ${VXJOBS.LABELS[j.status]}`;
+          b.onclick = () => { jbView = { kind: 'job', id: j.id }; jobRender(); };
+          list.appendChild(b);
+        });
+      }
+      const jbNote = (t, bad) => { const n = jbEl('jbNote'); if (n) { n.textContent = t; n.style.color = bad ? '#ff5a4f' : ''; } };
+      // run a step from a button; errors show under the buttons instead of throwing
+      const jbTry = fn => { try { const r = fn(); if (r && typeof r === 'string') jbNote(r); } catch (e) { jbNote(e.message, true); } };
+      // money and cancelling take two clicks
+      function jbConfirm(btn, ask, fn) {
+        if (btn.dataset.armed) return fn();
+        btn.dataset.armed = '1'; const was = btn.textContent; btn.textContent = ask;
+        setTimeout(() => { if (btn.isConnected) { delete btn.dataset.armed; btn.textContent = was; } }, 4000);
+      }
+      function jbCopy(btn, text) { navigator.clipboard.writeText(text); const was = btn.textContent; btn.textContent = 'COPIED'; setTimeout(() => { btn.textContent = was; }, 1200); }
+
+      function jobRender() {
+        const m = jbEl('jbMain'); if (!m) return;
+        jbList();
+        const j = jbView.kind === 'job' && jobs.find(x => x.id === jbView.id);
+        if (jbView.kind === 'job' && !j) jbView = { kind: 'offer' };
+        if (jbView.kind === 'new' || jbView.kind === 'edit') return jbForm(m, jbView.kind === 'edit' ? jobs.find(x => x.id === jbView.id) : null);
+        if (jbView.kind === 'settings') return jbSettingsView(m);
+        if (jbView.kind === 'offer') return jbOfferView(m);
+        return jbJobView(m, j);
+      }
+
+      function jbForm(m, j) {
+        const open = !j || ['quote', 'awaiting_payment'].includes(j.status), dis = open ? '' : ' disabled';
+        const f = j || { customer: '', handle: '', contact: '', track: '', brief: '', tier: jobSet.tiers[0].id, priceUsd: null, houseStyle: jobSet.houseStyleDefault !== false, notes: '' };
+        m.innerHTML = `<div><div class="jb-title">${j ? 'EDIT JOB' : 'NEW JOB'}</div><div class="jb-sub">${j ? jbEsc(jbWho(j)) + (open ? '' : ' · PAID: THE DEAL IS FIXED') : 'FROM A BRIEF TO A QUOTE'}</div></div>
+          <div class="jb-form">
+            <label>CUSTOMER</label><input class="jb-in" data-f="customer" value="${jbEsc(f.customer)}" placeholder="Name">
+            <label>HANDLE</label><input class="jb-in" data-f="handle" value="${jbEsc(f.handle)}" placeholder="$handle, @x or paymail">
+            <label>CONTACT</label><input class="jb-in" data-f="contact" value="${jbEsc(f.contact)}" placeholder="Where to reach them">
+            <label>TRACK</label><input class="jb-in" data-f="track" value="${jbEsc(f.track)}" placeholder="Audio file path, URL or catalogue track">
+            <label>BRIEF</label><textarea class="jb-in" data-f="brief" rows="5" placeholder="What they want: the track's world, mood, references, length, deadline">${jbEsc(f.brief)}</textarea>
+            <label>TIER</label><select class="gen-select jb-in" data-f="tier"${dis}>${jobSet.tiers.map(t => `<option value="${jbEsc(t.id)}"${t.id === f.tier ? ' selected' : ''}>${jbEsc(t.name)} ${VXJOBS.tierPrice(t)}</option>`).join('')}</select>
+            <label>PRICE USD</label><input class="jb-in" data-f="priceUsd" type="number" min="0" step="1" value="${f.priceUsd == null ? '' : jbEsc(f.priceUsd)}" placeholder="the tier's price"${dis}>
+            <label>HOUSE STYLE</label><label class="ai-auto" title="Owner to decide per job: is the house look the product, or does the customer's brief override it?"><input type="checkbox" data-f="houseStyle"${f.houseStyle !== false ? ' checked' : ''}${dis}> ON: NO FACES, NEVER RETRO, MONOCHROME · OFF: THEIR BRIEF COMES FIRST</label>
+            <label>NOTES</label><textarea class="jb-in" data-f="notes" rows="2" placeholder="Private notes">${jbEsc(f.notes)}</textarea>
+          </div>
+          <div class="jb-quote" id="jbQuote"></div>
+          <div class="jb-acts"><button class="gen-btn hot" data-act="save">${j ? 'SAVE' : 'MAKE THE QUOTE'}</button><button class="gen-btn" data-act="back">CANCEL</button></div>
+          <div class="gen-note" id="jbNote"></div>`;
+        const read = () => { const o = {}; m.querySelectorAll('[data-f]').forEach(i => { if (!i.disabled) o[i.dataset.f] = i.type === 'checkbox' ? i.checked : i.value; }); if (o.priceUsd === '') o.priceUsd = null; return o; };
+        const preview = () => {
+          const o = Object.assign({ tier: f.tier, priceUsd: f.priceUsd, houseStyle: f.houseStyle }, read());
+          try { const q = VXJOBS.quote(o, jobSet); jbEl('jbQuote').textContent = `${q.name} · ${q.label} USD · ${q.grok ? q.grok + ' GROK CLIPS' : 'NO NEW FOOTAGE'} · ${q.changes} ROUND${q.changes === 1 ? '' : 'S'} OF CHANGES · ~${q.days} DAYS · HOUSE STYLE ${q.houseStyle ? 'ON' : 'OFF'}${jobSet.pricesApproved ? '' : ' · PRICES NOT APPROVED'}`; }
+          catch (e) { jbEl('jbQuote').textContent = e.message; }
+        };
+        m.querySelectorAll('[data-f]').forEach(i => i.addEventListener('input', preview)); preview();
+        m.querySelector('[data-act="back"]').onclick = () => { jbView = j ? { kind: 'job', id: j.id } : jobs.length ? { kind: 'job', id: jobs[0].id } : { kind: 'offer' }; jobRender(); };
+        m.querySelector('[data-act="save"]').onclick = () => jbTry(() => {
+          const o = read(), done = j ? VXJOBS.update(j, o, jobSet) : VXJOBS.create(o, jobSet);
+          if (!j) jobs.unshift(done);
+          jobSave(); renderGigs(); jbView = { kind: 'job', id: done.id }; jobRender();
+        });
+      }
+
+      function jbJobView(m, j) {
+        const q = j.quote, g = j.gigId && gigs.find(x => x.id === j.gigId), can = VXJOBS.allowed(j), gk = j.grok || { video: 0, image: 0, usd: 0 };
+        const btn = (act, label, hot, title) => can.includes(act) ? `<button class="gen-btn${hot ? ' hot' : ''}" data-act="${act}"${title ? ` title="${jbEsc(title)}"` : ''}>${label}</button>` : '';
+        const exports = jobExports(j).filter(f => !j.deliverables.includes(f));
+        m.innerHTML = `<div><div class="jb-title">${jbEsc(jbWho(j))}</div><div class="jb-sub">${VXJOBS.LABELS[j.status]} · ${jbEsc(q.name)} · ${j.created.slice(0, 10)}${j.due ? ' · DUE ' + j.due : ''} · ${j.id}</div></div>
+          <div class="jb-price"><span class="mk-big">${q.label}</span><div class="jb-pay">USD · ${jbEsc(q.name)}${q.custom ? ' · CUSTOM PRICE' : ''}${j.paidAt ? ' · PAID ' + j.paidAt.slice(0, 10) : ''}<br>PAY TO <b>${jbEsc(q.payTo)}</b> · ${jbEsc(q.payee)}</div>${jobSet.pricesApproved ? '' : '<span class="jb-warn" title="The owner has not approved the tier prices yet (TIERS + TERMS)">PRICES NOT APPROVED</span>'}</div>
+          <div class="jb-acts">
+            ${btn('quote_given', 'QUOTE GIVEN', false, 'You gave the customer the quote (COPY QUOTE); now it waits for payment')}
+            ${btn('mark_paid', 'MARK PAID', true, 'Only once you have seen the money arrive at the paymail. Freezes the price and the terms.')}
+            ${btn('start', 'START: HAND TO VEXVOID', true, 'Opens the job\'s conversation and gives VexVoid the brief, the Grok allowance and the house-style setting')}
+            ${btn('deliver', 'MARK DELIVERED', true, 'Marks the job delivered with the attached files. Nothing is sent: send the video to the customer yourself.')}
+            ${btn('changes', `CHANGES (${VXJOBS.changesLeft(j)} LEFT)`)}
+            <button class="gen-btn" data-act="copy-quote">COPY QUOTE</button>
+            ${g ? '<button class="gen-btn" data-act="open">OPEN CONVERSATION</button>' : ''}
+            <button class="gen-btn" data-act="edit">EDIT DETAILS</button>
+            ${btn('cancel', 'CANCEL JOB')}
+            ${j.status === 'quote' || j.status === 'cancelled' ? '<button class="gen-btn" data-act="delete">DELETE</button>' : ''}
+          </div>
+          <div class="jb-row" id="jbChanges" style="display:none"><textarea class="jb-in" rows="3" style="flex:1" placeholder="What the customer wants changed"></textarea><button class="gen-btn hot" data-act="changes-go">HAND TO VEXVOID</button></div>
+          <div class="gen-note" id="jbNote"></div>
+          <div class="jb-h">BRIEF</div><div class="jb-text">${jbEsc(j.brief)}</div>
+          <div class="jb-meta">
+            <span>HANDLE</span><b>${jbEsc(j.handle || '-')}</b><span>CONTACT</span><b>${jbEsc(j.contact || '-')}</b><span>TRACK</span><b>${jbEsc(j.track || 'not given yet')}</b>
+            <span>INCLUDED</span><b>${jbEsc(q.includes)}</b>
+            <span>HOUSE STYLE</span><b>${q.houseStyle ? 'On: no faces, never retro, monochrome' : 'Off: their brief comes first'}</b>
+            <span>GROK CLIPS</span><b>${gk.video} of ${q.grok}${gk.image ? ` · ${gk.image} still${gk.image === 1 ? '' : 's'}` : ''} · $${(gk.usd || 0).toFixed(2)} spent on Grok${VXJOBS.grokLeft(j) < 0 ? ' · OVER THE ALLOWANCE' : ''}</b>
+            <span>CHANGES</span><b>${j.changesUsed || 0} of ${q.changes} rounds used</b>
+            <span>TERMS</span><b>Version ${j.termsVersion}${j.termsText ? ' (frozen at payment)' : ''}</b>
+            <span>CONVERSATION</span><b>${g ? jbEsc(g.title) : 'starts with START'}</b>
+          </div>
+          <div class="jb-h">DELIVERABLES</div>
+          <div class="jb-files">${j.deliverables.map(f => `<div><span>${jbEsc(f)}</span></div>`).join('') || '<div><span style="color:#555">Nothing attached yet.</span></div>'}
+            ${exports.map((f, i) => `<div><button class="gen-btn" data-attach="${i}">ATTACH</button><span style="color:#777">${jbEsc(f)}</span></div>`).join('')}</div>
+          <div class="jb-row"><input class="jb-in" id="jbPath" style="flex:1" placeholder="Or the path of an exported video"><button class="gen-btn" data-act="attach">ATTACH</button></div>
+          <div class="jb-h">NOTES</div><textarea class="jb-in" id="jbNotes" rows="3" placeholder="Private notes">${jbEsc(j.notes)}</textarea>
+          <div class="jb-h">HISTORY</div><div class="jb-hist">${j.history.map(h => `<div>${h.at.slice(0, 16).replace('T', ' ')}  ${VXJOBS.LABELS[h.status]}${h.note ? '  · ' + jbEsc(h.note) : ''}</div>`).join('')}</div>`;
+        const on = (act, fn) => { const b = m.querySelector(`[data-act="${act}"]`); if (b) b.onclick = () => fn(b); };
+        const step = (a, opts) => jbTry(() => { VXJOBS.act(j, a, jobSet, opts); jobSave(); renderGigs(); jobRender(); });
+        on('quote_given', () => step('quote_given'));
+        on('mark_paid', b => jbConfirm(b, 'MONEY ARRIVED? CLICK AGAIN', () => step('mark_paid', { note: 'marked paid by hand' })));
+        on('start', () => jbTry(() => jobStart(j)));
+        on('deliver', () => step('deliver'));
+        on('changes', () => { const c = jbEl('jbChanges'); c.style.display = 'flex'; c.querySelector('textarea').focus(); });
+        on('changes-go', () => jbTry(() => { const t = jbEl('jbChanges').querySelector('textarea').value.trim(); if (!t) throw new Error('write the changes first'); return jobChanges(j, t); }));
+        on('copy-quote', b => jbCopy(b, VXJOBS.quoteText(j, jobSet)));
+        on('open', () => { openGig(g); document.querySelector('[data-tab="ai"]').click(); });
+        on('edit', () => { jbView = { kind: 'edit', id: j.id }; jobRender(); });
+        on('cancel', b => jbConfirm(b, 'CANCEL IT? CLICK AGAIN', () => step('cancel')));
+        on('delete', b => jbConfirm(b, 'DELETE? CLICK AGAIN', () => { jobs = jobs.filter(x => x !== j); jobSave(); renderGigs(); jbView = jobs.length ? { kind: 'job', id: jobs[0].id } : { kind: 'offer' }; jobRender(); }));
+        on('attach', () => jbTry(() => { jobAttach(j, jbEl('jbPath').value); jobRender(); }));
+        m.querySelectorAll('[data-attach]').forEach(b => { b.onclick = () => jbTry(() => { jobAttach(j, exports[Number(b.dataset.attach)]); jobRender(); }); });
+        jbEl('jbNotes').addEventListener('blur', e => { j.notes = e.target.value.slice(0, 4000); jobSave(); });
+      }
+
+      function jbOfferView(m) {
+        m.innerHTML = `<div><div class="jb-title">BJOBSX OFFER</div><div class="jb-sub">A DRAFT FROM THE TIERS AND TERMS, TO COPY. NOTHING IS POSTED FROM HERE.</div></div>
+          ${jobSet.pricesApproved ? '' : '<div><span class="jb-warn" style="margin:0">PRICES NOT APPROVED BY THE OWNER</span></div>'}
+          <textarea class="jb-in" id="jbOfferText" rows="26" readonly></textarea>
+          <div class="jb-acts"><button class="gen-btn hot" data-act="copy">COPY</button><button class="gen-btn" data-act="settings">EDIT TIERS + TERMS</button></div>`;
+        jbEl('jbOfferText').value = VXJOBS.offerText(jobSet);
+        m.querySelector('[data-act="copy"]').onclick = e => jbCopy(e.target, VXJOBS.offerText(jobSet));
+        m.querySelector('[data-act="settings"]').onclick = () => { jbView = { kind: 'settings' }; jobRender(); };
+      }
+
+      function jbSettingsView(m) {
+        const s = jobSet;
+        m.innerHTML = `<div><div class="jb-title">TIERS + TERMS</div><div class="jb-sub">OWNER TO DECIDE: PRICES, TURNAROUND, RIGHTS (IN THE TERMS) AND THE HOUSE-STYLE DEFAULT</div></div>
+          <label class="ai-auto"><input type="checkbox" data-s="pricesApproved"${s.pricesApproved ? ' checked' : ''}> PRICES APPROVED BY THE OWNER (TAKES THE DRAFT LINE OFF THE OFFER)</label>
+          <div class="jb-tiers"><span>TIER</span><span>USD</span><span title="A starting price: the job can be quoted higher, never lower">FROM</span><span title="New Grok video clips the price pays for">GROK</span><span>CHANGES</span><span>DAYS</span><span>INCLUDED</span>
+            ${s.tiers.map((t, i) => `<input class="jb-in" data-t="${i}:name" value="${jbEsc(t.name)}"><input class="jb-in" data-t="${i}:usd" type="number" min="1" value="${jbEsc(t.usd)}"><input type="checkbox" data-t="${i}:from"${t.from ? ' checked' : ''}><input class="jb-in" data-t="${i}:grok" type="number" min="0" value="${jbEsc(t.grok)}"><input class="jb-in" data-t="${i}:changes" type="number" min="0" value="${jbEsc(t.changes)}"><input class="jb-in" data-t="${i}:days" type="number" min="0" value="${jbEsc(t.days)}"><textarea class="jb-in" data-t="${i}:includes" rows="2">${jbEsc(t.includes)}</textarea>`).join('')}
+          </div>
+          <div class="jb-form">
+            <label>PAY TO</label><input class="jb-in" data-s="payTo" value="${jbEsc(s.payTo)}">
+            <label>PAYEE</label><input class="jb-in" data-s="payee" value="${jbEsc(s.payee)}">
+            <label>HOUSE STYLE</label><label class="ai-auto"><input type="checkbox" data-s="houseStyleDefault"${s.houseStyleDefault !== false ? ' checked' : ''}> NEW JOBS START WITH HOUSE STYLE ON</label>
+            <label>TURNAROUND</label><input class="jb-in" data-s="turnaround" value="${jbEsc(s.turnaround)}">
+            <label>TERMS V${s.terms.version}</label><textarea class="jb-in" data-s="terms" rows="12">${jbEsc(s.terms.text)}</textarea>
+          </div>
+          <div class="jb-acts"><button class="gen-btn hot" data-act="save">SAVE</button><button class="gen-btn" data-act="offer">SEE THE OFFER</button><button class="gen-btn" data-act="reset">RESET TO DEFAULTS</button></div>
+          <div class="gen-note" id="jbNote">Saved quotes keep their price; paid jobs keep the terms they were paid under.</div>`;
+        m.querySelector('[data-act="save"]').onclick = () => jbTry(() => {
+          const tiers = s.tiers.map(t => Object.assign({}, t));
+          m.querySelectorAll('[data-t]').forEach(i => {
+            const [n, k] = i.dataset.t.split(':'), t = tiers[n];
+            if (k === 'from') t.from = i.checked;
+            else if (k === 'name') t.name = i.value.trim().toUpperCase().slice(0, 24) || t.name;
+            else if (k === 'includes') t.includes = i.value.trim().slice(0, 600);
+            else { const v = Number(i.value); if (!isFinite(v) || v < 0 || (k === 'usd' && v <= 0)) throw new Error(`${t.name}: ${k} must be a number${k === 'usd' ? ' above 0' : ''}`); t[k] = k === 'usd' ? Math.round(v * 100) / 100 : Math.round(v); }
+          });
+          const get = k => m.querySelector(`[data-s="${k}"]`);
+          s.tiers = tiers; s.pricesApproved = get('pricesApproved').checked; s.houseStyleDefault = get('houseStyleDefault').checked;
+          s.payTo = get('payTo').value.trim() || s.payTo; s.payee = get('payee').value.trim() || s.payee; s.turnaround = get('turnaround').value.trim().slice(0, 400);
+          const v = VXJOBS.setTerms(s, get('terms').value);
+          jobSave(); jobRender(); return `Saved. Terms are version ${v}.`;
+        });
+        m.querySelector('[data-act="offer"]').onclick = () => { jbView = { kind: 'offer' }; jobRender(); };
+        m.querySelector('[data-act="reset"]').onclick = e => jbConfirm(e.target, 'RESET? CLICK AGAIN', () => { jobSet = VXJOBS.settings(Object.assign(VXJOBS.defaults(), { terms: s.terms })); VXJOBS.setTerms(jobSet, VXJOBS.defaults().terms.text); jobSave(); jobRender(); });
+      }
+
+      jbEl('jbNew').addEventListener('click', () => { jbView = { kind: 'new' }; jobRender(); });
+      jbEl('jbOffer').addEventListener('click', () => { jbView = { kind: 'offer' }; jobRender(); });
+      jbEl('jbSettings').addEventListener('click', () => { jbView = { kind: 'settings' }; jobRender(); });
+      // typing in a job never reaches the mixer's keys
+      jbEl('jobsTab').addEventListener('keydown', e => { if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) e.stopPropagation(); });
+      document.querySelector('[data-tab="jobs"]').addEventListener('click', () => jobRender());
+      jobRender(); renderGigs();
 
       // ===== MINT: sketches (PATTERNS) and sets (COMPOSER) as 1Sat inscriptions through bWalletX =====
       async function mintWallet(statusFn) {
@@ -8280,6 +8626,7 @@ Reply with only the JSON array in one \`\`\`json code block.`;
   <script src="./vx/lib/three.global.js"></script>
   <script src="./vx/text3d.js"></script>
   <script src="./vx/brain.js"></script>
+  <script src="./vx/jobs.js"></script>
   <script src="./vx/mint.js"></script>
   <script src="./vx/vx-keys.js"></script>
   <script>
