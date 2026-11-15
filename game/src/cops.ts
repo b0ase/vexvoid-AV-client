@@ -250,7 +250,7 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
       aimS.set(mount.x + Math.sin(a) * 24, 1.2, mount.z + Math.cos(a) * 24);
     }
     car.search.target.position.copy(aimS); car.search.target.updateMatrixWorld();
-    car.search.intensity = carS.onStreet ? 2600 : 0;
+    car.search.intensity = carS.onStreet ? 650 : 0; // bright enough to pick the writer out, not so bright that fresh white paint whites out the screen
 
     // ── who sees the writer ──
     const lit = carS.onStreet && (() => {
