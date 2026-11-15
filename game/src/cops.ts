@@ -79,8 +79,8 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
   for (let i = 0; i < 2; i++) {
     const w = await loadWriter(o.base + 'anims/ual.glb', high, o.base + 'models/writer.glb', look);
     let head: THREE.Object3D = w.root;
-    // no cans on the belt, no backpack: just the uniform
-    w.root.traverse((m) => { if (/Can\d|Cap\d|Pack|strap|String/i.test(m.name)) m.visible = false; if (/(^|:)Head$/.test(m.name)) head = m; });
+    // no cans, no backpack, no hood (the helmet sits where it was): just the uniform
+    w.root.traverse((m) => { if (/Can\d|Cap\d|Pack|strap|String|Hood/i.test(m.name)) m.visible = false; if (/(^|:)Head$/.test(m.name)) head = m; });
     const helmet = new THREE.Group();
     const shell = new THREE.Mesh(shellG, shellM), visor = new THREE.Mesh(visorG, visorM);
     shell.castShadow = high;
@@ -210,7 +210,7 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
     cp.w.root.updateMatrixWorld(true);
     const m = cp.head.matrixWorld, p = new THREE.Vector3().setFromMatrixPosition(m), q = new THREE.Quaternion();
     m.decompose(new THREE.Vector3(), q, new THREE.Vector3());
-    cp.helmet.position.copy(p).add(new THREE.Vector3(0, 0.1, 0.012).applyQuaternion(q));
+    cp.helmet.position.copy(p).add(new THREE.Vector3(0, 0.175, 0.045).applyQuaternion(q));
     cp.helmet.quaternion.copy(q);
   };
 

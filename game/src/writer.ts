@@ -63,18 +63,22 @@ function weave(kind: Weave, per: number) {
 // the game's own materials for the model's named slots
 const LOOK: Record<string, () => THREE.Material> = {
   // cotton and canvas: a soft sheen at grazing angles, the thing that makes cloth read as cloth
-  Hoodie: () => new THREE.MeshPhysicalMaterial({ color: '#45464c', roughness: 0.92, metalness: 0, sheen: 0.6, sheenRoughness: 0.6, sheenColor: new THREE.Color('#8a8a90'), normalScale: new THREE.Vector2(0.7, 0.7), ...weave('knit', 36) }),
-  Trousers: () => new THREE.MeshPhysicalMaterial({ color: '#56575d', roughness: 0.86, metalness: 0, sheen: 0.5, sheenRoughness: 0.65, sheenColor: new THREE.Color('#7c7c82'), normalScale: new THREE.Vector2(0.5, 0.5), ...weave('twill', 30) }),
-  Gloves: () => new THREE.MeshStandardMaterial({ color: '#6a6a6e', roughness: 0.65, metalness: 0 }),
-  Trim: () => new THREE.MeshStandardMaterial({ color: '#2e2f34', roughness: 0.92, metalness: 0, normalScale: new THREE.Vector2(0.8, 0.8), ...weave('knit', 60) }),
-  Shoes: () => new THREE.MeshStandardMaterial({ color: '#f4f4f4', roughness: 0.4, metalness: 0, emissive: '#202020' }),
-  Sole: () => new THREE.MeshStandardMaterial({ color: '#8c8c8e', roughness: 0.6, metalness: 0 }),
+  // the jacket is a technical shell: a tight ripstop with a sheen, so the street's rim lights draw its folds
+  Hoodie: () => new THREE.MeshPhysicalMaterial({ color: '#4a4b51', roughness: 0.6, metalness: 0, sheen: 0.9, sheenRoughness: 0.45, sheenColor: new THREE.Color('#a4a5ad'), normalScale: new THREE.Vector2(0.45, 0.45), ...weave('ripstop', 44) }),
+  Trousers: () => new THREE.MeshPhysicalMaterial({ color: '#5d5e64', roughness: 0.84, metalness: 0, sheen: 0.5, sheenRoughness: 0.65, sheenColor: new THREE.Color('#84848a'), normalScale: new THREE.Vector2(0.5, 0.5), ...weave('twill', 30) }),
+  Gloves: () => new THREE.MeshStandardMaterial({ color: '#34353a', roughness: 0.55, metalness: 0, normalScale: new THREE.Vector2(0.4, 0.4), ...weave('knit', 70) }),
+  Trim: () => new THREE.MeshStandardMaterial({ color: '#2a2b30', roughness: 0.9, metalness: 0, normalScale: new THREE.Vector2(0.8, 0.8), ...weave('knit', 60) }),
+  Shoes: () => new THREE.MeshStandardMaterial({ color: '#dcdcdf', roughness: 0.5, metalness: 0, emissive: '#141414' }),
+  Sole: () => new THREE.MeshStandardMaterial({ color: '#f1f1f1', roughness: 0.55, metalness: 0, emissive: '#1c1c1c' }),
   Void: () => new THREE.MeshBasicMaterial({ color: '#000000' }),
   // the bandana is near-black: inside the hood there is only darkness (no faces, not even the suggestion of one)
   Mask: () => new THREE.MeshPhysicalMaterial({ color: '#0b0b0d', roughness: 0.95, metalness: 0, sheen: 0.25, sheenRoughness: 0.8, sheenColor: new THREE.Color('#2a2a2e') }),
   Pack: () => new THREE.MeshStandardMaterial({ color: '#36373c', roughness: 0.5, metalness: 0.05, normalScale: new THREE.Vector2(0.45, 0.45), ...weave('ripstop', 24) }), // nylon, a little sheen
   Can: () => new THREE.MeshStandardMaterial({ color: '#b8b8bc', roughness: 0.35, metalness: 0.8 }),
   Cap: () => new THREE.MeshStandardMaterial({ color: '#f2f2f2', roughness: 0.5, metalness: 0 }),
+  // reflective tape (the pack, the heels): it throws back whatever light finds it; and the dark hardware: zips, buckles, rubber
+  Reflect: () => new THREE.MeshStandardMaterial({ color: '#e6e7ea', roughness: 0.32, metalness: 0.35, emissive: '#2c2c2e' }),
+  Detail: () => new THREE.MeshStandardMaterial({ color: '#17181b', roughness: 0.42, metalness: 0.15 }),
 };
 
 // each file is fetched and parsed once (the cops are the same model on the same skeleton)
@@ -84,6 +88,12 @@ const load = (url: string) => files.get(url) || files.set(url, new GLTFLoader().
 /** `look` swaps the materials of named slots (Hoodie, Trousers, Shoes ...), e.g. to dress a cop in the writer's body. */
 export async function loadWriter(url: string, shadow: boolean, modelUrl?: string, look: Record<string, () => THREE.Material> = {}): Promise<Writer> {
   const gltf = await load(url);
+  // the modelled body, and what its builder says about the skeleton: tidied joint offsets (`rest`), the pose the meshes
+  // were built in (`bind`, a matrix per bone), metres per skeleton unit (`scale`) and where a can sits in the hand (`grip`)
+  let model: GLTF | null = null;
+  if (modelUrl) try { model = await load(modelUrl); } catch (e) { console.warn('writer model', e); }
+  let vx: { scale?: number; rest?: Record<string, number[]>; bind?: Record<string, number[]>; grip?: number[] } = {};
+  model?.scene.traverse((o) => { if (typeof o.userData.vx === 'string') try { vx = JSON.parse(o.userData.vx); } catch { /* an older model: none */ } });
   const armSrc = gltf.scene.getObjectByName('Armature') || gltf.scene.children[0];
   const hipsSrc = armSrc.children[0];
 
@@ -92,6 +102,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
   const mk = (n: THREE.Object3D): THREE.Bone => {
     const b = new THREE.Bone();
     b.name = n.name; b.position.copy(n.position); b.quaternion.copy(n.quaternion); b.scale.copy(n.scale);
+    if (vx.rest?.[n.name]) b.position.fromArray(vx.rest[n.name]);
     bones.push(b);
     n.children.forEach((c) => b.add(mk(c)));
     return b;
@@ -116,8 +127,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
   const meshes: THREE.SkinnedMesh[] = [];
   const owned: { dispose: () => void }[] = [];
   // the modelled body: each skinned mesh, its weights moved onto this skeleton by bone name, in the same rest pose
-  if (modelUrl) try {
-    const model = await load(modelUrl);
+  if (model) try {
     model.scene.updateMatrixWorld(true);
     model.scene.traverse((o) => {
       const sm = o as THREE.SkinnedMesh; if (!sm.isSkinnedMesh) return;
@@ -126,7 +136,10 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       const si = geo.attributes.skinIndex as THREE.BufferAttribute;
       for (let i = 0; i < si.array.length; i++) (si.array as Uint16Array)[i] = Math.max(0, map[si.array[i]]);
       si.needsUpdate = true;
-      const src = sm.material as THREE.Material, mat = (look[src.name] || LOOK[src.name] || (() => src))();
+      const src = sm.material as THREE.MeshStandardMaterial, mat = (look[src.name] || LOOK[src.name] || (() => src))();
+      // the model's atlas (second UV set): baked occlusion, seams and wear, multiplied into the cloth and used as its occlusion
+      const std = mat as THREE.MeshStandardMaterial;
+      if (src.map && std.isMeshStandardMaterial && !std.map) { std.map = src.map; std.aoMap = src.map; std.aoMapIntensity = 1; std.needsUpdate = true; }
       const m = new THREE.SkinnedMesh(geo, mat); m.name = sm.name;
       meshes.push(m); owned.push(geo, mat);
     });
@@ -272,14 +285,16 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
   }
   for (const m of meshes) { m.castShadow = shadow; m.receiveShadow = true; m.frustumCulled = false; char.add(m); }
   char.updateMatrixWorld(true);
-  const skeleton = new THREE.Skeleton(bones);
+  // bound in the pose the model was built in (its own bind matrices), not the clip file's rest pose
+  const inv = vx.bind ? bones.map((b) => (vx.bind![b.name] ? new THREE.Matrix4().fromArray(vx.bind![b.name]).invert() : b.matrixWorld.clone().invert())) : undefined;
+  const skeleton = new THREE.Skeleton(bones, inv);
   for (const m of meshes) m.bind(skeleton);
 
   // stand on the ground at 1.78 m, feet at y = 0
-  const k = HEIGHT / Hs;
+  const k = vx.scale || HEIGHT / Hs;
   const root = new THREE.Group();
   char.scale.setScalar(k);
-  char.position.y = -foot * k;
+  char.position.y = vx.scale ? 0 : -foot * k; // the model stands on the clips' own ground
   root.add(char);
 
   // the clips: in place (the game moves the body), hips keep their bob
@@ -326,6 +341,13 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
     qa.setFromUnitVectors(from, to); bone.getWorldQuaternion(qb); bone.parent!.getWorldQuaternion(qp);
     bone.quaternion.slerp(qp.invert().multiply(qa.multiply(qb)), w); bone.updateMatrixWorld(true);
   };
+  // the can sits in the hand's grip: the hand turns so the nozzle (along the fingers) points at the wall
+  let gripPos: THREE.Vector3 | null = null; const gripRot = new THREE.Quaternion(), gripInv = new THREE.Quaternion();
+  if (vx.grip && vx.bind?.[rHand.name]) {
+    const g = new THREE.Matrix4().fromArray(vx.bind[rHand.name]).invert().multiply(new THREE.Matrix4().fromArray(vx.grip));
+    gripPos = new THREE.Vector3(); g.decompose(gripPos, gripRot, new THREE.Vector3()); gripInv.copy(gripRot).invert();
+  }
+  const gM = new THREE.Matrix4(), gQ = new THREE.Quaternion(), gH = new THREE.Quaternion(), UP = new THREE.Vector3(0, 1, 0);
   const aimHand = new THREE.Vector3(), aimAt = new THREE.Vector3();
   let aimOn = false, aimTo = 1, aimW = 0;
   const ik = (w: number) => {
@@ -360,7 +382,14 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       aimW += ((aimOn ? aimTo : 0) - aimW) * Math.min(1, dt * 9);
       if (aimW > 0.01) {
         ik(aimW);
-        can.visible = aimW > 0.3; can.position.copy(iC).lerp(iB, -0.15); can.lookAt(aimAt);
+        can.visible = aimW > 0.3;
+        if (gripPos) {
+          gQ.setFromRotationMatrix(gM.lookAt(aimAt, iC, UP)); // the can upright, its nozzle at the wall
+          rHand.parent!.getWorldQuaternion(qp); gH.copy(qp).invert().multiply(gQ).multiply(gripInv);
+          rHand.quaternion.slerp(gH, aimW); rHand.updateMatrixWorld(true);
+          rHand.getWorldQuaternion(gQ).multiply(gripRot); can.quaternion.copy(gQ);
+          can.position.copy(gripPos); rHand.localToWorld(can.position); can.position.add(iP.set(0, 0.075, 0).applyQuaternion(gQ));
+        } else { can.position.copy(iC).lerp(iB, -0.15); can.lookAt(aimAt); }
       } else can.visible = false;
     },
     dispose: () => { mixer.stopAllAction(); owned.forEach((d) => d.dispose()); },
