@@ -7074,7 +7074,8 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
             await edEnsureEnv(); if (!ed.env) throw new Error('could not read the track');
             const m = VXEDIT.energyMap(ed.env, edBpm(), edBar0());
             const how = ed.track.tempo ? 'set by hand' : `detected from the audio, confidence ${ed.track.tempoConf ?? '?'}; bar 1 starts at ${edBar0().toFixed(2)} s`;
-            return `${ed.track.name}: ${mmss(ed.env.seconds)} at ${edBpm()} BPM (${how}) = ${m.length} bars. Loudness per bar (0-9), in rows of 16 bars:\n` + m.match(/.{1,16}/g).map((r, i) => `bar ${String(i * 16 + 1).padStart(3)}: ${r}`).join('\n');
+            const dr = ed.env.drums, feel = !dr || !dr.snareEvery ? '' : ` Drums at ${ed.env.bpm}: the snare repeats every ${dr.snareEvery} beat${dr.snareEvery > 1 ? 's' : ''} (${dr.feel}${dr.snareEvery === 2 ? ', snare on 2 and 4, so this is the tempo as felt' : dr.snareEvery === 4 ? ', one snare a bar' : ''}); the same grid counts as ${dr.alt} BPM in ${dr.alt > ed.env.bpm ? 'double' : 'half'} time, so use tempo ${dr.alt} only if the cuts should come twice as ${dr.alt > ed.env.bpm ? 'often' : 'rarely'}.`;
+            return `${ed.track.name}: ${mmss(ed.env.seconds)} at ${edBpm()} BPM (${how}) = ${m.length} bars.${feel} Loudness per bar (0-9), in rows of 16 bars:\n` + m.match(/.{1,16}/g).map((r, i) => `bar ${String(i * 16 + 1).padStart(3)}: ${r}`).join('\n');
           }
           if (a === 'look') {
             if (input.look && ED_LOOKS[input.look]) { ed.look = input.look; ed.lookOver = null; edEl('edLook').value = ed.look; }

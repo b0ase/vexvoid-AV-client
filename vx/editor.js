@@ -1,6 +1,6 @@
 /* The EDIT tab's engine: a music video as a list of shots cut to a track. Pure logic; the page does the UI.
  *
- *   VXEDIT.envelope(bytes) -> { rms: Float32Array (one value per STEP seconds, 0..1), step, seconds, bpm, bar0, tempoConf }
+ *   VXEDIT.envelope(bytes) -> { rms: Float32Array (one value per STEP seconds, 0..1), step, seconds, bpm, bar0, tempoConf, drums }
  *   VXEDIT.tempo(channels, sampleRate) -> { bpm, beat0, bar0, conf }: the track's tempo and where its bars start
  *   VXEDIT.autoCut({ seconds, env, bpm, pool, pace }) -> shots [{ src, name, in, dur }]
  *   VXEDIT.layout(shots) -> shots with start times;   VXEDIT.at(shots, t) -> { i, shot, offset }
@@ -37,7 +37,7 @@
     var sorted = Array.from(rms).sort(function (a, b) { return a - b; }), lo = sorted[Math.floor(n * 0.05)] || 0, hi = sorted[Math.floor(n * 0.97)] || 1;
     for (i = 0; i < n; i++) rms[i] = Math.max(0, Math.min(1, (rms[i] - lo) / ((hi - lo) || 1)));
     var tp = tempo(chans, sr);
-    return { rms: rms, step: STEP, seconds: ab.duration, bpm: tp.bpm, bar0: tp.bar0, tempoConf: tp.conf };
+    return { rms: rms, step: STEP, seconds: ab.duration, bpm: tp.bpm, bar0: tp.bar0, tempoConf: tp.conf, drums: tp.drums };
   }
 
   // Tempo from the audio: an onset curve (rises in loudness: full band, a kick band and a snare/hat band), every
@@ -45,15 +45,15 @@
   // Then the beat phase and the downbeat: of the four beats in a bar, the one with the most kick.
   function tempo(chans, sr) {
     var hop = 512, len = chans[0].length, n = Math.floor(len / hop), fps = sr / hop;
-    var full = new Float32Array(n), low = new Float32Array(n), high = new Float32Array(n), highLin = new Float32Array(n), lp = 0, lp2 = 0, nc = chans.length;
-    var a = 1 - Math.exp(-2 * Math.PI * 150 / sr), a2 = 1 - Math.exp(-2 * Math.PI * 1500 / sr);
+    var full = new Float32Array(n), low = new Float32Array(n), high = new Float32Array(n), highLin = new Float32Array(n), midLin = new Float32Array(n), lp = 0, lp2 = 0, lp3 = 0, nc = chans.length;
+    var a = 1 - Math.exp(-2 * Math.PI * 150 / sr), a2 = 1 - Math.exp(-2 * Math.PI * 1500 / sr), a3 = 1 - Math.exp(-2 * Math.PI * 6000 / sr);
     for (var i = 0; i < n; i++) {
-      var ef = 0, el = 0, eh = 0;
+      var ef = 0, el = 0, eh = 0, em = 0;
       for (var j = i * hop; j < (i + 1) * hop; j++) {
         var v = 0; for (var c = 0; c < nc; c++) v += chans[c][j]; v /= nc;
-        lp += a * (v - lp); lp2 += a2 * (v - lp2); ef += v * v; el += lp * lp; eh += (v - lp2) * (v - lp2);
+        lp += a * (v - lp); lp2 += a2 * (v - lp2); lp3 += a3 * (v - lp3); em += (lp3 - lp2) * (lp3 - lp2); ef += v * v; el += lp * lp; eh += (v - lp2) * (v - lp2);
       }
-      full[i] = Math.log(1 + 1000 * ef); low[i] = Math.log(1 + 1000 * el); high[i] = Math.log(1 + 1000 * eh); highLin[i] = Math.sqrt(eh / hop);
+      full[i] = Math.log(1 + 1000 * ef); low[i] = Math.log(1 + 1000 * el); high[i] = Math.log(1 + 1000 * eh); highLin[i] = Math.sqrt(eh / hop); midLin[i] = Math.sqrt(em / hop);
     }
     var o = new Float32Array(n);
     for (i = 1; i < n; i++) o[i] = Math.max(0, full[i] - full[i - 1]) + Math.max(0, low[i] - low[i - 1]) + 0.7 * Math.max(0, high[i] - high[i - 1]);
@@ -140,7 +140,16 @@
     }
     var barLen = 240 / bpmOut, bar0 = ((bestP + bestB * P) / fps) % barLen;
     if (bar0 > barLen - 0.15) bar0 = 0; // a downbeat a hair under a bar in is really bar 1 at the start
-    return { bpm: bpmOut, beat0: bestP / fps, bar0: Math.round(bar0 * 1000) / 1000, conf: Math.round(Math.min(1, (best / (mean || 1) - 1) / 2) * 100) / 100 };
+    // half or double? Both grids fit the same hits, so say what the drums do and let the snare settle the name: how
+    // often the snare band (1.5-6 kHz) repeats, in beats of this tempo. Every 2 beats is a backbeat (2 and 4): the
+    // tempo as felt. Every 4 is half-time (one snare a bar): the same track counts as half this tempo with a backbeat.
+    var so = new Float32Array(n), z0 = 0;
+    for (i = 2; i < n; i++) { so[i] = Math.max(0, midLin[i] - midLin[i - 2]); z0 += so[i] * so[i]; }
+    var rp = function (beats) { var Lr = Math.round(beats * P), s5 = 0; for (var x2 = 0; x2 + Lr < n; x2++) s5 += so[x2] * so[x2 + Lr]; return z0 ? Math.round(s5 / z0 * 100) / 100 : 0; };
+    var reps = { 1: rp(1), 2: rp(2), 4: rp(4) }, top = Math.max(reps[1], reps[2], reps[4]), every = top < 0.08 ? 0 : reps[1] >= 0.8 * top ? 1 : reps[2] >= 0.8 * top ? 2 : 4;
+    var drums = { snareEvery: every, repeats: reps, feel: every === 2 ? 'backbeat' : every === 4 ? 'half-time' : every === 1 ? 'double-time' : 'no clear snare',
+      alt: every === 4 ? Math.round(bpmOut / 2 * 10) / 10 : every === 1 ? Math.round(bpmOut * 2 * 10) / 10 : bpmOut < 110 ? Math.round(bpmOut * 2 * 10) / 10 : Math.round(bpmOut / 2 * 10) / 10 };
+    return { drums: drums, bpm: bpmOut, beat0: bestP / fps, bar0: Math.round(bar0 * 1000) / 1000, conf: Math.round(Math.min(1, (best / (mean || 1) - 1) / 2) * 100) / 100 };
   }
   function energy(env, from, to) {
     var a = Math.floor(from / env.step), b = Math.max(a + 1, Math.ceil(to / env.step)), s = 0, k = 0;

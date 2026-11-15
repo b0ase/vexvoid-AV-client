@@ -17,7 +17,7 @@ const P={ DnB:[[0,'kick',0.9],[2.5,'kick',0.7],[1,'snare',0.8],[3,'snare',0.8],.
   'kicks-only':[[0,'kick',0.9],[1,'kick',0.45],[2,'kick',0.45],[3,'kick',0.45],...[0.5,1.5,2.5,3.5].map(p=>[p,'hat',0.08])] };
 let ok=0, all=0;
 for (const [name,bpm,lead] of [['DnB',174,0.4],['DnB',170,0],['boom-bap',90,0.2],['boom-bap',85,0],['four-floor',128,0.3],['four-floor',140,0],['four-floor',95,0],['four-floor',120,1.1],['kicks-only',90,0],['kicks-only',120,0.3],['kicks-only',150,0.2],['kicks-only',137,0.7],['boom-bap',100,2],['DnB',160,0.5]]) {
-  const r=E.tempo([pattern(bpm,90,lead,P[name])],sr); const good=Math.abs(r.bpm-bpm)<0.3; ok+=good; all++;
+  const r=E.tempo([pattern(bpm,90,lead,P[name])],sr); const good=Math.abs(r.bpm-bpm)<0.3&&(name==='kicks-only'||r.drums.snareEvery===2); // a snare on 2 and 4 reads as a backbeat ok+=good; all++;
   console.log((good?'OK  ':'BAD ')+name.padEnd(10),'true',bpm,'-> ',r.bpm,'bar0',r.bar0,'(lead',lead+')');
 }
 console.log(ok+'/'+all); if (ok !== all) process.exit(1);
