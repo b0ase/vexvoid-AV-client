@@ -23,19 +23,52 @@ export type Writer = {
 
 const HEIGHT = 1.78;
 
+// fabric detail, drawn once: a height pattern turned into a normal map and a roughness map, tiling. One UV unit is the
+// figure's height (1.78 m) on every piece of the model, so `per` = how many tiles across that height.
+type Weave = 'knit' | 'twill' | 'ripstop';
+const weaves = new Map<Weave, { normal: THREE.Texture; rough: THREE.Texture }>();
+function weave(kind: Weave, per: number) {
+  let w = weaves.get(kind);
+  if (!w) {
+    const N = 256, h = new Float32Array(N * N);
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const u = x / N, v = y / N; let k = 0;
+      if (kind === 'knit') { // rows of V stitches, 8 x 8 a tile
+        const sx = (u * 8) % 1, sy = (v * 8) % 1, ch = Math.abs(sx - 0.5) * 2;
+        k = Math.pow(Math.sin(Math.PI * ((ch * 0.55 + sy) % 1)), 2) * (0.75 + 0.25 * Math.sin(Math.PI * sx));
+      } else if (kind === 'twill') k = 0.5 + 0.5 * Math.sin(2 * Math.PI * (u + v) * 12) * (0.85 + 0.15 * Math.sin(2 * Math.PI * v * 48));
+      else k = Math.max(Math.pow(Math.abs(Math.sin(Math.PI * u * 6)), 30), Math.pow(Math.abs(Math.sin(Math.PI * v * 6)), 30)) * 0.8 + 0.2 * Math.sin(2 * Math.PI * u * 40) * Math.sin(2 * Math.PI * v * 40);
+      h[y * N + x] = k + (Math.random() - 0.5) * 0.08;
+    }
+    const nc = document.createElement('canvas'), rc = document.createElement('canvas'); nc.width = nc.height = rc.width = rc.height = N;
+    const nd = nc.getContext('2d')!.createImageData(N, N), rd = rc.getContext('2d')!.createImageData(N, N);
+    const H = (x: number, y: number) => h[((y + N) % N) * N + ((x + N) % N)];
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const dx = (H(x + 1, y) - H(x - 1, y)) * 2, dy = (H(x, y + 1) - H(x, y - 1)) * 2, l = Math.hypot(dx, dy, 1), i = (y * N + x) * 4;
+      nd.data[i] = 128 - (dx / l) * 127; nd.data[i + 1] = 128 - (dy / l) * 127; nd.data[i + 2] = 128 + (1 / l) * 127; nd.data[i + 3] = 255;
+      const r = 200 + (0.5 - H(x, y)) * 90; rd.data[i] = rd.data[i + 1] = rd.data[i + 2] = Math.max(0, Math.min(255, r)); rd.data[i + 3] = 255;
+    }
+    nc.getContext('2d')!.putImageData(nd, 0, 0); rc.getContext('2d')!.putImageData(rd, 0, 0);
+    const mk = (c: HTMLCanvasElement) => { const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; return t; };
+    w = { normal: mk(nc), rough: mk(rc) }; weaves.set(kind, w);
+  }
+  const n = w.normal.clone(), r = w.rough.clone(); n.repeat.set(per, per); r.repeat.set(per, per);
+  return { normalMap: n, roughnessMap: r };
+}
+
 // the game's own materials for the model's named slots
 const LOOK: Record<string, () => THREE.Material> = {
   // cotton and canvas: a soft sheen at grazing angles, the thing that makes cloth read as cloth
-  Hoodie: () => new THREE.MeshPhysicalMaterial({ color: '#45464c', roughness: 0.88, metalness: 0, sheen: 0.6, sheenRoughness: 0.6, sheenColor: new THREE.Color('#8a8a90') }),
-  Trousers: () => new THREE.MeshPhysicalMaterial({ color: '#56575d', roughness: 0.82, metalness: 0, sheen: 0.5, sheenRoughness: 0.65, sheenColor: new THREE.Color('#7c7c82') }),
+  Hoodie: () => new THREE.MeshPhysicalMaterial({ color: '#45464c', roughness: 0.92, metalness: 0, sheen: 0.6, sheenRoughness: 0.6, sheenColor: new THREE.Color('#8a8a90'), normalScale: new THREE.Vector2(0.7, 0.7), ...weave('knit', 36) }),
+  Trousers: () => new THREE.MeshPhysicalMaterial({ color: '#56575d', roughness: 0.86, metalness: 0, sheen: 0.5, sheenRoughness: 0.65, sheenColor: new THREE.Color('#7c7c82'), normalScale: new THREE.Vector2(0.5, 0.5), ...weave('twill', 30) }),
   Gloves: () => new THREE.MeshStandardMaterial({ color: '#6a6a6e', roughness: 0.65, metalness: 0 }),
-  Trim: () => new THREE.MeshStandardMaterial({ color: '#2e2f34', roughness: 0.9, metalness: 0 }),
+  Trim: () => new THREE.MeshStandardMaterial({ color: '#2e2f34', roughness: 0.92, metalness: 0, normalScale: new THREE.Vector2(0.8, 0.8), ...weave('knit', 60) }),
   Shoes: () => new THREE.MeshStandardMaterial({ color: '#f4f4f4', roughness: 0.4, metalness: 0, emissive: '#202020' }),
   Sole: () => new THREE.MeshStandardMaterial({ color: '#8c8c8e', roughness: 0.6, metalness: 0 }),
   Void: () => new THREE.MeshBasicMaterial({ color: '#000000' }),
   // the bandana is near-black: inside the hood there is only darkness (no faces, not even the suggestion of one)
   Mask: () => new THREE.MeshPhysicalMaterial({ color: '#0b0b0d', roughness: 0.95, metalness: 0, sheen: 0.25, sheenRoughness: 0.8, sheenColor: new THREE.Color('#2a2a2e') }),
-  Pack: () => new THREE.MeshStandardMaterial({ color: '#36373c', roughness: 0.5, metalness: 0.05 }), // nylon, a little sheen
+  Pack: () => new THREE.MeshStandardMaterial({ color: '#36373c', roughness: 0.5, metalness: 0.05, normalScale: new THREE.Vector2(0.45, 0.45), ...weave('ripstop', 24) }), // nylon, a little sheen
   Can: () => new THREE.MeshStandardMaterial({ color: '#b8b8bc', roughness: 0.35, metalness: 0.8 }),
   Cap: () => new THREE.MeshStandardMaterial({ color: '#f2f2f2', roughness: 0.5, metalness: 0 }),
 };
@@ -258,9 +291,20 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
     a.play(); cur = a; curName = name;
   };
   play('Idle_Loop', 0);
+  // standing still is never quite still: a breath through the chest and a slow look round, over whatever idle plays
+  const spine1 = B('Spine1'), neckB = B('Neck'), headB = B('Head');
+  let life = 0, lt = 0;
   return {
     root, height: HEIGHT, play, playing: () => curName,
-    update: (dt) => mixer.update(dt),
+    update: (dt) => {
+      mixer.update(dt);
+      lt += dt; life += ((/Idle/.test(curName) ? 1 : 0) - life) * Math.min(1, dt * 2);
+      if (life > 0.01) {
+        spine1.rotateX(Math.sin(lt * 1.6) * 0.018 * life);
+        const look = Math.sin(lt * 0.23) * 0.5 + Math.sin(lt * 0.61 + 1.3) * 0.2;
+        neckB.rotateY(look * 0.18 * life); headB.rotateY(look * 0.22 * life); headB.rotateX((Math.sin(lt * 0.37) * 0.06 + 0.03) * life);
+      }
+    },
     dispose: () => { mixer.stopAllAction(); owned.forEach((d) => d.dispose()); },
   };
 }

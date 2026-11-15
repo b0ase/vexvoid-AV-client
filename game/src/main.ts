@@ -20,7 +20,7 @@ import { loadLook, makeGradePass } from './look';
 import { loadWriter } from './writer';
 
 export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) => void };
-export type Game = { canvas: HTMLCanvasElement; stop: () => void; inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string }) => void; where: () => { x: number; z: number; yaw: number; heading: number; anim: string }; spots: () => { id: string; w: number; h: number; x: number; y: number; z: number }[]; goto: (x: number, z: number, yaw?: number, pitch?: number) => void };
+export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?: number) => string; inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string }) => void; where: () => { x: number; z: number; yaw: number; heading: number; anim: string }; spots: () => { id: string; w: number; h: number; x: number; y: number; z: number }[]; goto: (x: number, z: number, yaw?: number, pitch?: number) => void };
 
 // VexVoid's grade: no colour at all, hard contrast, a heavy vignette
 const MONO = { shadow: [1, 1, 1] as [number, number, number], high: [1, 1, 1] as [number, number, number], sat: 0, contrast: 1.32, vignette: 0.72 };
@@ -119,7 +119,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const clock = new THREE.Clock();
   let raf = 0, t = 0, stopped = false;
   const fwd = new THREE.Vector3(), side = new THREE.Vector3(), camPos = new THREE.Vector3(0, 2, 12), camLook = new THREE.Vector3();
-  let landT = 0, forceAnim = '';
+  let landT = 0, forceAnim = '', idleT = 0;
   cam.position.copy(camPos);
   const frame = () => {
     if (stopped) return;
@@ -153,7 +153,12 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       else if (me.vy < 2.5) writer.play('Jump_Loop', 0.15);
     } else if (landT > 0) landT -= dt;
     else if (forceAnim) writer.play(forceAnim, 0.2);
-    else writer.play(me.crouch ? (moving ? 'Crouch_Fwd_Loop' : 'Crouch_Idle_Loop') : moving ? (sprint ? 'Sprint_Loop' : 'Jog_Fwd_Loop') : 'Idle_Loop', 0.22);
+    else {
+      // standing a while, the writer folds their arms for a bit, then lets them drop
+      idleT = moving || me.crouch ? 0 : idleT + dt;
+      const idle = idleT % 16 > 9 ? 'Idle_FoldArms_Loop' : 'Idle_Loop';
+      writer.play(me.crouch ? (moving ? 'Crouch_Fwd_Loop' : 'Crouch_Idle_Loop') : moving ? (sprint ? 'Sprint_Loop' : 'Jog_Fwd_Loop') : idle, idle === 'Idle_FoldArms_Loop' ? 0.6 : 0.22);
+    }
     writer.root.position.set(me.x, me.y, me.z);
     writer.root.rotation.y = me.heading;
     writer.update(dt);
@@ -178,6 +183,13 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   return {
     canvas,
     where: () => ({ x: me.x, z: me.z, yaw: camO.yaw, heading: me.heading, anim: writer.playing() }),
+    // a picture of the game: render a frame and copy it in the same step (the drawing buffer is not kept)
+    snap: (width = 768) => {
+      city.beforeRender(r, scene, cam); comp.render(0);
+      const c = document.createElement('canvas'); c.width = width; c.height = Math.round(width * canvas.height / canvas.width);
+      c.getContext('2d')!.drawImage(canvas, 0, 0, c.width, c.height);
+      return c.toDataURL('image/jpeg', 0.82);
+    },
     // look at the writer: camera yaw/pitch/distance, which way they face, a clip to hold (for judging the model)
     inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string }) => {
       if (o.yaw != null) camO.yaw = o.yaw; if (o.pitch != null) camO.pitch = o.pitch; if (o.dist != null) camO.dist = o.dist;

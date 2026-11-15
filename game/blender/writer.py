@@ -341,6 +341,25 @@ for s in ('Left', 'Right'):
         bmesh.ops.transform(bm, matrix=Matrix.Translation(q) @ Matrix.Rotation(yaw, 4, 'Z') @ Matrix.Rotation(math.radians(90), 4, 'Y'), verts=bm.verts)
         la = obj_from(bm, f'SM_Char_Writer_Lace{s}{k}'); smooth(la); add_mat(la, 'Trim'); parts.append((la, s + 'Foot'))
 
+# ---- UVs: every piece unwrapped, then scaled so one UV unit is the same real size everywhere (the figure's height),
+# so the game's fabric textures repeat at one scale on the hoodie, the cuffs and the pack alike ----
+def unwrap(o):
+    bpy.ops.object.select_all(action='DESELECT'); o.select_set(True); bpy.context.view_layer.objects.active = o
+    bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.uv.smart_project(angle_limit=math.radians(60), island_margin=0.01)
+    bpy.ops.object.mode_set(mode='OBJECT')
+    me3 = o.data; uv = me3.uv_layers.active.data
+    a3 = sum(p.area for p in me3.polygons)
+    a2 = 0.0
+    for p in me3.polygons:
+        ls = [uv[i].uv for i in p.loop_indices]
+        for k in range(1, len(ls) - 1):
+            (x0, y0), (x1, y1), (x2, y2) = ls[0], ls[k], ls[k + 1]; a2 += abs((x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0)) / 2
+    if a2 > 0:
+        k2 = math.sqrt(a3 / a2) / Hs
+        for d2 in uv: d2.uv = d2.uv * k2
+for o in [body] + [p[0] for p in parts]: unwrap(o)
+
 # ---- the rig: bones of the game's names at the same joints ----
 arm_d = bpy.data.armatures.new('ARM_Writer'); arm = bpy.data.objects.new('ARM_Writer', arm_d)
 bpy.context.collection.objects.link(arm); bpy.context.view_layer.objects.active = arm
