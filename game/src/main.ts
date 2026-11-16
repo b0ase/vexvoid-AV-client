@@ -6,12 +6,14 @@
  *   g.stop();  g.canvas  (to record)
  *
  * Stage 2: the writer, third person (./writer.ts). WASD or arrows move relative to the camera (jog), Shift sprints,
- * C crouches (sneak), Space jumps, drag to look. Movement has weight: speed builds up and dies away, the writer turns
- * at a limited rate (on the spot from standing, in an arc at speed) and leans into turns; the clips blend by speed
+ * C crouches (sneak), Space jumps, drag to look. Movement is snappy: run speed in about 0.15 s, stopped in about 0.12 s,
+ * quick turns (on the spot only for a big reversal), a lean into turns; the clips blend by speed
  * (idle, walk, jog, sprint; crouch idle, crouch walk) at the cadence that matches the stride, the feet are fitted to
- * the ground (kerbs too), a jump gathers first and a landing gives; the camera trails a little. g.gait() measures it. Stage 3: F at any wall paints it (./spray.ts): the mouse is the can,
+ * the ground (kerbs too), a jump gathers first and a landing gives; the camera keeps up. g.gait() measures it. Stage 3: F at any wall paints it (./spray.ts): the mouse is the can,
  * left button sprays, right button sprays lightly, Shift lays a straight line, the wheel is the can's distance, 1 2 3
  * the cap, Tab or 4 to 7 the colour, X the buff can, Z undo; A D step along the wall, W S and the arrows move the view.
+ * While the button is held the writer stays planted (no stepping after the can, no crouching, no idle sway); the can
+ * reaches 2.4 m either side, further needs A D. The painting HUD (./hud.ts) draws the can's settings with keycaps.
  * Stage 4: the law (./cops.ts): heat, a patrol car, officers on foot; BUSTED loses a piece painted by hand (a sketch half blasted stays). P turns the patrol off.
  * The SKETCHBOOK (./sketchbook.ts): B opens a panel of sketches (tags, throw-ups, pieces); pick one, aim at a wall and
  * click (or G) and the writer puts it up stroke by stroke ("blast"), at 1x 2x 4x, sized to fit; moving stops it, Z takes
@@ -29,6 +31,7 @@ import { loadLook, makeGradePass } from './look';
 import { loadWriter, type GaitInfo } from './writer';
 import { makeSpray, footprint, COLOURS, COLOUR_NAMES, type Can, type Stroke, type WallStore } from './spray';
 import { makeLaw, type LawState } from './cops';
+import { makeHud, keyed, kc, hudScale } from './hud';
 import { makeBook, sketchOf, fit, drawSketch, secsOf, cleanName, type Sketch, type SketchKind, type SketchStore, type BookState } from './sketchbook';
 
 export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) => void; onHud?: (s: string) => void; onRec?: () => void;
@@ -38,7 +41,9 @@ export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) =
   sketches?: SketchStore;
   /** What happens to the writer, for a host that keeps a player's history: seen, caught, got away. */
   onEvent?: (ev: 'alert' | 'busted' | 'escaped') => void };
-export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?: number) => string; inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string }) => void; where: () => { x: number; z: number; yaw: number; heading: number; anim: string }; spots: () => { id: string; w: number; h: number; x: number; y: number; z: number }[];
+export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?: number) => string; inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string }) => void; where: () => { x: number; z: number; y: number; yaw: number; heading: number; anim: string; speed: number; tip: [number, number, number] | null };
+  /** Call the law on the writer now: the patrol car pulls up nearest them and two officers give chase (testing an escape). */
+  alarm: () => void; spots: () => { id: string; w: number; h: number; x: number; y: number; z: number }[];
   /** Every wall that takes paint (the spots, shop fronts, columns, piers). near: only those within this many metres of the writer. */
   walls: (o?: { near?: number }) => { id: string; w: number; h: number; x: number; y: number; z: number; nx: number; nz: number; painted: boolean }[];
   paint: (id: string, pts: [number, number][], o?: { colour?: string; cap?: 1 | 2 | 3; dist?: number; pressure?: number; buff?: boolean }) => void; clearPaint: (id?: string) => void; piece: (id: string) => string; painting: () => string;
@@ -97,19 +102,18 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   canvas.tabIndex = 0;
   host.appendChild(canvas);
   // one line over the picture for what to do next (press F here, hold the mouse, too high): the HUD line is easy to miss
-  const tip = document.createElement('div');
-  tip.style.cssText = 'position:absolute;left:50%;bottom:9%;transform:translateX(-50%);padding:9px 16px;background:rgba(0,0,0,.72);border:1px solid rgba(255,255,255,.55);color:#fff;font:600 13px/1 ui-monospace,Menlo,monospace;letter-spacing:.22em;text-transform:uppercase;white-space:nowrap;pointer-events:none;display:none';
+  const tip = document.createElement('div'); tip.dataset.vxPrompt = 'tip';
+  tip.style.cssText = 'position:absolute;left:50%;bottom:9%;transform:translateX(-50%);display:none;align-items:center;gap:8px;padding:8px 14px;background:rgba(8,8,10,.66);border:1px solid rgba(255,255,255,.22);border-radius:10px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#fff;font:700 11.5px/1 "SF Pro Text",-apple-system,system-ui,"Helvetica Neue",Arial,sans-serif;letter-spacing:.2em;text-transform:uppercase;white-space:nowrap;max-width:calc(100% - 32px);overflow:hidden;text-overflow:ellipsis;pointer-events:none;z-index:2';
   if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
   host.appendChild(tip);
   let tipNow = '', sprayed = false, follow = 0, tipHold = 0, tipNote = '';
-  const prompt = (s: string) => { if (s !== tipNow) { tipNow = s; tip.textContent = s; tip.style.display = s ? 'block' : 'none'; } };
+  // the line under the picture: square brackets are keys ("[F] PAINT THIS WALL" shows F on a keycap)
+  const prompt = (s: string) => { if (s !== tipNow) { tipNow = s; tip.innerHTML = keyed(s); tip.style.display = s ? 'flex' : 'none'; } };
   // a short word on what just changed (the cap, the colour, an undo), in the prompt's place for a moment
   const note = (s: string, secs = 1.4) => { tipNote = s; tipHold = t + secs; };
-  // the painting controls, small in a corner while painting (H hides them)
-  const helpEl = document.createElement('div');
-  helpEl.style.cssText = 'position:absolute;left:12px;top:12px;padding:8px 10px;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.28);color:rgba(255,255,255,.82);font:500 10px/1.7 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;white-space:pre;pointer-events:none;display:none';
-  helpEl.textContent = ['MOUSE  SPRAY · RIGHT BUTTON  LIGHT COAT', 'SHIFT  STRAIGHT LINE · WHEEL  CAN CLOSER / FURTHER', '1 2 3  CAP · TAB  COLOUR · X  BUFF CAN · Z  UNDO', 'A D  STEP ALONG · W S  VIEW IN / OUT · ARROWS  LOOK', 'B  SKETCHBOOK · H  HIDE THIS · F  DONE'].join('\n');
-  host.appendChild(helpEl);
+  // the painting HUD: the can drawn (cap, colour, distance, buff, undo, sketchbook, help) in a dock, keys on keycaps,
+  // a keycap and a verb by the reticle only when there is something to do; H opens the full list (./hud.ts)
+  const hudUi = makeHud(host);
 
   const scene = new THREE.Scene();
   const cam = new THREE.PerspectiveCamera(62, 16 / 9, 0.05, 900);
@@ -164,7 +168,11 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   // how the writer moves: a speed along the way they face that builds up and dies away, a heading that turns at a
   // limited rate (on the spot from standing, in an arc when running), a lean into turns and with the push of a start
   const mv = { speed: 0, yawRate: 0, side: 0, roll: 0, pitch: 0, offset: 0, takeoff: 0 };
-  const GAIT = { jog: 3.3, sprint: 6.2, crouch: 1.15, accel: 8, sprintAccel: 5.5, decel: 11, turnStand: 8.5, turnFast: 4, air: 0.25 };
+  // snappy (owner 16 Nov: "too slow and languorous"): run speed in about 0.15 s, stopped in about 0.12 s, quick turns;
+  // sprint well over the officers' run (cops.ts RUN_SPEED 5.9) so sprinting round corners loses them
+  const GAIT = { jog: 4.5, sprint: 7.6, crouch: 1.5, accel: 30, sprintAccel: 42, decel: 38, decelPer: 3, turnStand: 24, turnFast: 13, air: 0.55, gather: 0.05 };
+  // how far along the wall either side of the writer the can reaches; further, A D step along (no stepping by itself)
+  const REACH = 2.4;
   const camO = { yaw: 0, pitch: 0.12, dist: 3.4 };
   const keys = new Set<string>();
   const MOVE = ['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Shift', ' ', 'c', 'f', 'p', 'r', '1', '2', '3', '4', '5', '6', '7', 'z', 'x', 'h', 'Tab', 'Escape', 'b', 'g', 'v', 'n', '[', ']', '-', '=', '+', 'Enter'];
@@ -172,7 +180,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   type W = (typeof city.walls)[number];
   const can: Can = { colour: COLOURS[0], cap: 2, dist: 0.2, pressure: 1, buff: false };
   const CAPS = ['', 'SKINNY', 'MEDIUM', 'FAT'];
-  let paint: { id: string; spot: W } | null = null, colourI = 0, btn = 0, help = true, sprayingNow = false;
+  let paint: { id: string; spot: W } | null = null, colourI = 0, btn = 0, help = false, sprayingNow = false;
   let down: THREE.Vector2 | null = null;   // where the button went down: a stroke or a line starts there, not where the mouse is a frame later
   // a stroke by hand: the can's point on the wall, eased after the mouse so the line comes out steady
   let stroke: { key: string; t0: number; x: number; y: number } | null = null;
@@ -207,7 +215,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     const bk = book.state.open ? (() => { const s = book.pick(); return `SKETCHBOOK · ${s ? s.name + ' ' + s.kind.toUpperCase() : 'PICK ONE'} · ${book.state.speed}× · SIZE ${Math.round(book.state.size * 100)}% · B CLOSE · `; })() : '';
     if (bk) return bk + (paint ? `PAINTING ${paint.id.toUpperCase()} · F DONE · ` : 'WASD MOVE · F AT A WALL · ') + lawS;
     return (paint
-      ? `PAINTING ${paint.id.toUpperCase()} · ${can.buff ? 'BUFF' : COLOUR_NAMES[colourI]} · ${CAPS[can.cap]} CAP · ${Math.round(can.dist * 100)} CM OFF · LINE ${cm(footprint(can).width)} CM · ${help ? 'F DONE' : 'H HELP · F DONE'}`
+      ? `PAINTING ${paint.id.toUpperCase()} · ${can.buff ? 'BUFF' : COLOUR_NAMES[colourI]} · ${CAPS[can.cap]} CAP · ${Math.round(can.dist * 100)} CM · H HELP · F DONE`
       : 'WASD MOVE · SHIFT SPRINT · C CROUCH · SPACE JUMP · DRAG LOOK · F AT ANY WALL TO PAINT · B SKETCHBOOK') + ' · ' + lawS + (opts.onRec ? ' · R RECORD' : '');
   };
   const hud = () => { const s = hudText(); if (s !== lastHud) { lastHud = s; if (opts.onHud) opts.onHud(s); } };
@@ -323,8 +331,8 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     const sk = sketchOf(spray.strokes(id), name, kind); if (!sk) throw new Error('nothing painted on ' + id + ' this time round to save');
     await book.add(sk); note(`SAVED ${sk.name} TO THE SKETCHBOOK`, 2); return sk;
   };
-  const setCap = (c: 1 | 2 | 3) => { can.cap = c; note(`${CAPS[c]} CAP · ${cm(footprint(can).width)} CM LINE`); hud(); };
-  const setColour = (i: number) => { colourI = (i + COLOURS.length) % COLOURS.length; can.colour = COLOURS[colourI]; can.buff = false; note(COLOUR_NAMES[colourI]); hud(); };
+  const setCap = (c: 1 | 2 | 3) => { can.cap = c; hud(); };
+  const setColour = (i: number) => { colourI = (i + COLOURS.length) % COLOURS.length; can.colour = COLOURS[colourI]; can.buff = false; hud(); };
   const undo = (id?: string) => {
     const w = id ? wallOf.get(id) : paint ? paint.spot : null; if (!w) return 0;
     stroke = null; line = null;
@@ -352,12 +360,12 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     if (down && !e.repeat && paint && (k === '1' || k === '2' || k === '3')) setCap(Number(k) as 1 | 2 | 3);
     if (down && !e.repeat && paint && k >= '4' && k <= '7' && k.length === 1) setColour(Number(k) - 4);
     if (down && !e.repeat && paint && k === 'Tab') setColour(colourI + (e.shiftKey ? -1 : 1));
-    if (down && !e.repeat && paint && k === 'x') { can.buff = !can.buff; note(can.buff ? 'BUFF CAN · TAKES PAINT OFF' : `PAINT · ${COLOUR_NAMES[colourI]}`); hud(); }
+    if (down && !e.repeat && paint && k === 'x') { can.buff = !can.buff; if (can.buff) note('BUFF CAN · TAKES PAINT OFF'); hud(); }
     if (down && paint && k === 'z' && !auto) undo();
     if (down && !e.repeat && paint && k === 'h') { help = !help; hud(); }
     if (down && !e.repeat && k === 'c' && !paint) me.crouch = !me.crouch;
     // a jump: a moment's gather (the body dips), then up
-    if (down && !e.repeat && k === ' ' && !me.airborne && !mv.takeoff) { mv.takeoff = 0.11; me.crouch = false; writer.land(0.35); writer.play('Jump_Start', 0.06, true); }
+    if (down && !e.repeat && k === ' ' && !me.airborne && !mv.takeoff) { mv.takeoff = GAIT.gather; me.crouch = false; writer.land(0.25); writer.play('Jump_Start', 0.06, true); }
     if (down) keys.add(k); else keys.delete(k);
   };
   const kd = (e: KeyboardEvent) => onKey(e, true), ku = (e: KeyboardEvent) => onKey(e, false);
@@ -393,12 +401,12 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   };
   canvas.addEventListener('pointerup', endDrag);
   canvas.addEventListener('pointercancel', endDrag);
-  canvas.addEventListener('wheel', (e) => { e.preventDefault(); if (paint) { can.dist = Math.round(Math.max(0.05, Math.min(0.6, can.dist + e.deltaY * 0.0005)) * 200) / 200; note(`CAN ${Math.round(can.dist * 100)} CM OFF · ${cm(footprint(can).width)} CM LINE`, 1); hud(); return; } camO.dist = Math.max(1.2, Math.min(7, camO.dist * Math.exp(e.deltaY * 0.001))); }, { passive: false });
+  canvas.addEventListener('wheel', (e) => { e.preventDefault(); if (paint) { can.dist = Math.round(Math.max(0.05, Math.min(0.6, can.dist + e.deltaY * 0.0005)) * 200) / 200; hud(); return; } camO.dist = Math.max(1.2, Math.min(7, camO.dist * Math.exp(e.deltaY * 0.001))); }, { passive: false });
 
   const ro = new ResizeObserver(() => {
     ({ w, h } = size());
     r.setSize(w, h, false); comp.setSize(w, h); city.resize(w, h);
-    cam.aspect = w / h; cam.updateProjectionMatrix();
+    cam.aspect = w / h; cam.updateProjectionMatrix(); hudUi.resize(w, h);
   });
   ro.observe(host);
 
@@ -407,9 +415,9 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   // BUSTED: a slow-motion beat with the camera swinging round, the wall gets buffed, the writer starts again
   // spot: the wall they buff (what was being painted by hand); kept: a wall with a half-blasted sketch, which stays
   let bust: { t: number; spot: string; kept: string } | null = null;
-  const camPos = new THREE.Vector3(0, 2, 12), camLook = new THREE.Vector3();
+  const camPos = new THREE.Vector3(0, 2, 12), camLook = new THREE.Vector3(), scr = new THREE.Vector3();
   let landT = 0, forceAnim = '', idleT = 0, camH = 1.45;
-  const lookTo = new THREE.Vector3();
+  const lookTo = new THREE.Vector3(), tipV = new THREE.Vector3();
   cam.position.copy(camPos);
   const frame = () => {
     if (stopped) return;
@@ -431,10 +439,11 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
         // turning is quick standing, slower flat out; facing well away, the writer turns before going
         const rate = (GAIT.turnStand + (GAIT.turnFast - GAIT.turnStand) * Math.min(1, mv.speed / GAIT.sprint)) * air;
         step = Math.max(-rate * dt, Math.min(rate * dt, d));
-        const a = Math.abs(d - step); target = top * (a < 0.6 ? 1 : a > 2 ? 0 : 1 - (a - 0.6) / 1.4);
+        // only a big reversal (still facing well away) stops to turn first, and the turn is quick
+        const a = Math.abs(d - step); target = top * (a < 1.4 ? 1 : a > 2.6 ? 0 : 1 - (a - 1.4) / 1.2);
       }
-      me.heading += step; mv.yawRate += ((dt > 0 ? step / dt : 0) - mv.yawRate) * Math.min(1, dt * 14);
-      const was = mv.speed, acc = target > mv.speed ? (sprint ? GAIT.sprintAccel : GAIT.accel) : GAIT.decel;
+      me.heading += step; mv.yawRate += ((dt > 0 ? step / dt : 0) - mv.yawRate) * Math.min(1, dt * 20);
+      const was = mv.speed, acc = target > mv.speed ? (sprint ? GAIT.sprintAccel : GAIT.accel) : GAIT.decel + GAIT.decelPer * mv.speed;
       mv.speed += Math.max(-acc * dt * air, Math.min(acc * dt * air, target - mv.speed));
       if (mv.speed > 0.001) {
         const x0 = me.x, z0 = me.z;
@@ -453,8 +462,8 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       }
       // lean into the turn, and forward with the push of a start (back a touch as they pull up)
       const accel = dt > 0 ? (mv.speed - was) / dt : 0;
-      mv.roll += (Math.max(-0.2, Math.min(0.2, -0.032 * mv.yawRate * mv.speed)) - mv.roll) * Math.min(1, dt * 6);
-      mv.pitch += (Math.max(-0.07, Math.min(0.12, accel * 0.014 + (mv.speed / GAIT.sprint) * 0.05)) - mv.pitch) * Math.min(1, dt * 5);
+      mv.roll += (Math.max(-0.16, Math.min(0.16, -0.02 * mv.yawRate * mv.speed)) - mv.roll) * Math.min(1, dt * 10);
+      mv.pitch += (Math.max(-0.06, Math.min(0.1, accel * 0.004 + (mv.speed / GAIT.sprint) * 0.05)) - mv.pitch) * Math.min(1, dt * 9);
     } else { mv.yawRate = 0; mv.roll *= Math.max(0, 1 - dt * 6); mv.pitch *= Math.max(0, 1 - dt * 6); }   // painting: the side step sets the speed
     const moving = mv.speed > 0.15;
     sprayingNow = false;
@@ -468,8 +477,9 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       const px0 = me.x, pz0 = me.z;
       // A D: a side step that gets going and stops, not a slide
       mv.side += Math.max(-9 * dt, Math.min(9 * dt, ax * 1.1 - mv.side)); along += mv.side * dt;
-      // spraying past arm's reach: the writer steps along the wall after the can
-      if (Math.abs(follow) > 1.1) along += Math.sign(follow) * Math.min(Math.abs(follow) - 1.1, (auto ? 4 : 1.6) * dt);
+      // a sketch being blasted: the writer steps along the wall after the can. By hand never: the writer stays planted
+      // while the button is held (owner 16 Nov) and only A D step along
+      if (Math.abs(follow) > 1.1) along += Math.sign(follow) * Math.min(Math.abs(follow) - 1.1, 4 * dt);
       off = Math.max(0.55, Math.min(0.9, off)); along = run.hi - run.lo > 0.7 ? Math.max(run.lo + 0.3, Math.min(run.hi - 0.3, along)) : (run.lo + run.hi) / 2;
       // things standing at the wall (a vending machine, a bin): the writer stands to one side of them, or steps past
       for (const b of city.blockers) {
@@ -493,7 +503,8 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       if (h) { const c = cam.position, len = Math.hypot(h.point.x - c.x, h.point.z - c.z); if ((1 - sightTo(c.x, c.z, c.y, h.point.x, h.point.z, h.point.y, h.wall)) * len > 0.3) h = null; }
       if (h && h.wall !== sp) { paint = { id: h.id, spot: h.wall }; sp = h.wall; n = sp.normal; hud(); }
       const feet = me.gy, top = feet + me.y + (me.crouch ? 1.9 : 2.6);
-      const tooHigh = !!h && h.point.y >= top, reach = !!h && !tooHigh, pressing = btn !== 0 && !auto;
+      const lat = h ? (h.point.x - me.x) * n.z - (h.point.z - me.z) * n.x : 0, tooFar = !!h && Math.abs(lat) > REACH;
+      const tooHigh = !!h && h.point.y >= top, reach = !!h && !tooHigh && !tooFar, pressing = btn !== 0 && !auto;
       // the sketchbook open: the sketch picked shows where a click would put it
       aimAt = h ? { id: h.id, x: h.x, y: h.y } : null;
       const armed = book.state.open && !auto ? book.pick() : null;
@@ -548,10 +559,14 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
           P = spray.point(h.id, stroke.x, stroke.y, canAt);
         } else { if (stroke) { spray.end(); stroke = null; } if (h) P = canAt.copy(h.point); }
       }
-      // low on the wall the writer gets down to it, and stands again for the rest
-      if (P && !me.airborne) { if (P.y < feet + 0.8) me.crouch = true; else if (P.y > feet + 1.15) me.crouch = false; }
-      follow = P && (sprayingNow || auto) ? (P.x - me.x) * n.z - (P.z - me.z) * n.x : 0;
-      prompt(t < tipHold ? tipNote : auto ? (blasting ? `BLASTING ${blasting} · MOVE TO STOP` : '') : armed ? (h ? `CLICK TO BLAST ${armed.name}${plan && plan.fitted ? ' · SIZED TO FIT' : ''}` : 'POINT AT THE WALL TO PLACE IT') : line ? 'STRAIGHT LINE · LET GO TO SPRAY IT' : tooHigh ? 'TOO HIGH TO REACH · AIM LOWER' : !h ? 'POINT AT THE WALL' : !sprayed ? 'HOLD THE MOUSE BUTTON TO SPRAY · F WHEN DONE' : '');
+      // low on the wall the writer gets down to it, and stands again for the rest; never while the button is held
+      if (P && !me.airborne && !pressing && !sprayingNow) { if (P.y < feet + 0.8) me.crouch = true; else if (P.y > feet + 1.15) me.crouch = false; }
+      follow = P && auto && auto.group[0] === 'p' ? (P.x - me.x) * n.z - (P.z - me.z) * n.x : 0;
+      prompt(t < tipHold ? tipNote : auto ? (blasting ? `BLASTING ${blasting} · [A] [D] TO STOP` : '') : armed && !h ? 'POINT AT THE WALL TO PLACE IT' : !h ? 'POINT AT THE WALL' : '');
+      // by the reticle: a keycap and a verb, only when there is something to do
+      const sep = '<span class="sep"></span>';
+      const near = auto || !h ? '' : armed ? `${kc('LMB')}BLAST ${armed.name}${plan && plan.fitted ? ' · SIZED TO FIT' : ''}` : line ? `${kc('SHIFT')}STRAIGHT LINE · LET GO TO SPRAY` : tooHigh ? 'TOO HIGH · AIM LOWER' : tooFar ? `${kc('A')}${kc('D')}STEP ALONG` : !sprayed ? `${kc('LMB')}SPRAY${sep}${kc('RMB')}LIGHT${sep}${kc('F')}DONE` : keys.has('Shift') && !pressing ? `${kc('LMB')}DRAG A STRAIGHT LINE` : '';
+      if (near && P) { scr.copy(P).project(cam); hudUi.near(near, (scr.x + 1) / 2 * canvas.clientWidth, (1 - scr.y) / 2 * canvas.clientHeight); } else hudUi.near('');
       reticle.visible = !!P && !armed; dot.visible = !!P;
       if (P) {
         reticle.position.copy(P).addScaledVector(n, 0.02); reticle.rotation.set(0, Math.atan2(n.x, n.z), 0); dot.position.copy(reticle.position); dot.rotation.copy(reticle.rotation);
@@ -559,18 +574,23 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
         const col = auto || reach ? (can.buff && !auto ? '#9a9a9e' : '#ffffff') : '#555555';
         (reticle.material as THREE.MeshBasicMaterial).color.set(col); (dot.material as THREE.MeshBasicMaterial).color.set(col);
         // the arm goes up with the can wherever the aim is on the wall; the hand stops the can's distance off it
-        writer.aim(aimHand.copy(P).addScaledVector(n, can.dist + 0.03), P, sprayingNow ? 1 : 0.85);
+        // full weight hovering too, so pressing the button does not move the can
+        writer.aim(aimHand.copy(P).addScaledVector(n, can.dist + 0.03), P, 1);
       } else writer.aim(null);
       hissOn(sprayingNow, 0.55 + 0.45 * vol);
     } else {
-      reticle.visible = dot.visible = preview.visible = ghost.visible = false; hissOn(false); writer.aim(null); follow = 0; aimAt = null; plan = null;
+      reticle.visible = dot.visible = preview.visible = ghost.visible = false; hissOn(false); writer.aim(null); follow = 0; aimAt = null; plan = null; hudUi.near('');
       const nw = !bust && nearestWall(2.5), sk = book.state.open ? book.pick() : null;
-      prompt(t < tipHold ? tipNote : nw ? (sk ? `PRESS F · THEN CLICK THE WALL TO BLAST ${sk.name}` : 'PRESS F TO PAINT THIS WALL') : sk ? 'WALK UP TO A WALL TO BLAST ' + sk.name : '');
+      prompt(t < tipHold ? tipNote : nw ? (sk ? `[F] THEN CLICK THE WALL TO BLAST ${sk.name}` : '[F] PAINT THIS WALL') : sk ? 'WALK UP TO A WALL TO BLAST ' + sk.name : '');
     }
-    helpEl.style.display = paint && help ? 'block' : 'none';
+    writer.steady(!!paint && mv.speed < 0.05);
+    hudUi.dock({ on: !!paint && !bust, cap: can.cap, colour: colourI, colours: COLOURS, names: COLOUR_NAMES, dist: can.dist, line: cm(footprint(can).width), buff: !!can.buff, undo: paint ? spray.undoable(runOf(paint.spot).ids) : 0, book: !!book.state.open, help });
+    // the line under the picture sits above the dock, and in the middle of what the sketchbook panel leaves free
+    tip.style.bottom = paint ? `${Math.round(16 + 124 * hudScale(w, h))}px` : '9%';
+    tip.style.left = book.state.open ? 'calc((100% - 296px) / 2)' : '50%'; tip.style.maxWidth = book.state.open ? 'calc(100% - 330px)' : 'calc(100% - 32px)';
     spray.update(dt, me);
     law.pushOut(me, 0.35);
-    const ev = law.update(dt, t, { x: me.x, z: me.z, y: me.y, crouch: me.crouch, painting: !!paint, spraying: sprayingNow });
+    const ev = law.update(dt, t, { x: me.x, z: me.z, y: me.y, crouch: me.crouch, painting: !!paint, spraying: sprayingNow, vx: paint ? 0 : Math.sin(me.heading) * mv.speed, vz: paint ? 0 : Math.cos(me.heading) * mv.speed });
     if (ev && opts.onEvent) try { opts.onEvent(ev); } catch { /* the host's business */ }
     if (ev === 'busted') {
       // a sketch half put up stays on the wall (owner, 16 Nov), undoable as one step; hand painting is still buffed
@@ -602,8 +622,8 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       if (me.y <= 0) {
         // the landing: the harder it is, the more the body gives and the more speed it costs
         const k = Math.min(1, Math.max(0, -me.vy / 7)); me.y = 0; me.vy = 0; me.airborne = false;
-        writer.land(0.4 + 0.6 * k); mv.speed *= 1 - 0.35 * k;
-        if (mv.speed > 1.5) landT = 0; else { writer.play('Jump_Land', 0.06, true); landT = 0.28; }
+        writer.land(0.3 + 0.5 * k); mv.speed *= 1 - 0.12 * k;
+        if (mv.speed > 1.5) landT = 0; else { writer.play('Jump_Land', 0.05, true); landT = 0.14; }
       } else if (me.vy < 2.5) writer.play('Jump_Loop', 0.15);
     } else if (mv.takeoff > 0) { /* gathering for the jump */ }
     else if (landT > 0) landT -= dt;
@@ -626,7 +646,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     rim.position.set(me.x + Math.sin(camO.yaw) * 1.8 + Math.cos(camO.yaw) * 0.9, py + 2.4, me.z + Math.cos(camO.yaw) * 1.8 - Math.sin(camO.yaw) * 0.9);
     back.position.set(me.x - Math.sin(camO.yaw) * 1.4, py + 2.1, me.z - Math.cos(camO.yaw) * 1.4);
     // the camera: behind, above, over the right shoulder, kept inside the street
-    camH += ((me.crouch ? 1.05 : 1.45) - camH) * Math.min(1, dt * 6);
+    camH += ((me.crouch && !paint ? 1.05 : 1.45) - camH) * Math.min(1, dt * 10);
     const tgtY = py + camH;
     const cx = me.x + Math.sin(camO.yaw) * Math.cos(camO.pitch) * camO.dist + Math.cos(camO.yaw) * 0.55;
     const cz = me.z + Math.cos(camO.yaw) * Math.cos(camO.pitch) * camO.dist - Math.sin(camO.yaw) * 0.55;
@@ -634,10 +654,10 @@ let camY = Math.max(0.35, tgtY + Math.sin(camO.pitch) * camO.dist), camX = Math.
     // painting behind something (a vending machine on the pavement): the camera comes in front of it
     if (paint) { const k = sightTo(me.x, me.z, tgtY, camX, camZ, camY); if (k < 1) { const f = Math.max(0.3, k - 0.1); camX = me.x + (camX - me.x) * f; camZ = me.z + (camZ - me.z) * f; camY = tgtY + (camY - tgtY) * f; } }
     camPos.set(camX, camY, camZ);
-    cam.position.lerp(camPos, Math.min(1, dt * 10));
-    // what it looks at trails the writer a little (a camera operator, not a rod), a touch more when running
+    cam.position.lerp(camPos, 1 - Math.exp(-dt * 24));
+    // what it looks at keeps up with the writer: only the slightest give, so the camera feels quick
     lookTo.set(me.x + Math.cos(camO.yaw) * 0.55, tgtY, me.z - Math.sin(camO.yaw) * 0.55);
-    camLook.lerp(lookTo, paint || bust ? 1 : Math.min(1, dt * 14));
+    camLook.lerp(lookTo, paint || bust ? 1 : 1 - Math.exp(-dt * 40));
     cam.lookAt(camLook);
     city.update(dt, t, cam);
     city.beforeRender(r, scene, cam);
@@ -665,7 +685,8 @@ let camY = Math.max(0.35, tgtY + Math.sin(camO.pitch) * camO.dist), camX = Math.
 
   return {
     canvas,
-    where: () => ({ x: me.x, z: me.z, yaw: camO.yaw, heading: me.heading, anim: writer.playing() }),
+    where: () => { const p = writer.tip(tipV); return { x: me.x, z: me.z, y: me.gy + me.y, yaw: camO.yaw, heading: me.heading, anim: writer.playing(), speed: mv.speed, tip: p ? [p.x, p.y, p.z] as [number, number, number] : null }; },
+    alarm: () => law.alarm(me),
     // a picture of the game: render a frame and copy it in the same step (the drawing buffer is not kept)
     snap: (width = 768) => {
       city.beforeRender(r, scene, cam); comp.render(0);
@@ -717,7 +738,7 @@ let camY = Math.max(0.35, tgtY + Math.sin(camO.pitch) * camO.dist), camX = Math.
     stop: () => {
       stopped = true; cancelAnimationFrame(raf); ro.disconnect();
       canvas.removeEventListener('keydown', kd); canvas.removeEventListener('keyup', ku);
-      hissOn(false); law.dispose(); book.dispose(); if (bus) void bus.ctx.close(); spray.dispose(); writer.dispose(); city.dispose(); look.dispose(); comp.dispose(); r.dispose(); canvas.remove(); tip.remove(); helpEl.remove();
+      hissOn(false); law.dispose(); book.dispose(); if (bus) void bus.ctx.close(); spray.dispose(); writer.dispose(); city.dispose(); look.dispose(); comp.dispose(); r.dispose(); canvas.remove(); tip.remove(); hudUi.dispose();
       for (const o of [reticle, dot, preview, ghost, ghostFrame]) { o.geometry.dispose(); (o.material as THREE.Material).dispose(); }
       const gm = (ghost.material as THREE.MeshBasicMaterial).map; if (gm) gm.dispose();
     },

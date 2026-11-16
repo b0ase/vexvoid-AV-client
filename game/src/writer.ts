@@ -29,6 +29,8 @@ export type Writer = {
   twist: (a: number) => void;
   /** A landing: the body gives a little (k 0..1, how hard). */
   land: (k: number) => void;
+  /** Hold still (painting): the standing clips stop breathing and swaying, so a raised can stays where it is aimed. */
+  steady: (on: boolean) => void;
   /** Whether the writer is on the ground (not in a jump): foot contact only counts then. */
   grounded: (on: boolean) => void;
   /** Where the soles are and how well they meet the ground; stats since the last reset (sink: sole below the ground,
@@ -38,6 +40,8 @@ export type Writer = {
   tune: (clip: string, v: number) => void;
   /** Raise the right arm with a can to spray: the hand goes to `hand`, the nozzle points at `at` (null lowers it). */
   aim: (hand: THREE.Vector3 | null, at?: THREE.Vector3, weight?: number) => void;
+  /** Where the can's nozzle is now (world), or null when the can is down. */
+  tip: (out: THREE.Vector3) => THREE.Vector3 | null;
   /** The can in the hand (a scene-level object: add it to the scene once). */
   can: THREE.Object3D;
   update: (dt: number) => void;
@@ -453,7 +457,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
   };
 
   // ---- locomotion: weights by speed, one shared cycle so the clips' steps line up, cadence from the stride ----
-  let locoOn = false, locoW = 0, locoS = 0, crouchT = false, crouchW = 0, cycle = 0, mixName = '';
+  let locoOn = false, locoW = 0, locoS = 0, crouchT = false, crouchW = 0, cycle = 0, mixName = '', steadyOn = false, steadyK = 1;
   const locoA = new Map<string, THREE.AnimationAction>();
   const locoStart = () => {
     if (locoA.size) return;
@@ -477,8 +481,11 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
     cycle = (cycle + (s * dt) / Math.max(0.2, L)) % 1;
     const w = new Map<string, number>(); const add = (n: string, k: number) => w.set(n, (w.get(n) || 0) + k);
     add(STAND[st.a], (1 - st.f) * (1 - crouchW)); add(STAND[st.b], st.f * (1 - crouchW)); add(CROUCH[cr.a], (1 - cr.f) * crouchW); add(CROUCH[cr.b], cr.f * crouchW);
+    // holding still: the standing clips slow to a stop where they are (no breath, no sway), and start again after
+    steadyK += ((steadyOn ? 0 : 1) - steadyK) * Math.min(1, dt * 10); if (steadyK < 0.02 && steadyOn) steadyK = 0;
     let best = 0;
     for (const [n, a] of locoA) {
+      if (!MOVING.includes(n)) a.timeScale = steadyK;
       const k = (w.get(n) || 0) * locoW; a.setEffectiveWeight(k);
       if (MOVING.includes(n)) { const ci = clipInfo[n], d = a.getClip().duration; a.time = (((cycle + (ci ? ci.ph : 0)) % 1) + 1) % 1 * d; }
       if (k > best) { best = k; mixName = n; }
@@ -556,6 +563,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       play(name, fade, once);
     },
     playing: () => (locoOn ? mixName : curName), can,
+    tip: (out) => (can.visible ? can.localToWorld(out.set(0, 0.068, 0.016)) : null),
     loco: (speed, crouch) => {
       locoStart(); locoS = speed; crouchT = crouch;
       if (!locoOn) { locoOn = true; if (cur) cur.fadeOut(0.18); cur = null; curName = ''; }
@@ -565,6 +573,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
     twist: (a) => { twistA = a; },
     land: (k) => { dip = Math.min(dip, -0.09 * Math.max(0, Math.min(1, k))); },
     grounded: (on) => { onGround = on; },
+    steady: (on) => { steadyOn = on; },
     tune: (n, v) => { const c = clips.get(n); if (c && v > 0) clipInfo[n] = { ...(clipInfo[n] || { ph: 0 }), v, stride: v * c.duration, dur: c.duration }; },
     gait: (reset) => {
       const n = Math.max(1, S.frames), out: GaitInfo = { on: feetOn, rest: soleRest.map(r3), clips: Object.fromEntries(Object.entries(clipInfo).map(([k, v]) => [k, { v: r3(v.v), stride: r3(v.stride), lift: (v.lift || []).map(r3), zr: (v.zr || []).map(r3) }])), speed: r3(locoS), mix: locoOn ? mixName : curName, bodyOff: r3(bodyOff),

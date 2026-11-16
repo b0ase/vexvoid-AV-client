@@ -7,6 +7,7 @@
  *   book.all() · book.pick() · book.state · book.setOpen(true) · book.add(sketch)
  *   sketchOf(strokes, name, kind) · fit(sketch, wall, aim, size, top) · drawSketch(canvas, sketch)
  */
+import { kc } from './hud';
 import { footprint, localKeep, type Stroke } from './spray';
 import STARTERS from '../sketches/index';
 
@@ -116,7 +117,9 @@ const CSS = `
 .vxsb-save button{background:none;border:1px solid rgba(255,255,255,.55);color:#fff;font:inherit;padding:6px 8px;cursor:pointer;white-space:nowrap}
 .vxsb-save button:hover:not(:disabled){background:#fff;color:#000}
 .vxsb-save button:disabled{opacity:.4;cursor:default}
-.vxsb-keys{color:rgba(255,255,255,.42);font-size:9px;line-height:1.7;padding:0 14px 10px}
+.vxsb-keys{display:flex;flex-wrap:wrap;gap:6px 12px;padding:2px 14px 12px;color:rgba(255,255,255,.72);font:700 9.5px/1 "SF Pro Text",-apple-system,system-ui,sans-serif;letter-spacing:.14em}
+.vxsb-k{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.vxsb-k .vxh-kc{margin-right:-2px}
 `;
 
 export type BookState = { open: boolean; kind: SketchKind; pick: string; speed: 1 | 2 | 4; size: number };
@@ -142,7 +145,7 @@ export function makeBook(host: HTMLElement, cb: Cb, store: SketchStore = localSk
       <button class="vxsb-go">BLAST</button>
       <div class="vxsb-save"><input maxlength="24" placeholder="NAME" spellcheck="false"><button>SAVE WALL</button></div>
     </div>
-    <div class="vxsb-keys">[ ] PICK · V SPEED · - = SIZE<br>CLICK THE WALL OR G TO BLAST<br>N SAVES THE WALL · MOVE STOPS IT · Z UNDO</div>`;
+    <div class="vxsb-keys">${([[["[", "]"], "PICK"], [["V"], "SPEED"], [["-", "="], "SIZE"], [["G"], "BLAST"], [["N"], "SAVE"], [["Z"], "UNDO"]] as [string[], string][]).map(([k, v]) => `<span class="vxsb-k">${k.map((x) => kc(x)).join("")}${v}</span>`).join("")}</div>`;
   host.appendChild(el);
   const $ = <T extends Element>(q: string) => el.querySelector(q) as T;
   const list = $<HTMLDivElement>('.vxsb-list'), range = $<HTMLInputElement>('input[type=range]'), out = $<HTMLOutputElement>('output');

@@ -17,7 +17,7 @@ import { makeCar, CAR } from './car';
 import { loadWriter, type Writer } from './writer';
 
 export type Chase = 'off' | 'calm' | 'alerted' | 'chase' | 'searching' | 'busted';
-export type Suspect = { x: number; z: number; y: number; crouch: boolean; painting: boolean; spraying: boolean };
+export type Suspect = { x: number; z: number; y: number; crouch: boolean; painting: boolean; spraying: boolean; vx?: number; vz?: number };
 export type LawEvent = '' | 'alert' | 'busted' | 'escaped';
 export type LawState = {
   on: boolean; heat: number; chase: Chase; seen: boolean;
@@ -33,6 +33,9 @@ export type Law = {
   reset: () => void;
   /** Push a body (radius r) out of the car. */
   pushOut: (p: { x: number; z: number }, r: number) => void;
+  /** Call the law on the writer now (a test of an escape, or an agent's): the car pulls up where its loop passes
+   *  nearest them and the officers get out and give chase. */
+  alarm: (me: { x: number; z: number }) => void;
   /** The officer nearest the writer (for the bust camera). */
   nearest: () => { x: number; z: number } | null;
   dispose: () => void;
@@ -47,11 +50,13 @@ const pathAt = (s: number) => {
 };
 const ang = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 
-// officers: a little slower than the writer's sprint, and they tire
-const RUN_SPEED = 5.5, JOG_SPEED = 3.4, WALK_SPEED = 1.6, BUST_R = 1.0, SIGHT = 22;
+// officers: faster than the writer's jog (4.5) so jogging off gets you caught, a good deal slower than the sprint (7.6,
+// about 29% faster) so sprinting and turning corners gets away; they take a moment to get going, and they tire.
+// The second one runs at where the writer is going (cuts the corner), the first straight at them.
+const RUN_SPEED = 5.9, JOG_SPEED = 3.4, WALK_SPEED = 1.6, BUST_R = 1.0, SIGHT = 22, COP_ACCEL = 14, WIND = 6, REST = 2.2, LOSE = 2.5, SEARCH = 9;
 
 type Cop = { w: Writer; helmet: THREE.Group; head: THREE.Object3D; x: number; z: number; h: number; out: boolean; doing: 'in' | 'run' | 'search' | 'return' | 'bust';
-  wind: number; tired: number; side: number; goal: THREE.Vector2; look: number; door: number };
+  wind: number; tired: number; side: number; goal: THREE.Vector2; look: number; door: number; v: number };
 
 export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: string; blockers: Blocker[]; groundY: (x: number, z: number) => number; bounds: { x: number; z0: number; z1: number }; sound: () => { ctx: AudioContext; out: AudioNode } | null }): Promise<Law> {
   const { scene, high, blockers, bounds } = o;
@@ -87,7 +92,7 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
     helmet.add(shell, visor);
     w.root.visible = false; helmet.visible = false;
     scene.add(w.root, helmet);
-    cops.push({ w, helmet, head, x: 0, z: 0, h: 0, out: false, doing: 'in', wind: 0, tired: 0, side: i ? 1 : -1, goal: new THREE.Vector2(), look: 0, door: i ? 1 : -1 });
+    cops.push({ w, helmet, head, x: 0, z: 0, h: 0, out: false, doing: 'in', wind: 0, tired: 0, side: i ? 1 : -1, goal: new THREE.Vector2(), look: 0, door: i ? 1 : -1, v: 0 });
   }
 
   let on = true, heat = 0, chase: Chase = 'calm', seen = false, seenT = 0, lostT = 0, searchT = 0, alertT = 0;
@@ -180,7 +185,7 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
     const s = Math.sin(carS.h), c = Math.cos(carS.h);
     for (const cp of cops) {
       cp.x = carS.x + c * cp.door * 1.35 + s * (cp.door < 0 ? 0.6 : -0.2); cp.z = carS.z - s * cp.door * 1.35 + c * (cp.door < 0 ? 0.6 : -0.2);
-      cp.h = carS.h + cp.door * Math.PI / 2; cp.out = true; cp.doing = 'run'; cp.wind = 0; cp.tired = 0;
+      cp.h = carS.h + cp.door * Math.PI / 2; cp.out = true; cp.doing = 'run'; cp.wind = 0; cp.tired = 0; cp.v = 0;
       cp.w.root.visible = cp.helmet.visible = true; cp.w.play('Idle_Loop', 0);
     }
   };
@@ -286,20 +291,23 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
       if (seen) { lastSeen.set(me.x, me.z); lostT = 0; if (chase === 'searching') { chase = 'chase'; for (const cp of cops) cp.doing = 'run'; } }
       else lostT += dt;
       const near = Math.min(...cops.map((cp) => Math.hypot(cp.x - me.x, cp.z - me.z)));
-      if (chase === 'chase' && lostT > 3 && near > 9) {
+      if (chase === 'chase' && lostT > LOSE && near > 9) {
         chase = 'searching'; searchT = 0;
         cops.forEach((cp, i) => { cp.doing = 'search'; cp.goal.set(lastSeen.x + (i ? 1.6 : -1.6), lastSeen.y + (i ? -1 : 1)); cp.look = 0; });
       }
-      if (chase === 'searching' && (searchT += dt) > 13) { chase = 'calm'; heat = 0.3; ev = 'escaped'; for (const cp of cops) cp.doing = 'return'; }
+      if (chase === 'searching' && (searchT += dt) > SEARCH) { chase = 'calm'; heat = 0.3; ev = 'escaped'; for (const cp of cops) cp.doing = 'return'; }
     }
     // officers: run at the writer, search, or walk back to the car and get in
     for (const cp of cops) {
       if (!cp.out) continue;
       if (cp.doing === 'run') {
         // they can't sprint for ever: a few seconds at a jog to get their wind back
-        cp.wind += dt; if (cp.tired > 0) cp.tired -= dt; else if (cp.wind > 8) { cp.tired = 2.6; cp.wind = 0; }
-        const tx = seen ? me.x : lastSeen.x, tz = seen ? me.z : lastSeen.y;
-        const moved = steer(cp, tx, tz, cp.tired > 0 ? JOG_SPEED : RUN_SPEED, dt);
+        cp.wind += dt; if (cp.tired > 0) cp.tired -= dt; else if (cp.wind > WIND) { cp.tired = REST; cp.wind = 0; }
+        let tx = seen ? me.x : lastSeen.x, tz = seen ? me.z : lastSeen.y;
+        // the second officer heads where the writer is going (up to 0.7 s ahead), to cut them off at a corner
+        if (seen && cp === cops[1]) { const lead = Math.min(0.7, Math.hypot(me.x - cp.x, me.z - cp.z) / RUN_SPEED * 0.5); tx += (me.vx || 0) * lead; tz += (me.vz || 0) * lead; }
+        const want = cp.tired > 0 ? JOG_SPEED : RUN_SPEED; cp.v += Math.max(-COP_ACCEL * dt, Math.min(COP_ACCEL * dt, want - cp.v));
+        const moved = steer(cp, tx, tz, cp.v, dt);
         cp.w.play(moved ? (cp.tired > 0 ? 'Jog_Fwd_Loop' : 'Sprint_Loop') : 'Idle_Loop', 0.2);
         if (Math.hypot(cp.x - me.x, cp.z - me.z) < BUST_R && me.y < 0.6 && chase === 'chase') {
           chase = 'busted'; ev = 'busted'; cp.doing = 'bust';
@@ -354,6 +362,13 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
     },
     reset: () => { stow(); chase = 'calm'; heat = 0; seenT = 0; wail(0); },
     pushOut,
+    alarm: (me) => {
+      if (!on) return;
+      let best = 0, bd = 1e9;
+      for (let s = 0; s < LOOP; s += 0.5) { const p = pathAt(s), d = Math.hypot(p.x - me.x, p.z - me.z); if (d < bd) { bd = d; best = s; } }
+      const p = pathAt(best); Object.assign(carS, { onStreet: true, s: best, speed: 0, x: p.x, z: p.z, h: p.h });
+      stow(); chase = 'alerted'; alertT = 0; heat = 1; seenT = 0; lastSeen.set(me.x, me.z); whoop();
+    },
     nearest: () => { const c = cops.filter((cp) => cp.out); return c.length ? { x: c[0].x, z: c[0].z } : null; },
     dispose: () => {
       for (const cp of cops) { scene.remove(cp.w.root, cp.helmet); cp.w.dispose(); }
