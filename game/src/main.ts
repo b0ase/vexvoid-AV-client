@@ -54,7 +54,10 @@ export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?:
   /** An overhead picture of the whole district, places named (PNG data URL). */
   map: (width?: number) => string;
   /** The train on the viaduct (head x, track z, running). */
-  train: () => { x: number; z: number; on: boolean }; spots: () => { id: string; w: number; h: number; x: number; y: number; z: number }[];
+  train: () => { x: number; z: number; on: boolean };
+  /** Render knobs for tests and tuning: ambient occlusion, bloom, the real lights near the writer, the street reflection. */
+  quality: (o?: { ao?: boolean; bloom?: boolean; lights?: number; refl?: boolean }) => { ao: boolean; bloom: boolean; lights: number; refl: boolean };
+  spots: () => { id: string; w: number; h: number; x: number; y: number; z: number }[];
   /** Every wall that takes paint (the spots, shop fronts, columns, piers). near: only those within this many metres of the writer. */
   walls: (o?: { near?: number }) => { id: string; w: number; h: number; x: number; y: number; z: number; nx: number; nz: number; painted: boolean }[];
   paint: (id: string, pts: [number, number][], o?: { colour?: string; cap?: 1 | 2 | 3; dist?: number; pressure?: number; buff?: boolean }) => void; clearPaint: (id?: string) => void; piece: (id: string) => string; painting: () => string;
@@ -153,8 +156,9 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   r.setSize(w, h, false);
   const comp = new EffectComposer(r);
   comp.addPass(new RenderPass(scene, cam));
+  let aoPass: GTAOPass | null = null;
   if (high) {
-    const ao = new GTAOPass(scene, cam, w, h);
+    const ao = new GTAOPass(scene, cam, w, h); aoPass = ao;
     ao.updateGtaoMaterial({ radius: 1.4, distanceExponent: 1.4, thickness: 1.5, scale: 1.1, samples: 8 });
     // sprites, rain and particles stay out of the occlusion (as in TERRORNODE)
     const aoRender = ao.render.bind(ao);
@@ -625,7 +629,9 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     if (bust) { /* the knockback clip plays out */ }
     else if (paint && !me.airborne) writer.loco(mv.speed, me.crouch);
     else if (me.airborne) {
-      me.vy -= 13 * dt; me.y += me.vy * dt;
+      // exact under constant gravity, so a jump peaks at the same 0.81 m at 25 fps as at 60 (Euler lost ~9 cm at
+      // 25 fps and the 0.72 m loading dock became unjumpable)
+      me.y += me.vy * dt - 6.5 * dt * dt; me.vy -= 13 * dt;
       // over a ledge or a dock while high enough: the ground under the writer is up there now
       { const feet = me.gy + me.y, g = W0.groundAt(me.x, me.z, feet); if (!Number.isNaN(g) && Math.abs(g - me.gy) > 0.01) { me.y = feet - g; me.gy = g; } }
       if (me.y <= 0) {
@@ -753,6 +759,12 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     painting: () => (paint ? paint.id : ''),
     /** Save the walls' paint now (it saves itself a moment after each stroke settles). */
     flush: async () => { await spray.loaded; await spray.flush(); },
+    quality: (o = {}) => {
+      if (o.ao != null && aoPass) aoPass.enabled = !!o.ao;
+      if (o.bloom != null) bloom.enabled = !!o.bloom;
+      const d = city.quality({ lights: o.lights, refl: o.refl });
+      return { ao: !!aoPass && aoPass.enabled, bloom: bloom.enabled, ...d };
+    },
     spots: () => city.spots.map((s) => ({ id: s.id, w: s.w, h: s.h, x: s.center.x, y: s.center.y, z: s.center.z })),
     /** The law: heat 0..1, chase (off, calm, alerted, chase, searching, busted), the patrol car and the officers. */
     law: () => law.state(),

@@ -37,6 +37,8 @@ export type District = {
   map: (renderer: THREE.WebGLRenderer, width?: number) => string;
   beforeRender: (renderer: THREE.WebGLRenderer, scene: THREE.Scene, cam: THREE.PerspectiveCamera) => void;
   resize: (w: number, h: number) => void;
+  /** Test/tuning knobs: how many real lights follow the writer, the street reflection on or off. */
+  quality: (o?: { lights?: number; refl?: boolean }) => { lights: number; refl: boolean };
   update: (dt: number, t: number, cam: THREE.Camera, focus: THREE.Vector3) => void;
   dispose: () => void;
 };
@@ -453,8 +455,8 @@ export function buildDistrict({ renderer, scene, high, look }: { renderer: THREE
       const m = new THREE.Mesh(track(g), track(new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 }))); group.add(m);
     });
     // a standard lamp and a string of bulbs
-    box(dark, -15.05, -14.95, 0, 1.6, -42.55, -42.45, 'dark');
-    const shade = new THREE.Mesh(track(new THREE.CylinderGeometry(0.16, 0.26, 0.3, 16, 1, true)), std({ color: '#d8d8d8', roughness: 0.9, side: THREE.DoubleSide, emissive: '#ffffff', emissiveIntensity: 0.35 })); shade.position.set(-15, 1.7, -42.5); group.add(shade);
+    box(dark, -17.65, -17.55, 0, 1.6, -45.15, -45.05, 'dark');
+    const shade = new THREE.Mesh(track(new THREE.CylinderGeometry(0.16, 0.26, 0.3, 16, 1, true)), track(new THREE.MeshBasicMaterial({ color: '#d2ccc2', side: THREE.DoubleSide }))); shade.position.set(-17.6, 1.7, -45.1); group.add(shade);
     for (let i = 0; i < 14; i++) addGlow(-21.5 + i * 0.95, 2.7 + Math.sin(i * 0.9) * 0.12, st.z0 + 0.5, 0.12, 1.2, 3);
     // a laptop on a crate, its screen the only cold light
     box(wood, -17.6, -17.0, 0, 0.45, -39.5, -38.9, 'wood'); box(dark, -17.5, -17.1, 0.45, 0.47, -39.4, -39.0, 'dark');
@@ -591,10 +593,11 @@ export function buildDistrict({ renderer, scene, high, look }: { renderer: THREE
     const front = (draw: (g: CanvasRenderingContext2D, W: number, H: number) => void) => { const c = document.createElement('canvas'); c.width = 512; c.height = 256; const g = c.getContext('2d')!; draw(g, 512, 256); return track(texOf(c, true, false)); };
     const recT = front((g, Wd, H) => { g.fillStyle = '#d8d0c4'; g.fillRect(0, 0, Wd, H); for (let s = 0; s < 3; s++) { g.fillStyle = '#2a2a2a'; g.fillRect(0, 70 + s * 70, Wd, 6); for (let i = 0; i < 26; i++) { g.fillStyle = `rgb(${40 + (i * 37) % 160},${40 + (i * 37) % 160},${40 + (i * 37) % 160})`; g.fillRect(8 + i * 19, 20 + s * 70, 16, 50); } } g.fillStyle = 'rgba(0,0,0,0.6)'; g.fillRect(Wd * 0.62, 0, Wd * 0.2, H); g.fillStyle = '#111'; g.font = '900 30px Impact, sans-serif'; g.fillText('VEXVOID · OUT NOW', 20, H - 14); });
     const paintT = front((g, Wd, H) => { g.fillStyle = '#e0e0e0'; g.fillRect(0, 0, Wd, H); for (let row = 0; row < 6; row++) for (let i = 0; i <= row; i++) { const x = Wd * 0.3 + (i - row / 2) * 34, y = 40 + row * 34; g.fillStyle = `rgb(${60 + (row * 31 + i * 53) % 180},${60 + (row * 31 + i * 53) % 180},${60 + (row * 31 + i * 53) % 180})`; g.fillRect(x - 13, y, 26, 32); g.fillStyle = '#fff'; g.fillRect(x - 6, y - 5, 12, 6); } g.fillStyle = 'rgba(0,0,0,0.7)'; g.fillRect(Wd * 0.66, 0, Wd * 0.18, H); g.fillStyle = '#111'; g.font = '900 28px Impact, sans-serif'; g.fillText('CAPS · CANS · INK', Wd * 0.05, H - 14); });
-    const win = (t: THREE.Texture, w: number, h: number, x: number, y: number, z: number, ry: number) => { const m = new THREE.Mesh(track(new THREE.PlaneGeometry(w, h)), track(new THREE.MeshStandardMaterial({ map: t, emissive: '#ffffff', emissiveMap: t, emissiveIntensity: 0.9, roughness: 0.15, metalness: 0.2 }))); m.position.set(x, y, z); m.rotation.y = ry; group.add(m); };
+    // the window glows by itself and takes no light: lit, a lamp or the writer's own rim light standing at it burnt it white
+    const win = (t: THREE.Texture, w: number, h: number, x: number, y: number, z: number, ry: number) => { const m = new THREE.Mesh(track(new THREE.PlaneGeometry(w, h)), track(new THREE.MeshBasicMaterial({ map: t, color: new THREE.Color('#ffffff').multiplyScalar(0.62) }))); m.position.set(x, y, z); m.rotation.y = ry; group.add(m); };
     win(recT, 5.6, 2.8, (recDoor.x0 + recDoor.x1) / 2, 1.6, P.viaduct.z1 - 0.58, 0);
     win(paintT, 5.2, 2.6, 57.03, 1.5, 32, Math.PI / 2);
-    srcs.push({ p: new THREE.Vector3((recDoor.x0 + recDoor.x1) / 2, 2.0, P.viaduct.z1 + 1.2), k: 22, d: 9, flick: 0 }, { p: new THREE.Vector3(58.4, 2.0, 32), k: 22, d: 9, flick: 0 });
+    srcs.push({ p: new THREE.Vector3((recDoor.x0 + recDoor.x1) / 2, 2.4, P.viaduct.z1 + 2.4), k: 22, d: 9, flick: 0 }, { p: new THREE.Vector3(59.6, 2.4, 32), k: 22, d: 9, flick: 0 });
     addPool((recDoor.x0 + recDoor.x1) / 2, 0.01, P.viaduct.z1 + 2, 6, 0.9); addPool(59, ROAD_Y + 0.02, 32, 6, 0.8);
     // the entry: a doormat outlined in white (phase 3 opens the door)
     const mk = std({ color: '#ffffff', emissive: '#ffffff', emissiveIntensity: 0.6, roughness: 0.5, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
@@ -613,12 +616,20 @@ export function buildDistrict({ renderer, scene, high, look }: { renderer: THREE
     const mesh = new THREE.Mesh(track(new THREE.PlaneGeometry(h.w, h.h)), m); mesh.position.set(h.x, h.h / 2, z + 0.02); mesh.receiveShadow = true; group.add(mesh);
     const wd = P.walls.find((w) => w.id === 'hall-of-fame')!;
     spots.push({ id: 'hall-of-fame', mesh, w: h.w, h: h.h, center: new THREE.Vector3(...wd.c), normal: new THREE.Vector3(wd.n[0], 0, wd.n[1]) });
-    box(iron, h.x - 0.1, h.x + 0.1, 0, 9.6, z + 9.2, z + 9.4, 'iron', false);
-    const fl = new THREE.SpotLight('#ffffff', high ? 260 : 160, 30, 0.9, 0.8, 1.2); fl.position.set(h.x, 9.5, z + 9.2); fl.target.position.set(h.x, 3, z); group.add(fl, fl.target);
-    addGlow(h.x, 9.5, z + 9.1, 1.6, 1.8);
+    // the flood's mast stands by the tunnel gate, off the line from the tunnel to the wall (it used to block the view)
+    const fx = h.x + 6, fz = z + 10.9;
+    box(iron, fx - 0.1, fx + 0.1, 0, 9.6, fz - 0.1, fz + 0.1, 'iron', false);
+    const fl = new THREE.SpotLight('#ffffff', high ? 260 : 160, 32, 0.9, 0.8, 1.2); fl.position.set(fx, 9.5, fz - 0.2); fl.target.position.set(h.x, 3, z); group.add(fl, fl.target);
+    addGlow(fx, 9.5, fz - 0.3, 1.6, 1.8);
   }
 
   // ── lamps: geometry, glow, pools; their positions feed the pool of real lights ──
+  // 0.9 m out along the normal of the wall a lamp is fixed to (none near: no offset)
+  const offWall = (x: number, z: number): [number, number] => {
+    let best: (typeof P.walls)[number] | null = null, bd = 0.8;
+    for (const w of P.walls) { const dx = x - w.c[0], dz = z - w.c[2], d = dx * w.n[0] + dz * w.n[1], a = Math.abs(-dx * w.n[1] + dz * w.n[0]); if (d > -0.2 && d < bd && a < w.w / 2 + 0.5) { bd = d; best = w; } }
+    return best ? [best.n[0] * 1.2, best.n[1] * 1.2] : [0, 0];
+  };
   {
     const polesM: THREE.Matrix4[] = [], heads: THREE.Matrix4[] = [], cones: THREE.Matrix4[] = [], brackets: THREE.Matrix4[] = [], tubes: THREE.Matrix4[] = [], lanterns: THREE.Matrix4[] = [];
     for (const l of P.lamps) {
@@ -639,13 +650,16 @@ export function buildDistrict({ renderer, scene, high, look }: { renderer: THREE
       } else if (l.kind === 'wall' || l.kind === 'bulb') {
         heads.push(M(l.x, l.y, l.z, 0.5, 0.6, 0.5)); addGlow(l.x, l.y - 0.1, l.z, 0.6, 1.6 * (l.k || 1), R() < 0.2 ? 2 : 0);
         const g = W.groundAt(l.x, l.z, l.y); addPool(l.x, (Number.isNaN(g) ? 0 : g) + 0.01, l.z, 6, 0.8 * (l.k || 1));
-        srcs.push({ p: new THREE.Vector3(l.x, l.y - 0.3, l.z), k: 18 * (l.k || 1), d: 11, flick: R() < 0.15 ? 1 : 0 });
+        // the real light sits out from the wall it hangs on: right at the wall it burns a white hole in the bricks
+        const o = l.kind === 'wall' ? offWall(l.x, l.z) : [0, 0];
+        srcs.push({ p: new THREE.Vector3(l.x + o[0], l.y - 0.3, l.z + o[1]), k: 18 * (l.k || 1), d: 11, flick: R() < 0.15 ? 1 : 0 });
       } else if (l.kind === 'tube') {
         tubes.push(M(l.x, l.y, l.z)); addGlow(l.x, l.y - 0.05, l.z, 0.9, 1.6, l.z < -95 ? 2 : 0); addPool(l.x, 0.01, l.z, 5, 0.8);
         srcs.push({ p: new THREE.Vector3(l.x, l.y - 0.2, l.z), k: 16, d: 9, flick: l.z < -95 ? 1 : 0 });
       } else if (l.kind === 'warm') {
         addGlow(l.x, l.y - 0.85, l.z, 0.6, 1.1); addPool(l.x, 0.01, l.z, 5, 0.9);
-        srcs.push({ p: new THREE.Vector3(l.x, 1.7, l.z), k: 9, d: 8, flick: 0 });
+        srcs.push({ p: new THREE.Vector3(l.x, 1.5, l.z + 0.7), k: 9, d: 9, flick: 0 });
+        if (l.x < -15 && l.z < -44) srcs.push({ p: new THREE.Vector3(-14, 2.4, -44.2), k: 8, d: 9, flick: 0 });   // the studio's string of bulbs
       } else if (l.kind === 'flood') { /* the hall's spotlight, above */ }
     }
     instanced(new THREE.CylinderGeometry(0.08, 0.12, 1, 8), iron, polesM);
@@ -658,7 +672,7 @@ export function buildDistrict({ renderer, scene, high, look }: { renderer: THREE
   }
 
   // ── the pool of real lights: follow the writer to the nearest lamps ──
-  const NL = high ? 10 : 6;
+  const NL = high ? 8 : 5;   // every real light costs every lit pixel; far lamps are glows and pools on the ground
   const pool = Array.from({ length: NL }, () => { const l = new THREE.PointLight('#fff6ea', 0, 12, 1.8); group.add(l); return { l, src: null as Src | null }; });
   let poolT = 0;
 
@@ -822,12 +836,23 @@ export function buildDistrict({ renderer, scene, high, look }: { renderer: THREE
     trainLight.visible = on; trainLight.position.set(head + dir * 0.05, P.viaduct.deck + 1.3, tz);
     trainNow = { x: head, z: tz, on };
   };
+  let reflOn = true, lightsOn = NL;
+  const noRefl = track(new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1)); noRefl.needsUpdate = true;
+  const quality = (o: { lights?: number; refl?: boolean } = {}) => {
+    if (o.lights != null) { lightsOn = Math.max(0, Math.min(NL, Math.round(o.lights))); pool.forEach((p, i) => { p.l.visible = i < lightsOn; }); }
+    if (o.refl != null) { reflOn = !!o.refl && !!refl; wu.uReflOn.value = reflOn ? 1 : 0; }
+    return { lights: lightsOn, refl: reflOn && !!refl };
+  };
   const beforeRender = (r: THREE.WebGLRenderer, sc: THREE.Scene, cam: THREE.PerspectiveCamera) => {
-    if (!refl || frames++ < 3) return;
+    if (!refl || !reflOn || frames++ < 3) return;
     const rc = refl as unknown as { getReflectionCamera?: (c: THREE.Camera) => THREE.Camera; camera: THREE.Camera };
     (rc.getReflectionCamera ? rc.getReflectionCamera(cam) : rc.camera).layers.set(0);
     // only worth it near the street level: under the canal or high up the street is not in view
+    // while the reflection is drawn the wet ground must not sample the reflection's own target (a GL feedback loop):
+    // it reads a black texel instead, then gets the fresh reflection back
+    const rt = refl.getRenderTarget().texture; wu.tReflect.value = noRefl; wu.uReflOn.value = 0;
     (refl.onBeforeRender as unknown as (r: THREE.WebGLRenderer, s: THREE.Scene, c: THREE.Camera) => void).call(refl, r, sc, cam);
+    wu.tReflect.value = rt; wu.uReflOn.value = 1;
     wu.uReflMat.value.copy((refl.material as THREE.ShaderMaterial).uniforms.textureMatrix.value as THREE.Matrix4).multiply(reflInv);
   };
   const resize = (w: number, h: number) => { refl?.getRenderTarget().setSize(Math.max(64, Math.round(w * 0.42)), Math.max(64, Math.round(h * 0.42))); };
@@ -862,7 +887,7 @@ export function buildDistrict({ renderer, scene, high, look }: { renderer: THREE
     group, plan: P, world: W, spots, walls, blockers: W.boxes,
     nav: () => navC || (navC = makeNav(W)),
     groundAt: (x, z, feet) => W.groundAt(x, z, feet),
-    ceilingAt, train: () => trainNow, map, beforeRender, resize, update,
+    ceilingAt, train: () => trainNow, map, beforeRender, resize, update, quality,
     dispose: () => { scene.remove(group); disp.forEach((d) => d.dispose()); refl?.dispose(); scene.environment = null; },
   };
 }
