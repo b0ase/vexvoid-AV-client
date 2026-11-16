@@ -9,7 +9,7 @@
  * C crouches (sneak), Space jumps, drag to look. Stage 3: F at any wall paints it (./spray.ts): the mouse is the can,
  * left button sprays, right button sprays lightly, Shift lays a straight line, the wheel is the can's distance, 1 2 3
  * the cap, Tab or 4 to 7 the colour, X the buff can, Z undo; A D step along the wall, W S and the arrows move the view.
- * Stage 4: the law (./cops.ts): heat, a patrol car, officers on foot; BUSTED loses the piece. P turns the patrol off.
+ * Stage 4: the law (./cops.ts): heat, a patrol car, officers on foot; BUSTED loses a piece painted by hand (a sketch half blasted stays). P turns the patrol off.
  * The SKETCHBOOK (./sketchbook.ts): B opens a panel of sketches (tags, throw-ups, pieces); pick one, aim at a wall and
  * click (or G) and the writer puts it up stroke by stroke ("blast"), at 1x 2x 4x, sized to fit; moving stops it, Z takes
  * it back in one go. N (or SAVE WALL) keeps what is on the wall being painted as a new sketch.
@@ -391,7 +391,8 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const clock = new THREE.Clock();
   let raf = 0, stopped = false, lastSpray = '';
   // BUSTED: a slow-motion beat with the camera swinging round, the wall gets buffed, the writer starts again
-  let bust: { t: number; spot: string } | null = null;
+  // spot: the wall they buff (what was being painted by hand); kept: a wall with a half-blasted sketch, which stays
+  let bust: { t: number; spot: string; kept: string } | null = null;
   const camPos = new THREE.Vector3(0, 2, 12), camLook = new THREE.Vector3();
   let landT = 0, forceAnim = '', idleT = 0;
   cam.position.copy(camPos);
@@ -531,7 +532,9 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     const ev = law.update(dt, t, { x: me.x, z: me.z, y: me.y, crouch: me.crouch, painting: !!paint, spraying: sprayingNow });
     if (ev && opts.onEvent) try { opts.onEvent(ev); } catch { /* the host's business */ }
     if (ev === 'busted') {
-      bust = { t: 0, spot: lastSpray };
+      // a sketch half put up stays on the wall (owner, 16 Nov), undoable as one step; hand painting is still buffed
+      const blastWall = auto && auto.group[0] === 'p' ? auto.list[Math.min(auto.i, auto.list.length - 1)].wall : '';
+      bust = { t: 0, spot: blastWall && blastWall === lastSpray ? '' : lastSpray, kept: blastWall };
       if (paint) togglePaint();
       btn = 0; me.crouch = false; keys.clear();
       writer.play('Hit_Knockback', 0.08, true);
@@ -545,7 +548,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       flash = { text: bust.spot ? `BUSTED · THEY ARE BUFFING ${bust.spot.toUpperCase()}` : 'BUSTED', until: t + 0.1 };
       if (bust.t > 2.8) {
         if (bust.spot) spray.clear(bust.spot);
-        say2(bust.spot ? `BUSTED · ${bust.spot.toUpperCase()} GOT BUFFED · BACK TO THE START` : 'BUSTED · BACK TO THE START', 3.5);
+        say2(bust.spot ? `BUSTED · ${bust.spot.toUpperCase()} GOT BUFFED · BACK TO THE START` : bust.kept ? `BUSTED · THE PIECE STAYS ON ${bust.kept.toUpperCase()} · BACK TO THE START` : 'BUSTED · BACK TO THE START', 3.5);
         Object.assign(me, { x: 0, z: 8, y: 0, vy: 0, heading: Math.PI, crouch: false, airborne: false });
         Object.assign(camO, { yaw: 0, pitch: 0.12, dist: 3.4 });
         bust = null; lastSpray = ''; law.reset(); writer.play('Idle_Loop', 0.2);
