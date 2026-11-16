@@ -394,6 +394,18 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     if (down && !e.repeat && k === ' ' && !me.airborne && !mv.takeoff) { mv.takeoff = GAIT.gather; me.crouch = false; writer.land(0.25); writer.play('Jump_Start', 0.06, true); }
     if (down) keys.add(k); else keys.delete(k);
   };
+  // the dock answers the mouse too (owner: "select the spraycan controls with my mouse"): each tile does what its key does
+  hudUi.bind({
+    cap: (c) => { if (paint) setCap(c); },
+    colour: (i) => { if (paint) { if (can.buff) { can.buff = false; } setColour(i); hud(); } },
+    colourNext: () => { if (paint) { if (can.buff) can.buff = false; setColour(colourI + 1); hud(); } },
+    dist: (m) => { if (paint) { can.dist = Math.max(0.05, Math.min(0.6, m)); hud(); } },
+    buff: () => { if (!paint) return; can.buff = !can.buff; if (can.buff) note('BUFF CAN · TAKES PAINT OFF'); hud(); },
+    undo: () => { if (paint && !auto) undo(); },
+    book: () => { book.setOpen(!book.state.open); if (book.state.open) { disarmed = false; note(paint ? 'PICK A SKETCH · CLICK THE WALL TO BLAST' : 'PICK A SKETCH · WALK UP TO A WALL'); } },
+    help: () => { if (paint) { help = !help; hud(); } },
+    focus: () => canvas.focus(),
+  });
   const kd = (e: KeyboardEvent) => onKey(e, true), ku = (e: KeyboardEvent) => onKey(e, false);
   canvas.addEventListener('keydown', kd);
   canvas.addEventListener('keyup', ku);
@@ -590,7 +602,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       prompt(t < tipHold ? tipNote : auto ? (blasting ? `BLASTING ${blasting} · [A] [D] TO STOP` : '') : armed && !h ? 'POINT AT THE WALL TO PLACE IT' : !h ? 'POINT AT THE WALL' : '');
       // by the reticle: a keycap and a verb, only when there is something to do
       const sep = '<span class="sep"></span>';
-      const near = auto || !h ? '' : armed ? `${kc('LMB')}BLAST ${armed.name}${plan && plan.fitted ? ' · SIZED TO FIT' : ''}` : line ? `${kc('SHIFT')}STRAIGHT LINE · LET GO TO SPRAY` : tooHigh ? 'TOO HIGH · AIM LOWER' : tooFar ? `${kc('A')}${kc('D')}STEP ALONG` : !sprayed ? `${kc('LMB')}SPRAY${sep}${kc('RMB')}LIGHT${sep}${kc('F')}DONE` : keys.has('Shift') && !pressing ? `${kc('LMB')}DRAG A STRAIGHT LINE` : '';
+      const near = auto || !h ? '' : armed ? `${kc('LMB')}BLAST ${armed.name}${plan && plan.fitted ? ' · SIZED TO FIT' : ''}` : line ? `${kc('SHIFT')}STRAIGHT LINE · LET GO TO SPRAY` : tooHigh ? 'TOO HIGH · AIM LOWER' : tooFar ? `${kc('A')}${kc('D')}STEP ALONG` : !sprayed ? `${kc('LMB')}SPRAY${sep}${kc('RMB')}LIGHT${sep}${kc('F')}DONE${sep}TOOLS: CLICK THE DOCK` : keys.has('Shift') && !pressing ? `${kc('LMB')}DRAG A STRAIGHT LINE` : '';
       if (near && P) { scr.copy(P).project(cam); hudUi.near(near, (scr.x + 1) / 2 * canvas.clientWidth, (1 - scr.y) / 2 * canvas.clientHeight); } else hudUi.near('');
       reticle.visible = !!P && !armed; dot.visible = !!P;
       if (P) {

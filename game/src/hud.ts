@@ -8,12 +8,23 @@
  *
  *   const hud = makeHud(host); hud.dock({ ... }); hud.near(html, x, y); hud.help(true); hud.dispose()
  */
+/** What a click on the dock does (the same as the keys): set by the game once its controls exist. */
+export type DockActions = { cap: (c: 1 | 2 | 3) => void; colour: (i: number) => void; colourNext: () => void; dist: (m: number) => void; buff: () => void; undo: () => void; book: () => void; help: () => void; focus: () => void };
 export type DockState = { on: boolean; cap: 1 | 2 | 3; colour: number; colours: string[]; names: string[]; dist: number; line: string; buff: boolean; undo: number; book: boolean; help: boolean };
 
 const CSS = `
 .vxh{--s:1;position:absolute;inset:0;pointer-events:none;font-family:"SF Pro Text",-apple-system,system-ui,"Helvetica Neue",Arial,sans-serif;color:#fff;-webkit-font-smoothing:antialiased}
 .vxh-dock{position:absolute;left:16px;bottom:16px;display:flex;gap:6px;padding:8px;background:rgba(8,8,10,.62);border:1px solid rgba(255,255,255,.16);border-radius:12px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 10px 30px rgba(0,0,0,.45);transform:scale(var(--s));transform-origin:0 100%;opacity:0;translate:0 8px;transition:opacity .18s ease,translate .18s ease}
-.vxh-dock.on{opacity:1;translate:0 0}
+.vxh-dock.on{opacity:1;translate:0 0;pointer-events:auto}
+.vxh-dock.on .vxh-t{cursor:pointer}
+.vxh-dock.on .vxh-t:hover{background:rgba(255,255,255,.12);box-shadow:inset 0 0 0 1px rgba(255,255,255,.28)}
+.vxh-dock.on .vxh-t.act:hover{background:#fff}
+.vxh-dock .vxh-kc[data-cap]{cursor:pointer;position:relative}
+.vxh-dock .vxh-kc[data-cap]::after{content:"";position:absolute;inset:-7px -3px}
+.vxh-dock .vxh-kc[data-cap]:hover{background:rgba(255,255,255,.3)}
+.vxh-dock .seg{cursor:pointer}
+.vxh-dock .seg:hover+.segv{stroke-width:6}
+.vxh-t[data-k=dist]{cursor:ew-resize!important;touch-action:none}
 .vxh-t{position:relative;width:66px;height:92px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:6px;box-sizing:border-box;border-radius:8px;background:rgba(255,255,255,.035);transition:background .15s ease,color .15s ease}
 .vxh-t.act{background:#f2f2f2;color:#0a0a0b}
 .vxh-t.act .vxh-kc{border-color:rgba(0,0,0,.55);color:#0a0a0b;background:rgba(0,0,0,.06)}
@@ -58,7 +69,9 @@ const ringIcon = (cols: string[], cur: number) => {
   for (let i = 0; i < n; i++) {
     const a0 = (i / n) * Math.PI * 2 - Math.PI / 2 + 0.09, a1 = ((i + 1) / n) * Math.PI * 2 - Math.PI / 2 - 0.09, r = i === cur ? R + 1.5 : R;
     const p = (a: number) => `${(20 + Math.cos(a) * r).toFixed(2)} ${(20 + Math.sin(a) * r).toFixed(2)}`;
-    out.push(`<path d="M${p(a0)} A${r} ${r} 0 0 1 ${p(a1)}" fill="none" stroke="${cols[i]}" stroke-width="${i === cur ? 6 : 3.5}" stroke-linecap="round"/>`);
+    // a fat invisible arc over each segment is its click target (the drawn arc is too thin to hit)
+    out.push(`<path class="seg" data-c="${i}" d="M${p(a0)} A${r} ${r} 0 0 1 ${p(a1)}" fill="none" stroke="rgba(0,0,0,0)" stroke-width="11" pointer-events="stroke"/>`);
+    out.push(`<path class="segv" d="M${p(a0)} A${r} ${r} 0 0 1 ${p(a1)}" fill="none" stroke="${cols[i]}" stroke-width="${i === cur ? 6 : 3.5}" stroke-linecap="round" pointer-events="none"/>`);
     if (i === cur) out.push(`<path d="M${p(a0)} A${r} ${r} 0 0 1 ${p(a1)}" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="8.5" stroke-linecap="round" opacity=".35"/>`);
   }
   return `<svg viewBox="0 0 40 40">${out.join('')}<circle cx="20" cy="20" r="7.5" fill="${cols[cur]}" stroke="rgba(255,255,255,.75)" stroke-width="1.2"/></svg>`;
@@ -78,6 +91,7 @@ const HELP: [string, string][] = [
   ['LMB', 'SPRAY'], ['RMB', 'LIGHT COAT'], ['SHIFT', 'STRAIGHT LINE'], ['WHEEL', 'CAN DISTANCE'],
   ['1 2 3', 'CAP'], ['TAB', 'COLOUR'], ['X', 'BUFF CAN'], ['Z', 'UNDO'],
   ['A D', 'STEP ALONG'], ['W S', 'VIEW IN / OUT'], ['← →', 'LOOK'], ['B', 'SKETCHBOOK'], ['F', 'DONE'], ['M', 'MUSIC ON / OFF'], ['H', 'CLOSE HELP'],
+  ['LMB', 'CLICK THE DOCK: EVERY TILE'],
 ];
 
 /** How big the panels are drawn for a view this size (never below 0.8: the labels must stay readable). */
@@ -101,16 +115,46 @@ export function makeHud(host: HTMLElement) {
   root.append(dockEl, helpEl, nearEl);
   host.appendChild(root);
   let last: Partial<DockState> = {}, nearNow = '';
+  // THE MOUSE ON THE DOCK: the cursor is never locked (it aims the can on the wall), so the dock is simply clickable
+  // while painting; the dock sits over the picture, so a click there never reaches the wall (no spray, no camera turn)
+  // and the keyboard stays with the game
+  let act: DockActions | null = null, distDrag = false;
+  const gaugeAt = (e: PointerEvent) => {   // the gauge's angle under the pointer -> the can's distance (5-60 cm)
+    const svg = T.dist.i.querySelector('svg'); if (!svg || !act) return;
+    const b = svg.getBoundingClientRect(), x = (e.clientX - b.left) / b.width * 40 - 20, y = (e.clientY - b.top) / b.height * 40 - 23;
+    let a = Math.atan2(y, x) - Math.PI * 0.8; while (a < 0) a += Math.PI * 2; while (a > Math.PI * 2) a -= Math.PI * 2;
+    const f = a > Math.PI * 1.7 ? 0 : Math.min(1, a / (Math.PI * 1.4));   // past the far end, nearer the start: close
+    act.dist(Math.round((0.05 + f * 0.55) * 200) / 200);
+  };
+  dockEl.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); e.stopPropagation(); if (!act || !last.on) return;
+    const el = e.target as Element, tile = el.closest('.vxh-t') as HTMLElement | null; if (!tile) return;
+    const k = tile.dataset.k, capK = el.closest('[data-cap]') as HTMLElement | null, seg = el.closest('.seg') as SVGElement | null;
+    if (k === 'cap') act.cap(capK ? (Number(capK.dataset.cap) as 1 | 2 | 3) : ((((last.cap || 2) % 3) + 1) as 1 | 2 | 3));
+    else if (k === 'colour') { if (seg) act.colour(Number(seg.dataset.c)); else act.colourNext(); }
+    else if (k === 'dist') { distDrag = true; dockEl.setPointerCapture(e.pointerId); gaugeAt(e); }
+    else if (k === 'buff') act.buff(); else if (k === 'undo') act.undo(); else if (k === 'book') act.book(); else if (k === 'help') act.help();
+    act.focus();
+  });
+  dockEl.addEventListener('pointermove', (e) => { if (distDrag) gaugeAt(e); });
+  const endDist = (e: PointerEvent) => { if (distDrag) { distDrag = false; try { dockEl.releasePointerCapture(e.pointerId); } catch { /* gone */ } } };
+  dockEl.addEventListener('pointerup', endDist); dockEl.addEventListener('pointercancel', endDist);
+  dockEl.addEventListener('contextmenu', (e) => e.preventDefault());
+  // the wheel over the dock still sets the distance (the picture under it does not get the wheel)
+  dockEl.addEventListener('wheel', (e) => { e.preventDefault(); if (act && last.on && last.dist != null) act.dist(Math.round(Math.max(0.05, Math.min(0.6, last.dist + e.deltaY * 0.0005)) * 200) / 200); }, { passive: false });
+  for (const [k, t] of [['cap', 'CAP: CLICK TO CHANGE · 1 2 3'], ['colour', 'COLOUR: CLICK ONE · TAB'], ['dist', 'DISTANCE: DRAG OR CLICK THE GAUGE · WHEEL'], ['buff', 'BUFF CAN · X'], ['undo', 'UNDO · Z'], ['book', 'SKETCHBOOK · B'], ['help', 'HELP · H']] as const) T[k].t.title = t;
   const pop = (t: HTMLElement) => { t.classList.remove('pop'); void t.offsetWidth; t.classList.add('pop'); };
   return {
     el: root,
+    /** Make the dock clickable: what each tile does. */
+    bind: (a: DockActions) => { act = a; },
     /** Scale the panels to the view (small windows get smaller panels, never clipped ones). */
     resize: (w: number, h: number) => root.style.setProperty('--s', String(hudScale(w, h).toFixed(3))),
     dock: (s: DockState) => {
       if (s.on !== last.on) dockEl.classList.toggle('on', s.on);
-      if (s.cap !== last.cap) { T.cap.i.innerHTML = capIcon(s.cap); T.cap.l.textContent = ['', 'SKINNY', 'MEDIUM', 'FAT'][s.cap]; T.cap.k.innerHTML = [1, 2, 3].map((c) => kc(String(c), c === s.cap ? 'on' : '')).join(''); if (last.cap) pop(T.cap.t); }
+      if (s.cap !== last.cap) { T.cap.i.innerHTML = capIcon(s.cap); T.cap.l.textContent = ['', 'SKINNY', 'MEDIUM', 'FAT'][s.cap]; T.cap.k.innerHTML = [1, 2, 3].map((c) => kc(String(c), c === s.cap ? 'on' : '').replace('<span ', `<span data-cap="${c}" title="${['', 'SKINNY', 'MEDIUM', 'FAT'][c]} CAP" `)).join(''); if (last.cap) pop(T.cap.t); }
       if (s.colour !== last.colour || s.buff !== last.buff) { T.colour.i.innerHTML = ringIcon(s.colours, s.colour); T.colour.l.textContent = s.names[s.colour]; T.colour.k.innerHTML = kc('TAB', s.buff ? 'dim' : ''); T.colour.t.style.opacity = s.buff ? '.45' : ''; if (last.colour != null && s.colour !== last.colour) pop(T.colour.t); }
-      if (s.dist !== last.dist || s.line !== last.line) { T.dist.i.innerHTML = gaugeIcon(s.dist); T.dist.l.textContent = `${Math.round(s.dist * 100)} CM`; T.dist.t.title = `line ${s.line} cm`; }
+      if (s.dist !== last.dist || s.line !== last.line) { T.dist.i.innerHTML = gaugeIcon(s.dist); T.dist.l.textContent = `${Math.round(s.dist * 100)} CM`; T.dist.t.dataset.line = s.line; }
       if (s.buff !== last.buff) { T.buff.t.classList.toggle('act', s.buff); if (last.buff != null) pop(T.buff.t); }
       if (s.undo !== last.undo) { badge.textContent = String(s.undo); badge.style.display = s.undo > 0 ? '' : 'none'; T.undo.t.style.opacity = s.undo > 0 ? '' : '.45'; }
       if (s.book !== last.book) T.book.t.classList.toggle('act', s.book);
