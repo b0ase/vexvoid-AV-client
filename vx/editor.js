@@ -1,6 +1,7 @@
 /* The EDIT tab's engine: a music video as a list of shots cut to a track. Pure logic; the page does the UI.
  *
  *   VXEDIT.envelope(bytes) -> { rms: Float32Array (one value per STEP seconds, 0..1), step, seconds, bpm, bar0, tempoConf, drums }
+ *   VXEDIT.peaks(channels, sampleRate, perSec) -> { peaks: Uint8Array (0-255 per 1/perSec s), perSec }: the waveform
  *   VXEDIT.tempo(channels, sampleRate) -> { bpm, beat0, bar0, conf }: the track's tempo and where its bars start
  *   VXEDIT.autoCut({ seconds, env, bpm, pool, pace }) -> shots [{ src, name, in, dur }]
  *   VXEDIT.layout(shots) -> shots with start times;   VXEDIT.at(shots, t) -> { i, shot, offset }
@@ -36,8 +37,19 @@
     }
     var sorted = Array.from(rms).sort(function (a, b) { return a - b; }), lo = sorted[Math.floor(n * 0.05)] || 0, hi = sorted[Math.floor(n * 0.97)] || 1;
     for (i = 0; i < n; i++) rms[i] = Math.max(0, Math.min(1, (rms[i] - lo) / ((hi - lo) || 1)));
-    var tp = tempo(chans, sr);
-    return { rms: rms, step: STEP, seconds: ab.duration, bpm: tp.bpm, bar0: tp.bar0, tempoConf: tp.conf, drums: tp.drums };
+    var tp = tempo(chans, sr), pk = peaks(chans, sr);
+    return { rms: rms, step: STEP, seconds: ab.duration, bpm: tp.bpm, bar0: tp.bar0, tempoConf: tp.conf, drums: tp.drums, peaks: pk.peaks, perSec: pk.perSec };
+  }
+  // the waveform: the loudest sample in each 1/perSec of a second (any channel), 0-255, drawn on the audio lanes
+  function peaks(chans, sr, perSec) {
+    perSec = perSec || 100;
+    var len = chans[0].length, hop = sr / perSec, n = Math.ceil(len / hop), out = new Uint8Array(n);
+    for (var i = 0; i < n; i++) {
+      var m = 0, j1 = Math.min(len, Math.round((i + 1) * hop));
+      for (var c = 0; c < chans.length; c++) { var ch = chans[c]; for (var j = Math.round(i * hop); j < j1; j++) { var v = ch[j] < 0 ? -ch[j] : ch[j]; if (v > m) m = v; } }
+      out[i] = Math.min(255, Math.round(m * 255));
+    }
+    return { peaks: out, perSec: perSec };
   }
 
   // Tempo from the audio: an onset curve (rises in loudness: full band, a kick band and a snare/hat band), every
@@ -282,6 +294,6 @@
       '-maxrate', '14M', '-bufsize', '28M', '-c:a', 'copy', '-movflags', '+faststart', o.out]);
   }
 
-  root.VXEDIT = { STEP: STEP, envelope: envelope, autoCut: autoCut, layout: layout, at: at, ffmpegArgs: ffmpegArgs, PACE: PACE,
+  root.VXEDIT = { STEP: STEP, envelope: envelope, peaks: peaks, autoCut: autoCut, layout: layout, at: at, ffmpegArgs: ffmpegArgs, PACE: PACE,
     energyMap: energyMap, tempo: tempo, finishPlan: finishPlan, matteArgs: matteArgs, finishArgs: finishArgs, IDENT_NAMES: IDENT_NAMES };
 })(typeof window !== 'undefined' ? window : this);

@@ -21,6 +21,7 @@
     "test:tempo": "node scripts/test-tempo.js",
     "test:timeline": "node scripts/test-timeline.js",
     "test:jobs": "node scripts/test-jobs.js",
+    "test:music": "node scripts/test-music.js",
     "build:game": "bash scripts/build-game.sh",
     "build:writer": "/Volumes/2026/Apps/Blender.app/Contents/MacOS/Blender -b --factory-startup --python game/blender/writer.py -- vx/game/anims/ual.glb vx/game/models/writer.glb"
   },
