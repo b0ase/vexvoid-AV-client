@@ -34,8 +34,10 @@ export const EYE = 1.62;
 export type Window = { i: number; x: number; y: number; hp: number; broke: boolean; lit: number };
 export type Rack = { mesh: THREE.Mesh; hp: number; broke: boolean; t: number };
 
-/** A wall the writer can paint: a plane facing the street, w x h metres, centred at center, facing normal. */
-export type Spot = { id: string; mesh: THREE.Mesh; w: number; h: number; center: THREE.Vector3; normal: THREE.Vector3 };
+/** A wall the writer can paint: an upright plane, w x h metres, centred at center, facing normal. */
+export type Wall = { id: string; w: number; h: number; center: THREE.Vector3; normal: THREE.Vector3 };
+/** A wall built to be painted (its own concrete panel). */
+export type Spot = Wall & { mesh: THREE.Mesh };
 /** Something solid at street level the walker cannot pass through (x/z extents). */
 /** Something solid at street level. `low`: you can see over it standing (a parked car, a barrier), not crouched. */
 export type Blocker = { x0: number; x1: number; z0: number; z1: number; low?: boolean };
@@ -46,6 +48,8 @@ export type City = {
   group: THREE.Group;
   /** VexVoid's walls to paint (empty in the TERRORNODE set). */
   spots: Spot[];
+  /** Every wall the writer can walk up to and paint: the spots, then the shop fronts, the columns, the bridge piers. */
+  walls: Wall[];
   blockers: Blocker[];
   /** How high the ground is here: the road, or a pavement. */
   groundY: (x: number, z: number) => number;
@@ -1487,6 +1491,7 @@ export function buildCity({ renderer, scene, high, look, vexvoid = false }: { re
 
   // ── VexVoid's end of the street: a rail bridge over it, a wall closing it, and walls to paint ──
   const spots: Spot[] = [];
+  const walls: Wall[] = [];
   if (vexvoid) {
     const wallMat = (w: number, h: number, tint: string) => { const m = track(look.material('concrete_floor_02', [w / 5, h / 5], tint, 0.02)); m.roughness = 0.92; m.envMapIntensity = 0.5; return m; };
     const slab = (w: number, h: number, d: number, x: number, y: number, z: number, tint = '#55585f') => {
@@ -1523,6 +1528,25 @@ export function buildCity({ renderer, scene, high, look, vexvoid = false }: { re
       const w = Math.min(10, b.za - b.zb - 3), zc = (b.za + b.zb) / 2;
       spot(`wall-${b.sx < 0 ? 'l' : 'r'}${Math.round(-zc)}`, w, 3.7, b.sx * (X0 - 0.04), 2.1, zc, -b.sx, 0);
     }
+    // everything else you can walk up to takes paint too: a strip of wall from the ground to as high as a jump reaches.
+    // The ids come from where the wall stands, so saved paint finds its wall again.
+    walls.push(...spots);
+    const WH = 3.75, wall = (id: string, w: number, x: number, z: number, nx: number, nz: number, y0 = 0.25) => walls.push({ id, w, h: WH, center: new THREE.Vector3(x, y0 + WH / 2, z), normal: new THREE.Vector3(nx, 0, nz) });
+    // the shop fronts, one wall per building
+    for (const b of firsts) if (b.za > -82 && b.zb < 26) wall(`shop-${b.sx < 0 ? 'l' : 'r'}${Math.round(-(b.za + b.zb) / 2)}`, b.za - b.zb, b.sx * X0, (b.za + b.zb) / 2, -b.sx, 0);
+    // the end wall either side of the hall of fame
+    for (const sx of [-1, 1]) wall(sx < 0 ? 'end-l' : 'end-r', 12, sx * 21, WZ, 0, 1);
+    // the four sides of a column or pier: e w face along x, n s along z (north is up the street, towards the bridge)
+    const column = (id: string, x: number, z: number, hx: number, hz: number, skip = '') => {
+      if (!skip.includes('e')) wall(`${id}-e`, hz * 2, x + hx, z, 1, 0);
+      if (!skip.includes('w')) wall(`${id}-w`, hz * 2, x - hx, z, -1, 0);
+      if (!skip.includes('n')) wall(`${id}-n`, hx * 2, x, z - hz, 0, -1);
+      if (!skip.includes('s')) wall(`${id}-s`, hx * 2, x, z + hz, 0, 1);
+    };
+    for (let z = 4; z > -80; z -= 20) column(`exp${Math.round(4 - z) / 20 + 1}`, EXL, z, 0.9, 1.3);
+    for (let z = 0; z > -80; z -= 14) column(`rail${Math.round(-z) / 14 + 1}`, RLX, z, 0.7, 1.8);
+    // the bridge piers: the street side is a spot already, the side facing the other pier is out of the way
+    for (const sx of [-1, 1]) for (const k of [-1, 1]) column(`pier-${sx < 0 ? 'l' : 'r'}${k < 0 ? 'n' : 's'}`, sx * 17.2, BZ + k * 2.6, 1.2, 1.1, (sx < 0 ? 'e' : 'w') + (k < 0 ? 's' : 'n'));
   }
 
   // ── Mist banks, drifting low across the street ──
@@ -1686,6 +1710,7 @@ export function buildCity({ renderer, scene, high, look, vexvoid = false }: { re
   return {
     group,
     spots,
+    walls,
     blockers,
     groundY: (x) => (Math.abs(x) >= KERB.x ? KERB.h : 0),
     windows,
