@@ -387,11 +387,13 @@ patch(body, Pt, Nt, rz(zS - 0.06, zS + 0.0), ct(math.pi - 0.75, math.pi + 0.75),
 hood = Mesh('SM_Char_Writer_Hood')
 HY, HZ = J['Head'][1], zN                                    # the base of the neck; the skull sits forward and above it
 HU = [0.0, 0.15, 0.4, 0.65, 0.85, 1.0]
-h_c = curve(HU, [(HY - 0.162, HZ + 0.158), (HY - 0.125, HZ + 0.16), (HY - 0.05, HZ + 0.168), (HY - 0.0, HZ + 0.118), (HY + 0.012, HZ + 0.04), (HY + 0.012, HZ - 0.07)])
-h_ang = curve(HU, np.radians([4, 8, 22, 62, 86, 90]))
-h_a = curve(HU, [0.09, 0.112, 0.13, 0.134, 0.132, 0.165])     # half width
-h_top = curve(HU, [0.098, 0.116, 0.128, 0.122, 0.112, 0.115])     # over the head, then down the back
-h_bot = curve(HU, [0.088, 0.098, 0.1, 0.062, 0.075, 0.09])     # under the chin, then the throat
+# (owner, 16 Nov: the old hood closed round the face like Kenny's, under the chin and over the nose. A real hoodie:
+#  the opening runs from the brow down to the throat, leaning back at the bottom, and the hood falls to the shoulders)
+h_c = curve(HU, [(HY - 0.158, HZ + 0.128), (HY - 0.122, HZ + 0.14), (HY - 0.05, HZ + 0.168), (HY - 0.0, HZ + 0.118), (HY + 0.012, HZ + 0.04), (HY + 0.012, HZ - 0.07)])
+h_ang = curve(HU, np.radians([-14, -4, 22, 62, 86, 90]))
+h_a = curve(HU, [0.088, 0.112, 0.13, 0.134, 0.132, 0.165])     # half width
+h_top = curve(HU, [0.108, 0.122, 0.13, 0.122, 0.112, 0.115])     # over the head, then down the back
+h_bot = curve(HU, [0.158, 0.15, 0.12, 0.066, 0.075, 0.09])     # down the throat (open), then round the neck
 NH = 40; psi = np.arange(NH) / NH * 2 * math.pi; u_h = np.concatenate([np.linspace(0, 0.15, 5)[:-1], np.linspace(0.15, 1.0, 26)])
 def hood_ring(u):
     c = h_c(u); a = h_ang(u); cu = np.cos(psi); top = cu > 0
@@ -401,8 +403,8 @@ def hood_ring(u):
     P = np.array([CX, c[0], c[1]]) + np.outer(h_a(u) * sup(np.sin(psi), 2.3), [1, 0, 0]) + np.outer((r + peak + seam) * sup(cu, 2.2), up)
     brim = sstep(0.25, 0.95, cu) * (1 - sstep(0.0, 0.14, u))                                    # the stiffened peak over the brow
     P[:, 1] -= 0.045 * brim; P[:, 2] -= 0.012 * brim
-    chin = sstep(0.3, 1.0, -cu) * (1 - sstep(0.0, 0.2, u))                                      # the collar stands up over the mouth
-    P[:, 1] -= 0.012 * chin; P[:, 2] += 0.03 * chin
+    chin = sstep(0.3, 1.0, -cu) * (1 - sstep(0.0, 0.2, u))                                      # the open bottom tucks back to the throat
+    P[:, 1] += 0.012 * chin
     return P
 Ph = np.array([hood_ring(u) for u in u_h])
 # folds: the hood slumps on the shoulders behind, and the cloth is never drum-tight
