@@ -226,14 +226,16 @@ export function buildDistrict({ renderer, scene, high, look }: { renderer: THREE
   for (const x of [31, 21.5]) for (const dx of [-0.72, 0.72]) box(steel, x + dx - 0.035, x + dx + 0.035, 0.0, 0.03, x === 31 ? -36 : -33.2, -12.2, 'siding', false);
   // the canal: towpaths, the water, coping
   for (const z0 of [P.canal.z0, P.canal.z1 - 2]) for (let x0 = P.bounds.x0; x0 < P.bounds.x1; x0 += CH) flat({ mat: towMat, tw: 3, th: 3 }, x0, Math.min(P.bounds.x1, x0 + CH), z0, z0 + 2, TOW_Y, 'tow');
-  const waterMat = track(new THREE.MeshStandardMaterial({ color: '#0a0b0d', roughness: 0.06, metalness: 0.1, envMapIntensity: 1.6 }));
+  // (the moon's glint through slow waves made a cow print on near-mirror water: a softer sheen, finer ripples)
+  const waterMat = track(new THREE.MeshStandardMaterial({ color: '#0a0b0d', roughness: 0.3, metalness: 0.1, envMapIntensity: 0.7 }));
   waterMat.onBeforeCompile = (s) => {
     s.uniforms.uT = sh.uT;
     s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWw;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvWw = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vWw; uniform float uT;').replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
       { vec2 p = vWw.xz; float a = sin(p.x * 1.7 + uT * 1.3) * 0.5 + sin(p.y * 2.3 - uT * 1.1 + p.x * 0.4) * 0.5 + sin((p.x + p.y) * 4.1 + uT * 2.2) * 0.25;
         float b = cos(p.y * 1.9 + uT * 0.9) * 0.5 + cos((p.x - p.y) * 3.3 - uT * 1.7) * 0.3;
-        normal = normalize(normal + (viewMatrix * vec4(a * 0.05, 0.0, b * 0.05, 0.0)).xyz); }`);
+        float c = sin(p.x * 9.7 + p.y * 3.1 + uT * 3.1) * sin(p.y * 11.3 - p.x * 2.3 - uT * 2.6);
+        normal = normalize(normal + (viewMatrix * vec4(a * 0.018 + c * 0.014, 0.0, b * 0.018 - c * 0.011, 0.0)).xyz); }`);
   };
   for (let x0 = P.bounds.x0; x0 < P.bounds.x1; x0 += CH) { const g = new THREE.PlaneGeometry(CH, P.canal.z1 - P.canal.z0 - 4); g.rotateX(-Math.PI / 2); g.translate(x0 + CH / 2, WATER_Y, (P.canal.z0 + P.canal.z1) / 2); const m = new THREE.Mesh(track(g), waterMat); m.receiveShadow = true; group.add(m); }
   // the towpath edges (stone kerbs at the water), and the walls down to the water
