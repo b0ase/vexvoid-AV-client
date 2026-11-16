@@ -537,7 +537,8 @@ let camY = Math.max(0.35, tgtY + Math.sin(camO.pitch) * camO.dist), camX = Math.
     cops: (on: boolean) => law.setOn(on),
     /** The game's sound, for a recorder: connect node to a MediaStreamDestination made on ctx. */
     audio: () => { const b = sound(); return b ? { ctx: b.ctx, node: b.out } : null; },
-    goto: (x, z, yaw, pitch) => { me.x = x; me.z = z; if (yaw != null) { camO.yaw = yaw; me.heading = yaw + Math.PI; } if (pitch != null) camO.pitch = pitch; },
+    goto: (x, z, yaw, pitch) => { if (paint) togglePaint();   // painting holds the writer at the wall: put the can down first
+      me.x = x; me.z = z; if (yaw != null) { camO.yaw = yaw; me.heading = yaw + Math.PI; } if (pitch != null) camO.pitch = pitch; },
     stop: () => {
       stopped = true; cancelAnimationFrame(raf); ro.disconnect();
       canvas.removeEventListener('keydown', kd); canvas.removeEventListener('keyup', ku);

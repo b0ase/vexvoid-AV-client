@@ -145,11 +145,13 @@ export function makeSpray(scene: THREE.Scene, walls: Wall[], store: WallStore = 
     return true;
   };
   // what was painted last time comes back
+  // (a wall cleared before its old paint is back stays clear)
+  const wiped = new Set<string>();
   const loaded = Promise.all(walls.map(async (wall) => {
     try {
-      const png = await store.load(wall.id); if (!png) return;
+      const png = await store.load(wall.id); if (!png || wiped.has(wall.id)) return;
       const im = await createImageBitmap(png), L = layerOf(wall.id)!;
-      if (blit(L, im, true)) { L.blob = png; if (store.loadStrokes) { const log = await store.loadStrokes(wall.id); if (log && Array.isArray(log)) L.strokes.unshift(...log); } }
+      if (!wiped.has(wall.id) && blit(L, im, true)) { L.blob = png; if (store.loadStrokes) { const log = await store.loadStrokes(wall.id); if (log && Array.isArray(log) && !wiped.has(wall.id)) L.strokes.unshift(...log); } }
       im.close();
     } catch { /* a broken save, or the store is away: start clean */ }
   }));
@@ -362,6 +364,7 @@ export function makeSpray(scene: THREE.Scene, walls: Wall[], store: WallStore = 
     undoable: (ids: string[]) => new Set(undos.filter((e) => ids.includes(e.L.wall.id)).map((e, i) => e.group || '#' + i)).size,
     clear(id?: string) {
       for (const wall of walls) if (!id || wall.id === id) {
+        wiped.add(wall.id);
         const L = layers.get(wall.id); if (!L) continue;
         if (cur && cur.L === L) cur = null;
         for (const i of [...L.tiles.keys()]) dropTile(L, i);
