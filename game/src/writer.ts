@@ -27,6 +27,9 @@ export type Writer = {
   lean: (roll: number, pitch: number) => void;
   /** Turn the upper body by this much against the hips (radians): the hips go one way, the chest stays. */
   twist: (a: number) => void;
+  /** The head on the body, for tests: drift (m) of the head bone from its rest place in the chest's frame, the neck's
+   *  and head's turn from rest (rad), and how much the head-to-neck distance has changed (m). */
+  head: (o?: { steady?: boolean }) => { drift: number; neck: number; head: number; gap: number; hood: number; worst: string; pts: number; wob: number };
   /** A landing: the body gives a little (k 0..1, how hard). */
   land: (k: number) => void;
   /** Hold still (painting): the standing clips stop breathing and swaying, so a raised can stays where it is aimed. */
@@ -343,6 +346,26 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
   play('Idle_Loop', 0);
   // standing still is never quite still: a breath through the chest and a slow look round, over whatever idle plays
   const spine0 = B('Spine'), spine1 = B('Spine1'), neckB = B('Neck'), headB = B('Head');
+  // where the head sits on the chest at rest (Spine2's frame) and how far it is from the neck: head() measures against it
+  const headRest = (() => { root.updateMatrixWorld(true); const s2 = B('Spine2'); return { inChest: s2.worldToLocal(headB.getWorldPosition(new THREE.Vector3())), gap: headB.getWorldPosition(new THREE.Vector3()).distanceTo(neckB.getWorldPosition(new THREE.Vector3())) }; })();   // (the body's scale never changes)
+  const hdV = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]; let lastHR: THREE.Quaternion | null = null;
+  // sample points on the head and hood (vertices above the neck), kept in the Head bone's frame at rest: head() checks
+  // the skinned mesh still sits where the head bone says (a hood that slides or stretches off the head shows here)
+  const hoodPts: { m: THREE.SkinnedMesh; i: number; rest: THREE.Vector3; w: string }[] = [];
+  {
+    root.updateMatrixWorld(true); for (const m of meshes) m.skeleton?.update();
+    const ny = neckB.getWorldPosition(new THREE.Vector3()).y, hb = bones.indexOf(headB), nb = bones.indexOf(neckB), v = new THREE.Vector3();
+    for (const m of meshes) {
+      const pos = m.geometry.attributes.position, si = m.geometry.attributes.skinIndex, sw = m.geometry.attributes.skinWeight; if (!si) continue;
+      const cand: number[] = [];
+      for (let i = 0; i < pos.count; i++) { m.getVertexPosition(i, v); v.applyMatrix4(m.matrixWorld); let hw = 0; for (let c = 0; c < 4; c++) if (si.getComponent(i, c) === hb || si.getComponent(i, c) === nb) hw += sw.getComponent(i, c); if (v.y > ny && hw > 0.05) cand.push(i); }
+      for (let k = 0; k < cand.length; k += Math.max(1, Math.floor(cand.length / 40))) {
+        const i = cand[k]; m.getVertexPosition(i, v); v.applyMatrix4(m.matrixWorld);
+        const ws = [0, 1, 2, 3].map((c) => [si.getComponent(i, c), sw.getComponent(i, c)]).filter(([, w]) => w > 0.01).map(([b, w]) => `${b === hb ? 'Head' : b === nb ? 'Neck' : bones[b]?.name || b}:${w.toFixed(2)}`).join(' ');
+        hoodPts.push({ m, i, rest: headB.worldToLocal(v.clone()), w: `${m.name || m.userData.slot}#${i} ${ws}` });
+      }
+    }
+  }
   let life = 0, lt = 0;
   // spraying: the right arm reaches for the wall (two-bone IK over whatever clip plays) with a can in the hand
   const rArm = B('RightArm'), rFore = B('RightForeArm'), rHand = B('RightHand'), spine2 = B('Spine2');
@@ -493,7 +516,31 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
   };
 
   // ---- fitting the feet to the ground ----
-  let bodyOff = 0, dip = 0, leanR = 0, leanP = 0, twistA = 0, feetOn = false;
+  let bodyOff = 0, dip = 0, leanR = 0, leanP = 0, twistA = 0, twistS = 0, feetOn = false;
+  const poseQ = bones.map((b) => b.quaternion.clone()); let poseOk = false;
+  // THE STEADY HEAD (owner: "his head sort of wobbles about and falls off"): measured in play, the clips (blended by
+  // speed at stride cadence) swung the neck and head up to 0.2-0.27 rad in a single frame, reversing every few frames,
+  // and the big hood magnified it (its crown is on Head, its lower edge on Neck and Spine2, so it shears off the
+  // shoulders as the head nods). Runners keep their head level: the head is pulled halfway back to looking level along
+  // the body's heading, its turn from the chest is capped, and it follows its target smoothly (about 60 ms).
+  const restHeadInRoot = (() => { root.updateMatrixWorld(true); const q = new THREE.Quaternion(); headB.getWorldQuaternion(q); return root.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(q); })();
+  const headRestLocal = headB.quaternion.clone();
+  const shQ = new THREE.Quaternion(), shT = new THREE.Quaternion(), shP = new THREE.Quaternion(), shPrev = new THREE.Quaternion(), shR = new THREE.Quaternion(); let shOn = false;
+  const STEADY = { on: true, level: 0.5, cap: 0.8, rate: 16 };
+  const steadyHead = (dt: number) => {
+    if (!STEADY.on) { shOn = false; return; }
+    root.updateMatrixWorld(true); root.getWorldQuaternion(shT);
+    // the head as the clip (and the idle look) has it, in the body's frame (so turning the whole body is no wobble)
+    headB.getWorldQuaternion(shQ); shQ.premultiply(shR.copy(shT).invert());
+    shQ.slerp(restHeadInRoot, STEADY.level);                                         // halfway back to level
+    if (shOn) shQ.copy(shPrev.slerp(shQ, 1 - Math.exp(-dt * STEADY.rate)));         // and smooth
+    shPrev.copy(shQ); shOn = true;
+    shQ.premultiply(shT);                                                            // back to the world
+    // never further than `cap` from where the chest carries it (a neck has a range)
+    headB.parent!.getWorldQuaternion(shP); shR.copy(shP).multiply(headRestLocal);
+    const a = shR.angleTo(shQ); if (a > STEADY.cap) { shR.slerp(shQ, STEADY.cap / a); shQ.copy(shR); }
+    headB.quaternion.copy(shP.invert().multiply(shQ)); headB.updateMatrixWorld(true);
+  };
   let baseY = char.position.y;
   const iU = new THREE.Vector3(), qF = new THREE.Quaternion();
   const legIK = (lg: { up: THREE.Bone; knee: THREE.Bone; foot: THREE.Bone }, lift: number) => {
@@ -571,6 +618,20 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
     setGround: (f, fit = true) => { ground = f; feetOn = fit; init(); },
     lean: (r, p) => { leanR = r; leanP = p; },
     twist: (a) => { twistA = a; },
+    head: (o) => {
+      if (o && o.steady != null) STEADY.on = !!o.steady;
+      root.updateMatrixWorld(true);
+      const hp = headB.getWorldPosition(hdV[0]), np = neckB.getWorldPosition(hdV[1]), rest = spine2.localToWorld(hdV[2].copy(headRest.inChest));
+      const ang = (q: THREE.Quaternion) => 2 * Math.acos(Math.min(1, Math.abs(q.w)));
+      const drift = hp.distanceTo(rest), gap = Math.abs(hp.distanceTo(np) - headRest.gap);
+      // the skinned head and hood against the head bone: the worst sample point's distance from where the bone puts it
+      let hood = 0, worst = ''; for (const m of meshes) m.skeleton.update();
+      for (const p of hoodPts) { p.m.getVertexPosition(p.i, hdV[2]); hdV[2].applyMatrix4(p.m.matrixWorld); const d = hdV[2].distanceTo(headB.localToWorld(hdV[1].copy(p.rest))); if (d > hood) { hood = d; worst = p.w; } }
+      // the head's turn against the body since the last call (a wobble shows as big changes, frame to frame)
+      const hr = root.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(headB.getWorldQuaternion(new THREE.Quaternion()));
+      const wob = lastHR ? lastHR.angleTo(hr) : 0; lastHR = hr;
+      return { drift, neck: ang(neckB.quaternion), head: ang(headB.quaternion), gap, hood, worst, pts: hoodPts.length, wob };
+    },
     land: (k) => { dip = Math.min(dip, -0.09 * Math.max(0, Math.min(1, k))); },
     grounded: (on) => { onGround = on; },
     steady: (on) => { steadyOn = on; },
@@ -587,8 +648,14 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
     },
     update: (dt) => {
       locoTick(dt);
+      // the procedural layers below (twist, the idle look, the steady head, foot and arm IK) are deltas on the clips'
+      // pose: put the pose the mixer made last frame back first (the mixer writes a bone only when its value changed),
+      // so nothing can pile up from frame to frame
+      if (poseOk) for (let i = 0; i < bones.length; i++) bones[i].quaternion.copy(poseQ[i]);
       mixer.update(dt);
-      if (Math.abs(twistA) > 1e-3) { const ch: [THREE.Bone, number][] = [[spine0, 0.3], [spine1, 0.3], [spine2, 0.25], [neckB, 0.15]]; for (const [b, k] of ch) b.rotateY(twistA * k); }
+      for (let i = 0; i < bones.length; i++) poseQ[i].copy(bones[i].quaternion); poseOk = true;
+      twistS += (Math.max(-1.3, Math.min(1.3, twistA)) - twistS) * Math.min(1, dt * 12);   // eased: no snap of the neck
+      if (Math.abs(twistS) > 1e-3) { const ch: [THREE.Bone, number][] = [[spine0, 0.3], [spine1, 0.3], [spine2, 0.25], [neckB, 0.15]]; for (const [b, k] of ch) b.rotateY(twistS * k); }
       char.rotation.set(leanP, 0, leanR);
       lt += dt; life += ((/Idle/.test(locoOn ? mixName : curName) && !aimOn ? 1 : 0) - life) * Math.min(1, dt * 2);
       if (life > 0.01) {
@@ -596,6 +663,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
         const look = Math.sin(lt * 0.23) * 0.5 + Math.sin(lt * 0.61 + 1.3) * 0.2;
         neckB.rotateY(look * 0.18 * life); headB.rotateY(look * 0.22 * life); headB.rotateX((Math.sin(lt * 0.37) * 0.06 + 0.03) * life);
       }
+      steadyHead(dt);
       if (ground) { if (feetOn) fitFeet(dt); else soleNow(); measure(dt); }
       aimW += ((aimOn ? aimTo : 0) - aimW) * Math.min(1, dt * 9);
       if (aimW > 0.01) {

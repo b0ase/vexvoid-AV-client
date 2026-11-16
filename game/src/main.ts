@@ -89,6 +89,8 @@ export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?:
   /** How the writer moves: speed, heading, and how the soles meet the ground (stats since the last reset). */
   /** Tuning: the speed a moving clip was made for. */
   tuneGait: (clip: string, v: number) => void;
+  /** The head on the body (tests): drift from its rest place on the chest (m), neck and head turn (rad), neck gap change (m). */
+  head: (o?: { steady?: boolean }) => { drift: number; neck: number; head: number; gap: number; hood: number; worst: string; pts: number; wob: number };
   gait: (reset?: boolean) => GaitInfo & { move: { speed: number; vx: number; vz: number; heading: number; yawRate: number; airborne: boolean; crouch: boolean; gy: number } };
   /** Take back the last stroke on a wall (none given: the wall being painted). Returns how many strokes went. */
   undo: (id?: string) => number;
@@ -748,6 +750,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     play,
     undo: (id) => undo(id),
     tuneGait: (clip: string, v: number) => writer.tune(clip, v),
+    head: (o) => writer.head(o),
     gait: (reset) => ({ ...writer.gait(reset), move: { speed: mv.speed, vx: Math.sin(me.heading) * mv.speed, vz: Math.cos(me.heading) * mv.speed, heading: me.heading, yawRate: mv.yawRate, airborne: me.airborne, crouch: me.crouch, gy: me.gy } }),
     sketches: () => book.all().map(infoOf),
     sketch: (q, kind) => { const s = findSketch(q, kind); return s ? JSON.parse(JSON.stringify(s)) : null; },
