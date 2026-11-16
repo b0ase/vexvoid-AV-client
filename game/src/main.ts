@@ -6,7 +6,10 @@
  *   g.stop();  g.canvas  (to record)
  *
  * Stage 2: the writer, third person (./writer.ts). WASD or arrows move relative to the camera (jog), Shift sprints,
- * C crouches (sneak), Space jumps, drag to look. Stage 3: F at any wall paints it (./spray.ts): the mouse is the can,
+ * C crouches (sneak), Space jumps, drag to look. Movement has weight: speed builds up and dies away, the writer turns
+ * at a limited rate (on the spot from standing, in an arc at speed) and leans into turns; the clips blend by speed
+ * (idle, walk, jog, sprint; crouch idle, crouch walk) at the cadence that matches the stride, the feet are fitted to
+ * the ground (kerbs too), a jump gathers first and a landing gives; the camera trails a little. g.gait() measures it. Stage 3: F at any wall paints it (./spray.ts): the mouse is the can,
  * left button sprays, right button sprays lightly, Shift lays a straight line, the wheel is the can's distance, 1 2 3
  * the cap, Tab or 4 to 7 the colour, X the buff can, Z undo; A D step along the wall, W S and the arrows move the view.
  * Stage 4: the law (./cops.ts): heat, a patrol car, officers on foot; BUSTED loses a piece painted by hand (a sketch half blasted stays). P turns the patrol off.
@@ -23,7 +26,7 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { buildCity, EYE } from './city';
 import { loadLook, makeGradePass } from './look';
-import { loadWriter } from './writer';
+import { loadWriter, type GaitInfo } from './writer';
 import { makeSpray, footprint, COLOURS, COLOUR_NAMES, type Can, type Stroke, type WallStore } from './spray';
 import { makeLaw, type LawState } from './cops';
 import { makeBook, sketchOf, fit, drawSketch, secsOf, cleanName, type Sketch, type SketchKind, type SketchStore, type BookState } from './sketchbook';
@@ -59,6 +62,10 @@ export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?:
   blast: (idOrName: string, o?: { wall?: string; at?: [number, number]; size?: number; speed?: number; kind?: SketchKind }) => Promise<boolean>;
   /** The sketchbook panel: open it, pick, speed, size; returns its state and where a blast would go now. */
   sketchbook: (o?: Partial<BookState>) => BookState & { blasting: string; plan: { wall: string; at: [number, number]; scale: number; fitted: boolean } | null };
+  /** How the writer moves: speed, heading, and how the soles meet the ground (stats since the last reset). */
+  /** Tuning: the speed a moving clip was made for. */
+  tuneGait: (clip: string, v: number) => void;
+  gait: (reset?: boolean) => GaitInfo & { move: { speed: number; vx: number; vz: number; heading: number; yawRate: number; airborne: boolean; crouch: boolean; gy: number } };
   /** Take back the last stroke on a wall (none given: the wall being painted). Returns how many strokes went. */
   undo: (id?: string) => number;
   /** The can in the writer's hand; give fields to change them. */
@@ -73,6 +80,7 @@ const infoOf = (s: Sketch): SketchInfo => ({ id: s.id, name: s.name, kind: s.kin
 const MONO = { shadow: [1, 1, 1] as [number, number, number], high: [1, 1, 1] as [number, number, number], sat: 0, contrast: 1.32, vignette: 0.72 };
 // where you can walk: the road and both pavements, short of the tower
 const BOUNDS = { x: 25.5, z0: -79, z1: 24 };
+const FIT_FEET = true;
 
 export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const high = opts.high !== false;
@@ -111,6 +119,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   say('Dressing the writer…');
   const writer = await loadWriter(opts.base + 'anims/ual.glb', high, opts.base + 'models/writer.glb');
   scene.add(writer.root, writer.can);
+  writer.setGround(city.groundY, FIT_FEET);
   const spray = makeSpray(scene, city.walls, opts.store);
   // every sound the game makes goes through one node, so a recorder can tap it (made the first time something needs it)
   let bus: { ctx: AudioContext; out: GainNode } | null = null;
@@ -152,6 +161,10 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
 
   // the writer on the ground; the camera orbits behind and over the right shoulder
   const me = { x: 0, z: 8, y: 0, gy: 0, vy: 0, heading: Math.PI, crouch: false, airborne: false };
+  // how the writer moves: a speed along the way they face that builds up and dies away, a heading that turns at a
+  // limited rate (on the spot from standing, in an arc when running), a lean into turns and with the push of a start
+  const mv = { speed: 0, yawRate: 0, side: 0, roll: 0, pitch: 0, offset: 0, takeoff: 0 };
+  const GAIT = { jog: 3.3, sprint: 6.2, crouch: 1.15, accel: 8, sprintAccel: 5.5, decel: 11, turnStand: 8.5, turnFast: 4, air: 0.25 };
   const camO = { yaw: 0, pitch: 0.12, dist: 3.4 };
   const keys = new Set<string>();
   const MOVE = ['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Shift', ' ', 'c', 'f', 'p', 'r', '1', '2', '3', '4', '5', '6', '7', 'z', 'x', 'h', 'Tab', 'Escape', 'b', 'g', 'v', 'n', '[', ']', '-', '=', '+', 'Enter'];
@@ -343,7 +356,8 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     if (down && paint && k === 'z' && !auto) undo();
     if (down && !e.repeat && paint && k === 'h') { help = !help; hud(); }
     if (down && !e.repeat && k === 'c' && !paint) me.crouch = !me.crouch;
-    if (down && !e.repeat && k === ' ' && !me.airborne) { me.vy = 4.6; me.airborne = true; me.crouch = false; writer.play('Jump_Start', 0.08, true); }
+    // a jump: a moment's gather (the body dips), then up
+    if (down && !e.repeat && k === ' ' && !me.airborne && !mv.takeoff) { mv.takeoff = 0.11; me.crouch = false; writer.land(0.35); writer.play('Jump_Start', 0.06, true); }
     if (down) keys.add(k); else keys.delete(k);
   };
   const kd = (e: KeyboardEvent) => onKey(e, true), ku = (e: KeyboardEvent) => onKey(e, false);
@@ -394,7 +408,8 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   // spot: the wall they buff (what was being painted by hand); kept: a wall with a half-blasted sketch, which stays
   let bust: { t: number; spot: string; kept: string } | null = null;
   const camPos = new THREE.Vector3(0, 2, 12), camLook = new THREE.Vector3();
-  let landT = 0, forceAnim = '', idleT = 0;
+  let landT = 0, forceAnim = '', idleT = 0, camH = 1.45;
+  const lookTo = new THREE.Vector3();
   cam.position.copy(camPos);
   const frame = () => {
     if (stopped) return;
@@ -403,26 +418,45 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     const left = keys.has('ArrowLeft'), rightK = keys.has('ArrowRight'), upK = keys.has('ArrowUp'), downK = keys.has('ArrowDown');
     const ax = bust ? 0 : (keys.has('d') || (!paint && rightK) ? 1 : 0) - (keys.has('a') || (!paint && left) ? 1 : 0);
     const az = bust ? 0 : (keys.has('w') || (!paint && upK) ? 1 : 0) - (keys.has('s') || (!paint && downK) ? 1 : 0);
-    const sprint = keys.has('Shift') && !me.crouch && !paint, moving = !!(ax || (az && !paint));
-    const speed = me.crouch ? 1.35 : sprint ? 6.2 : 3.3;
+    const sprint = keys.has('Shift') && !me.crouch && !paint;
     // movement is relative to where the camera looks
     fwd.set(-Math.sin(camO.yaw), 0, -Math.cos(camO.yaw)); side.set(Math.cos(camO.yaw), 0, -Math.sin(camO.yaw));
-    if (moving && !paint) {
-      const dx = fwd.x * az + side.x * ax, dz = fwd.z * az + side.z * ax, l = Math.hypot(dx, dz);
-      me.x = Math.max(-BOUNDS.x, Math.min(BOUNDS.x, me.x + (dx / l) * speed * dt));
-      me.z = Math.max(BOUNDS.z0, Math.min(BOUNDS.z1, me.z + (dz / l) * speed * dt));
-      // turn toward the way you are going, quickly but not instantly
-      let d = Math.atan2(dx, dz) - me.heading; d = Math.atan2(Math.sin(d), Math.cos(d));
-      me.heading += d * Math.min(1, dt * 12);
-      // push out of piers and walls (a body 0.35 m round)
-      for (const b of city.blockers) {
-        const x0 = b.x0 - 0.35, x1 = b.x1 + 0.35, z0 = b.z0 - 0.35, z1 = b.z1 + 0.35;
-        if (me.x > x0 && me.x < x1 && me.z > z0 && me.z < z1) {
-          const dd = [me.x - x0, x1 - me.x, me.z - z0, z1 - me.z], m = Math.min(...dd);
-          if (m === dd[0]) me.x = x0; else if (m === dd[1]) me.x = x1; else if (m === dd[2]) me.z = z0; else me.z = z1;
-        }
+    if (mv.takeoff > 0 && (mv.takeoff -= dt) <= 0) { mv.takeoff = 0; me.vy = 4.6; me.airborne = true; }
+    if (!paint) {
+      const top = me.crouch ? GAIT.crouch : sprint ? GAIT.sprint : GAIT.jog, air = me.airborne ? GAIT.air : 1;
+      let target = 0, step = 0;
+      if (ax || az) {
+        const dx = fwd.x * az + side.x * ax, dz = fwd.z * az + side.z * ax;
+        let d = Math.atan2(dx, dz) - me.heading; d = Math.atan2(Math.sin(d), Math.cos(d));
+        // turning is quick standing, slower flat out; facing well away, the writer turns before going
+        const rate = (GAIT.turnStand + (GAIT.turnFast - GAIT.turnStand) * Math.min(1, mv.speed / GAIT.sprint)) * air;
+        step = Math.max(-rate * dt, Math.min(rate * dt, d));
+        const a = Math.abs(d - step); target = top * (a < 0.6 ? 1 : a > 2 ? 0 : 1 - (a - 0.6) / 1.4);
       }
-    }
+      me.heading += step; mv.yawRate += ((dt > 0 ? step / dt : 0) - mv.yawRate) * Math.min(1, dt * 14);
+      const was = mv.speed, acc = target > mv.speed ? (sprint ? GAIT.sprintAccel : GAIT.accel) : GAIT.decel;
+      mv.speed += Math.max(-acc * dt * air, Math.min(acc * dt * air, target - mv.speed));
+      if (mv.speed > 0.001) {
+        const x0 = me.x, z0 = me.z;
+        me.x = Math.max(-BOUNDS.x, Math.min(BOUNDS.x, me.x + Math.sin(me.heading) * mv.speed * dt));
+        me.z = Math.max(BOUNDS.z0, Math.min(BOUNDS.z1, me.z + Math.cos(me.heading) * mv.speed * dt));
+        // push out of piers and walls (a body 0.35 m round)
+        for (const b of city.blockers) {
+          const x0b = b.x0 - 0.35, x1 = b.x1 + 0.35, z0b = b.z0 - 0.35, z1 = b.z1 + 0.35;
+          if (me.x > x0b && me.x < x1 && me.z > z0b && me.z < z1) {
+            const dd = [me.x - x0b, x1 - me.x, me.z - z0b, z1 - me.z], m = Math.min(...dd);
+            if (m === dd[0]) me.x = x0b; else if (m === dd[1]) me.x = x1; else if (m === dd[2]) me.z = z0b; else me.z = z1;
+          }
+        }
+        // running into something: the legs slow to what the body really does, rather than running on the spot
+        if (dt > 0 && !me.airborne) { const real = Math.hypot(me.x - x0, me.z - z0) / dt; if (real < mv.speed - 0.3) mv.speed += (real - mv.speed) * Math.min(1, dt * 10); }
+      }
+      // lean into the turn, and forward with the push of a start (back a touch as they pull up)
+      const accel = dt > 0 ? (mv.speed - was) / dt : 0;
+      mv.roll += (Math.max(-0.2, Math.min(0.2, -0.032 * mv.yawRate * mv.speed)) - mv.roll) * Math.min(1, dt * 6);
+      mv.pitch += (Math.max(-0.07, Math.min(0.12, accel * 0.014 + (mv.speed / GAIT.sprint) * 0.05)) - mv.pitch) * Math.min(1, dt * 5);
+    } else { mv.yawRate = 0; mv.roll *= Math.max(0, 1 - dt * 6); mv.pitch *= Math.max(0, 1 - dt * 6); }   // painting: the side step sets the speed
+    const moving = mv.speed > 0.15;
     sprayingNow = false;
     if (paint) {
       // the view: W S step it in and back, the arrows look along and up the wall
@@ -431,7 +465,9 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       let sp = paint.spot, n = sp.normal, tx = n.z, tz = -n.x;
       const run = runOf(sp);
       let off = offOf(sp, me.x, me.z), along = alongOf(sp, me.x, me.z);
-      along += ax * 1.1 * dt;
+      const px0 = me.x, pz0 = me.z;
+      // A D: a side step that gets going and stops, not a slide
+      mv.side += Math.max(-9 * dt, Math.min(9 * dt, ax * 1.1 - mv.side)); along += mv.side * dt;
       // spraying past arm's reach: the writer steps along the wall after the can
       if (Math.abs(follow) > 1.1) along += Math.sign(follow) * Math.min(Math.abs(follow) - 1.1, (auto ? 4 : 1.6) * dt);
       off = Math.max(0.55, Math.min(0.9, off)); along = run.hi - run.lo > 0.7 ? Math.max(run.lo + 0.3, Math.min(run.hi - 0.3, along)) : (run.lo + run.hi) / 2;
@@ -443,7 +479,12 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
         along = ax > 0 ? a1 : ax < 0 ? a0 : along - a0 < a1 - along ? a0 : a1;
       }
       me.x = sp.center.x + n.x * off + tx * along; me.z = sp.center.z + n.z * off + tz * along;
-      let dh = Math.atan2(-n.x, -n.z) - me.heading; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); me.heading += dh * Math.min(1, dt * 10);
+      // stepping along the wall: the hips turn the way they go and the chest stays to the wall (no clip walks sideways)
+      const sv = dt > 0 ? ((me.x - px0) * tx + (me.z - pz0) * tz) / dt : 0;
+      if (Math.abs(sv) > 8) mv.side = 0;   // moved to another wall: not a step
+      mv.speed += (Math.min(4, Math.abs(sv)) - mv.speed) * Math.min(1, dt * 12);
+      mv.offset += ((mv.speed > 0.12 ? Math.sign(sv) * 1.15 * Math.min(1, mv.speed / 0.7) : 0) - mv.offset) * Math.min(1, dt * 8);
+      let dh = Math.atan2(-n.x, -n.z) - mv.offset - me.heading; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); me.heading += dh * Math.min(1, dt * 10);
       // aim: where the mouse points on this wall or the next one along. Anywhere along it paints (the writer steps after
       // the can); only height is out of reach
       ray.setFromCamera(mouse, cam);
@@ -536,7 +577,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       const blastWall = auto && auto.group[0] === 'p' ? auto.list[Math.min(auto.i, auto.list.length - 1)].wall : '';
       bust = { t: 0, spot: blastWall && blastWall === lastSpray ? '' : lastSpray, kept: blastWall };
       if (paint) togglePaint();
-      btn = 0; me.crouch = false; keys.clear();
+      btn = 0; me.crouch = false; keys.clear(); mv.speed = 0; mv.yawRate = 0;
       writer.play('Hit_Knockback', 0.08, true);
       const c = law.nearest(); if (c) camO.yaw = Math.atan2(me.x - c.x, me.z - c.z) + 1.1;
     }
@@ -555,29 +596,38 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       }
     }
     if (bust) { /* the knockback clip plays out */ }
-    else if (paint && !me.airborne) writer.play(me.crouch ? (ax ? 'Crouch_Fwd_Loop' : 'Crouch_Idle_Loop') : ax ? 'Jog_Fwd_Loop' : 'Idle_Loop', 0.15);
+    else if (paint && !me.airborne) writer.loco(mv.speed, me.crouch);
     else if (me.airborne) {
       me.vy -= 13 * dt; me.y += me.vy * dt;
-      if (me.y <= 0) { me.y = 0; me.vy = 0; me.airborne = false; writer.play('Jump_Land', 0.06, true); landT = 0.28; }
-      else if (me.vy < 2.5) writer.play('Jump_Loop', 0.15);
-    } else if (landT > 0) landT -= dt;
+      if (me.y <= 0) {
+        // the landing: the harder it is, the more the body gives and the more speed it costs
+        const k = Math.min(1, Math.max(0, -me.vy / 7)); me.y = 0; me.vy = 0; me.airborne = false;
+        writer.land(0.4 + 0.6 * k); mv.speed *= 1 - 0.35 * k;
+        if (mv.speed > 1.5) landT = 0; else { writer.play('Jump_Land', 0.06, true); landT = 0.28; }
+      } else if (me.vy < 2.5) writer.play('Jump_Loop', 0.15);
+    } else if (mv.takeoff > 0) { /* gathering for the jump */ }
+    else if (landT > 0) landT -= dt;
     else if (forceAnim) writer.play(forceAnim, 0.2);
     else {
       // standing a while, the writer folds their arms for a bit, then lets them drop
-      idleT = moving || me.crouch ? 0 : idleT + dt;
-      const idle = idleT % 16 > 9 ? 'Idle_FoldArms_Loop' : 'Idle_Loop';
-      writer.play(me.crouch ? (moving ? 'Crouch_Fwd_Loop' : 'Crouch_Idle_Loop') : moving ? (sprint ? 'Sprint_Loop' : 'Jog_Fwd_Loop') : idle, idle === 'Idle_FoldArms_Loop' ? 0.6 : 0.22);
+      idleT = moving || me.crouch || Math.abs(mv.yawRate) > 0.5 ? 0 : idleT + dt;
+      if (idleT % 16 > 9) writer.play('Idle_FoldArms_Loop', 0.6);
+      // turning on the spot takes small steps
+      else writer.loco(Math.max(mv.speed, Math.min(0.45, Math.abs(mv.yawRate) * 0.12)), me.crouch);
     }
+    writer.lean(mv.roll, mv.pitch); writer.twist(paint ? mv.offset : 0);
     // the ground under the writer: up a kerb is a quick step, not a pop
     me.gy += (city.groundY(me.x, me.z) - me.gy) * Math.min(1, dt * 16);
     const py = me.gy + me.y;
+    writer.grounded(!me.airborne);
     writer.root.position.set(me.x, py, me.z);
     writer.root.rotation.y = me.heading;
     writer.update(dt);
     rim.position.set(me.x + Math.sin(camO.yaw) * 1.8 + Math.cos(camO.yaw) * 0.9, py + 2.4, me.z + Math.cos(camO.yaw) * 1.8 - Math.sin(camO.yaw) * 0.9);
     back.position.set(me.x - Math.sin(camO.yaw) * 1.4, py + 2.1, me.z - Math.cos(camO.yaw) * 1.4);
     // the camera: behind, above, over the right shoulder, kept inside the street
-    const tgtY = py + (me.crouch ? 1.05 : 1.45);
+    camH += ((me.crouch ? 1.05 : 1.45) - camH) * Math.min(1, dt * 6);
+    const tgtY = py + camH;
     const cx = me.x + Math.sin(camO.yaw) * Math.cos(camO.pitch) * camO.dist + Math.cos(camO.yaw) * 0.55;
     const cz = me.z + Math.cos(camO.yaw) * Math.cos(camO.pitch) * camO.dist - Math.sin(camO.yaw) * 0.55;
 let camY = Math.max(0.35, tgtY + Math.sin(camO.pitch) * camO.dist), camX = Math.max(-26.5, Math.min(26.5, cx)), camZ = Math.max(BOUNDS.z0 - 0.5, Math.min(BOUNDS.z1 + 4, cz));
@@ -585,7 +635,9 @@ let camY = Math.max(0.35, tgtY + Math.sin(camO.pitch) * camO.dist), camX = Math.
     if (paint) { const k = sightTo(me.x, me.z, tgtY, camX, camZ, camY); if (k < 1) { const f = Math.max(0.3, k - 0.1); camX = me.x + (camX - me.x) * f; camZ = me.z + (camZ - me.z) * f; camY = tgtY + (camY - tgtY) * f; } }
     camPos.set(camX, camY, camZ);
     cam.position.lerp(camPos, Math.min(1, dt * 10));
-    camLook.set(me.x + Math.cos(camO.yaw) * 0.55, tgtY, me.z - Math.sin(camO.yaw) * 0.55);
+    // what it looks at trails the writer a little (a camera operator, not a rod), a touch more when running
+    lookTo.set(me.x + Math.cos(camO.yaw) * 0.55, tgtY, me.z - Math.sin(camO.yaw) * 0.55);
+    camLook.lerp(lookTo, paint || bust ? 1 : Math.min(1, dt * 14));
     cam.lookAt(camLook);
     city.update(dt, t, cam);
     city.beforeRender(r, scene, cam);
@@ -632,6 +684,8 @@ let camY = Math.max(0.35, tgtY + Math.sin(camO.pitch) * camO.dist), camX = Math.
     strokes: (id) => spray.strokes(id).map((s) => ({ ...s, pts: s.pts.map((p) => [p[0], p[1], p[2]] as [number, number, number]) })),
     play,
     undo: (id) => undo(id),
+    tuneGait: (clip: string, v: number) => writer.tune(clip, v),
+    gait: (reset) => ({ ...writer.gait(reset), move: { speed: mv.speed, vx: Math.sin(me.heading) * mv.speed, vz: Math.cos(me.heading) * mv.speed, heading: me.heading, yawRate: mv.yawRate, airborne: me.airborne, crouch: me.crouch, gy: me.gy } }),
     sketches: () => book.all().map(infoOf),
     sketch: (q, kind) => { const s = findSketch(q, kind); return s ? JSON.parse(JSON.stringify(s)) : null; },
     saveSketch: async (o = {}) => infoOf(await saveWall(o)),
@@ -658,6 +712,7 @@ let camY = Math.max(0.35, tgtY + Math.sin(camO.pitch) * camO.dist), camX = Math.
     /** The game's sound, for a recorder: connect node to a MediaStreamDestination made on ctx. */
     audio: () => { const b = sound(); return b ? { ctx: b.ctx, node: b.out } : null; },
     goto: (x, z, yaw, pitch) => { if (paint) togglePaint();   // painting holds the writer at the wall: put the can down first
+      mv.speed = 0; mv.yawRate = 0; mv.side = 0;
       me.x = x; me.z = z; if (yaw != null) { camO.yaw = yaw; me.heading = yaw + Math.PI; } if (pitch != null) camO.pitch = pitch; },
     stop: () => {
       stopped = true; cancelAnimationFrame(raf); ro.disconnect();

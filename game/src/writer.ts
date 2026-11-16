@@ -17,6 +17,25 @@ export type Writer = {
   height: number;
   play: (name: string, fade?: number, once?: boolean) => void;
   playing: () => string;
+  /** Moving under the game's control: blends idle, walk, jog, sprint (or crouch idle, crouch walk) by speed (m/s), each
+   *  clip played at the cadence that makes its stride match that speed, so the feet do not skate. play() takes over again. */
+  loco: (speed: number, crouch: boolean) => void;
+  /** The ground under the writer (y at x, z): turns on fitting the feet to it (the body drops or rises so the standing
+   *  foot is on it, a foot over higher ground bends up to it) and the foot measurements in gait(). */
+  setGround: (f: (x: number, z: number) => number, fit?: boolean) => void;
+  /** Lean the body: roll into a turn, pitch with acceleration (radians, pivot at the feet). */
+  lean: (roll: number, pitch: number) => void;
+  /** Turn the upper body by this much against the hips (radians): the hips go one way, the chest stays. */
+  twist: (a: number) => void;
+  /** A landing: the body gives a little (k 0..1, how hard). */
+  land: (k: number) => void;
+  /** Whether the writer is on the ground (not in a jump): foot contact only counts then. */
+  grounded: (on: boolean) => void;
+  /** Where the soles are and how well they meet the ground; stats since the last reset (sink: sole below the ground,
+   *  slip: how fast a planted foot moves over it). */
+  gait: (reset?: boolean) => GaitInfo;
+  /** Set the speed a moving clip was made for (m/s), for tuning. */
+  tune: (clip: string, v: number) => void;
   /** Raise the right arm with a can to spray: the hand goes to `hand`, the nozzle points at `at` (null lowers it). */
   aim: (hand: THREE.Vector3 | null, at?: THREE.Vector3, weight?: number) => void;
   /** The can in the hand (a scene-level object: add it to the scene once). */
@@ -26,6 +45,9 @@ export type Writer = {
 };
 
 const HEIGHT = 1.78;
+export type GaitInfo = { on: boolean; rest: number[]; clips: Record<string, { v: number; stride: number; lift?: number[]; zr?: number[] }>; speed: number; mix: string; bodyOff: number;
+  feet: { err: number; contact: boolean; slip: number; pen?: number }[];
+  stats: { frames: number; sinkMean: number; sinkMax: number; sinkP95: number; floatMean: number; slipMean: number; slipP90: number; slipMax: number; contacts: number } };
 
 // fabric detail, drawn once: a height pattern turned into a normal map and a roughness map, tiling. One UV unit is the
 // figure's height (1.78 m) on every piece of the model, so `per` = how many tiles across that height.
@@ -140,7 +162,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       // the model's atlas (second UV set): baked occlusion, seams and wear, multiplied into the cloth and used as its occlusion
       const std = mat as THREE.MeshStandardMaterial;
       if (src.map && std.isMeshStandardMaterial && !std.map) { std.map = src.map; std.aoMap = src.map; std.aoMapIntensity = 1; std.needsUpdate = true; }
-      const m = new THREE.SkinnedMesh(geo, mat); m.name = sm.name;
+      const m = new THREE.SkinnedMesh(geo, mat); m.name = sm.name; m.userData.slot = src.name;
       meshes.push(m); owned.push(geo, mat);
     });
   } catch (e) { console.warn('writer model', e); }
@@ -316,7 +338,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
   };
   play('Idle_Loop', 0);
   // standing still is never quite still: a breath through the chest and a slow look round, over whatever idle plays
-  const spine1 = B('Spine1'), neckB = B('Neck'), headB = B('Head');
+  const spine0 = B('Spine'), spine1 = B('Spine1'), neckB = B('Neck'), headB = B('Head');
   let life = 0, lt = 0;
   // spraying: the right arm reaches for the wall (two-bone IK over whatever clip plays) with a can in the hand
   const rArm = B('RightArm'), rFore = B('RightForeArm'), rHand = B('RightHand'), spine2 = B('Spine2');
@@ -366,19 +388,206 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
     turn(rFore, iC.clone().sub(iB).normalize(), iE.sub(iB).normalize(), w);
     rHand.getWorldPosition(iC);
   };
+  // ---- the feet: points on each sole, carried by the foot and toe bones, so the game knows where the soles are ----
+  type SP = { bone: THREE.Bone; p: THREE.Vector3; w: THREE.Vector3; last: THREE.Vector3 };
+  const soles: SP[][] = [[], []], soleRest = [0, 0];
+  const legs = ['Left', 'Right'].map((s) => ({ up: B(`${s}UpLeg`), knee: B(`${s}Leg`), foot: B(`${s}Foot`) }));
+  let ground: ((x: number, z: number) => number) | null = null, inited = false, onGround = true;
+  const clipInfo: Record<string, { v: number; stride: number; dur: number; ph: number; lift?: number[]; zr?: number[] }> = {};
+  const MOVING = ['Walk_Loop', 'Jog_Fwd_Loop', 'Sprint_Loop', 'Crouch_Fwd_Loop'], STAND = ['Idle_Loop', 'Walk_Loop', 'Jog_Fwd_Loop', 'Sprint_Loop'], CROUCH = ['Crouch_Idle_Loop', 'Crouch_Fwd_Loop'];
+  const FALLBACK: Record<string, number> = { Walk_Loop: 1.4, Jog_Fwd_Loop: 3.2, Sprint_Loop: 6, Crouch_Fwd_Loop: 1.1 };
+  const tv = new THREE.Vector3();
+  const soleNow = () => { root.updateMatrixWorld(true); for (const side of soles) for (const q of side) q.w.copy(q.p).applyMatrix4(q.bone.matrixWorld); };
+  // the clips measured once, posed by a mixer of their own: where the soles are standing still, and for each moving
+  // clip how fast a planted foot travels back under the body (the speed the clip was made for) and where its cycle starts
+  const init = () => {
+    if (inited) return; inited = true;
+    const keepP = root.position.clone(), keepQ = root.quaternion.clone(), keepC = char.quaternion.clone(), keepY = char.position.y;
+    root.position.set(0, 0, 0); root.quaternion.identity(); char.quaternion.identity();
+    const tmp = new THREE.AnimationMixer(char), pose = (name: string, t: number) => { tmp.stopAllAction(); const c = clips.get(name); if (!c) return null; const a = tmp.clipAction(c); a.reset(); a.play(); a.time = t; tmp.update(0); root.updateMatrixWorld(true); return c; };
+    try {
+      if (pose('Idle_Loop', 0)) {
+        const v = new THREE.Vector3(), cand: { side: number; bone: THREE.Bone; w: THREE.Vector3 }[] = [];
+        for (const m of meshes) {
+          if (!/^(Sole|Shoes)$/.test(String(m.userData.slot || ''))) continue;
+          m.skeleton.update();
+          const si = m.geometry.attributes.skinIndex as THREE.BufferAttribute, sw = m.geometry.attributes.skinWeight as THREE.BufferAttribute, n = si.count, step = Math.max(1, Math.floor(n / 3000));
+          for (let i = 0; i < n; i += step) {
+            let bi = si.getX(i), bw = sw.getX(i);
+            for (let c = 1; c < 4; c++) { const w = sw.getComponent(i, c); if (w > bw) { bw = w; bi = si.getComponent(i, c); } }
+            const bone = bones[bi]; if (!bone) continue;
+            const side = /Left(Foot|Toe)/.test(bone.name) ? 0 : /Right(Foot|Toe)/.test(bone.name) ? 1 : -1; if (side < 0) continue;
+            m.getVertexPosition(i, v); v.applyMatrix4(m.matrixWorld); cand.push({ side, bone, w: v.clone() });
+          }
+        }
+        for (const side of [0, 1]) {
+          const c = cand.filter((x) => x.side === side); if (!c.length) continue;
+          const lo = Math.min(...c.map((x) => x.w.y)), pick = c.filter((x) => x.w.y < lo + 0.012), every = Math.max(1, Math.ceil(pick.length / 28));
+          soleRest[side] = lo;
+          for (let i = 0; i < pick.length; i += every) { const x = pick[i]; soles[side].push({ bone: x.bone, p: x.bone.worldToLocal(x.w.clone()), w: x.w.clone(), last: x.w.clone() }); }
+        }
+      }
+      for (const name of MOVING) {
+        const c = clips.get(name); if (!c) continue;
+        const K = 60, dur = c.duration, ys: number[][] = [[], []], zs: number[][] = [[], []];
+        for (let k = 0; k < K; k++) {
+          pose(name, (k / K) * dur); soleNow();
+          // height: the lowest point; travel: the middle of the sole (the lowest point hops from heel to toe as it rolls)
+          for (const side of [0, 1]) { let lo = Infinity, z = 0; for (const q of soles[side]) { lo = Math.min(lo, q.w.y); z += q.w.z; } ys[side].push(lo); zs[side].push(z / soles[side].length); }
+        }
+        const sp: number[] = []; let ph = -1;
+        for (const side of [0, 1]) {
+          const lo = Math.min(...ys[side]), on = ys[side].map((y) => y < lo + 0.025);
+          for (let k = 0; k < K; k++) { const k1 = (k + 1) % K; if (on[k] && on[k1]) { const d = -(zs[side][k1] - zs[side][k]) / (dur / K); if (d > 0.05) sp.push(d); } if (side === 0 && ph < 0 && on[k] && !on[(k + K - 1) % K]) ph = k / K; }
+        }
+        sp.sort((a, b) => a - b);
+        const v = sp.length > 4 ? sp[Math.floor(sp.length / 2)] : FALLBACK[name];
+        clipInfo[name] = { v, stride: v * dur, dur, ph: Math.max(0, ph), lift: ys.map((y) => Math.max(...y) - Math.min(...y)), zr: zs.map((z) => Math.max(...z) - Math.min(...z)) };
+      }
+    } catch (e) { console.warn('writer gait', e); }
+    tmp.stopAllAction(); tmp.uncacheRoot(char);
+    root.position.copy(keepP); root.quaternion.copy(keepQ); char.quaternion.copy(keepC); char.position.y = keepY;
+    // the model's soles stand this far below the clips' ground: it stands on them instead
+    if (soles[0].length && soles[1].length) baseY = keepY - (soleRest[0] + soleRest[1]) / 2;
+    if (cur) { mixer.update(0); }
+  };
+
+  // ---- locomotion: weights by speed, one shared cycle so the clips' steps line up, cadence from the stride ----
+  let locoOn = false, locoW = 0, locoS = 0, crouchT = false, crouchW = 0, cycle = 0, mixName = '';
+  const locoA = new Map<string, THREE.AnimationAction>();
+  const locoStart = () => {
+    if (locoA.size) return;
+    for (const n of new Set([...STAND, ...CROUCH])) { const c = clips.get(n); if (!c) continue; const a = mixer.clipAction(c.clone()); a.reset(); a.setLoop(THREE.LoopRepeat, Infinity); a.enabled = true; a.setEffectiveWeight(0); a.play(); if (MOVING.includes(n)) a.timeScale = 0; locoA.set(n, a); }
+  };
+  const vOf = (n: string) => (clipInfo[n] ? clipInfo[n].v : FALLBACK[n] || 1);
+  const strideOf = (n: string) => (clipInfo[n] ? clipInfo[n].stride : vOf(n) * (clips.get(n)?.duration || 1));
+  // the two clips either side of a speed in a set, and how far between them
+  const span = (set: string[], s: number) => {
+    const vs = set.map((n, i) => (i === 0 ? 0 : vOf(n)));
+    for (let i = 0; i < set.length - 1; i++) if (s < vs[i + 1]) return { a: i, b: i + 1, f: Math.max(0, (s - vs[i]) / (vs[i + 1] - vs[i])) };
+    return { a: set.length - 1, b: set.length - 1, f: 0 };
+  };
+  const locoTick = (dt: number) => {
+    if (!locoA.size) return;
+    locoW = Math.max(0, Math.min(1, locoW + (locoOn ? 1 : -1) * dt / 0.18));
+    crouchW = Math.max(0, Math.min(1, crouchW + (crouchT ? 1 : -1) * dt / 0.28));
+    const s = Math.max(0, locoS), st = span(STAND, s), cr = span(CROUCH, s);
+    const Ls = st.a === 0 ? strideOf(STAND[1]) : strideOf(STAND[st.a]) + (strideOf(STAND[st.b]) - strideOf(STAND[st.a])) * st.f;
+    const L = Ls + (strideOf(CROUCH[1]) - Ls) * crouchW;
+    cycle = (cycle + (s * dt) / Math.max(0.2, L)) % 1;
+    const w = new Map<string, number>(); const add = (n: string, k: number) => w.set(n, (w.get(n) || 0) + k);
+    add(STAND[st.a], (1 - st.f) * (1 - crouchW)); add(STAND[st.b], st.f * (1 - crouchW)); add(CROUCH[cr.a], (1 - cr.f) * crouchW); add(CROUCH[cr.b], cr.f * crouchW);
+    let best = 0;
+    for (const [n, a] of locoA) {
+      const k = (w.get(n) || 0) * locoW; a.setEffectiveWeight(k);
+      if (MOVING.includes(n)) { const ci = clipInfo[n], d = a.getClip().duration; a.time = (((cycle + (ci ? ci.ph : 0)) % 1) + 1) % 1 * d; }
+      if (k > best) { best = k; mixName = n; }
+    }
+  };
+
+  // ---- fitting the feet to the ground ----
+  let bodyOff = 0, dip = 0, leanR = 0, leanP = 0, twistA = 0, feetOn = false;
+  let baseY = char.position.y;
+  const iU = new THREE.Vector3(), qF = new THREE.Quaternion();
+  const legIK = (lg: { up: THREE.Bone; knee: THREE.Bone; foot: THREE.Bone }, lift: number) => {
+    lg.foot.getWorldQuaternion(qF);
+    lg.up.getWorldPosition(iA); lg.knee.getWorldPosition(iB); lg.foot.getWorldPosition(iC);
+    iT.copy(iC); iT.y += lift;
+    const l1 = iA.distanceTo(iB), l2 = iB.distanceTo(iC);
+    iU.copy(iT).sub(iA); const d = Math.max(0.05, Math.min(iU.length(), (l1 + l2) * 0.999)); iU.normalize();
+    const cosA = Math.max(-1, Math.min(1, (l1 * l1 + d * d - l2 * l2) / (2 * l1 * d))), sinA = Math.sqrt(1 - cosA * cosA);
+    // the knee stays in the plane it bends in now (forward)
+    iP.copy(iB).sub(iA); iP.addScaledVector(iU, -iP.dot(iU)); if (iP.lengthSq() < 1e-8) iP.set(0, 0, 1).applyQuaternion(root.quaternion); iP.normalize();
+    iE.copy(iA).addScaledVector(iU, l1 * cosA).addScaledVector(iP, l1 * sinA);
+    turn(lg.up, iB.clone().sub(iA).normalize(), iE.sub(iA).normalize(), 1);
+    lg.knee.getWorldPosition(iB); lg.foot.getWorldPosition(iC);
+    turn(lg.knee, iC.clone().sub(iB).normalize(), iE.copy(iT).sub(iB).normalize(), 1);
+    // the foot keeps the way it was pointing
+    lg.foot.parent!.getWorldQuaternion(qp); lg.foot.quaternion.copy(qp.invert().multiply(qF)); lg.foot.updateMatrixWorld(true);
+  };
+  const lowest = (side: number) => { let lo = Infinity, x = 0, z = 0; for (const q of soles[side]) if (q.w.y < lo) { lo = q.w.y; x = q.w.x; z = q.w.z; } return { y: lo, x, z }; };
+  const fitFeet = (dt: number) => {
+    char.position.y = baseY;   // measured from the pose as animated, so the offset is absolute
+    soleNow();
+    if (!ground || !soles[0].length || !soles[1].length) return;
+    const f = [lowest(0), lowest(1)], g = f.map((p) => ground!(p.x, p.z)), e = [g[0] - f[0].y, g[1] - f[1].y]; pen[0] = e[0]; pen[1] = e[1];
+    // the foot over the lower ground carries the body; standing or walking a floating foot pulls the body down to it
+    const ref = g[0] < g[1] - 0.01 ? 0 : g[1] < g[0] - 0.01 ? 1 : (e[0] > e[1] ? 0 : 1);
+    const target = onGround ? Math.max(locoOn && locoS < 2.2 && crouchW < 0.5 ? -0.06 : 0, Math.min(0.16, e[ref])) : Math.max(0, Math.min(0.16, Math.max(e[0], e[1])));
+    bodyOff += (target - bodyOff) * Math.min(1, dt * (target > bodyOff ? 30 : 14));
+    dip *= Math.exp(-dt * 7);
+    char.position.y = baseY + bodyOff + dip;
+    soleNow();
+    for (const side of [0, 1]) {
+      const p = lowest(side), lift = ground(p.x, p.z) - p.y;
+      if (lift > 0.004) { legIK(legs[side], Math.min(0.3, lift)); soleNow(); }
+    }
+  };
+
+  // ---- measuring ----
+  const S = { frames: 0, sink: [] as number[], sinkSum: 0, sinkMax: 0, floatSum: 0, floatN: 0, slips: [] as number[], slipSum: 0, slipMax: 0, contacts: 0 };
+  const feetNow = [0, 1].map(() => ({ err: 0, contact: false, slip: 0 })), pen = [0, 0];
+  const wasOn = [false, false]; let lastRoot = new THREE.Vector3(), hv: number[] = [];
+  const measure = (dt: number) => {
+    if (!ground || !soles[0].length) return;
+    const jumpRoot = root.position.distanceTo(lastRoot) > 0.6; lastRoot.copy(root.position);
+    let lowErr = Infinity;
+    for (const side of [0, 1]) {
+      const p = lowest(side), gy = ground(p.x, p.z), err = p.y - gy, F = feetNow[side];
+      F.err = err; lowErr = Math.min(lowErr, err);
+      F.contact = onGround && err < 0.012; F.slip = 0;
+      if (F.contact && wasOn[side] && !jumpRoot && dt > 0) {
+        hv = [];
+        for (const q of soles[side]) if (q.w.y - ground(q.w.x, q.w.z) < 0.01) hv.push(Math.hypot(q.w.x - q.last.x, q.w.z - q.last.z) / dt);
+        if (hv.length) { hv.sort((a, b) => a - b); F.slip = hv[Math.floor(hv.length / 2)]; S.slips.length < 40000 && S.slips.push(F.slip); S.slipSum += F.slip; S.slipMax = Math.max(S.slipMax, F.slip); S.contacts++; }
+      }
+      wasOn[side] = F.contact;
+      const sink = Math.max(0, -err); S.sinkSum += sink; S.sinkMax = Math.max(S.sinkMax, sink); S.sink.length < 40000 && S.sink.push(sink); S.frames++;
+    }
+    if (onGround && lowErr > 0) { S.floatSum += lowErr; S.floatN++; }
+    for (const side of soles) for (const q of side) q.last.copy(q.w);
+  };
+  const pct = (a: number[], k: number) => { if (!a.length) return 0; const b = [...a].sort((x, y) => x - y); return b[Math.min(b.length - 1, Math.floor(b.length * k))]; };
+  const r3 = (n: number) => Math.round(n * 1000) / 1000;
+
   return {
-    root, height: HEIGHT, play, playing: () => curName, can,
+    root, height: HEIGHT, play: (name: string, fade = 0.2, once = false) => {
+      if (locoOn) { locoOn = false; const clip = clips.get(name); if (!clip) return; const a = mixer.clipAction(clip); a.reset(); a.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, Infinity); a.clampWhenFinished = once; a.enabled = true; a.setEffectiveWeight(1); a.fadeIn(fade); a.play(); cur = a; curName = name; return; }
+      play(name, fade, once);
+    },
+    playing: () => (locoOn ? mixName : curName), can,
+    loco: (speed, crouch) => {
+      locoStart(); locoS = speed; crouchT = crouch;
+      if (!locoOn) { locoOn = true; if (cur) cur.fadeOut(0.18); cur = null; curName = ''; }
+    },
+    setGround: (f, fit = true) => { ground = f; feetOn = fit; init(); },
+    lean: (r, p) => { leanR = r; leanP = p; },
+    twist: (a) => { twistA = a; },
+    land: (k) => { dip = Math.min(dip, -0.09 * Math.max(0, Math.min(1, k))); },
+    grounded: (on) => { onGround = on; },
+    tune: (n, v) => { const c = clips.get(n); if (c && v > 0) clipInfo[n] = { ...(clipInfo[n] || { ph: 0 }), v, stride: v * c.duration, dur: c.duration }; },
+    gait: (reset) => {
+      const n = Math.max(1, S.frames), out: GaitInfo = { on: feetOn, rest: soleRest.map(r3), clips: Object.fromEntries(Object.entries(clipInfo).map(([k, v]) => [k, { v: r3(v.v), stride: r3(v.stride), lift: (v.lift || []).map(r3), zr: (v.zr || []).map(r3) }])), speed: r3(locoS), mix: locoOn ? mixName : curName, bodyOff: r3(bodyOff),
+        feet: feetNow.map((f, i) => ({ err: r3(f.err), contact: f.contact, slip: r3(f.slip), pen: r3(pen[i]) })),
+        stats: { frames: S.frames, sinkMean: r3(S.sinkSum / n), sinkMax: r3(S.sinkMax), sinkP95: r3(pct(S.sink, 0.95)), floatMean: r3(S.floatN ? S.floatSum / S.floatN : 0), slipMean: r3(S.contacts ? S.slipSum / S.contacts : 0), slipP90: r3(pct(S.slips, 0.9)), slipMax: r3(S.slipMax), contacts: S.contacts } };
+      if (reset) Object.assign(S, { frames: 0, sink: [], sinkSum: 0, sinkMax: 0, floatSum: 0, floatN: 0, slips: [], slipSum: 0, slipMax: 0, contacts: 0 });
+      return out;
+    },
     aim: (hand, at, weight = 1) => {
       aimOn = !!hand; if (hand) { aimHand.copy(hand); aimAt.copy(at || hand); aimTo = weight; }
     },
     update: (dt) => {
+      locoTick(dt);
       mixer.update(dt);
-      lt += dt; life += ((/Idle/.test(curName) && !aimOn ? 1 : 0) - life) * Math.min(1, dt * 2);
+      if (Math.abs(twistA) > 1e-3) { const ch: [THREE.Bone, number][] = [[spine0, 0.3], [spine1, 0.3], [spine2, 0.25], [neckB, 0.15]]; for (const [b, k] of ch) b.rotateY(twistA * k); }
+      char.rotation.set(leanP, 0, leanR);
+      lt += dt; life += ((/Idle/.test(locoOn ? mixName : curName) && !aimOn ? 1 : 0) - life) * Math.min(1, dt * 2);
       if (life > 0.01) {
         spine1.rotateX(Math.sin(lt * 1.6) * 0.018 * life);
         const look = Math.sin(lt * 0.23) * 0.5 + Math.sin(lt * 0.61 + 1.3) * 0.2;
         neckB.rotateY(look * 0.18 * life); headB.rotateY(look * 0.22 * life); headB.rotateX((Math.sin(lt * 0.37) * 0.06 + 0.03) * life);
       }
+      if (ground) { if (feetOn) fitFeet(dt); else soleNow(); measure(dt); }
       aimW += ((aimOn ? aimTo : 0) - aimW) * Math.min(1, dt * 9);
       if (aimW > 0.01) {
         ik(aimW);
