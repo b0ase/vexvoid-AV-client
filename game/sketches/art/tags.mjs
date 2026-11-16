@@ -72,6 +72,22 @@ const BLADE = {
   3: { w: 0.42, s: [S([[0.0, 0.98], [0.38, 1.0], [0.12, 0.56], [0.42, 0.48], [0.38, 0.1], [0.0, 0.02]])] },
   X: { w: 0.5, s: [S([[0.0, 1.04], [0.5, 0.0], [0.86, -0.08]]), S([[0.52, 1.06], [0.02, -0.02]])] },
 }
+// ---- whole words in one flow (the pen leaves the wall only where a writer's would) ----
+const FLOW = {
+  // V3X: the V runs straight on into the 3; the X's second blade kicks out low; a crown of three thorns over the V
+  v3x: { w: 1.9, s: [
+    S([[-0.1, 1.12], [0.0, 1.02], [0.2, 0.0], [0.52, 1.08], [0.9, 1.08], [0.62, 0.6], [0.95, 0.48], [0.86, 0.06], [0.48, -0.02]]),
+    S([[1.06, 1.06], [1.46, 0.02], [1.84, -0.12]]), S([[1.5, 1.1], [1.0, -0.04]], { hold0: 0.03 }),
+    S([[0.0, 1.22], [-0.08, 1.46]], { hold0: 0.02, speed: 1.3 }), S([[0.13, 1.2], [0.15, 1.56]], { hold0: 0.02, speed: 1.3 }), S([[0.27, 1.2], [0.38, 1.44]], { hold0: 0.02, speed: 1.3 }),
+  ] },
+  // VOID: V into O into I in one pull, the D on its own, a dot over the I
+  void: { w: 1.3, s: [
+    C([[-0.04, 1.04], [0.07, 0.5], [0.17, 0.0], [0.27, 0.5], [0.38, 0.9], [0.5, 1.0], [0.63, 0.84], [0.66, 0.4], [0.56, 0.03], [0.44, 0.05], [0.39, 0.42], [0.45, 0.8], [0.62, 0.97], [0.76, 0.86], [0.79, 0.4], [0.77, 0.0]]),
+    S([[0.93, 1.0], [0.9, 0.0]]), C([[0.88, 1.02], [1.1, 0.95], [1.24, 0.55], [1.15, 0.12], [0.92, 0.0], [0.78, 0.06]], { hold0: 0.02 }),
+    S([[0.82, 1.2], [0.83, 1.22]], { hold1: 0.12 }),
+  ] },
+}
+
 // ---- the round hand: VOID run together, a loop into the next letter ----
 const ROUND = {
   V: { w: 0.42, s: [C([[-0.04, 1.02], [0.06, 0.6], [0.2, 0.0], [0.3, 0.5], [0.46, 1.0], [0.6, 0.92]])] },
@@ -142,26 +158,23 @@ export const TAGS = [
       return drips(runs, { cap: 1, dist: 0.05, colour: can.colour }, { speed: 0.9, hold: 0.1, up: 0.0 })
     } }) },
   { id: 'tag-vexvoid-brush', make: () => brushTag('tag-vexvoid-brush', 'VEXVOID BRUSH', 'VEXVOID', { h: 0.75, bounce: [0, -0.02, 0.03, 0, -0.03, 0.02, 0.02], about: 'brush hand: heavy angular VEXVOID, strokes pressed on and flicked off to points, drips and splatter' }) },
-  { id: 'tag-v3x', make: () => tag('tag-v3x', 'V3X', 'V3X', BLADE, {
-    h: 0.45, lean: 0.22, gap: 0.1, cap: 1, dist: 0.09, colour: BLACK, speed: 2.6, hold0: 0.03, bounce: [0, 0.08, -0.03], about: 'blade hand: sharp black V3X, a white crown and sparks',
+  { id: 'tag-v3x', make: () => tag('tag-v3x', 'V3X', '#', { '#': FLOW.v3x }, {
+    h: 0.45, lean: 0.24, cap: 1, dist: 0.085, colour: BLACK, speed: 2.6, hold0: 0.04, wob: 0, squash: [1.15], about: 'blade hand: sharp black V3X in one pull, a crown of thorns, white sparks',
     extra: (laid) => {
-      const r = right(laid), t = top(laid), W = { cap: 1, dist: 0.07, colour: WHITE }
-      const spark = (x, y, k) => [stroke([[x, y - k], [x, y + k]], W, { speed: 1.2 }), stroke([[x - k * 0.7, y], [x + k * 0.7, y]], W, { speed: 1.2 })]
-      return [
-        // the crown over the V: three thorns
-        stroke([[0.02, t + 0.02], [0.06, t + 0.14], [0.11, t + 0.04], [0.17, t + 0.2], [0.21, t + 0.05], [0.28, t + 0.15], [0.3, t + 0.02]], W, { speed: 1.8, corner: 0.8 }),
-        ...spark(r + 0.08, t - 0.02, 0.06), ...spark(-0.12, 0.1, 0.04),
-      ]
+      const r = right(laid), t = top(laid), W = { cap: 1, dist: 0.06, colour: WHITE }
+      const spark = (x, y, k) => [stroke([[x, y - k], [x, y + k]], W, { speed: 1.2 }), stroke([[x - k * 0.7, y], [x + k * 0.7, y]], W, { speed: 1.2 }), dot(x, y, W, 0.08)]
+      return [...spark(r + 0.06, t - 0.12, 0.07), ...spark(0.16, t - 0.05, 0.045), ...spark(r * 0.55, -0.1, 0.035)]
     } }) },
-  { id: 'tag-void', make: () => tag('tag-void', 'VOID', 'VOID', ROUND, {
-    h: 0.5, lean: 0.24, gap: 0.04, cap: 2, dist: 0.08, speed: 2.3, hold0: 0.05, corner: 0.5, bounce: [0.04, 0, -0.03, 0.02], about: 'round hand: VOID run together, a halo over the O',
+  { id: 'tag-void', make: () => tag('tag-void', 'VOID', '#', { '#': FLOW.void }, {
+    h: 0.5, lean: 0.26, cap: 2, dist: 0.07, speed: 2.4, hold0: 0.06, corner: 0.45, wob: 0, squash: [1.35], about: 'round hand: VOID in one flowing pull, a halo, an underline that flicks up',
     extra: (laid, can) => {
-      const r = right(laid), t = top(laid)
-      return [stroke(smooth([[0.62, t + 0.04], [0.74, t + 0.1], [0.9, t + 0.06], [0.86, t - 0.0], [0.7, t + 0.0], [0.6, t + 0.05]], 6), { ...can, cap: 1, dist: 0.06 }, { speed: 1.8 }),
-        stroke([[-0.05, -0.08], [r * 0.5, -0.12], [r + 0.05, -0.06], [r + 0.12, 0.04]], { ...can, cap: 1, dist: 0.06 }, { speed: 2.4, corner: 0.3 })]
+      const r = right(laid), t = top(laid), thin = { ...can, cap: 1, dist: 0.055 }
+      const halo = Array.from({ length: 25 }, (_, i) => { const a = -0.4 + i / 24 * Math.PI * 2.1; return [0.62 + Math.cos(a) * 0.15 + Math.sin(a) * 0.02, t + 0.06 + Math.sin(a) * 0.045] })
+      return [stroke(halo, thin, { speed: 1.6 }),
+        stroke(smooth([[-0.02, -0.07], [r * 0.45, -0.12], [r * 0.9, -0.08], [r + 0.08, 0.06]], 8), thin, { speed: 2.6, corner: 0.2, ease: 0.1 })]
     } }) },
   { id: 'tag-npg', make: () => tag('tag-npg', 'NPG', 'NPG', DRIP, {
-    h: 0.42, lean: 0.2, gap: 0.12, cap: 1, dist: 0.1, colour: CHROME, speed: 2.4, hold0: 0.04, bounce: [0, 0.05, -0.03], about: 'chrome skinny NPG with an arrow under it',
+    h: 0.42, lean: 0.3, gap: 0.08, cap: 1, dist: 0.09, colour: CHROME, speed: 2.4, hold0: 0.04, bounce: [0, 0.05, -0.03], squash: [0.85, 0.85, 0.85], about: 'chrome skinny NPG with an arrow under it',
     extra: (laid, can) => {
       const r = right(laid)
       return [stroke([[-0.04, -0.07], [r + 0.14, -0.04]], can, { speed: 2.6 }), stroke([[r + 0.04, 0.03], [r + 0.15, -0.04], [r + 0.05, -0.11]], can, { speed: 1.6, corner: 0.9 })]
