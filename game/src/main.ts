@@ -33,6 +33,7 @@ import { loadWriter, type GaitInfo } from './writer';
 import { makeSpray, footprint, COLOURS, COLOUR_NAMES, type Can, type Stroke, type WallStore } from './spray';
 import { makeLaw, type LawState } from './cops';
 import { makeHud, keyed, kc, hudScale } from './hud';
+import { makeMusic, type MusicState, type Track } from './music';
 import { makeBook, sketchOf, fit, drawSketch, secsOf, cleanName, type Sketch, type SketchKind, type SketchStore, type BookState } from './sketchbook';
 
 export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) => void; onHud?: (s: string) => void; onRec?: () => void;
@@ -41,7 +42,9 @@ export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) =
   /** Where the player's own sketches are kept (default: this browser). */
   sketches?: SketchStore;
   /** What happens to the writer, for a host that keeps a player's history: seen, caught, got away. */
-  onEvent?: (ev: 'alert' | 'busted' | 'escaped') => void };
+  onEvent?: (ev: 'alert' | 'busted' | 'escaped') => void;
+  /** The soundtrack: VexVoid's own tracks by default (./playlist.ts), a host's own list, or false for none. */
+  music?: Track[] | false };
 export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?: number) => string; inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string }) => void; where: () => { x: number; z: number; y: number; yaw: number; heading: number; anim: string; speed: number; tip: [number, number, number] | null };
   /** Call the law on the writer now: the patrol car pulls up nearest them and two officers give chase (testing an escape). */
   alarm: () => void;
@@ -55,6 +58,8 @@ export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?:
   map: (width?: number) => string;
   /** The train on the viaduct (head x, track z, running). */
   train: () => { x: number; z: number; on: boolean };
+  /** The soundtrack (on by default; M toggles it; the choice is kept per viewer): on/off, next track; returns what plays. */
+  music: (o?: { on?: boolean; next?: boolean }) => MusicState | null;
   /** Render knobs for tests and tuning: ambient occlusion, bloom, the real lights near the writer, the street reflection. */
   quality: (o?: { ao?: boolean; bloom?: boolean; lights?: number; refl?: boolean }) => { ao: boolean; bloom: boolean; lights: number; refl: boolean };
   spots: () => { id: string; w: number; h: number; x: number; y: number; z: number }[];
@@ -140,6 +145,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const spray = makeSpray(scene, city.walls, opts.store);
   // every sound the game makes goes through one node, so a recorder can tap it (made the first time something needs it)
   let bus: { ctx: AudioContext; out: GainNode } | null = null;
+  let music: ReturnType<typeof makeMusic> | null = null;   // started once the game runs (below)
   const sound = () => {
     if (!bus) try { const ctx = new AudioContext(), out = ctx.createGain(); out.connect(ctx.destination); bus = { ctx, out }; } catch { bus = null; }
     return bus;
@@ -190,7 +196,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const REACH = 2.4;
   const camO = { yaw: home.yaw, pitch: 0.12, dist: 3.4 };
   const keys = new Set<string>();
-  const MOVE = ['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Shift', ' ', 'c', 'f', 'p', 'r', '1', '2', '3', '4', '5', '6', '7', 'z', 'x', 'h', 'Tab', 'Escape', 'b', 'g', 'v', 'n', '[', ']', '-', '=', '+', 'Enter'];
+  const MOVE = ['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Shift', ' ', 'c', 'f', 'm', 'p', 'r', '1', '2', '3', '4', '5', '6', '7', 'z', 'x', 'h', 'Tab', 'Escape', 'b', 'g', 'v', 'n', '[', ']', '-', '=', '+', 'Enter'];
   // painting: F at a wall squares up to it; the mouse aims, holding it sprays; the wheel sets the can's distance
   type W = (typeof city.walls)[number];
   const can: Can = { colour: COLOURS[0], cap: 2, dist: 0.2, pressure: 1, buff: false };
@@ -231,7 +237,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     if (bk) return bk + (paint ? `PAINTING ${paint.id.toUpperCase()} · F DONE · ` : 'WASD MOVE · F AT A WALL · ') + lawS;
     return (paint
       ? `PAINTING ${paint.id.toUpperCase()} · ${can.buff ? 'BUFF' : COLOUR_NAMES[colourI]} · ${CAPS[can.cap]} CAP · ${Math.round(can.dist * 100)} CM · H HELP · F DONE`
-      : 'WASD MOVE · SHIFT SPRINT · C CROUCH · SPACE JUMP · DRAG LOOK · F AT ANY WALL TO PAINT · B SKETCHBOOK') + ' · ' + lawS + (opts.onRec ? ' · R RECORD' : '');
+      : 'WASD MOVE · SHIFT SPRINT · C CROUCH · SPACE JUMP · DRAG LOOK · F AT ANY WALL TO PAINT · B SKETCHBOOK') + ' · ' + lawS + (opts.onRec ? ' · R RECORD' : '') + (music ? (music.state().on ? ' · M MUSIC OFF' : ' · M MUSIC ON') : '');
   };
   const hud = () => { const s = hudText(); if (s !== lastHud) { lastHud = s; if (opts.onHud) opts.onHud(s); } };
   const fwd = new THREE.Vector3(0, 0, -1), side = new THREE.Vector3();
@@ -360,6 +366,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     if (bust) return; // nothing to do while you are being nicked
     // a sketch going up stops when the writer moves (what is up stays; Z takes it back)
     if (down && !e.repeat && auto && auto.group[0] === 'p' && ['a', 'd', ' ', 'c', 'f', 'Escape'].includes(k)) stopAuto(false);
+    if (down && !e.repeat && k === 'm' && music) { const s = music.toggle(); note(s.on ? `♪ MUSIC ON · ${s.title.toUpperCase()}` : 'MUSIC OFF · [M] TURNS IT BACK ON', 2.5); }
     if (down && !e.repeat && k === 'b') { book.setOpen(!book.state.open); if (book.state.open) note(paint ? 'PICK A SKETCH · CLICK THE WALL TO BLAST' : 'PICK A SKETCH · WALK UP TO A WALL'); }
     if (down && (k === '[' || k === ']')) { if (!book.state.open) book.setOpen(true); book.step(k === ']' ? 1 : -1); const s = book.pick(); if (s) note(`${s.name} · ${s.kind.toUpperCase()}`); }
     if (down && !e.repeat && book.state.open && k === 'v') { book.speed(-1); note(`SPEED ${book.state.speed}×`); }
@@ -710,6 +717,8 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
 
   say(''); hud();
   frame();
+  // the soundtrack starts with the game (owner: music on by default); a held-back AudioContext starts on the first key
+  if (opts.music !== false) music = makeMusic({ bus: sound, tracks: opts.music || undefined, onTrack: (tr) => note(`♪ ${tr.title.toUpperCase()} · [M] MUSIC`, 3.5) });
 
   const api: Game = {
     canvas,
@@ -770,6 +779,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     law: () => law.state(),
     cops: (on: boolean) => law.setOn(on),
     /** The game's sound, for a recorder: connect node to a MediaStreamDestination made on ctx. */
+    music: (o = {}) => { if (!music) return null; if (o.on != null) music.set(!!o.on); if (o.next) music.next(); return music.state(); },
     audio: () => { const b = sound(); return b ? { ctx: b.ctx, node: b.out } : null; },
     goto: (x, z, yaw, pitch, y) => { if (paint) togglePaint();   // painting holds the writer at the wall: put the can down first
       mv.speed = 0; mv.yawRate = 0; mv.side = 0;
@@ -781,7 +791,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     stop: () => {
       stopped = true; cancelAnimationFrame(raf); ro.disconnect();
       canvas.removeEventListener('keydown', kd); canvas.removeEventListener('keyup', ku);
-      hissOn(false); law.dispose(); book.dispose(); if (bus) void bus.ctx.close(); spray.dispose(); writer.dispose(); city.dispose(); look.dispose(); comp.dispose(); r.dispose(); canvas.remove(); tip.remove(); hudUi.dispose();
+      music?.stop(); hissOn(false); law.dispose(); book.dispose(); if (bus) void bus.ctx.close(); spray.dispose(); writer.dispose(); city.dispose(); look.dispose(); comp.dispose(); r.dispose(); canvas.remove(); tip.remove(); hudUi.dispose();
       for (const o of [reticle, dot, preview, ghost, ghostFrame]) { o.geometry.dispose(); (o.material as THREE.Material).dispose(); }
       const gm = (ghost.material as THREE.MeshBasicMaterial).map; if (gm) gm.dispose();
     },

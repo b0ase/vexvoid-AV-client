@@ -77,7 +77,7 @@ const helpIcon = () => `<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="13" 
 const HELP: [string, string][] = [
   ['LMB', 'SPRAY'], ['RMB', 'LIGHT COAT'], ['SHIFT', 'STRAIGHT LINE'], ['WHEEL', 'CAN DISTANCE'],
   ['1 2 3', 'CAP'], ['TAB', 'COLOUR'], ['X', 'BUFF CAN'], ['Z', 'UNDO'],
-  ['A D', 'STEP ALONG'], ['W S', 'VIEW IN / OUT'], ['← →', 'LOOK'], ['B', 'SKETCHBOOK'], ['F', 'DONE'], ['H', 'CLOSE HELP'],
+  ['A D', 'STEP ALONG'], ['W S', 'VIEW IN / OUT'], ['← →', 'LOOK'], ['B', 'SKETCHBOOK'], ['F', 'DONE'], ['M', 'MUSIC ON / OFF'], ['H', 'CLOSE HELP'],
 ];
 
 /** How big the panels are drawn for a view this size (never below 0.8: the labels must stay readable). */

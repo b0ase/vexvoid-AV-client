@@ -1,0 +1,42 @@
+/**
+ * The game's soundtrack: VexVoid's own releases (one take of each, as in vx/catalogue.json, all produced by b0ase),
+ * streamed from the VexVoid music bucket (public, CORS open). A host can pass its own list instead (MountOpts.music).
+ * Regenerate from the catalogue if releases are added.
+ */
+export const MUSIC_BASE = 'https://api.b0ase.com/storage/v1/object/public/music/vexvoid/';
+export const PLAYLIST: [title: string, file: string][] = [
+  ["Echoes in the Dust", "Echoes%20in%20the%20Dust.mp3"],
+  ["Shadow Steps", "Shadow%20Steps.mp3"],
+  ["Four Ton Shadow", "Four%20Ton%20Shadow.mp3"],
+  ["Shadows of the Mind", "Shadows%20of%20the%20Mind.mp3"],
+  ["Shadows of the Past", "Shadows%20of%20the%20Past.mp3"],
+  ["Echoes in the Abyss", "Echoes%20in%20the%20Abyss.mp3"],
+  ["Echoes in the Fog", "Echoes%20in%20the%20Fog.mp3"],
+  ["Echoes of the Silent Blade", "Echoes%20of%20the%20Silent%20Blade.mp3"],
+  ["Four Ton Shadows", "Four%20Ton%20Shadows.mp3"],
+  ["Insect Groove", "Insect%20Groove.mp3"],
+  ["Midnight Reverie", "Midnight%20Reverie.mp3"],
+  ["Phantom Echoes", "Phantom%20Echoes.mp3"],
+  ["Shadowed Whispers", "Shadowed%20Whispers.mp3"],
+  ["Shadows and Silhouettes", "Shadows%20and%20Silhouettes.mp3"],
+  ["Shadows in the Smoke", "Shadows%20in%20the%20Smoke.mp3"],
+  ["Shadows of the Street", "Shadows%20of%20the%20Street.mp3"],
+  ["Shattered Circuits", "Shattered%20Circuits.mp3"],
+  ["Silent Shadows", "Silent%20Shadows.mp3"],
+  ["Whispered Wings", "Whispered%20Wings.mp3"],
+  ["Whispering Echoes", "Whispering%20Echoes.mp3"],
+  ["Whispering Shadows", "Whispering%20Shadows.mp3"],
+  ["Whispers in the Smoke", "Whispers%20in%20the%20Smoke.mp3"],
+  ["chadCN-2", "chadCN-2.mp3"],
+  ["Echoes in the Mist", "Echoes%20in%20the%20Mist.mp3"],
+  ["Echoes of the Hidden Blade", "Echoes%20of%20the%20Hidden%20Blade.mp3"],
+  ["Echoes of the Void", "Echoes%20of%20the%20Void.mp3"],
+  ["Ghost in the Echoes", "Ghost%20in%20the%20Echoes.mp3"],
+  ["Insect Symphony", "Insect%20Symphony.mp3"],
+  ["shadCN-1", "shadCN-1.mp3"],
+  ["Shadowed Depths", "Shadowed%20Depths.mp3"],
+  ["Shadowed Rhythms", "Shadowed%20Rhythms.mp3"],
+  ["Shadows of the Streets", "Shadows%20of%20the%20Streets.mp3"],
+  ["Whispers in the Rain", "Whispers%20in%20the%20Rain.mp3"],
+  ["Whispers in the Wind", "Whispers%20in%20the%20Wind.mp3"],
+];
