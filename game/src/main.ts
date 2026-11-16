@@ -425,7 +425,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   let bust: { t: number; spot: string; kept: string } | null = null;
   const camPos = new THREE.Vector3(home.x + Math.sin(home.yaw) * 3.4, home.y + 2, home.z + Math.cos(home.yaw) * 3.4), camLook = new THREE.Vector3(), scr = new THREE.Vector3();
   let landT = 0, forceAnim = '', idleT = 0, camH = 1.45;
-  const lookTo = new THREE.Vector3(), tipV = new THREE.Vector3(), focusV = new THREE.Vector3();
+  const lookTo = new THREE.Vector3(), tipV = new THREE.Vector3(), focusV = new THREE.Vector3(), headV = new THREE.Vector3();
   const doorAt = () => city.plan.doors.find((d) => me.x > d.x0 - 0.3 && me.x < d.x1 + 0.3 && me.z > d.z0 - 0.3 && me.z < d.z1 + 0.3 && Math.abs(me.gy) < 0.5) || null;
   cam.position.copy(camPos);
   const frame = () => {
@@ -668,10 +668,13 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     let camY = Math.max(me.gy + 0.35, tgtY + Math.sin(camO.pitch) * camO.dist), camX = cx, camZ = cz;
     // in a lane, a doorway, the tunnel or the studio: the camera comes in front of the wall behind it, and stays under
     // the ceiling (the boxes are grown a little so the near plane never cuts into a wall)
-    { const k = W0.ray(me.x, tgtY, me.z, camX, camY, camZ, 0.22); if (k < 1) { const f = Math.max(0.12, k - 0.04); camX = me.x + (camX - me.x) * f; camZ = me.z + (camZ - me.z) * f; camY = tgtY + (camY - tgtY) * f; } }
+    let pulled = false;
+    { const k = W0.ray(me.x, tgtY, me.z, camX, camY, camZ, 0.22); if (k < 1) { const f = Math.max(0.12, k - 0.04); camX = me.x + (camX - me.x) * f; camZ = me.z + (camZ - me.z) * f; camY = tgtY + (camY - tgtY) * f; pulled = true; } }
     { const ceil = city.ceilingAt(camX, camZ, me.gy + 1); if (camY > ceil - 0.3) camY = Math.max(tgtY - 0.2, ceil - 0.3); }
     camPos.set(camX, camY, camZ);
-    cam.position.lerp(camPos, 1 - Math.exp(-dt * 24));
+    // pulled in by a wall: straight there if the eased camera would be behind it, else ease as usual
+    if (pulled && camPos.distanceToSquared(headV.set(me.x, tgtY, me.z)) < cam.position.distanceToSquared(headV)) cam.position.copy(camPos);
+    else cam.position.lerp(camPos, 1 - Math.exp(-dt * 24));
     // what it looks at keeps up with the writer: only the slightest give, so the camera feels quick
     lookTo.set(me.x + Math.cos(camO.yaw) * 0.55, tgtY, me.z - Math.sin(camO.yaw) * 0.55);
     camLook.lerp(lookTo, paint || bust ? 1 : 1 - Math.exp(-dt * 40));
