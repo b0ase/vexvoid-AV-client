@@ -1,9 +1,11 @@
 vexvoid-game.js: game/src (TypeScript) bundled by scripts/build-game.sh with esbuild 0.27.2 (darwin-arm64, npm
 integrity checked) and three 0.182.0 (MIT, npm sha512-GbHabT+Irv+ihI1/f5kIIsZ+Ef9Sl5A1Y7imvS5RQjWgtTPfPnZ43JmlYI7NtCRDK9zir20lQpfg8/9Yd02OvQ==).
-sha256 e5d82eba2e7fdd7b55c869a705983683f24ac23bcba1684743649a7c70caf404
+sha256 ae27a61678e51333cf04bc89a697172fb54d9d7c3645ccd3a7130d89e9d96bb7
 The district (game/src/plan.ts, world.ts, district.ts, districtTex.ts) is our own, all surfaces drawn in code. city.ts (forked from
 tokenblaster.lol @88d14f1, ESCAPE FROM TERRORNODE, NPG Ltd) is no longer used by the game; cityAssets.ts/cityShaders.ts still lend it shaders.
 sketches: game/sketches/*.json, our own starter sketches (stroke data, written by game/sketches/make.mjs), bundled in.
+loading/: the loading screen's clips (ident = the dripping VEXVOID title, hall = the hall of fame under its floodlight; H.264, no sound, with poster frames): loading clips: VexVoid's own (Grok Imagine, made by the owner).
+music: streamed from the VexVoid music bucket (game/src/playlist.ts): VexVoid's own tracks, produced by the owner.
 tex/: Poly Haven concrete_floor_02 and large_floor_tiles_02 (CC0), via tokenblaster.lol public/doubleo/tex.
 anims/ual.glb: Quaternius Universal Animation Library clips (CC0), see anims/CREDITS.md.
 models/writer.glb: our own, built by game/blender/writer.py (Blender 5.1.1, headless) on the UAL skeleton.

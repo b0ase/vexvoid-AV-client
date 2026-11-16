@@ -34,6 +34,7 @@ import { makeSpray, footprint, COLOURS, COLOUR_NAMES, type Can, type Stroke, typ
 import { makeLaw, type LawState } from './cops';
 import { makeHud, keyed, kc, hudScale } from './hud';
 import { makeMusic, type MusicState, type Track } from './music';
+import { makeLoading } from './loading';
 import { makeBook, slotsOf, sketchOf, fit, drawSketch, secsOf, cleanName, type Sketch, type SketchKind, type SketchStore, type BookState } from './sketchbook';
 
 export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) => void; onHud?: (s: string) => void; onRec?: () => void;
@@ -111,7 +112,9 @@ const FIT_FEET = true;
 
 export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const high = opts.high !== false;
-  const say = (s: string) => opts.onStatus && opts.onStatus(s);
+  // the loading screen: VexVoid's own clips and the progress line, until the first frame is drawn (./loading.ts)
+  const loading = makeLoading(host, opts.base + 'loading/');
+  const say = (s: string) => { loading.say(s); if (opts.onStatus) opts.onStatus(s); };
   say('Building the city…');
   const r = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: false });
   r.setPixelRatio(Math.min(window.devicePixelRatio || 1, high ? 1.5 : 1));
@@ -764,6 +767,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
 
   say(''); hud();
   frame();
+  requestAnimationFrame(() => loading.done());   // the first frame is up: fade into the game
   // the soundtrack starts with the game (owner: music on by default); a held-back AudioContext starts on the first key
   if (opts.music !== false) music = makeMusic({ bus: sound, tracks: opts.music || undefined, onTrack: (tr) => note(`♪ ${tr.title.toUpperCase()} · [M] MUSIC`, 3.5) });
 
