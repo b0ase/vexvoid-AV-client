@@ -19,7 +19,7 @@ import type { World, makeNav } from './world';
 import { loadWriter, type Writer } from './writer';
 
 export type Chase = 'off' | 'calm' | 'alerted' | 'chase' | 'searching' | 'busted';
-export type Suspect = { x: number; z: number; y: number; gy?: number; crouch: boolean; painting: boolean; spraying: boolean; vx?: number; vz?: number };
+export type Suspect = { x: number; z: number; y: number; gy?: number; crouch: boolean; painting: boolean; spraying: boolean; torch?: boolean; vx?: number; vz?: number };
 export type LawEvent = '' | 'alert' | 'busted' | 'escaped';
 export type LawState = {
   on: boolean; heat: number; chase: Chase; seen: boolean;
@@ -276,9 +276,9 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
       const bx = aimS.x - mount.x, by = aimS.y - mount.y, bz = aimS.z - mount.z, bl = Math.hypot(bx, by, bz);
       return d < 48 && (dx * bx + dy * by + dz * bz) / (d * bl) > Math.cos(0.17) && clear(mount.x, mount.y, mount.z, me);
     })();
-    const fromCar = carS.onStreet && carS.x < 88.5 && (lit || sees(carS.x + Math.sin(carS.h) * 2.4, 1.2, carS.z + Math.cos(carS.h) * 2.4, carS.h, 0.62, me.crouch ? 14 : 26, me));
+    const fromCar = carS.onStreet && carS.x < 88.5 && (lit || sees(carS.x + Math.sin(carS.h) * 2.4, 1.2, carS.z + Math.cos(carS.h) * 2.4, carS.h, 0.62, me.torch ? 40 : me.crouch ? 14 : 26, me));
     let fromCops = false;
-    for (const cp of cops) if (cp.out && sees(cp.x, cp.y + 1.65, cp.z, cp.h, cp.doing === 'search' ? 1.6 : 1.3, me.crouch ? SIGHT * 0.55 : SIGHT, me)) fromCops = true;
+    for (const cp of cops) if (cp.out && sees(cp.x, cp.y + 1.65, cp.z, cp.h, cp.doing === 'search' ? 1.6 : 1.3, me.torch ? SIGHT * 1.7 : me.crouch ? SIGHT * 0.55 : SIGHT, me)) fromCops = true;   // a lit torch is seen from far, crouched or not
     seen = !!(fromCar || fromCops);
 
     // ── heat: the hiss alone warms it, being seen at it makes it boil; it cools when you stop and nobody looks ──
@@ -287,6 +287,7 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
     else if (pursuing) heat = Math.min(1, heat + dt);
     else if (me.spraying) heat = Math.min(1, heat + dt * (seen ? 0.8 : 0.03));
     else if (paintSeen) heat = Math.min(1, heat + dt * 0.3);
+    else if (seen && me.torch) heat = Math.min(1, heat + dt * 0.12);   // a torch in the lanes at night draws a look
     else heat = Math.max(0, heat - dt * 0.05);
 
     // ── the chase ──

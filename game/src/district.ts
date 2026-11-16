@@ -672,7 +672,7 @@ export function buildDistrict({ renderer, scene, high, look }: { renderer: THREE
   }
 
   // ── the pool of real lights: follow the writer to the nearest lamps ──
-  const NL = high ? 8 : 5;   // every real light costs every lit pixel; far lamps are glows and pools on the ground
+  const NL = high ? 7 : 4;   // (+1: the writer's torch, always in the scene)   // every real light costs every lit pixel; far lamps are glows and pools on the ground
   const pool = Array.from({ length: NL }, () => { const l = new THREE.PointLight('#fff6ea', 0, 12, 1.8); group.add(l); return { l, src: null as Src | null }; });
   let poolT = 0;
 

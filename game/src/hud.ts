@@ -9,8 +9,8 @@
  *   const hud = makeHud(host); hud.dock({ ... }); hud.near(html, x, y); hud.help(true); hud.dispose()
  */
 /** What a click on the dock does (the same as the keys): set by the game once its controls exist. */
-export type DockActions = { cap: (c: 1 | 2 | 3) => void; colour: (i: number) => void; colourNext: () => void; dist: (m: number) => void; buff: () => void; undo: () => void; book: () => void; help: () => void; focus: () => void };
-export type DockState = { on: boolean; cap: 1 | 2 | 3; colour: number; colours: string[]; names: string[]; dist: number; line: string; buff: boolean; undo: number; book: boolean; help: boolean };
+export type DockActions = { torch: () => void; cap: (c: 1 | 2 | 3) => void; colour: (i: number) => void; colourNext: () => void; dist: (m: number) => void; buff: () => void; undo: () => void; book: () => void; help: () => void; focus: () => void };
+export type DockState = { on: boolean; cap: 1 | 2 | 3; colour: number; colours: string[]; names: string[]; dist: number; line: string; buff: boolean; undo: number; book: boolean; help: boolean; torch?: boolean };
 
 const CSS = `
 .vxh{--s:1;position:absolute;inset:0;pointer-events:none;font-family:"SF Pro Text",-apple-system,system-ui,"Helvetica Neue",Arial,sans-serif;color:#fff;-webkit-font-smoothing:antialiased}
@@ -85,12 +85,13 @@ const gaugeIcon = (dist: number) => {
 const buffIcon = () => `<svg viewBox="0 0 40 40">${can(4, true)}<path d="M24 30 L35 19 M27 33 L36 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>`;
 const undoIcon = () => `<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15 H25 A8 8 0 0 1 25 31 H15"/><path d="M17 10 L12 15 L17 20"/></svg>`;
 const bookIcon = () => `<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M20 12 Q14 8.5 6 10 V31 Q14 29.5 20 33 Q26 29.5 34 31 V10 Q26 8.5 20 12 Z"/><path d="M20 12 V33"/><path d="M9.5 15 Q13 14.5 16.5 16 M9.5 20 Q13 19.5 16.5 21 M23.5 16 Q27 14.5 30.5 15 M23.5 21 Q27 19.5 30.5 20" stroke-width="1.1" opacity=".6"/></svg>`;
+const torchIcon = () => `<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6 17 H18 L22 13 V27 L18 23 H6 Z"/><path d="M9 20 H14" stroke-width="1.2" opacity=".6"/><path d="M25 14 L35 9 M25 20 H36 M25 26 L35 31" stroke-width="1.6" stroke-linecap="round" opacity=".75"/></svg>`;
 const helpIcon = () => `<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="13" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M15.8 16.5 A4.3 4.3 0 1 1 21.5 20.6 Q20 21.3 20 23.3 V24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="20" cy="28.6" r="1.5" fill="currentColor"/></svg>`;
 
 const HELP: [string, string][] = [
   ['LMB', 'SPRAY'], ['RMB', 'LIGHT COAT'], ['SHIFT', 'STRAIGHT LINE'], ['WHEEL', 'CAN DISTANCE'],
   ['1 2 3', 'CAP'], ['TAB', 'COLOUR'], ['X', 'BUFF CAN'], ['Z', 'UNDO'],
-  ['A D', 'STEP ALONG'], ['W S', 'VIEW IN / OUT'], ['← →', 'LOOK'], ['B', 'SKETCHBOOK'], ['F', 'DONE'], ['M', 'MUSIC ON / OFF'], ['H', 'CLOSE HELP'],
+  ['A D', 'STEP ALONG'], ['W S', 'VIEW IN / OUT'], ['← →', 'LOOK'], ['B', 'SKETCHBOOK'], ['F', 'DONE'], ['M', 'MUSIC ON / OFF'], ['T', 'TORCH (THEY SEE IT)'], ['H', 'CLOSE HELP'],
   ['LMB', 'CLICK THE DOCK: EVERY TILE'],
 ];
 
@@ -102,11 +103,12 @@ export function makeHud(host: HTMLElement) {
   const style = document.createElement('style'); style.textContent = CSS; root.appendChild(style);
   const dockEl = document.createElement('div'); dockEl.className = 'vxh-dock'; dockEl.dataset.vxHud = 'dock';
   const tile = (k: string) => { const t = document.createElement('div'); t.className = 'vxh-t'; t.dataset.k = k; t.innerHTML = '<div class="vxh-i"></div><div class="vxh-l"></div><div class="vxh-k"></div>'; dockEl.appendChild(t); return { t, i: t.children[0] as HTMLElement, l: t.children[1] as HTMLElement, k: t.children[2] as HTMLElement }; };
-  const T = { cap: tile('cap'), colour: tile('colour'), dist: tile('dist'), buff: tile('buff'), undo: tile('undo'), book: tile('book'), help: tile('help') };
+  const T = { cap: tile('cap'), colour: tile('colour'), dist: tile('dist'), buff: tile('buff'), undo: tile('undo'), book: tile('book'), torch: tile('torch'), help: tile('help') };
   const badge = document.createElement('div'); badge.className = 'vxh-badge'; T.undo.t.appendChild(badge);
   T.buff.i.innerHTML = buffIcon(); T.buff.l.textContent = 'BUFF'; T.buff.k.innerHTML = kc('X');
   T.undo.i.innerHTML = undoIcon(); T.undo.l.textContent = 'UNDO'; T.undo.k.innerHTML = kc('Z');
   T.book.i.innerHTML = bookIcon(); T.book.l.textContent = 'SKETCH'; T.book.k.innerHTML = kc('B');
+  T.torch.i.innerHTML = torchIcon(); T.torch.l.textContent = 'TORCH'; T.torch.k.innerHTML = kc('T');
   T.help.i.innerHTML = helpIcon(); T.help.l.textContent = 'HELP'; T.help.k.innerHTML = kc('H');
   T.dist.k.innerHTML = kc('WHEEL');
   const nearEl = document.createElement('div'); nearEl.className = 'vxh-near'; nearEl.dataset.vxPrompt = 'near';
@@ -133,7 +135,7 @@ export function makeHud(host: HTMLElement) {
     if (k === 'cap') act.cap(capK ? (Number(capK.dataset.cap) as 1 | 2 | 3) : ((((last.cap || 2) % 3) + 1) as 1 | 2 | 3));
     else if (k === 'colour') { if (seg) act.colour(Number(seg.dataset.c)); else act.colourNext(); }
     else if (k === 'dist') { distDrag = true; dockEl.setPointerCapture(e.pointerId); gaugeAt(e); }
-    else if (k === 'buff') act.buff(); else if (k === 'undo') act.undo(); else if (k === 'book') act.book(); else if (k === 'help') act.help();
+    else if (k === 'buff') act.buff(); else if (k === 'undo') act.undo(); else if (k === 'book') act.book(); else if (k === 'torch') act.torch(); else if (k === 'help') act.help();
     act.focus();
   });
   dockEl.addEventListener('pointermove', (e) => { if (distDrag) gaugeAt(e); });
@@ -142,7 +144,7 @@ export function makeHud(host: HTMLElement) {
   dockEl.addEventListener('contextmenu', (e) => e.preventDefault());
   // the wheel over the dock still sets the distance (the picture under it does not get the wheel)
   dockEl.addEventListener('wheel', (e) => { e.preventDefault(); if (act && last.on && last.dist != null) act.dist(Math.round(Math.max(0.05, Math.min(0.6, last.dist + e.deltaY * 0.0005)) * 200) / 200); }, { passive: false });
-  for (const [k, t] of [['cap', 'CAP: CLICK TO CHANGE · 1 2 3'], ['colour', 'COLOUR: CLICK ONE · TAB'], ['dist', 'DISTANCE: DRAG OR CLICK THE GAUGE · WHEEL'], ['buff', 'BUFF CAN · X'], ['undo', 'UNDO · Z'], ['book', 'SKETCHBOOK · B'], ['help', 'HELP · H']] as const) T[k].t.title = t;
+  for (const [k, t] of [['cap', 'CAP: CLICK TO CHANGE · 1 2 3'], ['colour', 'COLOUR: CLICK ONE · TAB'], ['dist', 'DISTANCE: DRAG OR CLICK THE GAUGE · WHEEL'], ['buff', 'BUFF CAN · X'], ['undo', 'UNDO · Z'], ['book', 'SKETCHBOOK · B'], ['torch', 'TORCH · T (they see you further)'], ['help', 'HELP · H']] as const) T[k].t.title = t;
   const pop = (t: HTMLElement) => { t.classList.remove('pop'); void t.offsetWidth; t.classList.add('pop'); };
   return {
     el: root,
@@ -158,6 +160,7 @@ export function makeHud(host: HTMLElement) {
       if (s.buff !== last.buff) { T.buff.t.classList.toggle('act', s.buff); if (last.buff != null) pop(T.buff.t); }
       if (s.undo !== last.undo) { badge.textContent = String(s.undo); badge.style.display = s.undo > 0 ? '' : 'none'; T.undo.t.style.opacity = s.undo > 0 ? '' : '.45'; }
       if (s.book !== last.book) T.book.t.classList.toggle('act', s.book);
+      if (s.torch !== last.torch) T.torch.t.classList.toggle('act', !!s.torch);
       if (s.help !== last.help || s.on !== last.on) { T.help.t.classList.toggle('act', s.help); helpEl.classList.toggle('on', s.help && s.on); }
       last = { ...s };
     },

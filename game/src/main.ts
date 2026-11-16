@@ -60,6 +60,8 @@ export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?:
   train: () => { x: number; z: number; on: boolean };
   /** The soundtrack (on by default; M toggles it; the choice is kept per viewer): on/off, next track; returns what plays. */
   music: (o?: { on?: boolean; next?: boolean }) => MusicState | null;
+  /** The torch (T): on/off; a lit torch is seen from further by the law. */
+  torch: (on?: boolean) => { on: boolean; intensity?: number; at?: number[]; dir?: number[] };
   /** Render knobs for tests and tuning: ambient occlusion, bloom, the real lights near the writer, the street reflection. */
   quality: (o?: { ao?: boolean; bloom?: boolean; lights?: number; refl?: boolean }) => { ao: boolean; bloom: boolean; lights: number; refl: boolean };
   spots: () => { id: string; w: number; h: number; x: number; y: number; z: number }[];
@@ -159,6 +161,20 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const rim = new THREE.PointLight('#ffffff', 9, 7, 2);
   const back = new THREE.PointLight('#ffffff', 6, 5, 2); // a kicker behind, to edge the hood and shoulders
   scene.add(rim, back);
+  // THE TORCH (T, or the dock): a real spotlight from the writer's chest along where they look (at the can's point while
+  // painting), a soft cone with a faint beam in the haze. No shadow (the moon already casts the one shadow map). It is
+  // always in the scene at zero when off, so switching it never recompiles a shader. A lit torch gets you seen (cops.ts).
+  const torch = { on: false, w: 0 };
+  const torchL = new THREE.SpotLight('#eef1ff', 0, 26, 0.42, 0.6, 1.4); torchL.castShadow = false; scene.add(torchL, torchL.target);
+  const beam = (() => {
+    const len = 9, g = new THREE.CylinderGeometry(0.04, Math.tan(0.42) * len, len, 24, 1, true); g.translate(0, -len / 2, 0);
+    const m = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, uniforms: { uW: { value: 0 } },
+      vertexShader: 'varying float vY; varying vec3 vN; varying vec3 vV; void main(){ vY = uv.y; vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }',
+      fragmentShader: 'uniform float uW; varying float vY; varying vec3 vN; varying vec3 vV; void main(){ float f = abs(dot(normalize(vN), normalize(vV))); float a = pow(vY, 1.5) * (0.35 + 0.65 * f * f) * 0.075 * uW; gl_FragColor = vec4(vec3(0.92, 0.94, 1.0) * a, 1.0); }' });
+    const mesh = new THREE.Mesh(g, m); mesh.frustumCulled = false; mesh.userData.noAO = true; mesh.renderOrder = 5; mesh.visible = false; scene.add(mesh); return mesh;
+  })();
+  const torchDir = new THREE.Vector3(), torchP = new THREE.Vector3(), DOWN = new THREE.Vector3(0, -1, 0);
+  const setTorch = (on: boolean) => { torch.on = on; note(on ? 'TORCH ON · THEY SEE YOU FROM FURTHER' : 'TORCH OFF', 1.8); hud(); };
 
   const size = () => { const b = host.getBoundingClientRect(); return { w: Math.max(2, Math.round(b.width)), h: Math.max(2, Math.round(b.height)) }; };
   let { w, h } = size();
@@ -199,7 +215,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const REACH = 2.4;
   const camO = { yaw: home.yaw, pitch: 0.12, dist: 3.4 };
   const keys = new Set<string>();
-  const MOVE = ['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Shift', ' ', 'c', 'f', 'm', 'p', 'r', '1', '2', '3', '4', '5', '6', '7', 'z', 'x', 'h', 'Tab', 'Escape', 'b', 'g', 'v', 'n', '[', ']', '-', '=', '+', 'Enter'];
+  const MOVE = ['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Shift', ' ', 'c', 'f', 'm', 'p', 't', 'r', '1', '2', '3', '4', '5', '6', '7', 'z', 'x', 'h', 'Tab', 'Escape', 'b', 'g', 'v', 'n', '[', ']', '-', '=', '+', 'Enter'];
   // painting: F at a wall squares up to it; the mouse aims, holding it sprays; the wheel sets the can's distance
   type W = (typeof city.walls)[number];
   const can: Can = { colour: COLOURS[0], cap: 2, dist: 0.2, pressure: 1, buff: false };
@@ -240,7 +256,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     if (bk) return bk + (paint ? `PAINTING ${paint.id.toUpperCase()} · F DONE · ` : 'WASD MOVE · F AT A WALL · ') + lawS;
     return (paint
       ? `PAINTING ${paint.id.toUpperCase()} · ${can.buff ? 'BUFF' : COLOUR_NAMES[colourI]} · ${CAPS[can.cap]} CAP · ${Math.round(can.dist * 100)} CM · H HELP · F DONE`
-      : 'WASD MOVE · SHIFT SPRINT · C CROUCH · SPACE JUMP · DRAG LOOK · F AT ANY WALL TO PAINT · B SKETCHBOOK') + ' · ' + lawS + (opts.onRec ? ' · R RECORD' : '') + (music ? (music.state().on ? ' · M MUSIC OFF' : ' · M MUSIC ON') : '');
+      : 'WASD MOVE · SHIFT SPRINT · C CROUCH · SPACE JUMP · DRAG LOOK · F AT ANY WALL TO PAINT · B SKETCHBOOK · T TORCH') + ' · ' + lawS + (opts.onRec ? ' · R RECORD' : '') + (music ? (music.state().on ? ' · M MUSIC OFF' : ' · M MUSIC ON') : '');
   };
   const hud = () => { const s = hudText(); if (s !== lastHud) { lastHud = s; if (opts.onHud) opts.onHud(s); } };
   const fwd = new THREE.Vector3(0, 0, -1), side = new THREE.Vector3();
@@ -375,6 +391,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     if (bust) return; // nothing to do while you are being nicked
     // a sketch going up stops when the writer moves (what is up stays; Z takes it back)
     if (down && !e.repeat && auto && auto.group[0] === 'p' && ['a', 'd', ' ', 'c', 'f', 'Escape'].includes(k)) stopAuto(false);
+    if (down && !e.repeat && k === 't') setTorch(!torch.on);
     if (down && !e.repeat && k === 'm' && music) { const s = music.toggle(); note(s.on ? `♪ MUSIC ON · ${s.title.toUpperCase()}` : 'MUSIC OFF · [M] TURNS IT BACK ON', 2.5); }
     if (down && !e.repeat && k === 'b') { book.setOpen(!book.state.open); if (book.state.open) disarmed = false; if (book.state.open) note(paint ? 'PICK A SKETCH · CLICK THE WALL TO BLAST' : 'PICK A SKETCH · WALK UP TO A WALL'); }
     if (down && (k === '[' || k === ']')) { if (!book.state.open) book.setOpen(true); book.step(k === ']' ? 1 : -1); const s = book.pick(); if (s) note(`${s.name} · ${s.kind.toUpperCase()}`); }
@@ -406,6 +423,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     undo: () => { if (paint && !auto) undo(); },
     book: () => { book.setOpen(!book.state.open); if (book.state.open) { disarmed = false; note(paint ? 'PICK A SKETCH · CLICK THE WALL TO BLAST' : 'PICK A SKETCH · WALK UP TO A WALL'); } },
     help: () => { if (paint) { help = !help; hud(); } },
+    torch: () => setTorch(!torch.on),
     focus: () => canvas.focus(),
   });
   const kd = (e: KeyboardEvent) => onKey(e, true), ku = (e: KeyboardEvent) => onKey(e, false);
@@ -623,13 +641,13 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       prompt(t < tipHold ? tipNote : nw ? (sk ? `[F] THEN CLICK THE WALL TO BLAST ${sk.name}` : '[F] PAINT THIS WALL') : sk ? 'WALK UP TO A WALL TO BLAST ' + sk.name : '');
     }
     writer.steady(!!paint && mv.speed < 0.05);
-    hudUi.dock({ on: !!paint && !bust, cap: can.cap, colour: colourI, colours: COLOURS, names: COLOUR_NAMES, dist: can.dist, line: cm(footprint(can).width), buff: !!can.buff, undo: paint ? spray.undoable(runOf(paint.spot).ids) : 0, book: !!book.state.open, help });
+    hudUi.dock({ on: !!paint && !bust, cap: can.cap, colour: colourI, colours: COLOURS, names: COLOUR_NAMES, dist: can.dist, line: cm(footprint(can).width), buff: !!can.buff, undo: paint ? spray.undoable(runOf(paint.spot).ids) : 0, book: !!book.state.open, help, torch: torch.on });
     // the line under the picture sits above the dock, and in the middle of what the sketchbook panel leaves free
     tip.style.bottom = paint ? `${Math.round(16 + 124 * hudScale(w, h))}px` : '9%';
     tip.style.left = book.state.open ? 'calc((100% - 296px) / 2)' : '50%'; tip.style.maxWidth = book.state.open ? 'calc(100% - 330px)' : 'calc(100% - 32px)';
     spray.update(dt, me);
     law.pushOut(me, 0.35);
-    const ev = law.update(dt, t, { x: me.x, z: me.z, y: me.y, gy: me.gy, crouch: me.crouch, painting: !!paint, spraying: sprayingNow, vx: paint ? 0 : Math.sin(me.heading) * mv.speed, vz: paint ? 0 : Math.cos(me.heading) * mv.speed });
+    const ev = law.update(dt, t, { x: me.x, z: me.z, y: me.y, gy: me.gy, crouch: me.crouch, painting: !!paint, spraying: sprayingNow, torch: torch.on, vx: paint ? 0 : Math.sin(me.heading) * mv.speed, vz: paint ? 0 : Math.cos(me.heading) * mv.speed });
     if (ev && opts.onEvent) try { opts.onEvent(ev); } catch { /* the host's business */ }
     if (ev === 'busted') {
       // a sketch half put up stays on the wall (owner, 16 Nov), undoable as one step; hand painting is still buffed
@@ -694,6 +712,14 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     writer.update(dt);
     rim.position.set(me.x + Math.sin(camO.yaw) * 1.8 + Math.cos(camO.yaw) * 0.9, py + 2.4, me.z + Math.cos(camO.yaw) * 1.8 - Math.sin(camO.yaw) * 0.9);
     back.position.set(me.x - Math.sin(camO.yaw) * 1.4, py + 2.1, me.z - Math.cos(camO.yaw) * 1.4);
+    // the torch: from the chest, along the heading tipped down a little, or at the can's point on the wall
+    torch.w += ((torch.on && !bust ? 1 : 0) - torch.w) * Math.min(1, dt * 14);
+    torchP.set(me.x + Math.sin(me.heading) * 0.28, py + 1.32, me.z + Math.cos(me.heading) * 0.28);
+    if (paint && aimAt) spray.point(aimAt.id, aimAt.x, aimAt.y, torchDir).sub(torchP).normalize(); else torchDir.set(Math.sin(me.heading), -0.3, Math.cos(me.heading)).normalize();
+    torchL.position.copy(torchP); torchL.target.position.copy(torchP).addScaledVector(torchDir, 6); torchL.target.updateMatrixWorld();
+    // at a wall a metre away the full beam burns a white hole: painting, it dims to a work light
+    torchL.intensity = (paint ? 14 : 420) * torch.w;
+    beam.visible = torch.w > 0.02; if (beam.visible) { beam.position.copy(torchP); beam.quaternion.setFromUnitVectors(DOWN, torchDir); (beam.material as THREE.ShaderMaterial).uniforms.uW.value = torch.w * (paint ? 0.3 : 1); }
     // the camera: behind, above, over the right shoulder, kept inside the street
     camH += ((me.crouch && !paint ? 1.05 : 1.45) - camH) * Math.min(1, dt * 10);
     const tgtY = py + camH;
@@ -801,6 +827,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     law: () => law.state(),
     cops: (on: boolean) => law.setOn(on),
     /** The game's sound, for a recorder: connect node to a MediaStreamDestination made on ctx. */
+    torch: (on) => { if (on != null && !!on !== torch.on) setTorch(!!on); return { on: torch.on, intensity: +torchL.intensity.toFixed(1), at: torchL.position.toArray().map((v) => +v.toFixed(2)), dir: torchDir.toArray().map((v) => +v.toFixed(2)) }; },
     music: (o = {}) => { if (!music) return null; if (o.on != null) music.set(!!o.on); if (o.next) music.next(); return music.state(); },
     audio: () => { const b = sound(); return b ? { ctx: b.ctx, node: b.out } : null; },
     goto: (x, z, yaw, pitch, y) => { if (paint) togglePaint();   // painting holds the writer at the wall: put the can down first
@@ -813,7 +840,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     stop: () => {
       stopped = true; cancelAnimationFrame(raf); ro.disconnect();
       canvas.removeEventListener('keydown', kd); canvas.removeEventListener('keyup', ku);
-      music?.stop(); hissOn(false); law.dispose(); book.dispose(); if (bus) void bus.ctx.close(); spray.dispose(); writer.dispose(); city.dispose(); look.dispose(); comp.dispose(); r.dispose(); canvas.remove(); tip.remove(); hudUi.dispose();
+      scene.remove(torchL, torchL.target, beam); beam.geometry.dispose(); (beam.material as THREE.Material).dispose(); music?.stop(); hissOn(false); law.dispose(); book.dispose(); if (bus) void bus.ctx.close(); spray.dispose(); writer.dispose(); city.dispose(); look.dispose(); comp.dispose(); r.dispose(); canvas.remove(); tip.remove(); hudUi.dispose();
       for (const o of [reticle, dot, preview, ghost, ghostFrame]) { o.geometry.dispose(); (o.material as THREE.Material).dispose(); }
       const gm = (ghost.material as THREE.MeshBasicMaterial).map; if (gm) gm.dispose();
     },
