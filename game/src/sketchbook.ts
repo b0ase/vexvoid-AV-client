@@ -123,7 +123,7 @@ const CSS = `
 `;
 
 export type BookState = { open: boolean; kind: SketchKind; pick: string; speed: 1 | 2 | 4; size: number };
-type Cb = { onBlast: () => void; onSave: (name: string, kind: SketchKind) => void; onDelete: (id: string) => void; onChange: () => void; focus: () => void; canSave: () => boolean };
+type Cb = { onPick?: () => void; onBlast: () => void; onSave: (name: string, kind: SketchKind) => void; onDelete: (id: string) => void; onChange: () => void; focus: () => void; canSave: () => boolean };
 
 export function makeBook(host: HTMLElement, cb: Cb, store: SketchStore = localSketches) {
   const starters = (STARTERS as unknown as Sketch[]).map((s) => ({ ...s, mine: false }));
@@ -177,7 +177,7 @@ export function makeBook(host: HTMLElement, cb: Cb, store: SketchStore = localSk
       const m = document.createElement('div'); m.className = 'm'; m.textContent = `${s.w.toFixed(1)} × ${s.h.toFixed(1)} M · ${s.strokes.length} STROKES · ${Math.round(secsOf(s))} S`;
       card.append(thumb(s), n, m);
       if (s.mine) { const x = document.createElement('button'); x.className = 'x'; x.textContent = '×'; x.title = 'Delete this sketch'; x.addEventListener('click', (e) => { e.stopPropagation(); cb.onDelete(s.id); }); card.appendChild(x); }
-      card.addEventListener('click', () => { state.pick = s.id; changed(); cb.focus(); });
+      card.addEventListener('click', () => { state.pick = s.id; cb.onPick?.(); changed(); cb.focus(); });
       return card;
     }));
     if (!shown.length) { const d = document.createElement('div'); d.className = 'vxsb-empty'; d.textContent = 'NOTHING HERE YET. PAINT A WALL, NAME IT BELOW AND SAVE WALL.'; list.appendChild(d); }
@@ -204,9 +204,9 @@ export function makeBook(host: HTMLElement, cb: Cb, store: SketchStore = localSk
     step: (d: number) => {
       const order = KINDS.flatMap((k) => all().filter((s) => s.kind === k.id)); if (!order.length) return;
       let i = order.findIndex((s) => s.id === state.pick); i = ((i < 0 ? 0 : i + d) + order.length) % order.length;
-      state.pick = order[i].id; state.kind = order[i].kind; changed();
+      state.pick = order[i].id; state.kind = order[i].kind; cb.onPick?.(); changed();
     },
-    choose: (id: string) => { const s = byId(id); if (!s) return false; state.pick = s.id; state.kind = s.kind; changed(); return true; },
+    choose: (id: string) => { const s = byId(id); if (!s) return false; state.pick = s.id; state.kind = s.kind; cb.onPick?.(); changed(); return true; },
     speed: (v?: number) => { if (v != null) { state.speed = (SPEEDS as readonly number[]).includes(v) ? v as 1 | 2 | 4 : SPEEDS[(SPEEDS.indexOf(state.speed) + 1) % SPEEDS.length]; changed(); } return state.speed; },
     size: (v: number) => { state.size = Math.max(0.25, Math.min(2, Math.round(v * 20) / 20)); changed(); },
     /** A new sketch of the player's, kept in the store. */

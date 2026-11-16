@@ -85,7 +85,7 @@ export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?:
    *  speed 1 2 4 animated (0: at once). Resolves true when it is all up, false if it was stopped (moving, busted). */
   blast: (idOrName: string, o?: { wall?: string; at?: [number, number]; size?: number; speed?: number; kind?: SketchKind }) => Promise<boolean>;
   /** The sketchbook panel: open it, pick, speed, size; returns its state and where a blast would go now. */
-  sketchbook: (o?: Partial<BookState>) => BookState & { blasting: string; plan: { wall: string; at: [number, number]; scale: number; fitted: boolean } | null };
+  sketchbook: (o?: Partial<BookState>) => BookState & { blasting: string; armed: boolean; plan: { wall: string; at: [number, number]; scale: number; fitted: boolean } | null };
   /** How the writer moves: speed, heading, and how the soles meet the ground (stats since the last reset). */
   /** Tuning: the speed a moving clip was made for. */
   tuneGait: (clip: string, v: number) => void;
@@ -264,7 +264,10 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     const ix = own ? own.center.x - own.normal.x * 0.2 : 1e9, iz = own ? own.center.z - own.normal.z * 0.2 : 1e9, iy = own ? by : 0;
     return W0.ray(ax, ay, az, bx, by, bz, 0, own ? (b) => ix > b.x0 && ix < b.x1 && iz > b.z0 && iz < b.z1 && iy > (b.y0 ?? -1e9) && iy < (b.y1 ?? 1e9) : undefined);
   };
-  const stopAuto = (ok: boolean) => { const a = auto; if (!a) return; auto = null; spray.end(); if (!ok && blasting) note(`STOPPED ${blasting} · Z TAKES IT BACK`, 2.5); blasting = ''; a.done(ok); };
+  // a finished (or stopped) blast leaves the piece clean on the wall: the ghost and its frame stay away until the player
+  // arms a sketch again (picks a card, [ ], opens the book, or blasts)
+  let disarmed = false;
+  const stopAuto = (ok: boolean) => { const a = auto; if (!a) return; auto = null; spray.end(); if (blasting) disarmed = true; if (!ok && blasting) note(`STOPPED ${blasting} · Z TAKES IT BACK`, 2.5); blasting = ''; a.done(ok); };
   const squareUp = (w: W) => { paint = { id: w.id, spot: w }; camO.yaw = Math.atan2(w.normal.x, w.normal.z); camO.pitch = 0.1; camO.dist = 2.6; };
   const togglePaint = () => {
     if (paint) { paint = null; btn = 0; stroke = null; line = null; spray.end(); stopAuto(false); me.crouch = false; hud(); return; }
@@ -293,6 +296,8 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   for (const o of [reticle, dot, preview]) { o.renderOrder = 10; o.visible = false; o.userData.noAO = true; o.frustumCulled = false; scene.add(o); }
   // the SKETCHBOOK panel, and the sketch picked shown faintly on the wall where a blast would put it
   const book = makeBook(host, {
+    // picking a card (even the same one again) arms it: its ghost shows on the wall where a click would put it
+    onPick: () => { disarmed = false; },
     onBlast: () => blastNow(), onChange: () => { hud(); }, focus: () => canvas.focus(),
     onSave: (name, kind) => { saveWall({ name, kind }).catch((e) => note(String(e.message || e).toUpperCase(), 2.5)); },
     onDelete: (id) => { const s = book.byId(id); void book.remove(id).then((ok) => { if (ok && s) note(`DELETED ${s.name}`); }); },
@@ -338,7 +343,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     return p;
   };
   const blastNow = () => {
-    const sk = book.pick(); if (!sk || bust) return;
+    const sk = book.pick(); if (!sk || bust) return; disarmed = false;
     if (auto) { note('ALREADY PUTTING ONE UP · MOVE TO STOP IT'); return; }
     if (!paint) { const w = nearestWall(); if (!w) { note('WALK UP TO A WALL TO BLAST', 2); return; } togglePaint(); }
     blast(sk).catch((e) => note(String(e.message || e).toUpperCase(), 2.5));
@@ -369,7 +374,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     // a sketch going up stops when the writer moves (what is up stays; Z takes it back)
     if (down && !e.repeat && auto && auto.group[0] === 'p' && ['a', 'd', ' ', 'c', 'f', 'Escape'].includes(k)) stopAuto(false);
     if (down && !e.repeat && k === 'm' && music) { const s = music.toggle(); note(s.on ? `♪ MUSIC ON · ${s.title.toUpperCase()}` : 'MUSIC OFF · [M] TURNS IT BACK ON', 2.5); }
-    if (down && !e.repeat && k === 'b') { book.setOpen(!book.state.open); if (book.state.open) note(paint ? 'PICK A SKETCH · CLICK THE WALL TO BLAST' : 'PICK A SKETCH · WALK UP TO A WALL'); }
+    if (down && !e.repeat && k === 'b') { book.setOpen(!book.state.open); if (book.state.open) disarmed = false; if (book.state.open) note(paint ? 'PICK A SKETCH · CLICK THE WALL TO BLAST' : 'PICK A SKETCH · WALK UP TO A WALL'); }
     if (down && (k === '[' || k === ']')) { if (!book.state.open) book.setOpen(true); book.step(k === ']' ? 1 : -1); const s = book.pick(); if (s) note(`${s.name} · ${s.kind.toUpperCase()}`); }
     if (down && !e.repeat && book.state.open && k === 'v') { book.speed(-1); note(`SPEED ${book.state.speed}×`); }
     if (down && book.state.open && (k === '-' || k === '=' || k === '+')) { book.size(book.state.size + (k === '-' ? -0.1 : 0.1)); note(`SIZE ${Math.round(book.state.size * 100)}%`); }
@@ -527,7 +532,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       const tooHigh = !!h && h.point.y >= top, reach = !!h && !tooHigh && !tooFar, pressing = btn !== 0 && !auto;
       // the sketchbook open: the sketch picked shows where a click would put it
       aimAt = h ? { id: h.id, x: h.x, y: h.y } : null;
-      const armed = book.state.open && !auto ? book.pick() : null;
+      const armed = book.state.open && !auto && !disarmed ? book.pick() : null;
       plan = armed && h ? planFor(armed, h.wall, h, book.state.size) : null;
       ghost.visible = !!(armed && plan && h);
       if (armed && plan && h) {
@@ -758,8 +763,8 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     deleteSketch: (id) => book.remove(id),
     blast: async (q, o = {}) => { await book.loaded; const s = findSketch(q, o.kind); if (!s) throw new Error('no sketch ' + q); book.choose(s.id); return blast(s, o); },
     sketchbook: (o) => {
-      if (o) { if (o.kind) book.setKind(o.kind); if (o.pick) book.choose(o.pick); if (o.speed) book.speed(o.speed); if (o.size) book.size(o.size); if (o.open != null) book.setOpen(o.open); }
-      return { ...book.state, blasting, plan };
+      if (o) { if (o.kind) book.setKind(o.kind); if (o.pick) book.choose(o.pick); if (o.speed) book.speed(o.speed); if (o.size) book.size(o.size); if (o.open != null) { book.setOpen(o.open); if (o.open) disarmed = false; } }
+      return { ...book.state, blasting, armed: book.state.open && !auto && !disarmed && !!book.pick(), plan: disarmed ? null : plan };
     },
     can: (o) => {
       if (o) { if (o.cap) can.cap = o.cap; if (o.dist != null) can.dist = Math.max(0.05, Math.min(0.6, o.dist)); if (o.buff != null) can.buff = o.buff; if (o.colour && COLOURS.includes(o.colour)) { colourI = COLOURS.indexOf(o.colour); can.colour = o.colour; } hud(); }
