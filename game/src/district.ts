@@ -648,18 +648,18 @@ export function buildDistrict({ renderer, scene, high, look }: { renderer: THREE
         addGlow(l.x, 3.6, l.z, 0.7, 1.4); addPool(l.x, 0.01, l.z, 7, 0.7); addPool(l.x, WATER_Y + 0.02, l.z < 0 ? l.z + 3 : l.z - 3, 5, 0.5);
         srcs.push({ p: new THREE.Vector3(l.x, 3.4, l.z), k: 24, d: 14, flick: 0 });
       } else if (l.kind === 'wall' || l.kind === 'bulb') {
-        heads.push(M(l.x, l.y, l.z, 0.5, 0.6, 0.5)); addGlow(l.x, l.y - 0.1, l.z, 0.6, 1.6 * (l.k || 1), R() < 0.2 ? 2 : 0);
+        heads.push(M(l.x, l.y, l.z, 0.5, 0.6, 0.5)); addGlow(l.x, l.y - 0.1, l.z, 0.6, 1.6 * (l.k || 1), l.steady ? 0 : R() < 0.2 ? 2 : 0);   // (steady lamps draw no dice: the rest of the district keeps its random layout)
         const g = W.groundAt(l.x, l.z, l.y); addPool(l.x, (Number.isNaN(g) ? 0 : g) + 0.01, l.z, 6, 0.8 * (l.k || 1));
         // the real light sits out from the wall it hangs on: right at the wall it burns a white hole in the bricks
         const o = l.kind === 'wall' ? offWall(l.x, l.z) : [0, 0];
-        srcs.push({ p: new THREE.Vector3(l.x + o[0], l.y - 0.3, l.z + o[1]), k: 18 * (l.k || 1), d: 11, flick: R() < 0.15 ? 1 : 0 });
+        srcs.push({ p: new THREE.Vector3(l.x + o[0], l.y - 0.3, l.z + o[1]), k: 18 * (l.k || 1), d: 11, flick: l.steady ? 0 : R() < 0.15 ? 1 : 0 });
       } else if (l.kind === 'tube') {
         tubes.push(M(l.x, l.y, l.z)); addGlow(l.x, l.y - 0.05, l.z, 0.9, 1.6, l.z < -95 ? 2 : 0); addPool(l.x, 0.01, l.z, 5, 0.8);
         srcs.push({ p: new THREE.Vector3(l.x, l.y - 0.2, l.z), k: 16, d: 9, flick: l.z < -95 ? 1 : 0 });
       } else if (l.kind === 'warm') {
         addGlow(l.x, l.y - 0.85, l.z, 0.6, 1.1); addPool(l.x, 0.01, l.z, 5, 0.9);
-        srcs.push({ p: new THREE.Vector3(l.x, 1.5, l.z + 0.7), k: 9, d: 9, flick: 0 });
-        if (l.x < -15 && l.z < -44) srcs.push({ p: new THREE.Vector3(-14, 2.4, -44.2), k: 8, d: 9, flick: 0 });   // the studio's string of bulbs
+        srcs.push({ p: new THREE.Vector3(l.x, 1.4, l.z + 1.1), k: 9, d: 10, flick: 0 });
+        if (l.x < -15 && l.z < -44) srcs.push({ p: new THREE.Vector3(-14, 2.4, -44.2), k: 12, d: 10, flick: 0 });   // the studio's string of bulbs
       } else if (l.kind === 'flood') { /* the hall's spotlight, above */ }
     }
     instanced(new THREE.CylinderGeometry(0.08, 0.12, 1, 8), iron, polesM);
