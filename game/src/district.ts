@@ -659,7 +659,7 @@ export function buildDistrict({ renderer, scene, high, look }: { renderer: THREE
       } else if (l.kind === 'warm') {
         addGlow(l.x, l.y - 0.85, l.z, 0.6, 1.1); addPool(l.x, 0.01, l.z, 5, 0.9);
         srcs.push({ p: new THREE.Vector3(l.x, 1.4, l.z + 1.1), k: 9, d: 10, flick: 0 });
-        if (l.x < -15 && l.z < -44) srcs.push({ p: new THREE.Vector3(-14, 2.4, -44.2), k: 12, d: 10, flick: 0 });   // the studio's string of bulbs
+        if (l.x < -15 && l.z < -44) srcs.push({ p: new THREE.Vector3(-14, 2.4, -44.2), k: 8, d: 9, flick: 0 });   // the studio's string of bulbs
       } else if (l.kind === 'flood') { /* the hall's spotlight, above */ }
     }
     instanced(new THREE.CylinderGeometry(0.08, 0.12, 1, 8), iron, polesM);

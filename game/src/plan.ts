@@ -350,9 +350,7 @@ export function makePlan(): Plan {
   lamps.push({ x: -9, y: 3.2, z: -84, kind: 'tube' }, { x: -9, y: 3.2, z: -91, kind: 'tube' }, { x: -9, y: 3.2, z: -97, kind: 'tube' });
   lamps.push({ x: -9, y: 9.5, z: -102.5, kind: 'flood' });
   lamps.push({ x: -17.6, y: 2.6, z: -45.1, kind: 'warm', k: 1.0 });   // the standard lamp by the mattress
-  // the first thing the player sees should read (owner: "the level starts a little too dark"): a bare bulb over the
-  // studio floor, a lamp over the garages across the studio yard
-  lamps.push({ x: -14.5, y: 5.1, z: -40.5, kind: 'bulb', k: 1.5, steady: true }, { x: -11, y: 3.0, z: -31.15, kind: 'wall', k: 1.2, steady: true });
+  // (owner, 16 Nov: the start looked better dark; the torch, T, is the answer to darkness: no extra lamps here)
   // work lights hung from the warehouse trusses (squatters' tubes), so the floor reads at night
   lamps.push({ x: 24, y: 4.4, z: -55, kind: 'tube' }, { x: 38, y: 4.4, z: -52, kind: 'tube' }, { x: 29, y: 4.4, z: -42, kind: 'tube' });
   lamps.push({ x: 31, y: 7.5, z: -48, kind: 'bulb', k: 1.2 }, { x: 22, y: 7.5, z: -52, kind: 'bulb', k: 0.6 });

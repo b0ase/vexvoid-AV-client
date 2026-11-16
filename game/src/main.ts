@@ -165,7 +165,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   // painting), a soft cone with a faint beam in the haze. No shadow (the moon already casts the one shadow map). It is
   // always in the scene at zero when off, so switching it never recompiles a shader. A lit torch gets you seen (cops.ts).
   const torch = { on: false, w: 0 };
-  const torchL = new THREE.SpotLight('#eef1ff', 0, 26, 0.42, 0.6, 1.4); torchL.castShadow = false; scene.add(torchL, torchL.target);
+  const torchL = new THREE.SpotLight('#eef1ff', 0, 28, 0.5, 0.55, 1.4); torchL.castShadow = false; scene.add(torchL, torchL.target);
   const beam = (() => {
     const len = 9, g = new THREE.CylinderGeometry(0.04, Math.tan(0.42) * len, len, 24, 1, true); g.translate(0, -len / 2, 0);
     const m = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, uniforms: { uW: { value: 0 } },
@@ -718,7 +718,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     if (paint && aimAt) spray.point(aimAt.id, aimAt.x, aimAt.y, torchDir).sub(torchP).normalize(); else torchDir.set(Math.sin(me.heading), -0.3, Math.cos(me.heading)).normalize();
     torchL.position.copy(torchP); torchL.target.position.copy(torchP).addScaledVector(torchDir, 6); torchL.target.updateMatrixWorld();
     // at a wall a metre away the full beam burns a white hole: painting, it dims to a work light
-    torchL.intensity = (paint ? 14 : 420) * torch.w;
+    torchL.intensity = (paint ? 14 : 650) * torch.w;
     beam.visible = torch.w > 0.02; if (beam.visible) { beam.position.copy(torchP); beam.quaternion.setFromUnitVectors(DOWN, torchDir); (beam.material as THREE.ShaderMaterial).uniforms.uW.value = torch.w * (paint ? 0.3 : 1); }
     // the camera: behind, above, over the right shoulder, kept inside the street
     camH += ((me.crouch && !paint ? 1.05 : 1.45) - camH) * Math.min(1, dt * 10);
