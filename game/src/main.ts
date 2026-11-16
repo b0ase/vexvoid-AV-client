@@ -10,6 +10,9 @@
  * left button sprays, right button sprays lightly, Shift lays a straight line, the wheel is the can's distance, 1 2 3
  * the cap, Tab or 4 to 7 the colour, X the buff can, Z undo; A D step along the wall, W S and the arrows move the view.
  * Stage 4: the law (./cops.ts): heat, a patrol car, officers on foot; BUSTED loses the piece. P turns the patrol off.
+ * The SKETCHBOOK (./sketchbook.ts): B opens a panel of sketches (tags, throw-ups, pieces); pick one, aim at a wall and
+ * click (or G) and the writer puts it up stroke by stroke ("blast"), at 1x 2x 4x, sized to fit; moving stops it, Z takes
+ * it back in one go. N (or SAVE WALL) keeps what is on the wall being painted as a new sketch.
  * Built by scripts/build-game.sh into vx/game/vexvoid-game.js (window.VXGAME).
  */
 import * as THREE from 'three';
@@ -23,10 +26,13 @@ import { loadLook, makeGradePass } from './look';
 import { loadWriter } from './writer';
 import { makeSpray, footprint, COLOURS, COLOUR_NAMES, type Can, type Stroke, type WallStore } from './spray';
 import { makeLaw, type LawState } from './cops';
+import { makeBook, sketchOf, fit, drawSketch, secsOf, cleanName, type Sketch, type SketchKind, type SketchStore, type BookState } from './sketchbook';
 
 export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) => void; onHud?: (s: string) => void; onRec?: () => void;
   /** Where the walls' paint is kept (default: this browser). */
   store?: WallStore;
+  /** Where the player's own sketches are kept (default: this browser). */
+  sketches?: SketchStore;
   /** What happens to the writer, for a host that keeps a player's history: seen, caught, got away. */
   onEvent?: (ev: 'alert' | 'busted' | 'escaped') => void };
 export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?: number) => string; inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string }) => void; where: () => { x: number; z: number; yaw: number; heading: number; anim: string }; spots: () => { id: string; w: number; h: number; x: number; y: number; z: number }[];
@@ -39,12 +45,29 @@ export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?:
    *  speed 0 or none: at once. speed 1: the writer paints them as they were made (2 twice as fast), stepping along the
    *  wall after the can. Resolves true when the last stroke is up, false if the player stopped it. */
   play: (strokes: Stroke[], o?: { wall?: string; at?: [number, number]; scale?: number; speed?: number }) => Promise<boolean>;
+  /** The sketchbook: every sketch (starters and the player's own). */
+  sketches: () => SketchInfo[];
+  /** One sketch in full (its strokes), by id or name. */
+  sketch: (idOrName: string, kind?: SketchKind) => Sketch | null;
+  /** Keep a wall's strokes (none given: the wall being painted) as a new sketch. */
+  saveSketch: (o?: { wall?: string; name?: string; kind?: SketchKind }) => Promise<SketchInfo>;
+  /** Forget one of the player's own sketches. */
+  deleteSketch: (id: string) => Promise<boolean>;
+  /** Put a sketch up: on `wall` (none: the wall being painted, or the nearest), centred on `at` (metres from the wall's
+   *  bottom left; none: where the can points, or in front of the writer), size x its own size (made smaller to fit),
+   *  speed 1 2 4 animated (0: at once). Resolves true when it is all up, false if it was stopped (moving, busted). */
+  blast: (idOrName: string, o?: { wall?: string; at?: [number, number]; size?: number; speed?: number; kind?: SketchKind }) => Promise<boolean>;
+  /** The sketchbook panel: open it, pick, speed, size; returns its state and where a blast would go now. */
+  sketchbook: (o?: Partial<BookState>) => BookState & { blasting: string; plan: { wall: string; at: [number, number]; scale: number; fitted: boolean } | null };
   /** Take back the last stroke on a wall (none given: the wall being painted). Returns how many strokes went. */
   undo: (id?: string) => number;
   /** The can in the writer's hand; give fields to change them. */
   can: (o?: Partial<Can>) => Can;
   /** What the paint costs in memory: walls with paint, tiles alive, MB of canvas. */
   paintStats: () => { walls: number; painted: number; tiles: number; mb: number; resting: number; undo: number; undoTiles: number; drips: number }; flush: () => Promise<void>; goto: (x: number, z: number, yaw?: number, pitch?: number) => void; law: () => LawState; cops: (on: boolean) => void; audio: () => { ctx: AudioContext; node: AudioNode } | null };
+
+export type SketchInfo = { id: string; name: string; kind: SketchKind; w: number; h: number; strokes: number; secs: number; mine: boolean; about?: string };
+const infoOf = (s: Sketch): SketchInfo => ({ id: s.id, name: s.name, kind: s.kind, w: s.w, h: s.h, strokes: s.strokes.length, secs: Math.round(secsOf(s)), mine: !!s.mine, about: s.about });
 
 // VexVoid's grade: no colour at all, hard contrast, a heavy vignette
 const MONO = { shadow: [1, 1, 1] as [number, number, number], high: [1, 1, 1] as [number, number, number], sat: 0, contrast: 1.32, vignette: 0.72 };
@@ -77,7 +100,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   // the painting controls, small in a corner while painting (H hides them)
   const helpEl = document.createElement('div');
   helpEl.style.cssText = 'position:absolute;left:12px;top:12px;padding:8px 10px;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.28);color:rgba(255,255,255,.82);font:500 10px/1.7 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;white-space:pre;pointer-events:none;display:none';
-  helpEl.textContent = ['MOUSE  SPRAY · RIGHT BUTTON  LIGHT COAT', 'SHIFT  STRAIGHT LINE · WHEEL  CAN CLOSER / FURTHER', '1 2 3  CAP · TAB  COLOUR · X  BUFF CAN · Z  UNDO', 'A D  STEP ALONG · W S  VIEW IN / OUT · ARROWS  LOOK', 'H  HIDE THIS · F  DONE'].join('\n');
+  helpEl.textContent = ['MOUSE  SPRAY · RIGHT BUTTON  LIGHT COAT', 'SHIFT  STRAIGHT LINE · WHEEL  CAN CLOSER / FURTHER', '1 2 3  CAP · TAB  COLOUR · X  BUFF CAN · Z  UNDO', 'A D  STEP ALONG · W S  VIEW IN / OUT · ARROWS  LOOK', 'B  SKETCHBOOK · H  HIDE THIS · F  DONE'].join('\n');
   host.appendChild(helpEl);
 
   const scene = new THREE.Scene();
@@ -131,7 +154,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const me = { x: 0, z: 8, y: 0, gy: 0, vy: 0, heading: Math.PI, crouch: false, airborne: false };
   const camO = { yaw: 0, pitch: 0.12, dist: 3.4 };
   const keys = new Set<string>();
-  const MOVE = ['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Shift', ' ', 'c', 'f', 'p', 'r', '1', '2', '3', '4', '5', '6', '7', 'z', 'x', 'h', 'Tab', 'Escape'];
+  const MOVE = ['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Shift', ' ', 'c', 'f', 'p', 'r', '1', '2', '3', '4', '5', '6', '7', 'z', 'x', 'h', 'Tab', 'Escape', 'b', 'g', 'v', 'n', '[', ']', '-', '=', '+', 'Enter'];
   // painting: F at a wall squares up to it; the mouse aims, holding it sprays; the wheel sets the can's distance
   type W = (typeof city.walls)[number];
   const can: Can = { colour: COLOURS[0], cap: 2, dist: 0.2, pressure: 1, buff: false };
@@ -145,6 +168,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   // strokes the writer is painting by themselves: a straight line, or a piece played from its log
   type Auto = { list: { wall: string; can: Can; seed?: number; pts: [number, number, number][] }[]; i: number; k: number; t: number; gap: number; speed: number; group: string; done: (ok: boolean) => void };
   let auto: Auto | null = null, autoN = 0, pressN = 0;   // pressN: one press of the button undoes as one step
+  let blasting = '';   // the sketch being put up, by name
   const mouse = new THREE.Vector2(), ray = new THREE.Raycaster(), aimHand = new THREE.Vector3(), canAt = new THREE.Vector3(), lineA = new THREE.Vector3();
   const wallOf = new Map(city.walls.map((w) => [w.id, w]));
   const alongOf = (w: W, x: number, z: number) => (x - w.center.x) * w.normal.z - (z - w.center.z) * w.normal.x;
@@ -167,9 +191,11 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     const L = law.state(), cells = Math.min(5, Math.ceil(L.heat * 5 - 0.001));
     const what = { off: 'PATROL OFF', calm: L.seen ? 'SEEN' : L.heat >= 0.6 ? 'WANTED' : 'CALM', alerted: 'ALERT', chase: 'CHASE', searching: 'SEARCHING', busted: 'BUSTED' }[L.chase];
     const lawS = L.on ? `HEAT ${'▮'.repeat(cells)}${'▯'.repeat(5 - cells)} ${what} · P PATROL OFF` : 'PATROL OFF · P PATROL ON';
+    const bk = book.state.open ? (() => { const s = book.pick(); return `SKETCHBOOK · ${s ? s.name + ' ' + s.kind.toUpperCase() : 'PICK ONE'} · ${book.state.speed}× · SIZE ${Math.round(book.state.size * 100)}% · B CLOSE · `; })() : '';
+    if (bk) return bk + (paint ? `PAINTING ${paint.id.toUpperCase()} · F DONE · ` : 'WASD MOVE · F AT A WALL · ') + lawS;
     return (paint
       ? `PAINTING ${paint.id.toUpperCase()} · ${can.buff ? 'BUFF' : COLOUR_NAMES[colourI]} · ${CAPS[can.cap]} CAP · ${Math.round(can.dist * 100)} CM OFF · LINE ${cm(footprint(can).width)} CM · ${help ? 'F DONE' : 'H HELP · F DONE'}`
-      : 'WASD MOVE · SHIFT SPRINT · C CROUCH · SPACE JUMP · DRAG LOOK · F AT ANY WALL TO PAINT') + ' · ' + lawS + (opts.onRec ? ' · R RECORD' : '');
+      : 'WASD MOVE · SHIFT SPRINT · C CROUCH · SPACE JUMP · DRAG LOOK · F AT ANY WALL TO PAINT · B SKETCHBOOK') + ' · ' + lawS + (opts.onRec ? ' · R RECORD' : '');
   };
   const hud = () => { const s = hudText(); if (s !== lastHud) { lastHud = s; if (opts.onHud) opts.onHud(s); } };
   const fwd = new THREE.Vector3(0, 0, -1), side = new THREE.Vector3();
@@ -197,7 +223,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     }
     return best;
   };
-  const stopAuto = (ok: boolean) => { const a = auto; if (!a) return; auto = null; spray.end(); a.done(ok); };
+  const stopAuto = (ok: boolean) => { const a = auto; if (!a) return; auto = null; spray.end(); if (!ok && blasting) note(`STOPPED ${blasting} · Z TAKES IT BACK`, 2.5); blasting = ''; a.done(ok); };
   const squareUp = (w: W) => { paint = { id: w.id, spot: w }; camO.yaw = Math.atan2(w.normal.x, w.normal.z); camO.pitch = 0.1; camO.dist = 2.6; };
   const togglePaint = () => {
     if (paint) { paint = null; btn = 0; stroke = null; line = null; spray.end(); stopAuto(false); me.crouch = false; hud(); return; }
@@ -224,6 +250,66 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const dot = new THREE.Mesh(new THREE.CircleGeometry(0.0035, 12), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.9, depthTest: false }));
   const preview = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.8, depthTest: false }));
   for (const o of [reticle, dot, preview]) { o.renderOrder = 10; o.visible = false; o.userData.noAO = true; o.frustumCulled = false; scene.add(o); }
+  // the SKETCHBOOK panel, and the sketch picked shown faintly on the wall where a blast would put it
+  const book = makeBook(host, {
+    onBlast: () => blastNow(), onChange: () => { hud(); }, focus: () => canvas.focus(),
+    onSave: (name, kind) => { saveWall({ name, kind }).catch((e) => note(String(e.message || e).toUpperCase(), 2.5)); },
+    onDelete: (id) => { const s = book.byId(id); void book.remove(id).then((ok) => { if (ok && s) note(`DELETED ${s.name}`); }); },
+    canSave: () => !!paint && spray.strokes(paint.id).length > 0,
+  }, opts.sketches);
+  const ghost = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.55, depthTest: false, depthWrite: false }));
+  const ghostFrame = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-0.5, -0.5, 0), new THREE.Vector3(0.5, -0.5, 0), new THREE.Vector3(0.5, 0.5, 0), new THREE.Vector3(-0.5, 0.5, 0)]), new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.75, depthTest: false }));
+  ghost.add(ghostFrame);
+  for (const o of [ghost, ghostFrame]) { o.renderOrder = 11; o.visible = o === ghostFrame; o.userData.noAO = true; o.frustumCulled = false; }
+  ghost.visible = false; scene.add(ghost);
+  let ghostOf = '';
+  const ghostPic = (sk: Sketch) => {
+    if (ghostOf === sk.id) return; ghostOf = sk.id;
+    const cv = document.createElement('canvas'); cv.width = 512; cv.height = Math.max(32, Math.min(512, Math.round(512 * sk.h / sk.w)));
+    drawSketch(cv, sk, { bg: null, pad: 0 });
+    const m = ghost.material as THREE.MeshBasicMaterial; if (m.map) m.map.dispose();
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; m.map = tex; m.needsUpdate = true;
+  };
+  // where the can points on a wall right now (paint mode), and where the picked sketch would go from there
+  let aimAt: { id: string; x: number; y: number } | null = null, plan: { wall: string; at: [number, number]; scale: number; fitted: boolean } | null = null;
+  // how high on a wall the writer reaches (metres from its bottom)
+  const reachOn = (w: W) => me.gy + 2.6 - (w.center.y - w.h / 2);
+  const planFor = (sk: Sketch, w: W, aim: { x: number; y: number } | null, size: number) => {
+    const a = aim || { x: alongOf(w, me.x, me.z) + w.w / 2, y: me.gy + 1.35 - (w.center.y - w.h / 2) };
+    const f = fit(sk, w, a, size, reachOn(w)); return { wall: w.id, at: f.at, scale: f.scale, fitted: f.fitted };
+  };
+  const findSketch = (q: string, kind?: SketchKind) => {
+    const all = book.all(), k = (s: Sketch) => !kind || s.kind === kind, n = cleanName(q);
+    return all.find((s) => s.id === q) || all.find((s) => k(s) && s.name === n) || all.find((s) => k(s) && s.id.endsWith('-' + q.toLowerCase())) || null;
+  };
+  /** The writer puts a sketch up. */
+  const blast = (sk: Sketch, o: { wall?: string; at?: [number, number]; size?: number; speed?: number } = {}) => {
+    if (bust) return Promise.resolve(false);
+    let w: W | undefined;
+    if (o.wall) { w = wallOf.get(o.wall); if (!w) return Promise.reject(new Error('no wall ' + o.wall)); }
+    else w = (aimAt && paint && wallOf.get(aimAt.id)) || (paint ? paint.spot : nearestWall()?.spot);
+    if (!w) return Promise.reject(new Error('no wall within reach: walk up to one, or give a wall'));
+    const pl = planFor(sk, w, o.at ? { x: o.at[0], y: o.at[1] } : aimAt && aimAt.id === w.id ? aimAt : null, o.size ?? book.state.size);
+    const speed = o.speed ?? book.state.speed;
+    const strokes: Stroke[] = sk.strokes.map((s) => ({ ...s, wall: w!.id, buff: !!s.buff }));
+    const p = play(strokes, { wall: w.id, at: pl.at, scale: pl.scale, speed });
+    if (speed > 0) { blasting = sk.name; note(`BLASTING ${sk.name} · ${speed}× · MOVE TO STOP`, 1.8); }
+    return p;
+  };
+  const blastNow = () => {
+    const sk = book.pick(); if (!sk || bust) return;
+    if (auto) { note('ALREADY PUTTING ONE UP · MOVE TO STOP IT'); return; }
+    if (!paint) { const w = nearestWall(); if (!w) { note('WALK UP TO A WALL TO BLAST', 2); return; } togglePaint(); }
+    blast(sk).catch((e) => note(String(e.message || e).toUpperCase(), 2.5));
+  };
+  const saveWall = async (o: { wall?: string; name?: string; kind?: SketchKind } = {}) => {
+    const id = o.wall || (paint ? paint.id : ''); if (!id) throw new Error('paint a wall first');
+    if (!wallOf.has(id)) throw new Error('no wall ' + id);
+    await book.loaded;
+    const kind = o.kind || book.state.kind, name = cleanName(o.name || '') || `SKETCH ${book.all().filter((s) => s.mine).length + 1}`;
+    const sk = sketchOf(spray.strokes(id), name, kind); if (!sk) throw new Error('nothing painted on ' + id + ' this time round to save');
+    await book.add(sk); note(`SAVED ${sk.name} TO THE SKETCHBOOK`, 2); return sk;
+  };
   const setCap = (c: 1 | 2 | 3) => { can.cap = c; note(`${CAPS[c]} CAP · ${cm(footprint(can).width)} CM LINE`); hud(); };
   const setColour = (i: number) => { colourI = (i + COLOURS.length) % COLOURS.length; can.colour = COLOURS[colourI]; can.buff = false; note(COLOUR_NAMES[colourI]); hud(); };
   const undo = (id?: string) => {
@@ -239,6 +325,14 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     e.preventDefault(); e.stopPropagation();
     if (down && !e.repeat && k === 'r') { if (opts.onRec) opts.onRec(); return; } // recording belongs to whoever mounted the game
     if (bust) return; // nothing to do while you are being nicked
+    // a sketch going up stops when the writer moves (what is up stays; Z takes it back)
+    if (down && !e.repeat && auto && auto.group[0] === 'p' && ['a', 'd', ' ', 'c', 'f', 'Escape'].includes(k)) stopAuto(false);
+    if (down && !e.repeat && k === 'b') { book.setOpen(!book.state.open); if (book.state.open) note(paint ? 'PICK A SKETCH · CLICK THE WALL TO BLAST' : 'PICK A SKETCH · WALK UP TO A WALL'); }
+    if (down && (k === '[' || k === ']')) { if (!book.state.open) book.setOpen(true); book.step(k === ']' ? 1 : -1); const s = book.pick(); if (s) note(`${s.name} · ${s.kind.toUpperCase()}`); }
+    if (down && !e.repeat && book.state.open && k === 'v') { book.speed(-1); note(`SPEED ${book.state.speed}×`); }
+    if (down && book.state.open && (k === '-' || k === '=' || k === '+')) { book.size(book.state.size + (k === '-' ? -0.1 : 0.1)); note(`SIZE ${Math.round(book.state.size * 100)}%`); }
+    if (down && !e.repeat && book.state.open && (k === 'g' || k === 'Enter')) blastNow();
+    if (down && !e.repeat && k === 'n') { if (!book.state.open) book.setOpen(true); saveWall({ name: book.nameField().value }).catch((er) => note(String(er.message || er).toUpperCase(), 2.5)); }
     if (down && !e.repeat && k === 'f') togglePaint();
     if (down && !e.repeat && k === 'p') { const on = !law.state().on; law.setOn(on); say2(on ? 'PATROL ON · WATCH FOR THE CAR' : 'PATROL OFF · PAINT IN PEACE', 2); }
     if (down && !e.repeat && k === 'Escape' && paint) togglePaint();
@@ -261,6 +355,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   canvas.addEventListener('pointerdown', (e) => {
     canvas.focus(); aim(e); canvas.setPointerCapture(e.pointerId);
     if (e.button === 1) e.preventDefault();
+    if (paint && e.button === 0 && book.state.open && book.pick()) { blastNow(); return; }   // sketchbook open: a click on the wall blasts the sketch picked
     if (paint && (e.button === 0 || e.button === 2)) { if (!btn) pressN++; btn |= e.button === 0 ? 1 : 2; down = mouse.clone(); return; }   // in paint mode the mouse is the can: left sprays, right sprays lightly
     drag = { x: e.clientX, y: e.clientY }; canvas.style.cursor = 'grabbing';
   });
@@ -357,6 +452,16 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       if (h && h.wall !== sp) { paint = { id: h.id, spot: h.wall }; sp = h.wall; n = sp.normal; hud(); }
       const feet = me.gy, top = feet + me.y + (me.crouch ? 1.9 : 2.6);
       const tooHigh = !!h && h.point.y >= top, reach = !!h && !tooHigh, pressing = btn !== 0 && !auto;
+      // the sketchbook open: the sketch picked shows where a click would put it
+      aimAt = h ? { id: h.id, x: h.x, y: h.y } : null;
+      const armed = book.state.open && !auto ? book.pick() : null;
+      plan = armed && h ? planFor(armed, h.wall, h, book.state.size) : null;
+      ghost.visible = !!(armed && plan && h);
+      if (armed && plan && h) {
+        ghostPic(armed);
+        spray.point(h.id, plan.at[0] + armed.w * plan.scale / 2, plan.at[1] + armed.h * plan.scale / 2, ghost.position).addScaledVector(h.wall.normal, 0.03);
+        ghost.rotation.set(0, Math.atan2(h.wall.normal.x, h.wall.normal.z), 0); ghost.scale.set(armed.w * plan.scale, armed.h * plan.scale, 1);
+      }
       let P: THREE.Vector3 | null = null, vol = 1, h0 = h;
       if (down && h) { ray.setFromCamera(down, cam); const q = spray.hit(ray, [h.id]); if (q && q.point.y < top) h0 = q; }
       down = null;
@@ -404,8 +509,8 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       // low on the wall the writer gets down to it, and stands again for the rest
       if (P && !me.airborne) { if (P.y < feet + 0.8) me.crouch = true; else if (P.y > feet + 1.15) me.crouch = false; }
       follow = P && (sprayingNow || auto) ? (P.x - me.x) * n.z - (P.z - me.z) * n.x : 0;
-      prompt(t < tipHold ? tipNote : auto ? '' : line ? 'STRAIGHT LINE · LET GO TO SPRAY IT' : tooHigh ? 'TOO HIGH TO REACH · AIM LOWER' : !h ? 'POINT AT THE WALL' : !sprayed ? 'HOLD THE MOUSE BUTTON TO SPRAY · F WHEN DONE' : '');
-      reticle.visible = dot.visible = !!P;
+      prompt(t < tipHold ? tipNote : auto ? (blasting ? `BLASTING ${blasting} · MOVE TO STOP` : '') : armed ? (h ? `CLICK TO BLAST ${armed.name}${plan && plan.fitted ? ' · SIZED TO FIT' : ''}` : 'POINT AT THE WALL TO PLACE IT') : line ? 'STRAIGHT LINE · LET GO TO SPRAY IT' : tooHigh ? 'TOO HIGH TO REACH · AIM LOWER' : !h ? 'POINT AT THE WALL' : !sprayed ? 'HOLD THE MOUSE BUTTON TO SPRAY · F WHEN DONE' : '');
+      reticle.visible = !!P && !armed; dot.visible = !!P;
       if (P) {
         reticle.position.copy(P).addScaledVector(n, 0.02); reticle.rotation.set(0, Math.atan2(n.x, n.z), 0); dot.position.copy(reticle.position); dot.rotation.copy(reticle.rotation);
         reticle.scale.setScalar(Math.max(0.004, footprint(auto ? auto.list[Math.min(auto.i, auto.list.length - 1)].can : can).width / 2));
@@ -416,8 +521,9 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       } else writer.aim(null);
       hissOn(sprayingNow, 0.55 + 0.45 * vol);
     } else {
-      reticle.visible = dot.visible = preview.visible = false; hissOn(false); writer.aim(null); follow = 0;
-      const nw = !bust && nearestWall(2.5); prompt(t < tipHold ? tipNote : nw ? 'PRESS F TO PAINT THIS WALL' : '');
+      reticle.visible = dot.visible = preview.visible = ghost.visible = false; hissOn(false); writer.aim(null); follow = 0; aimAt = null; plan = null;
+      const nw = !bust && nearestWall(2.5), sk = book.state.open ? book.pick() : null;
+      prompt(t < tipHold ? tipNote : nw ? (sk ? `PRESS F · THEN CLICK THE WALL TO BLAST ${sk.name}` : 'PRESS F TO PAINT THIS WALL') : sk ? 'WALK UP TO A WALL TO BLAST ' + sk.name : '');
     }
     helpEl.style.display = paint && help ? 'block' : 'none';
     spray.update(dt, me);
@@ -484,6 +590,21 @@ let camY = Math.max(0.35, tgtY + Math.sin(camO.pitch) * camO.dist), camX = Math.
     comp.render(dt);
     hud();
   };
+  const play = (strokes: Stroke[], o: { wall?: string; at?: [number, number]; scale?: number; speed?: number } = {}) => new Promise<boolean>((res, rej) => {
+    try {
+      if (!(o.speed && o.speed > 0)) { stroke = null; spray.replay(strokes, o); return res(true); }
+      const k = o.scale ?? 1, [ax, ay] = o.at || [0, 0];
+      const list = strokes.filter((s) => s.pts.length).map((s) => ({ wall: o.wall || s.wall, can: { colour: s.colour, cap: s.cap, dist: s.dist, pressure: s.pressure, buff: s.buff } as Can, seed: s.seed, pts: s.pts.map(([x, y, tt]) => [ax + x * k, ay + y * k, tt] as [number, number, number]) }));
+      const bad = list.find((s) => !wallOf.has(s.wall)); if (bad) throw new Error('no wall ' + bad.wall);
+      if (!list.length || bust) return res(false);
+      // the writer goes to the wall, in front of where the piece starts
+      stopAuto(false); stroke = null; line = null; btn = 0;
+      const w = wallOf.get(list[0].wall)!, a0 = list[0].pts[0][0] - w.w / 2;
+      if (!paint || paint.spot !== w || Math.abs(alongOf(w, me.x, me.z) - a0) > 3) { me.x = w.center.x + w.normal.x * 0.7 + w.normal.z * a0; me.z = w.center.z + w.normal.z * 0.7 - w.normal.x * a0; me.heading = Math.atan2(-w.normal.x, -w.normal.z); squareUp(w); }
+      auto = { list, i: 0, k: 0, t: 0, gap: 0.4, speed: o.speed, group: 'p' + ++autoN, done: res };
+    } catch (e) { rej(e); }
+  });
+
   say(''); hud();
   frame();
 
@@ -506,21 +627,17 @@ let camY = Math.max(0.35, tgtY + Math.sin(camO.pitch) * camO.dist), camX = Math.
     paint: (id, pts, o = {}) => { stroke = null; spray.path(id, pts, { colour: o.colour || COLOURS[0], cap: o.cap || 2, dist: o.dist ?? 0.2, pressure: o.pressure ?? 1, buff: !!o.buff }); },
     clearPaint: (id?: string) => { stroke = null; line = null; stopAuto(false); spray.clear(id); },
     strokes: (id) => spray.strokes(id).map((s) => ({ ...s, pts: s.pts.map((p) => [p[0], p[1], p[2]] as [number, number, number]) })),
-    play: (strokes, o = {}) => new Promise<boolean>((res, rej) => {
-      try {
-        if (!(o.speed && o.speed > 0)) { stroke = null; spray.replay(strokes, o); return res(true); }
-        const k = o.scale ?? 1, [ax, ay] = o.at || [0, 0];
-        const list = strokes.filter((s) => s.pts.length).map((s) => ({ wall: o.wall || s.wall, can: { colour: s.colour, cap: s.cap, dist: s.dist, pressure: s.pressure, buff: s.buff } as Can, seed: s.seed, pts: s.pts.map(([x, y, tt]) => [ax + x * k, ay + y * k, tt] as [number, number, number]) }));
-        const bad = list.find((s) => !wallOf.has(s.wall)); if (bad) throw new Error('no wall ' + bad.wall);
-        if (!list.length || bust) return res(false);
-        // the writer goes to the wall, in front of where the piece starts
-        stopAuto(false); stroke = null; line = null; btn = 0;
-        const w = wallOf.get(list[0].wall)!, a0 = list[0].pts[0][0] - w.w / 2;
-        if (!paint || paint.spot !== w || Math.abs(alongOf(w, me.x, me.z) - a0) > 3) { me.x = w.center.x + w.normal.x * 0.7 + w.normal.z * a0; me.z = w.center.z + w.normal.z * 0.7 - w.normal.x * a0; me.heading = Math.atan2(-w.normal.x, -w.normal.z); squareUp(w); }
-        auto = { list, i: 0, k: 0, t: 0, gap: 0.4, speed: o.speed, group: 'p' + ++autoN, done: res };
-      } catch (e) { rej(e); }
-    }),
+    play,
     undo: (id) => undo(id),
+    sketches: () => book.all().map(infoOf),
+    sketch: (q, kind) => { const s = findSketch(q, kind); return s ? JSON.parse(JSON.stringify(s)) : null; },
+    saveSketch: async (o = {}) => infoOf(await saveWall(o)),
+    deleteSketch: (id) => book.remove(id),
+    blast: async (q, o = {}) => { await book.loaded; const s = findSketch(q, o.kind); if (!s) throw new Error('no sketch ' + q); book.choose(s.id); return blast(s, o); },
+    sketchbook: (o) => {
+      if (o) { if (o.kind) book.setKind(o.kind); if (o.pick) book.choose(o.pick); if (o.speed) book.speed(o.speed); if (o.size) book.size(o.size); if (o.open != null) book.setOpen(o.open); }
+      return { ...book.state, blasting, plan };
+    },
     can: (o) => {
       if (o) { if (o.cap) can.cap = o.cap; if (o.dist != null) can.dist = Math.max(0.05, Math.min(0.6, o.dist)); if (o.buff != null) can.buff = o.buff; if (o.colour && COLOURS.includes(o.colour)) { colourI = COLOURS.indexOf(o.colour); can.colour = o.colour; } hud(); }
       return { ...can };
@@ -542,8 +659,9 @@ let camY = Math.max(0.35, tgtY + Math.sin(camO.pitch) * camO.dist), camX = Math.
     stop: () => {
       stopped = true; cancelAnimationFrame(raf); ro.disconnect();
       canvas.removeEventListener('keydown', kd); canvas.removeEventListener('keyup', ku);
-      hissOn(false); law.dispose(); if (bus) void bus.ctx.close(); spray.dispose(); writer.dispose(); city.dispose(); look.dispose(); comp.dispose(); r.dispose(); canvas.remove(); tip.remove(); helpEl.remove();
-      for (const o of [reticle, dot, preview]) { o.geometry.dispose(); (o.material as THREE.Material).dispose(); }
+      hissOn(false); law.dispose(); book.dispose(); if (bus) void bus.ctx.close(); spray.dispose(); writer.dispose(); city.dispose(); look.dispose(); comp.dispose(); r.dispose(); canvas.remove(); tip.remove(); helpEl.remove();
+      for (const o of [reticle, dot, preview, ghost, ghostFrame]) { o.geometry.dispose(); (o.material as THREE.Material).dispose(); }
+      const gm = (ghost.material as THREE.MeshBasicMaterial).map; if (gm) gm.dispose();
     },
   };
 }

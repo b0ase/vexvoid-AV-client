@@ -83,6 +83,11 @@ const local: WallStore = {
   loadStrokes: async (id) => (await tx<Stroke[]>('readonly', (st) => st.get(id + '#strokes'))) || null,
   saveStrokes: async (id, strokes) => { await tx('readwrite', (st) => (strokes && strokes.length ? st.put(strokes, id + '#strokes') : st.delete(id + '#strokes')) as IDBRequest<unknown>); },
 };
+/** Anything else the game keeps in this browser beside the walls (the sketchbook): a value under a key; null forgets it. */
+export const localKeep = {
+  get: async <T>(key: string) => ((await tx<T>('readonly', (st) => st.get(key))) ?? null) as T | null,
+  put: async (key: string, v: unknown) => { await tx('readwrite', (st) => (v == null ? st.delete(key) : st.put(v, key)) as IDBRequest<unknown>); },
+};
 
 const rng = (seed: number) => () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 const canvasOf = (w: number, h: number) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
