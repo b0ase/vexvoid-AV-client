@@ -127,11 +127,19 @@ export function makeSpray(scene: THREE.Scene, walls: Wall[], store: WallStore = 
     for (let cy = c; cy <= d; cy++) for (let cx = a; cx <= b; cx++) {
       const i = cy * L.cols + cx, had = L.tiles.get(i);
       if (e && !e.snaps.has(i)) { let s: HTMLCanvasElement | null = null; if (had) { s = canvasOf(had.cv.width, had.cv.height); s.getContext('2d')!.drawImage(had.cv, 0, 0); } e.snaps.set(i, s); }
-      const T = had || tileOf(L, i); f(T.g); T.dirty = true;
+      const T = had || tileOf(L, i); const c = clipSolid(L, T.g); f(T.g); if (c) T.g.restore(); T.dirty = true;
     }
     L.unsaved = 1.5;
   };
 
+  // paint only where the wall is solid: an arch's panel is brick below the spring and inside the arch, air elsewhere
+  // (saved paint over the air does not come back either). Leaves the context clipped (restore after) when it clips.
+  const clipSolid = (L: Layer, g: CanvasRenderingContext2D) => {
+    const a = L.wall.arch; if (!a) return false;
+    const sy = L.H - a.y * PX, cx = a.x * PX, r = a.r * PX;
+    g.save(); g.beginPath(); g.rect(0, sy, L.W, L.H - sy); g.moveTo(cx + r, sy); g.arc(cx, sy, r, 0, Math.PI * 2); g.clip();
+    return true;
+  };
   // a saved wall's picture goes back on its tiles (only where there is paint); under: beneath what is there already
   const blit = (L: Layer, im: ImageBitmap, under = false) => {
     if (Math.abs(im.width / im.height - L.W / L.H) > 0.02 * L.W / L.H) return false;   // the wall changed shape: start clean
@@ -144,8 +152,8 @@ export function makeSpray(scene: THREE.Scene, walls: Wall[], store: WallStore = 
       for (let y = Math.max(0, Math.floor(oy / k) - 1); y <= Math.min(ph - 1, Math.ceil((oy + th) / k)) && !any; y++)
         for (let x = Math.max(0, Math.floor(ox / k) - 1); x <= Math.min(pw - 1, Math.ceil((ox + tw) / k)); x++) if (d[(y * pw + x) * 4 + 3]) { any = true; break; }
       if (!any) continue;
-      const g = tileOf(L, i).g; g.globalAlpha = 1; g.globalCompositeOperation = under ? 'destination-over' : 'source-over';
-      g.drawImage(im, ox * sx, oy * sy, tw * sx, th * sy, ox, oy, tw, th); g.globalCompositeOperation = 'source-over'; L.tiles.get(i)!.dirty = true;
+      const g = tileOf(L, i).g, cl = clipSolid(L, g); g.globalAlpha = 1; g.globalCompositeOperation = under ? 'destination-over' : 'source-over';
+      g.drawImage(im, ox * sx, oy * sy, tw * sx, th * sy, ox, oy, tw, th); g.globalCompositeOperation = 'source-over'; if (cl) g.restore(); L.tiles.get(i)!.dirty = true;
     }
     return true;
   };
@@ -304,6 +312,8 @@ export function makeSpray(scene: THREE.Scene, walls: Wall[], store: WallStore = 
         const d = (v3.copy(wall.center).addScaledVector(n, 0.012).sub(o).dot(n)) / den; if (d <= 0 || (best && d >= best.dist)) continue;
         const p = v3.copy(o).addScaledVector(dir, d), x = (p.x - wall.center.x) * n.z - (p.z - wall.center.z) * n.x + wall.w / 2, y = p.y - wall.center.y + wall.h / 2;
         if (x < 0 || x > wall.w || y < 0 || y > wall.h) continue;
+        // over an arch's opening there is no wall: the ray goes on to whatever is behind
+        if (wall.arch && y > wall.arch.y && Math.hypot(x - wall.arch.x, y - wall.arch.y) > wall.arch.r) continue;
         best = { id: wall.id, wall, x, y, u: x / wall.w, v: y / wall.h, point: p.clone(), dist: d };
       }
       return best;

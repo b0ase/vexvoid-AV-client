@@ -14,7 +14,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import type { Look } from './look';
-import { makePlan, ROAD_Y, TOW_Y, WATER_Y, type Plan, type Bld, type Side } from './plan';
+import { makePlan, ROAD_Y, SPRING, TOW_Y, WATER_Y, type Plan, type Bld, type Side } from './plan';
 import { makeNav, type Box } from './world';
 import { skylineTex, softGlow, ringTex } from './cityAssets';
 import { beamMaterial, glowMaterial, makeShared, mistMaterial, rainMaterial, rippleMaterial, steamMaterial } from './cityShaders';
@@ -350,7 +350,7 @@ export function buildDistrict({ renderer, scene, high, look }: { renderer: THREE
 
   // ── the viaduct's arches: a ring in front of each bay, a vault over the open ones; tracks on the deck ──
   {
-    const V = P.viaduct, spring = 1.6;
+    const V = P.viaduct, spring = SPRING;
     for (const b of V.bays) {
       const w = b.x1 - b.x0, rad = w / 2, cx = (b.x0 + b.x1) / 2;
       // the spandrels and crown: the outline runs up one side, across the top, down the other and back over the arch
@@ -683,8 +683,17 @@ export function buildDistrict({ renderer, scene, high, look }: { renderer: THREE
     const ms: THREE.Matrix4[] = [], rects: number[] = [];
     const byKind = (k: string) => at.cells.map((c, i) => (c.kind === k ? i : -1)).filter((i) => i >= 0);
     const K = { tag: byKind('tag'), throw: byKind('throw'), scratch: byKind('scratch'), buff: byKind('buff'), poster: byKind('poster'), sticker: byKind('sticker'), stain: byKind('stain'), piece: byKind('piece'), stencil: byKind('stencil') };
+    // old work stays on its wall: shrunk to fit the panel, kept inside it, and only where the wall is solid (an arch's
+    // infill, not the air over the opening; a piece once hung off a pier into the open arch like a sign)
+    const solidAt = (wl: (typeof P.walls)[number], x: number, y: number) => x >= 0 && x <= wl.w && y >= 0 && y <= wl.h && (!wl.arch || y <= wl.arch.y || Math.hypot(x - wl.arch.x, y - wl.arch.y) <= wl.arch.r);
     const put = (wl: (typeof P.walls)[number], kind: keyof typeof K, along: number, y: number, s = 1, off = 0.006) => {
       const i = K[kind][ri(K[kind].length)], c = at.cells[i], tx = -wl.n[1], tz = wl.n[0];
+      s = Math.min(s, (wl.w - 0.2) / c.mw, (wl.h - 0.1) / c.mh); if (s <= 0.05) return;
+      const hw = (c.mw * s) / 2 + 0.05, hh = (c.mh * s) / 2 + 0.03, lo = wl.c[1] - wl.h / 2;
+      along = Math.max(-wl.w / 2 + hw, Math.min(wl.w / 2 - hw, along)); y = Math.max(lo + hh, Math.min(lo + wl.h - hh, y));
+      // the decal's corners in the panel's own x (spray.ts: along the tangent (n.z, -n.x), from its left end)
+      const px = -along + wl.w / 2, py = y - lo;
+      if (wl.arch && ![[-1, -1], [1, -1], [-1, 1], [1, 1], [0, 1]].every(([a, b]) => solidAt(wl, px + a * hw, py + b * hh))) return;
       const x = wl.c[0] + tx * along + wl.n[0] * off, z = wl.c[2] + tz * along + wl.n[1] * off;
       ms.push(M(x, y, z, c.mw * s, c.mh * s, 1, Math.atan2(wl.n[0], wl.n[1]), 0, kind === 'poster' || kind === 'sticker' ? (R() - 0.5) * 0.08 : (R() - 0.5) * 0.04));
       rects.push(...at.rect(i));
@@ -795,7 +804,7 @@ export function buildDistrict({ renderer, scene, high, look }: { renderer: THREE
   scene.add(group);
 
   // ── walls for the can ──
-  const walls: Wall[] = P.walls.map((w) => ({ id: w.id, w: w.w, h: w.h, center: new THREE.Vector3(...w.c), normal: new THREE.Vector3(w.n[0], 0, w.n[1]) }));
+  const walls: Wall[] = P.walls.map((w) => ({ id: w.id, w: w.w, h: w.h, center: new THREE.Vector3(...w.c), normal: new THREE.Vector3(w.n[0], 0, w.n[1]), ...(w.arch ? { arch: w.arch } : {}) }));
 
   // ceilings: the studio, the warehouse, the tunnel, the bridges, the open arches
   const ceilings: { x0: number; x1: number; z0: number; z1: number; y: number }[] = [];

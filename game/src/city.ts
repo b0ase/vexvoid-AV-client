@@ -35,7 +35,9 @@ export type Window = { i: number; x: number; y: number; hp: number; broke: boole
 export type Rack = { mesh: THREE.Mesh; hp: number; broke: boolean; t: number };
 
 /** A wall the writer can paint: an upright plane, w x h metres, centred at center, facing normal. */
-export type Wall = { id: string; w: number; h: number; center: THREE.Vector3; normal: THREE.Vector3 };
+/** arch: the panel is solid only below the spring line (y) and inside the arch's circle (centre x, y; radius r), in
+ *  metres from the panel's bottom left: the brick infill of a railway arch, the back of an open one. */
+export type Wall = { id: string; w: number; h: number; center: THREE.Vector3; normal: THREE.Vector3; arch?: { x: number; y: number; r: number } };
 /** A wall built to be painted (its own concrete panel). */
 export type Spot = Wall & { mesh: THREE.Mesh };
 /** Something solid at street level the walker cannot pass through (x/z extents). */

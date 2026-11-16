@@ -31,7 +31,7 @@ export type Lamp = { x: number; y: number; z: number; kind: 'street' | 'wall' | 
 export type Place = { id: string; name: string; x: number; z: number; y: number; yaw: number; about: string };
 export type Door = { id: string; name: string; x0: number; x1: number; z0: number; z1: number; face: Side; sign: string; about: string };
 export type Climb = { kind: 'drainpipe' | 'fire-stairs' | 'scaffold-ladder' | 'ledge' | 'dock'; x: number; z: number; y0: number; y1: number; bld?: string };
-export type WallDef = { id: string; w: number; h: number; c: [number, number, number]; n: [number, number] };
+export type WallDef = { id: string; w: number; h: number; c: [number, number, number]; n: [number, number]; arch?: { x: number; y: number; r: number } };
 export type Scaffold = { id: string; bld: string; side: Side; a: number; b: number; lifts: number; base: number };
 export type Plan = {
   bounds: Rect; blds: Bld[]; boxes: Box[]; surfs: Surf[]; holes: Rect[]; roads: Rect[]; gates: Gate[]; lamps: Lamp[];
@@ -49,6 +49,8 @@ export type Plan = {
 };
 
 export const ROAD_Y = -0.14, TOW_Y = -3, WATER_Y = -3.55, DECK_Y = 1.6, DOCK_Y = 0.72, VIA_Y = 7.2;
+/** The viaduct's arches spring 1.6 m up and are round (radius half the bay). */
+export const SPRING = 1.6;
 
 export function makePlan(): Plan {
   const bounds: Rect = { x0: -96, x1: 96, z0: -112, z1: 64 };
@@ -420,7 +422,14 @@ export function makePlan(): Plan {
   for (const b of bays) {
     if (b.kind === 'shut' || b.kind === 'shop' || b.kind === 'solid') faceRuns(`${b.id}`, b.x0, VZ1 - 0.6, b.x1, VZ1 - 0.6, [0, 1], 0, 5);
     if (b.kind === 'tunnel') { faceRuns(`${b.id}-l`, b.x0, VZ1, tunnel.x0, VZ1, [0, 1], 0, 5); faceRuns(`${b.id}-r`, tunnel.x1, VZ1, b.x1, VZ1, [0, 1], 0, 5); }
-    if (b.kind === 'open') { faceRuns(`${b.id}-back`, b.x0, VZ0 + 1.2, b.x1, VZ0 + 1.2, [0, 1], 0, 5); faceRuns(`${b.id}-l`, b.x0, VZ0 + 1.2, b.x0, VZ1, [1, 0], 0, 5); faceRuns(`${b.id}-r`, b.x1, VZ1, b.x1, VZ0 + 1.2, [-1, 0], 0, 5); }
+    // an open arch's sides are pier only up to the spring (the vault curves away above)
+    if (b.kind === 'open') { faceRuns(`${b.id}-back`, b.x0, VZ0 + 1.2, b.x1, VZ0 + 1.2, [0, 1], 0, 5); faceRuns(`${b.id}-l`, b.x0, VZ0 + 1.2, b.x0, VZ1, [1, 0], 0, SPRING); faceRuns(`${b.id}-r`, b.x1, VZ1, b.x1, VZ0 + 1.2, [-1, 0], 0, SPRING); }
+    // the fronts and the open arches' backs are solid only inside the arch (the rest is behind the spandrel or the vault)
+    if (b.kind !== 'tunnel') {
+      const cx = (b.x0 + b.x1) / 2, rad = (b.x1 - b.x0) / 2;
+      // (these panels face along z: the panel's x axis, as spray.ts measures it, is world x times n.z)
+      for (const w of walls) if ((w.id === b.id || w.id === `${b.id}-back`) && Math.abs(w.n[1]) > 0.5) w.arch = { x: (cx - w.c[0]) * w.n[1] + w.w / 2, y: SPRING - (w.c[1] - w.h / 2), r: rad };
+    }
   }
   for (let x = bounds.x0 + 9; x < bounds.x1; x += 9) faceRuns(`pier${Math.round((x - bounds.x0) / 9)}`, x - 0.9, VZ1, x + 0.9, VZ1, [0, 1], 0, 6);
   faceRuns('tunnel-w', tunnel.x0, VZ1, tunnel.x0, wide.z0, [1, 0], 0, 3.4); faceRuns('tunnel-e', tunnel.x1, wide.z0, tunnel.x1, VZ1, [-1, 0], 0, 3.4);
