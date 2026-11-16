@@ -1,23 +1,25 @@
 /**
  * The law. Painting is risky: HEAT builds while you spray (slowly from the hiss alone, fast if you are seen) and cools
- * when you stop. A patrol car (./car.ts) drives down the street and back on a loop, every so often, its headlamps and a
- * searchlight sweeping the walls. Seen painting, or seen with the heat up, and it stops: siren, strobes, and two
+ * when you stop. A patrol car (./car.ts) comes out of its depot, drives the road loop round the district (plan.ts
+ * route) and goes back in, every so often, its headlamps and a searchlight sweeping the walls. The officers find their
+ * way through the lanes, up and down steps and under bridges on the district's map (world.ts makeNav); corners and
+ * lanes the car cannot follow are how you get away. Seen painting, or seen with the heat up, and it stops: siren, strobes, and two
  * officers get out and run you down. Break their line of sight and get far enough away for a few seconds and they lose
  * you; they search where they last saw you, then give up and walk back (ESCAPED). If one gets within a metre: BUSTED.
  *
- *   const law = await makeLaw({ scene, high, base, blockers, bounds, sound })
+ *   const law = await makeLaw({ scene, high, base, world, nav, route, sound })
  *   const ev = law.update(dt, t, { x, z, y, crouch, painting, spraying })   // '' | 'alert' | 'busted' | 'escaped'
  *
  * The officers are the writer's own body on the same skeleton (./writer.ts), in dark uniform with a helmet and a
  * smoked visor: like the writer, no faces, ever.
  */
 import * as THREE from 'three';
-import type { Blocker } from './city';
 import { makeCar, CAR } from './car';
+import type { World, makeNav } from './world';
 import { loadWriter, type Writer } from './writer';
 
 export type Chase = 'off' | 'calm' | 'alerted' | 'chase' | 'searching' | 'busted';
-export type Suspect = { x: number; z: number; y: number; crouch: boolean; painting: boolean; spraying: boolean; vx?: number; vz?: number };
+export type Suspect = { x: number; z: number; y: number; gy?: number; crouch: boolean; painting: boolean; spraying: boolean; vx?: number; vz?: number };
 export type LawEvent = '' | 'alert' | 'busted' | 'escaped';
 export type LawState = {
   on: boolean; heat: number; chase: Chase; seen: boolean;
@@ -35,19 +37,34 @@ export type Law = {
   pushOut: (p: { x: number; z: number }, r: number) => void;
   /** Call the law on the writer now (a test of an escape, or an agent's): the car pulls up where its loop passes
    *  nearest them and the officers get out and give chase. */
-  alarm: (me: { x: number; z: number }) => void;
+  alarm: (me: { x: number; z: number; gy?: number }) => void;
   /** The officer nearest the writer (for the bust camera). */
   nearest: () => { x: number; z: number } | null;
   dispose: () => void;
 };
 
-// the loop: down the right lane, a U-turn short of the hall of fame, back up the left lane and away
-const LANE = 4.2, ZN = 46, ZS = -66, ARC = Math.PI * LANE, RUN = ZN - ZS, LOOP = RUN * 2 + ARC;
-const pathAt = (s: number) => {
-  if (s < RUN) return { x: LANE, z: ZN - s, h: Math.PI };
-  if (s < RUN + ARC) { const a = (s - RUN) / LANE; return { x: LANE * Math.cos(a), z: ZS - LANE * Math.sin(a), h: Math.atan2(-Math.sin(a), -Math.cos(a)) }; }
-  return { x: -LANE, z: ZS + (s - RUN - ARC), h: 0 };
-};
+/** The car's way round: the route's corners rounded (radius 5), sampled; pathAt(s) at s metres along. */
+function routeOf(pts: [number, number][], rad = 5) {
+  const out: { x: number; z: number }[] = [];
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    if (i === 0 || i === pts.length - 1) { out.push({ x: p[0], z: p[1] }); continue; }
+    const a = pts[i - 1], b = pts[i + 1];
+    const d1x = p[0] - a[0], d1z = p[1] - a[1], l1 = Math.hypot(d1x, d1z), d2x = b[0] - p[0], d2z = b[1] - p[1], l2 = Math.hypot(d2x, d2z);
+    const r = Math.min(rad, l1 / 2, l2 / 2), s = { x: p[0] - (d1x / l1) * r, z: p[1] - (d1z / l1) * r }, e = { x: p[0] + (d2x / l2) * r, z: p[1] + (d2z / l2) * r };
+    for (let k = 0; k <= 8; k++) { const t = k / 8, u = 1 - t; out.push({ x: u * u * s.x + 2 * u * t * p[0] + t * t * e.x, z: u * u * s.z + 2 * u * t * p[1] + t * t * e.z }); }
+  }
+  const S: { x: number; z: number; s: number }[] = [{ ...out[0], s: 0 }];
+  for (let i = 1; i < out.length; i++) S.push({ ...out[i], s: S[i - 1].s + Math.hypot(out[i].x - out[i - 1].x, out[i].z - out[i - 1].z) });
+  const LOOP = S[S.length - 1].s;
+  const pathAt = (s: number) => {
+    s = Math.max(0, Math.min(LOOP - 1e-4, s));
+    let lo = 0, hi = S.length - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (S[m].s <= s) lo = m; else hi = m; }
+    const a = S[lo], b = S[hi], t = (s - a.s) / Math.max(1e-6, b.s - a.s);
+    return { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t, h: Math.atan2(b.x - a.x, b.z - a.z) };
+  };
+  return { pathAt, LOOP };
+}
 const ang = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 
 // officers: faster than the writer's jog (4.5) so jogging off gets you caught, a good deal slower than the sprint (7.6,
@@ -55,11 +72,15 @@ const ang = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 // The second one runs at where the writer is going (cuts the corner), the first straight at them.
 const RUN_SPEED = 5.9, JOG_SPEED = 3.4, WALK_SPEED = 1.6, BUST_R = 1.0, SIGHT = 22, COP_ACCEL = 14, WIND = 6, REST = 2.2, LOSE = 2.5, SEARCH = 9;
 
-type Cop = { w: Writer; helmet: THREE.Group; head: THREE.Object3D; x: number; z: number; h: number; out: boolean; doing: 'in' | 'run' | 'search' | 'return' | 'bust';
-  wind: number; tired: number; side: number; goal: THREE.Vector2; look: number; door: number; v: number };
+type Cop = { w: Writer; helmet: THREE.Group; head: THREE.Object3D; x: number; z: number; y: number; h: number; out: boolean; doing: 'in' | 'run' | 'search' | 'return' | 'bust';
+  wind: number; tired: number; side: number; goal: THREE.Vector2; look: number; door: number; v: number;
+  /** the way there on the district's map: points, which goal it was made for, when to make it again */
+  path: { x: number; z: number; y: number }[]; pi: number; pathFor: THREE.Vector3; replan: number };
 
-export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: string; blockers: Blocker[]; groundY: (x: number, z: number) => number; bounds: { x: number; z0: number; z1: number }; sound: () => { ctx: AudioContext; out: AudioNode } | null }): Promise<Law> {
-  const { scene, high, blockers, bounds } = o;
+export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: string; world: World; nav: () => ReturnType<typeof makeNav>; route: [number, number][]; sound: () => { ctx: AudioContext; out: AudioNode } | null }): Promise<Law> {
+  const { scene, high, world } = o;
+  const { pathAt, LOOP } = routeOf(o.route);
+  const start = pathAt(0);
   const car = makeCar(high);
   scene.add(car.group, car.search, car.search.target, car.beam);
 
@@ -92,21 +113,18 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
     helmet.add(shell, visor);
     w.root.visible = false; helmet.visible = false;
     scene.add(w.root, helmet);
-    cops.push({ w, helmet, head, x: 0, z: 0, h: 0, out: false, doing: 'in', wind: 0, tired: 0, side: i ? 1 : -1, goal: new THREE.Vector2(), look: 0, door: i ? 1 : -1, v: 0 });
+    cops.push({ w, helmet, head, x: 0, z: 0, y: 0, h: 0, out: false, doing: 'in', wind: 0, tired: 0, side: i ? 1 : -1, goal: new THREE.Vector2(), look: 0, door: i ? 1 : -1, v: 0, path: [], pi: 0, pathFor: new THREE.Vector3(1e9, 0, 0), replan: 0 });
   }
 
   let on = true, heat = 0, chase: Chase = 'calm', seen = false, seenT = 0, lostT = 0, searchT = 0, alertT = 0;
   const lastSeen = new THREE.Vector2();
-  const carS = { s: 0, speed: 0, onStreet: false, gap: 6, x: LANE, z: ZN, h: Math.PI };
+  const carS = { s: 0, speed: 0, onStreet: false, gap: 6, x: start.x, z: start.z, h: start.h };
+  let meY = 0;   // the writer's ground level, for the officers' map
   let sweep = 0;
   const aimS = new THREE.Vector3();
 
   // ── geometry helpers ──
-  const free = (x: number, z: number, r: number) => {
-    if (Math.abs(x) > bounds.x || z < bounds.z0 || z > bounds.z1) return false;
-    for (const b of blockers) if (x > b.x0 - r && x < b.x1 + r && z > b.z0 - r && z < b.z1 + r) return false;
-    return !inCar(x, z, r);
-  };
+  const free = (x: number, z: number, r: number, y = 0) => world.free(x, z, r, y) && !Number.isNaN(world.groundAt(x, z, y)) && !inCar(x, z, r);
   const inCar = (x: number, z: number, r: number) => {
     if (!carS.onStreet) return false;
     const dx = x - carS.x, dz = z - carS.z, s = Math.sin(carS.h), c = Math.cos(carS.h);
@@ -121,37 +139,14 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
     if (ea < ec) along = Math.sign(along || 1) * (CAR.len / 2 + r); else across = Math.sign(across || 1) * (CAR.wid / 2 + r);
     p.x = carS.x + along * s + across * c; p.z = carS.z + along * c - across * s;
   };
-  const pushBlockers = (p: { x: number; z: number }, r: number) => {
-    for (const b of blockers) {
-      const x0 = b.x0 - r, x1 = b.x1 + r, z0 = b.z0 - r, z1 = b.z1 + r;
-      if (p.x > x0 && p.x < x1 && p.z > z0 && p.z < z1) {
-        const d = [p.x - x0, x1 - p.x, p.z - z0, z1 - p.z], m = Math.min(...d);
-        if (m === d[0]) p.x = x0; else if (m === d[1]) p.x = x1; else if (m === d[2]) p.z = z0; else p.z = z1;
-      }
-    }
-    p.x = Math.max(-bounds.x, Math.min(bounds.x, p.x)); p.z = Math.max(bounds.z0, Math.min(bounds.z1, p.z));
-    pushOut(p, r);
-  };
-  // line of sight at street level: does the segment cross a pier or the wall?
-  const clear = (ax: number, az: number, bx: number, bz: number, crouch = false) => {
-    const dx = bx - ax, dz = bz - az;
-    for (const b of blockers) {
-      if (b.low && !crouch) continue; // you can be seen over a car or a barrier, unless you get down behind it
-      let t0 = 0, t1 = 1;
-      for (const [p, d, lo, hi] of [[ax, dx, b.x0, b.x1], [az, dz, b.z0, b.z1]]) {
-        if (Math.abs(d) < 1e-6) { if (p < lo || p > hi) { t0 = 2; break; } continue; }
-        let ta = (lo - p) / d, tb = (hi - p) / d; if (ta > tb) [ta, tb] = [tb, ta];
-        t0 = Math.max(t0, ta); t1 = Math.min(t1, tb); if (t0 > t1) break;
-      }
-      if (t0 <= t1) return false;
-    }
-    return true;
-  };
-  const sees = (ox: number, oz: number, h: number, half: number, range: number, me: Suspect) => {
+  const pushBlockers = (p: { x: number; z: number }, r: number, y = 0) => { world.pushOut(p, r, y); pushOut(p, r); };
+  // line of sight in 3D: eye to the writer's chest (lower when crouched: a car or a low wall hides them then)
+  const clear = (ax: number, ay: number, az: number, me: Suspect) => world.clear(ax, ay, az, me.x, (me.gy ?? 0) + me.y + (me.crouch ? 0.7 : 1.25), me.z);
+  const sees = (ox: number, oy: number, oz: number, h: number, half: number, range: number, me: Suspect) => {
     const dx = me.x - ox, dz = me.z - oz, d = Math.hypot(dx, dz);
     if (d > range || d < 0.01) return d < 0.01;
     if (Math.abs(ang(Math.atan2(dx, dz) - h)) > half) return false;
-    return clear(ox, oz, me.x, me.z, me.crouch);
+    return clear(ox, oy, oz, me);
   };
 
   // ── sound: a siren made from oscillators (nothing to download); a whoop on alert, a wail while they hunt ──
@@ -185,14 +180,31 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
     const s = Math.sin(carS.h), c = Math.cos(carS.h);
     for (const cp of cops) {
       cp.x = carS.x + c * cp.door * 1.35 + s * (cp.door < 0 ? 0.6 : -0.2); cp.z = carS.z - s * cp.door * 1.35 + c * (cp.door < 0 ? 0.6 : -0.2);
-      cp.h = carS.h + cp.door * Math.PI / 2; cp.out = true; cp.doing = 'run'; cp.wind = 0; cp.tired = 0; cp.v = 0;
+      cp.h = carS.h + cp.door * Math.PI / 2; cp.out = true; cp.doing = 'run'; cp.wind = 0; cp.tired = 0; cp.v = 0; cp.y = 0; cp.path = []; cp.replan = 0;
+      const p = { x: cp.x, z: cp.z }; world.pushOut(p, 0.35, 0); cp.x = p.x; cp.z = p.z;
       cp.w.root.visible = cp.helmet.visible = true; cp.w.play('Idle_Loop', 0);
     }
   };
   const stow = () => { for (const cp of cops) { cp.out = false; cp.doing = 'in'; cp.w.root.visible = cp.helmet.visible = false; } };
   const tmp = { x: 0, z: 0 };
-  // walk toward a goal, turning round piers and the car: try the straight line, then fan out to the side that worked last
-  const steer = (cp: Cop, gx: number, gz: number, speed: number, dt: number) => {
+  // walk toward a goal: along a way found on the district's map (made again every half second or when the goal moves),
+  // steering at a point a couple of metres along it, turning round the car and anyone in the way
+  const goalV = new THREE.Vector3();
+  const steer = (cp: Cop, gx0: number, gz0: number, speed: number, dt: number, gy = meY) => {
+    let gx = gx0, gz = gz0;
+    if (Math.hypot(gx0 - cp.x, gz0 - cp.z) < 0.15 && Math.abs(gy - cp.y) < 0.6) return false;
+    cp.replan -= dt;
+    if (cp.replan <= 0 || cp.pathFor.distanceTo(goalV.set(gx0, gy, gz0)) > 2.5) {
+      cp.replan = 0.5 + Math.random() * 0.15; cp.pathFor.set(gx0, gy, gz0);
+      const r = o.nav().path(cp.x, cp.z, cp.y, gx0, gz0, gy, 40000);
+      cp.path = r ? r.pts : []; cp.pi = 0;
+    }
+    if (cp.path.length > 1) {
+      while (cp.pi < cp.path.length - 1 && Math.hypot(cp.path[cp.pi].x - cp.x, cp.path[cp.pi].z - cp.z) < 1.2) cp.pi++;
+      const k = Math.min(cp.path.length - 1, cp.pi + 4);
+      gx = cp.path[k].x; gz = cp.path[k].z;
+      if (k === cp.path.length - 1) { gx = gx0; gz = gz0; }
+    }
     const dx = gx - cp.x, dz = gz - cp.z, d = Math.hypot(dx, dz);
     if (d < 0.15) return false;
     let a = Math.atan2(dx, dz), ok = false;
@@ -200,14 +212,15 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
     for (const off of [0, 0.35, 0.7, 1.05, 1.4, 1.75, 2.1]) {
       for (const sgn of off ? [cp.side, -cp.side] : [1]) {
         const aa = a + off * sgn;
-        if (free(cp.x + Math.sin(aa) * probe, cp.z + Math.cos(aa) * probe, 0.35)) { a = aa; ok = true; if (off) cp.side = sgn; break; }
+        if (free(cp.x + Math.sin(aa) * probe, cp.z + Math.cos(aa) * probe, 0.35, cp.y)) { a = aa; ok = true; if (off) cp.side = sgn; break; }
       }
       if (ok) break;
     }
     const step = Math.min(d, speed * dt);
     tmp.x = cp.x + Math.sin(a) * step; tmp.z = cp.z + Math.cos(a) * step;
-    pushBlockers(tmp, 0.35);
-    cp.x = tmp.x; cp.z = tmp.z;
+    pushBlockers(tmp, 0.35, cp.y);
+    const g = world.groundAt(tmp.x, tmp.z, cp.y);
+    if (!Number.isNaN(g)) { cp.x = tmp.x; cp.z = tmp.z; cp.y = g; }
     cp.h += ang(a - cp.h) * Math.min(1, dt * 10);
     return true;
   };
@@ -220,7 +233,7 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
   };
 
   const update = (dt: number, t: number, me: Suspect): LawEvent => {
-    let ev: LawEvent = '';
+    let ev: LawEvent = ''; meY = me.gy ?? 0;
     // ── the car: drive the loop, brake for anyone in the lane, stop when alerted ──
     if (!on) { carS.onStreet = false; }
     else if (!carS.onStreet && chase === 'calm') {
@@ -241,7 +254,7 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
       const q = pathAt(Math.min(carS.s, LOOP - 0.01));
       carS.x = q.x; carS.z = q.z; carS.h = q.h;
     }
-    car.group.visible = carS.onStreet;
+    car.group.visible = carS.onStreet && carS.x < 88.5;   // inside the depot's door it is out of sight
     car.group.position.set(carS.x, 0, carS.z); car.group.rotation.y = carS.h;
     car.group.updateMatrixWorld(true);
 
@@ -261,11 +274,11 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
     const lit = carS.onStreet && (() => {
       const dx = me.x - mount.x, dz = me.z - mount.z, dy = me.y + 1 - mount.y, d = Math.hypot(dx, dy, dz);
       const bx = aimS.x - mount.x, by = aimS.y - mount.y, bz = aimS.z - mount.z, bl = Math.hypot(bx, by, bz);
-      return d < 48 && (dx * bx + dy * by + dz * bz) / (d * bl) > Math.cos(0.17) && clear(mount.x, mount.z, me.x, me.z, me.crouch);
+      return d < 48 && (dx * bx + dy * by + dz * bz) / (d * bl) > Math.cos(0.17) && clear(mount.x, mount.y, mount.z, me);
     })();
-    const fromCar = carS.onStreet && (lit || sees(carS.x + Math.sin(carS.h) * 2.4, carS.z + Math.cos(carS.h) * 2.4, carS.h, 0.62, me.crouch ? 14 : 26, me));
+    const fromCar = carS.onStreet && carS.x < 88.5 && (lit || sees(carS.x + Math.sin(carS.h) * 2.4, 1.2, carS.z + Math.cos(carS.h) * 2.4, carS.h, 0.62, me.crouch ? 14 : 26, me));
     let fromCops = false;
-    for (const cp of cops) if (cp.out && sees(cp.x, cp.z, cp.h, cp.doing === 'search' ? 1.6 : 1.3, me.crouch ? SIGHT * 0.55 : SIGHT, me)) fromCops = true;
+    for (const cp of cops) if (cp.out && sees(cp.x, cp.y + 1.65, cp.z, cp.h, cp.doing === 'search' ? 1.6 : 1.3, me.crouch ? SIGHT * 0.55 : SIGHT, me)) fromCops = true;
     seen = !!(fromCar || fromCops);
 
     // ── heat: the hiss alone warms it, being seen at it makes it boil; it cools when you stop and nobody looks ──
@@ -309,22 +322,22 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
         const want = cp.tired > 0 ? JOG_SPEED : RUN_SPEED; cp.v += Math.max(-COP_ACCEL * dt, Math.min(COP_ACCEL * dt, want - cp.v));
         const moved = steer(cp, tx, tz, cp.v, dt);
         cp.w.play(moved ? (cp.tired > 0 ? 'Jog_Fwd_Loop' : 'Sprint_Loop') : 'Idle_Loop', 0.2);
-        if (Math.hypot(cp.x - me.x, cp.z - me.z) < BUST_R && me.y < 0.6 && chase === 'chase') {
+        if (Math.hypot(cp.x - me.x, cp.z - me.z) < BUST_R && me.y < 0.6 && Math.abs(cp.y - meY) < 0.6 && chase === 'chase') {
           chase = 'busted'; ev = 'busted'; cp.doing = 'bust';
           cp.h = Math.atan2(me.x - cp.x, me.z - cp.z); cp.w.play('Punch_Jab', 0.1, true);
           for (const o2 of cops) if (o2 !== cp) { o2.doing = 'bust'; o2.w.play('Idle_Loop', 0.3); }
         }
       } else if (cp.doing === 'search') {
-        if (!steer(cp, cp.goal.x, cp.goal.y, JOG_SPEED, dt)) {
+        if (!steer(cp, cp.goal.x, cp.goal.y, JOG_SPEED, dt, cp.y)) {
           // at the spot: stand and look round, then try somewhere close by
           cp.look += dt; cp.h += Math.sin(t * 1.3 + cp.door) * dt * 1.4; cp.w.play('Idle_Loop', 0.3);
-          if (cp.look > 3) { cp.look = 0; cp.goal.set(lastSeen.x + (Math.random() - 0.5) * 12, lastSeen.y + (Math.random() - 0.5) * 12); }
+          if (cp.look > 3) { cp.look = 0; for (let k = 0; k < 8; k++) { const gx = lastSeen.x + (Math.random() - 0.5) * 12, gz = lastSeen.y + (Math.random() - 0.5) * 12; if (free(gx, gz, 0.35, cp.y)) { cp.goal.set(gx, gz); break; } } }
         } else cp.w.play('Jog_Fwd_Loop', 0.25);
       } else if (cp.doing === 'return') {
         // the nearer door: walking round the car to their own side, they could get stuck against it
         const s = Math.sin(carS.h), c = Math.cos(carS.h), side = Math.sign((cp.x - carS.x) * c - (cp.z - carS.z) * s) || cp.door;
         const dx = carS.x + c * side * 1.4, dz = carS.z - s * side * 1.4;
-        if (!steer(cp, dx, dz, WALK_SPEED * 1.4, dt) || Math.hypot(cp.x - dx, cp.z - dz) < 0.5) { cp.out = false; cp.doing = 'in'; cp.w.root.visible = cp.helmet.visible = false; }
+        if (!steer(cp, dx, dz, WALK_SPEED * 1.4, dt, 0) || Math.hypot(cp.x - dx, cp.z - dz) < 0.9) { cp.out = false; cp.doing = 'in'; cp.w.root.visible = cp.helmet.visible = false; }
         else cp.w.play('Walk_Loop', 0.3);
         // seen at it again on the way back: back on
         if (seen && heat >= 0.6 && chase === 'calm') { chase = 'chase'; lostT = 0; lastSeen.set(me.x, me.z); for (const o2 of cops) if (o2.out) o2.doing = 'run'; ev = 'alert'; whoop(); }
@@ -337,7 +350,7 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
     }
     for (const cp of cops) {
       if (!cp.out) continue;
-      cp.w.root.position.set(cp.x, o.groundY(cp.x, cp.z), cp.z); cp.w.root.rotation.y = cp.h;
+      cp.w.root.position.set(cp.x, cp.y, cp.z); cp.w.root.rotation.y = cp.h;
       cp.w.update(dt); helmetAt(cp);
     }
 
@@ -367,7 +380,7 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
       let best = 0, bd = 1e9;
       for (let s = 0; s < LOOP; s += 0.5) { const p = pathAt(s), d = Math.hypot(p.x - me.x, p.z - me.z); if (d < bd) { bd = d; best = s; } }
       const p = pathAt(best); Object.assign(carS, { onStreet: true, s: best, speed: 0, x: p.x, z: p.z, h: p.h });
-      stow(); chase = 'alerted'; alertT = 0; heat = 1; seenT = 0; lastSeen.set(me.x, me.z); whoop();
+      stow(); chase = 'alerted'; alertT = 0; heat = 1; seenT = 0; lastSeen.set(me.x, me.z); meY = me.gy ?? 0; whoop();
     },
     nearest: () => { const c = cops.filter((cp) => cp.out); return c.length ? { x: c[0].x, z: c[0].z } : null; },
     dispose: () => {

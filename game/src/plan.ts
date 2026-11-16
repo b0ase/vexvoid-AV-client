@@ -37,6 +37,7 @@ export type Plan = {
   bounds: Rect; blds: Bld[]; boxes: Box[]; surfs: Surf[]; holes: Rect[]; roads: Rect[]; gates: Gate[]; lamps: Lamp[];
   places: Place[]; doors: Door[]; climbs: Climb[]; walls: WallDef[]; scaffolds: Scaffold[];
   stairs: Surf[]; railings: { x0: number; x1: number; z0: number; z1: number; y: number }[];
+  containers: { x0: number; x1: number; z0: number; z1: number; y: number; h: number; seed: number }[];
   canal: { z0: number; z1: number; tow: number; water: number; bridges: Rect[]; foot: Rect[] };
   viaduct: { z0: number; z1: number; deck: number; wide: Rect; tunnel: Rect; bays: { x0: number; x1: number; kind: 'open' | 'shut' | 'shop' | 'tunnel' | 'solid'; id: string }[] };
   route: [number, number][];
@@ -182,17 +183,19 @@ export function makePlan(): Plan {
   B('nw3', -30.6, -70, -16, -62, 13, 'block', { shop: ['n'] });
   B('nw4', -16, -70, -3, -62, 9, 'brick', { shop: ['n'], fire: 'e' });
   B('nw5', -57, -62, -46, -27, 12, 'soot', { shop: ['w'], tanks: 1 });
-  B('nw6', -46, -59, -33.4, -46, 8, 'brick');
-  B('nw7', -30.6, -59, -24.2, -48, 7, 'render', { fire: 'e' });
-  B('nw8', -21.4, -59, -3, -48, 10, 'soot', { tanks: 1 });
+  B('nw6', -46, -62, -33.4, -46, 8, 'brick', { tanks: 1 });
+  B('nw7', -30.6, -59, -24.2, -48.5, 7, 'render', { fire: 'e' });
+  B('nw8', -21.4, -59, -3, -48.5, 10, 'soot', { tanks: 1 });
   // VEX'S STUDIO: a unit off its own yard, a steel door ajar and a shutter half up
-  B('studio', -22, -46, -8, -36, 6.4, 'shed', { parapet: false, shell: { t: 0.3, doors: [{ side: 's', a: -19.6, b: -18, h: 2.2, kind: 'door-ajar' }, { side: 's', a: -15.5, b: -11, h: 1.3, kind: 'shutter-half' }], inside: 'studio' } });
+  B('studio', -22, -46, -8, -36, 6.4, 'soot', { parapet: false, shell: { t: 0.3, doors: [{ side: 's', a: -19.6, b: -18, h: 2.2, kind: 'door-ajar' }, { side: 's', a: -15.5, b: -11, h: 1.3, kind: 'shutter-half' }], inside: 'studio' } });
   B('nw9', -7.6, -46, -3, -34, 8, 'render');
+  B('nw15', -30, -46, -24.8, -39, 4.6, 'render', { parapet: false });   // a lean-to beside the studio
   B('nw10', -57, -23, -40, -8, 10, 'brick', { shop: ['w'] });
   B('nw11', -36, -22, -26, -9.5, 7, 'render', { fire: 'n' });
   B('nw12', -46, -44, -34, -40.5, 4, 'render', { parapet: false });   // a low shed under the deck's north side
-  B('nw13', -22, -24, -10, -9.5, 11, 'soot', { scaffold: undefined });
-  B('nw14', -10, -22, -3, -9.5, 6, 'brick');
+  B('nw13', -22, -24, -10, -9.5, 11, 'soot');
+  B('nw14', -7.4, -22, -3, -9.5, 6, 'brick');
+  B('nw16', -16, -31, -6, -27.4, 3.4, 'render', { parapet: false });  // lock-up garages in the studio yard
   // NE block
   B('ne1', 3, -70, 12, -63, 14, 'brick', { shop: ['n', 'w'] });
   B('ne2', 12, -70, 26, -63, 10, 'soot', { shop: ['n'] });
@@ -201,37 +204,40 @@ export function makePlan(): Plan {
   B('warehouse', 14, -60.5, 48, -36, 9.5, 'shed', { parapet: false, shell: { t: 0.35, doors: [{ side: 's', a: 28, b: 34, h: 4.2, kind: 'open' }, { side: 'e', a: -46, b: -44.2, h: 2.2, kind: 'door-ajar' }, { side: 'w', a: -41, b: -39.2, h: 2.2, kind: 'open' }], inside: 'warehouse' } });
   B('ne5', 50, -60.5, 57, -36, 11, 'soot', { shop: ['e'], fire: 'w' });
   B('ne6', 3, -60.5, 10, -48, 7, 'render', { fire: 'e' });
+  B('ne9', 3, -45, 8.4, -38.6, 4, 'render', { parapet: false });
   B('ne7', 3, -34, 9, -14, 13, 'brick', { tanks: 1 });
   B('ne8', 50, -30, 57, -8, 9, 'brick', { shop: ['e'], scaffold: 'w' });
   // south block, along the canal
-  B('c1', -57, 10, -44, 18, 10, 'soot');
-  B('c2', -40, 10, -27, 18, 8, 'brick', { fire: 's' });
-  B('c3', -18, 10, 0, 18, 12, 'block', { scaffold: 'n' });
-  B('c4', 6, 10, 21, 18, 9, 'brick', { tanks: 1 });
-  B('c5', 30, 10, 44, 17, 11, 'soot');
-  B('s8', 48, 10, 57, 22, 10, 'brick', { shop: ['e'] });
+  B('c1', -57, 10, -44, 20, 10, 'soot');
+  B('c2', -41, 10, -27, 20, 8, 'brick', { fire: 's' });
+  B('c3', -18, 10, 0, 20, 12, 'block', { scaffold: 'n' });
+  B('c4', 3, 10, 21, 20, 9, 'brick', { tanks: 1 });
+  B('c5', 24, 10, 44, 20, 11, 'soot');
+  B('s8', 47, 10, 57, 22, 10, 'brick', { shop: ['e'] });
+  // south block, the middle row (lanes 2.5 m either side)
+  B('s9', -57, 22.5, -49, 28.5, 7, 'render');
+  B('s13', -46.5, 22.5, -37, 28.5, 9, 'soot', { fire: 'n' });
+  B('s12', -34, 22.5, -28.6, 31, 6, 'brick');
+  B('s14', -3.5, 22.5, 5, 28.5, 7, 'render');
+  B('s10', 8, 22.5, 21, 28.5, 6, 'brick');
+  B('s11', 24, 22.5, 36, 28.5, 8, 'soot', { fire: 'n' });
+  B('s15', 39, 22.5, 46, 28.5, 5, 'render', { parapet: false });
   // south block, along the S road
   B('s1', -57, 31, -40, 41, 12, 'brick', { shop: ['s', 'w'], tanks: 1 });
-  B('s2', -40, 33, -28.6, 41, 9, 'soot', { shop: ['s'] });
-  B('s3', -25.4, 33, -6, 41, 14, 'block', { shop: ['s'] });
+  B('s2', -40, 31, -28.6, 41, 9, 'soot', { shop: ['s'] });
+  B('s3', -25.4, 31, -6, 41, 14, 'block', { shop: ['s'] });
   B('s4', -6, 31, 8, 41, 8, 'brick', { shop: ['s'], fire: 'n' });
-  B('s5', 8, 33, 26, 41, 11, 'soot', { shop: ['s'], tanks: 1 });
-  B('s6', 28.6, 33, 46, 41, 13, 'brick', { shop: ['s'] });
-  B('s7', 46, 25, 57, 41, 9, 'render', { shop: ['s'] });   // the PAINT SHOP: its front on the E road (a shop door below)
-  B('s9', -57, 18, -48, 27, 7, 'render');
-  B('s10', 10, 22, 22, 29.4, 6, 'brick');
-  B('s11', 30, 21, 42, 29, 8, 'soot', { fire: 'w' });
-  B('s12', -34, 20, -28.6, 31, 6, 'brick');
-  B('s13', -46, 20, -37, 29, 9, 'soot', { fire: 's' });
-  B('s14', -4, 21, 5, 28, 7, 'render');
+  B('s5', 8, 31, 26, 41, 11, 'soot', { shop: ['s'], tanks: 1 });
+  B('s6', 28.6, 31, 46, 41, 13, 'brick', { shop: ['s'] });
+  B('s7', 46, 25, 57, 41, 9, 'render', { shop: ['s'] });   // the PAINT SHOP: its front on the E road
   B('depot', 90, 17, 96, 27, 8, 'block', { shop: ['w'] });
   doors.push({ id: 'paint-shop', name: 'PAINT SHOP', x0: 57, x1: 58.8, z0: 30.6, z1: 33.4, face: 'e', sign: 'PAINT', about: 'DEAD STOCK PAINT, the corner shop on the E road: cans, caps, markers (inside in phase 3)' });
 
   // ── raised places: the deck (+1.6) over the NW yard with steps down to the studio yard; the warehouse loading dock ──
-  const deck = { x0: -46, x1: -32, z0: -40.5, z1: -27, y: DECK_Y };
+  const deck = { x0: -46, x1: -32.5, z0: -40.5, z1: -27, y: DECK_Y };
   surfs.push({ ...deck, tag: 'deck' }); solid(deck.x0, deck.z0, deck.x1, deck.z1, -1, DECK_Y, 'deck');
-  const deckStairs: Surf = { x0: -32, x1: -28.6, z0: -34, z1: -31.6, y: DECK_Y, y1: 0, axis: 'x', steps: 9, tag: 'stairs' };
-  surfs.push(deckStairs); stairs.push(deckStairs);
+  const deckStairs: Surf = { x0: -32.5, x1: -29.1, z0: -34, z1: -31.6, y: DECK_Y, y1: 0, axis: 'x', steps: 9, tag: 'stairs' };
+  surfs.push(deckStairs); stairs.push(deckStairs); holes.push({ x0: deckStairs.x0, x1: deckStairs.x1, z0: deckStairs.z0, z1: deckStairs.z1 });
   solid(deckStairs.x0, deckStairs.z0 - 0.2, deckStairs.x1, deckStairs.z0, -1, DECK_Y + 1, 'stairwall');
   solid(deckStairs.x0, deckStairs.z1, deckStairs.x1, deckStairs.z1 + 0.2, -1, DECK_Y + 1, 'stairwall');
   // a parapet round the deck's east edge either side of the steps; its south edge is open: a drop into the alley
@@ -242,6 +248,14 @@ export function makePlan(): Plan {
   surfs.push({ ...dock, tag: 'dock' }); solid(dock.x0, dock.z0, dock.x1, dock.z1, -1, DOCK_Y, 'dock');
   climbs.push({ kind: 'dock', x: 31, z: dock.z1, y0: 0, y1: DOCK_Y });
 
+  // shipping containers in the goods yard (2.44 x 2.6 m, 6 or 12 m long), some two high: cover now, climbs later
+  const containers: { x0: number; x1: number; z0: number; z1: number; y: number; h: number; seed: number }[] = [];
+  const CT = (x0: number, z0: number, len: number, alongX: boolean, stack = 1) => {
+    for (let k = 0; k < stack; k++) { const c = { x0, z0, x1: x0 + (alongX ? len : 2.44), z1: z0 + (alongX ? 2.44 : len), y: k * 2.6, h: 2.6, seed: containers.length * 97 + 13 }; containers.push(c); }
+    solid(x0, z0, x0 + (alongX ? len : 2.44), z0 + (alongX ? 2.44 : len), -1, stack * 2.6, 'container');
+    climbs.push({ kind: 'ledge', x: x0 + (alongX ? len / 2 : 1.22), z: z0 + (alongX ? 2.44 : len / 2), y0: 0, y1: stack * 2.6 });
+  };
+  CT(12, -29, 12.2, true, 2); CT(12, -22.6, 6.1, true); CT(38, -29.5, 12.2, false, 1); CT(41.2, -27, 6.1, false, 2); CT(19.5, -18, 12.2, true); CT(44, -17, 6.1, true);
   // ── gates and fences ──
   const G = (id: string, x0: number, z0: number, x1: number, z1: number, kind: Gate['kind'], open = 0, h = kind === 'chain' ? 2.6 : 2.4) => {
     gates.push({ id, x0, x1, z0, z1, kind, open, h });
@@ -255,10 +269,10 @@ export function makePlan(): Plan {
   G('yard-fence-e', 33, -12.1, 50, -11.9, 'chain', 0);
   G('lane-gate', -3, -62.1, 3, -61.9, 'steel', 0);            // Void Street's top end: locked
   G('arch-fence-1', -60, -88.8, -50, -88.6, 'chain', 0);
-  G('square-gate', -34.1, 31, -33.9, 33, 'chain', 0.5);       // into the square from the west lane
+  G('wharf-chain', -44, 9.9, -41, 10.1, 'chain', 0.5);     // the south wharf into the west lanes, chain-link, open       // into the square from the west lane
   G('carpark', -67.1, 30, -66.9, 51, 'chain', 0.25);
   G('pit-gate', -11, -100.1, -7, -99.9, 'steel', 0.55);        // the tunnel's north end: a steel gate forced open
-  G('svc-gate', 22, 28.9, 30, 29.1, 'steel', 0);              // service yard behind the S road, locked
+  G('svc-gate', 21, 9.9, 24, 10.1, 'steel', 0);              // a service slot off the south wharf, locked
 
   // ── walls closing the hidden yard; the bounds ──
   solid(pit.x0 - 1, pit.z0 - 1, pit.x0, pit.z1, -1, 9, 'pitwall'); solid(pit.x1, pit.z0 - 1, pit.x1 + 1, pit.z1, -1, 9, 'pitwall');
@@ -368,9 +382,9 @@ export function makePlan(): Plan {
     const len = Math.hypot(x1 - x0, z1 - z0), tx = (x1 - x0) / len, tz = (z1 - z0) / len;
     const open: boolean[] = [];
     for (let u = 0.5; u < len; u += 1) {
-      const px = x0 + tx * u + n[0] * 0.6, pz = z0 + tz * u + n[1] * 0.6;
-      const g = world.groundAt(px, pz, standY + 0.2);
-      open.push(!Number.isNaN(g) && Math.abs(g - standY) < 0.7 && world.free(px, pz, 0.12, g) && !(skip && skip(x0 + tx * u, z0 + tz * u)));
+      // somewhere to stand in front of it: half a metre out, or past something low at its foot (a mattress, the decks)
+      const ok = (d: number) => { const px = x0 + tx * u + n[0] * d, pz = z0 + tz * u + n[1] * d, g = world.groundAt(px, pz, standY + 0.2); return !Number.isNaN(g) && Math.abs(g - standY) < 0.7 && world.free(px, pz, 0.12, g); };
+      open.push((ok(0.6) || (ok(1.6) && world.free(x0 + tx * u + n[0] * 0.6, z0 + tz * u + n[1] * 0.6, 0.05, standY + 1.3))) && !(skip && skip(x0 + tx * u, z0 + tz * u)));
     }
     const runs: [number, number][] = [];
     let s = -1;
@@ -417,12 +431,14 @@ export function makePlan(): Plan {
   walls.unshift({ id: 'hall-of-fame', w: hall.w, h: hall.h, c: [hall.x, hall.h / 2, pit.z0 + 0.4 + 0.03], n: [0, 1] });
   // gates take paint too (the steel ones)
   for (const g of gates) if (g.kind === 'steel') {
-    const alongX = g.x1 - g.x0 > g.z1 - g.z0;
-    if (alongX) { faceRuns(`${g.id}-s`, g.x0, g.z1, g.x1, g.z1, [0, 1], 0, g.h); faceRuns(`${g.id}-n`, g.x1, g.z0, g.x0, g.z0, [0, -1], 0, g.h); }
-    else { faceRuns(`${g.id}-e`, g.x1, g.z1, g.x1, g.z0, [1, 0], 0, g.h); faceRuns(`${g.id}-w`, g.x0, g.z0, g.x0, g.z1, [-1, 0], 0, g.h); }
+    // only the shut part (an open leaf is swung back out of the way)
+    const alongX = g.x1 - g.x0 > g.z1 - g.z0, len = alongX ? g.x1 - g.x0 : g.z1 - g.z0, a0 = (alongX ? g.x0 : g.z0) + len * g.open;
+    if (len * (1 - g.open) < 1.2) continue;
+    if (alongX) { faceRuns(`${g.id}-s`, a0, g.z1, g.x1, g.z1, [0, 1], 0, g.h); faceRuns(`${g.id}-n`, g.x1, g.z0, a0, g.z0, [0, -1], 0, g.h); }
+    else { faceRuns(`${g.id}-e`, g.x1, g.z1, g.x1, a0, [1, 0], 0, g.h); faceRuns(`${g.id}-w`, g.x0, a0, g.x0, g.z1, [-1, 0], 0, g.h); }
   }
 
-  return { bounds, blds, boxes, surfs, holes, roads, gates, lamps, places, doors, climbs, walls, scaffolds, stairs, railings,
+  return { bounds, blds, boxes, surfs, holes, roads, gates, lamps, places, doors, climbs, walls, scaffolds, stairs, railings, containers,
     canal: { z0: CZ0, z1: CZ1, tow: TOW_Y, water: WATER_Y, bridges, foot }, viaduct: { z0: VZ0, z1: VZ1, deck: VIA_Y, wide, tunnel, bays },
     route, deck, dock, yard: { x0: 10, x1: 50, z0: -33.2, z1: -12 }, pit, hall, world };
 }

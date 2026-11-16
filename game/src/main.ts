@@ -26,7 +26,8 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
-import { buildCity, EYE } from './city';
+import { buildDistrict } from './district';
+import { STEP } from './world';
 import { loadLook, makeGradePass } from './look';
 import { loadWriter, type GaitInfo } from './writer';
 import { makeSpray, footprint, COLOURS, COLOUR_NAMES, type Can, type Stroke, type WallStore } from './spray';
@@ -43,7 +44,17 @@ export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) =
   onEvent?: (ev: 'alert' | 'busted' | 'escaped') => void };
 export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?: number) => string; inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string }) => void; where: () => { x: number; z: number; y: number; yaw: number; heading: number; anim: string; speed: number; tip: [number, number, number] | null };
   /** Call the law on the writer now: the patrol car pulls up nearest them and two officers give chase (testing an escape). */
-  alarm: () => void; spots: () => { id: string; w: number; h: number; x: number; y: number; z: number }[];
+  alarm: () => void;
+  /** The district's named places (the studio is home; the shops; the tunnel, the rail, the warehouse, the scaffolds...). */
+  places: () => { id: string; name: string; x: number; z: number; y: number; yaw: number; about: string }[];
+  /** Put the writer at a named place (for testing). Returns it, or null if there is no such place. */
+  teleport: (id: string) => { id: string; name: string; x: number; z: number; y: number } | null;
+  /** Where the writer is in the district: the nearest place, a shop door they stand at, the ground level. */
+  at: () => { place: string; dist: number; door: string; ground: number; inside: boolean };
+  /** An overhead picture of the whole district, places named (PNG data URL). */
+  map: (width?: number) => string;
+  /** The train on the viaduct (head x, track z, running). */
+  train: () => { x: number; z: number; on: boolean }; spots: () => { id: string; w: number; h: number; x: number; y: number; z: number }[];
   /** Every wall that takes paint (the spots, shop fronts, columns, piers). near: only those within this many metres of the writer. */
   walls: (o?: { near?: number }) => { id: string; w: number; h: number; x: number; y: number; z: number; nx: number; nz: number; painted: boolean }[];
   paint: (id: string, pts: [number, number][], o?: { colour?: string; cap?: 1 | 2 | 3; dist?: number; pressure?: number; buff?: boolean }) => void; clearPaint: (id?: string) => void; piece: (id: string) => string; painting: () => string;
@@ -76,15 +87,13 @@ export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?:
   /** The can in the writer's hand; give fields to change them. */
   can: (o?: Partial<Can>) => Can;
   /** What the paint costs in memory: walls with paint, tiles alive, MB of canvas. */
-  paintStats: () => { walls: number; painted: number; tiles: number; mb: number; resting: number; undo: number; undoTiles: number; drips: number }; flush: () => Promise<void>; goto: (x: number, z: number, yaw?: number, pitch?: number) => void; law: () => LawState; cops: (on: boolean) => void; audio: () => { ctx: AudioContext; node: AudioNode } | null };
+  paintStats: () => { walls: number; painted: number; tiles: number; mb: number; resting: number; undo: number; undoTiles: number; drips: number }; flush: () => Promise<void>; goto: (x: number, z: number, yaw?: number, pitch?: number, y?: number) => void; law: () => LawState; cops: (on: boolean) => void; audio: () => { ctx: AudioContext; node: AudioNode } | null };
 
 export type SketchInfo = { id: string; name: string; kind: SketchKind; w: number; h: number; strokes: number; secs: number; mine: boolean; about?: string };
 const infoOf = (s: Sketch): SketchInfo => ({ id: s.id, name: s.name, kind: s.kind, w: s.w, h: s.h, strokes: s.strokes.length, secs: Math.round(secsOf(s)), mine: !!s.mine, about: s.about });
 
 // VexVoid's grade: no colour at all, hard contrast, a heavy vignette
 const MONO = { shadow: [1, 1, 1] as [number, number, number], high: [1, 1, 1] as [number, number, number], sat: 0, contrast: 1.32, vignette: 0.72 };
-// where you can walk: the road and both pavements, short of the tower
-const BOUNDS = { x: 25.5, z0: -79, z1: 24 };
 const FIT_FEET = true;
 
 export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
@@ -118,12 +127,13 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const scene = new THREE.Scene();
   const cam = new THREE.PerspectiveCamera(62, 16 / 9, 0.05, 900);
   const look = await loadLook(r, opts.base + 'tex/');
-  const city = buildCity({ renderer: r, scene, high, look, vexvoid: true });
-  scene.add(city.group);
+  const city = buildDistrict({ renderer: r, scene, high, look });
+  const W0 = city.world, home = city.plan.places[0];
   say('Dressing the writer…');
   const writer = await loadWriter(opts.base + 'anims/ual.glb', high, opts.base + 'models/writer.glb');
   scene.add(writer.root, writer.can);
-  writer.setGround(city.groundY, FIT_FEET);
+  // the feet fit the ground at the writer's own level (a kerb, a step; not the bridge over the towpath)
+  writer.setGround((x, z) => { const g = W0.groundAt(x, z, me.gy + 0.3); return Number.isNaN(g) ? me.gy : g; }, FIT_FEET);
   const spray = makeSpray(scene, city.walls, opts.store);
   // every sound the game makes goes through one node, so a recorder can tap it (made the first time something needs it)
   let bus: { ctx: AudioContext; out: GainNode } | null = null;
@@ -132,7 +142,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     return bus;
   };
   say('Calling the law…');
-  const law = await makeLaw({ scene, high, base: opts.base, blockers: city.blockers, groundY: city.groundY, bounds: BOUNDS, sound });
+  const law = await makeLaw({ scene, high, base: opts.base, world: W0, nav: city.nav, route: city.plan.route, sound });
   // a soft light that rides with the writer so the hoodie reads against the dark street
   const rim = new THREE.PointLight('#ffffff', 9, 7, 2);
   const back = new THREE.PointLight('#ffffff', 6, 5, 2); // a kicker behind, to edge the hood and shoulders
@@ -164,7 +174,8 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   comp.addPass(grade.pass);
 
   // the writer on the ground; the camera orbits behind and over the right shoulder
-  const me = { x: 0, z: 8, y: 0, gy: 0, vy: 0, heading: Math.PI, crouch: false, airborne: false };
+  // home is VEX'S STUDIO (plan.ts places[0]); y is height above the ground, gy the ground (level) under the writer
+  const me = { x: home.x, z: home.z, y: 0, gy: home.y, vy: 0, heading: home.yaw + Math.PI, crouch: false, airborne: false };
   // how the writer moves: a speed along the way they face that builds up and dies away, a heading that turns at a
   // limited rate (on the spot from standing, in an arc when running), a lean into turns and with the push of a start
   const mv = { speed: 0, yawRate: 0, side: 0, roll: 0, pitch: 0, offset: 0, takeoff: 0 };
@@ -173,7 +184,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const GAIT = { jog: 4.5, sprint: 7.6, crouch: 1.5, accel: 30, sprintAccel: 42, decel: 38, decelPer: 3, turnStand: 24, turnFast: 13, air: 0.55, gather: 0.05 };
   // how far along the wall either side of the writer the can reaches; further, A D step along (no stepping by itself)
   const REACH = 2.4;
-  const camO = { yaw: 0, pitch: 0.12, dist: 3.4 };
+  const camO = { yaw: home.yaw, pitch: 0.12, dist: 3.4 };
   const keys = new Set<string>();
   const MOVE = ['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Shift', ' ', 'c', 'f', 'p', 'r', '1', '2', '3', '4', '5', '6', '7', 'z', 'x', 'h', 'Tab', 'Escape', 'b', 'g', 'v', 'n', '[', ']', '-', '=', '+', 'Enter'];
   // painting: F at a wall squares up to it; the mouse aims, holding it sprays; the wheel sets the can's distance
@@ -199,7 +210,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const runs = new Map<string, { ids: string[]; lo: number; hi: number }>();
   const runOf = (w: W) => {
     let g = runs.get(w.id); if (g) return g;
-    const all = city.walls.filter((o) => o !== w && o.normal.dot(w.normal) > 0.99 && Math.abs(offOf(w, o.center.x, o.center.z)) < 0.1 && Math.abs(alongOf(w, o.center.x, o.center.z)) < (o.w + w.w) / 2 + 0.3);
+    const all = city.walls.filter((o) => o !== w && o.normal.dot(w.normal) > 0.99 && Math.abs(offOf(w, o.center.x, o.center.z)) < 0.1 && Math.abs(alongOf(w, o.center.x, o.center.z)) < (o.w + w.w) / 2 + 0.3 && Math.abs(o.center.y - o.h / 2 - (w.center.y - w.h / 2)) < 1);
     g = { ids: [w.id, ...all.map((o) => o.id)], lo: Math.min(-w.w / 2, ...all.map((o) => alongOf(w, o.center.x, o.center.z) - o.w / 2)), hi: Math.max(w.w / 2, ...all.map((o) => alongOf(w, o.center.x, o.center.z) + o.w / 2)) };
     runs.set(w.id, g); return g;
   };
@@ -225,6 +236,10 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     let best: W | null = null, bs = 1e9;
     for (const sp of city.walls) {
       const off = offOf(sp, me.x, me.z); if (off <= 0 || off > range || Math.abs(alongOf(sp, me.x, me.z)) > sp.w / 2 + 0.3) continue;
+      // at the writer's level: some of the wall within reach (not the canal wall below the street, not a roof edge)
+      const bot = sp.center.y - sp.h / 2, top = sp.center.y + sp.h / 2; if (bot > me.gy + 2.0 || top < me.gy + 0.3) continue;
+      // and nothing solid between them (a wall's other side, a gate)
+      if (W0.ray(me.x, me.gy + 1.2, me.z, sp.center.x + sp.normal.x * 0.05 + (me.x - sp.center.x) * Math.abs(sp.normal.z), me.gy + 1.2, sp.center.z + sp.normal.z * 0.05 + (me.z - sp.center.z) * Math.abs(sp.normal.x)) < 0.98) continue;
       const sc = off + 1.5 * (1 - Math.max(0, -(fwd.x * sp.normal.x + fwd.z * sp.normal.z)));
       if (sc < bs) { bs = sc; best = sp; }
     }
@@ -233,16 +248,9 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   // how far a straight line from a to b gets (0..1) before something solid at street level is in the way. Low things
   // (a barrier, a parked car) only count under 1.2 m; own: the wall being painted is not in its own way
   const sightTo = (ax: number, az: number, ay: number, bx: number, bz: number, by: number, own?: W) => {
-    let best = 1; const dx = bx - ax, dz = bz - az, ix = own ? own.center.x - own.normal.x * 0.2 : 1e9, iz = own ? own.center.z - own.normal.z * 0.2 : 1e9;
-    for (const b of city.blockers) {
-      if (ix > b.x0 && ix < b.x1 && iz > b.z0 && iz < b.z1) continue;
-      let t0 = 0, t1 = best;
-      if (Math.abs(dx) < 1e-6) { if (ax < b.x0 || ax > b.x1) continue; } else { const u = (b.x0 - ax) / dx, v = (b.x1 - ax) / dx; t0 = Math.max(t0, Math.min(u, v)); t1 = Math.min(t1, Math.max(u, v)); }
-      if (Math.abs(dz) < 1e-6) { if (az < b.z0 || az > b.z1) continue; } else { const u = (b.z0 - az) / dz, v = (b.z1 - az) / dz; t0 = Math.max(t0, Math.min(u, v)); t1 = Math.min(t1, Math.max(u, v)); }
-      if (t0 >= t1 || (b.low && ay + (by - ay) * t0 > 1.2)) continue;
-      best = t0;
-    }
-    return best;
+    // the boxes in the district have heights, so a low wall or a car only hides what is below its top
+    const ix = own ? own.center.x - own.normal.x * 0.2 : 1e9, iz = own ? own.center.z - own.normal.z * 0.2 : 1e9, iy = own ? by : 0;
+    return W0.ray(ax, ay, az, bx, by, bz, 0, own ? (b) => ix > b.x0 && ix < b.x1 && iz > b.z0 && iz < b.z1 && iy > (b.y0 ?? -1e9) && iy < (b.y1 ?? 1e9) : undefined);
   };
   const stopAuto = (ok: boolean) => { const a = auto; if (!a) return; auto = null; spray.end(); if (!ok && blasting) note(`STOPPED ${blasting} · Z TAKES IT BACK`, 2.5); blasting = ''; a.done(ok); };
   const squareUp = (w: W) => { paint = { id: w.id, spot: w }; camO.yaw = Math.atan2(w.normal.x, w.normal.z); camO.pitch = 0.1; camO.dist = 2.6; };
@@ -415,9 +423,10 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   // BUSTED: a slow-motion beat with the camera swinging round, the wall gets buffed, the writer starts again
   // spot: the wall they buff (what was being painted by hand); kept: a wall with a half-blasted sketch, which stays
   let bust: { t: number; spot: string; kept: string } | null = null;
-  const camPos = new THREE.Vector3(0, 2, 12), camLook = new THREE.Vector3(), scr = new THREE.Vector3();
+  const camPos = new THREE.Vector3(home.x + Math.sin(home.yaw) * 3.4, home.y + 2, home.z + Math.cos(home.yaw) * 3.4), camLook = new THREE.Vector3(), scr = new THREE.Vector3();
   let landT = 0, forceAnim = '', idleT = 0, camH = 1.45;
-  const lookTo = new THREE.Vector3(), tipV = new THREE.Vector3();
+  const lookTo = new THREE.Vector3(), tipV = new THREE.Vector3(), focusV = new THREE.Vector3();
+  const doorAt = () => city.plan.doors.find((d) => me.x > d.x0 - 0.3 && me.x < d.x1 + 0.3 && me.z > d.z0 - 0.3 && me.z < d.z1 + 0.3 && Math.abs(me.gy) < 0.5) || null;
   cam.position.copy(camPos);
   const frame = () => {
     if (stopped) return;
@@ -446,16 +455,13 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       const was = mv.speed, acc = target > mv.speed ? (sprint ? GAIT.sprintAccel : GAIT.accel) : GAIT.decel + GAIT.decelPer * mv.speed;
       mv.speed += Math.max(-acc * dt * air, Math.min(acc * dt * air, target - mv.speed));
       if (mv.speed > 0.001) {
-        const x0 = me.x, z0 = me.z;
-        me.x = Math.max(-BOUNDS.x, Math.min(BOUNDS.x, me.x + Math.sin(me.heading) * mv.speed * dt));
-        me.z = Math.max(BOUNDS.z0, Math.min(BOUNDS.z1, me.z + Math.cos(me.heading) * mv.speed * dt));
-        // push out of piers and walls (a body 0.35 m round)
-        for (const b of city.blockers) {
-          const x0b = b.x0 - 0.35, x1 = b.x1 + 0.35, z0b = b.z0 - 0.35, z1 = b.z1 + 0.35;
-          if (me.x > x0b && me.x < x1 && me.z > z0b && me.z < z1) {
-            const dd = [me.x - x0b, x1 - me.x, me.z - z0b, z1 - me.z], m = Math.min(...dd);
-            if (m === dd[0]) me.x = x0b; else if (m === dd[1]) me.x = x1; else if (m === dd[2]) me.z = z0b; else me.z = z1;
-          }
+        const x0 = me.x, z0 = me.z, feet = me.gy + me.y;
+        me.x += Math.sin(me.heading) * mv.speed * dt; me.z += Math.cos(me.heading) * mv.speed * dt;
+        // push out of walls, piers and props at the writer's height (a body 0.35 m round)
+        W0.pushOut(me, 0.35, feet);
+        // nothing to stand on here at this level (a step too high, the edge of the water): slide along, or stay
+        if (Number.isNaN(W0.groundAt(me.x, me.z, feet))) {
+          if (!Number.isNaN(W0.groundAt(me.x, z0, feet))) me.z = z0; else if (!Number.isNaN(W0.groundAt(x0, me.z, feet))) me.x = x0; else { me.x = x0; me.z = z0; }
         }
         // running into something: the legs slow to what the body really does, rather than running on the spot
         if (dt > 0 && !me.airborne) { const real = Math.hypot(me.x - x0, me.z - z0) / dt; if (real < mv.speed - 0.3) mv.speed += (real - mv.speed) * Math.min(1, dt * 10); }
@@ -482,7 +488,8 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       if (Math.abs(follow) > 1.1) along += Math.sign(follow) * Math.min(Math.abs(follow) - 1.1, 4 * dt);
       off = Math.max(0.55, Math.min(0.9, off)); along = run.hi - run.lo > 0.7 ? Math.max(run.lo + 0.3, Math.min(run.hi - 0.3, along)) : (run.lo + run.hi) / 2;
       // things standing at the wall (a vending machine, a bin): the writer stands to one side of them, or steps past
-      for (const b of city.blockers) {
+      for (const b of W0.near(sp.center.x + n.x * off + tx * along, sp.center.z + n.z * off + tz * along)) {
+        if (!W0.stops(b, me.gy)) continue;
         const px = sp.center.x + n.x * off + tx * along, pz = sp.center.z + n.z * off + tz * along, ix = sp.center.x - n.x * 0.2, iz = sp.center.z - n.z * 0.2;
         if (px <= b.x0 - 0.35 || px >= b.x1 + 0.35 || pz <= b.z0 - 0.35 || pz >= b.z1 + 0.35 || (ix > b.x0 && ix < b.x1 && iz > b.z0 && iz < b.z1)) continue;
         const c = [alongOf(sp, b.x0 - 0.35, b.z0 - 0.35), alongOf(sp, b.x1 + 0.35, b.z1 + 0.35)], a0 = Math.min(...c), a1 = Math.max(...c);
@@ -590,7 +597,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     tip.style.left = book.state.open ? 'calc((100% - 296px) / 2)' : '50%'; tip.style.maxWidth = book.state.open ? 'calc(100% - 330px)' : 'calc(100% - 32px)';
     spray.update(dt, me);
     law.pushOut(me, 0.35);
-    const ev = law.update(dt, t, { x: me.x, z: me.z, y: me.y, crouch: me.crouch, painting: !!paint, spraying: sprayingNow, vx: paint ? 0 : Math.sin(me.heading) * mv.speed, vz: paint ? 0 : Math.cos(me.heading) * mv.speed });
+    const ev = law.update(dt, t, { x: me.x, z: me.z, y: me.y, gy: me.gy, crouch: me.crouch, painting: !!paint, spraying: sprayingNow, vx: paint ? 0 : Math.sin(me.heading) * mv.speed, vz: paint ? 0 : Math.cos(me.heading) * mv.speed });
     if (ev && opts.onEvent) try { opts.onEvent(ev); } catch { /* the host's business */ }
     if (ev === 'busted') {
       // a sketch half put up stays on the wall (owner, 16 Nov), undoable as one step; hand painting is still buffed
@@ -609,9 +616,9 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       flash = { text: bust.spot ? `BUSTED · THEY ARE BUFFING ${bust.spot.toUpperCase()}` : 'BUSTED', until: t + 0.1 };
       if (bust.t > 2.8) {
         if (bust.spot) spray.clear(bust.spot);
-        say2(bust.spot ? `BUSTED · ${bust.spot.toUpperCase()} GOT BUFFED · BACK TO THE START` : bust.kept ? `BUSTED · THE PIECE STAYS ON ${bust.kept.toUpperCase()} · BACK TO THE START` : 'BUSTED · BACK TO THE START', 3.5);
-        Object.assign(me, { x: 0, z: 8, y: 0, vy: 0, heading: Math.PI, crouch: false, airborne: false });
-        Object.assign(camO, { yaw: 0, pitch: 0.12, dist: 3.4 });
+        say2(bust.spot ? `BUSTED · ${bust.spot.toUpperCase()} GOT BUFFED · BACK TO THE STUDIO` : bust.kept ? `BUSTED · THE PIECE STAYS ON ${bust.kept.toUpperCase()} · BACK TO THE STUDIO` : 'BUSTED · BACK TO THE STUDIO', 3.5);
+        Object.assign(me, { x: home.x, z: home.z, y: 0, gy: home.y, vy: 0, heading: home.yaw + Math.PI, crouch: false, airborne: false });
+        Object.assign(camO, { yaw: home.yaw, pitch: 0.12, dist: 3.4 });
         bust = null; lastSpray = ''; law.reset(); writer.play('Idle_Loop', 0.2);
       }
     }
@@ -619,6 +626,8 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     else if (paint && !me.airborne) writer.loco(mv.speed, me.crouch);
     else if (me.airborne) {
       me.vy -= 13 * dt; me.y += me.vy * dt;
+      // over a ledge or a dock while high enough: the ground under the writer is up there now
+      { const feet = me.gy + me.y, g = W0.groundAt(me.x, me.z, feet); if (!Number.isNaN(g) && Math.abs(g - me.gy) > 0.01) { me.y = feet - g; me.gy = g; } }
       if (me.y <= 0) {
         // the landing: the harder it is, the more the body gives and the more speed it costs
         const k = Math.min(1, Math.max(0, -me.vy / 7)); me.y = 0; me.vy = 0; me.airborne = false;
@@ -636,8 +645,14 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       else writer.loco(Math.max(mv.speed, Math.min(0.45, Math.abs(mv.yawRate) * 0.12)), me.crouch);
     }
     writer.lean(mv.roll, mv.pitch); writer.twist(paint ? mv.offset : 0);
-    // the ground under the writer: up a kerb is a quick step, not a pop
-    me.gy += (city.groundY(me.x, me.z) - me.gy) * Math.min(1, dt * 16);
+    // the ground under the writer: up a kerb or a step is a quick step, not a pop; off an edge, they fall
+    {
+      const g = W0.groundAt(me.x, me.z, me.gy + me.y);
+      if (!Number.isNaN(g)) {
+        if (!me.airborne && g < me.gy - STEP) { me.airborne = true; me.y = me.gy - g; me.vy = 0; me.gy = g; mv.takeoff = 0; }
+        else if (!me.airborne) me.gy += (g - me.gy) * Math.min(1, dt * 16);
+      }
+    }
     const py = me.gy + me.y;
     writer.grounded(!me.airborne);
     writer.root.position.set(me.x, py, me.z);
@@ -650,16 +665,20 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     const tgtY = py + camH;
     const cx = me.x + Math.sin(camO.yaw) * Math.cos(camO.pitch) * camO.dist + Math.cos(camO.yaw) * 0.55;
     const cz = me.z + Math.cos(camO.yaw) * Math.cos(camO.pitch) * camO.dist - Math.sin(camO.yaw) * 0.55;
-let camY = Math.max(0.35, tgtY + Math.sin(camO.pitch) * camO.dist), camX = Math.max(-26.5, Math.min(26.5, cx)), camZ = Math.max(BOUNDS.z0 - 0.5, Math.min(BOUNDS.z1 + 4, cz));
-    // painting behind something (a vending machine on the pavement): the camera comes in front of it
-    if (paint) { const k = sightTo(me.x, me.z, tgtY, camX, camZ, camY); if (k < 1) { const f = Math.max(0.3, k - 0.1); camX = me.x + (camX - me.x) * f; camZ = me.z + (camZ - me.z) * f; camY = tgtY + (camY - tgtY) * f; } }
+    let camY = Math.max(me.gy + 0.35, tgtY + Math.sin(camO.pitch) * camO.dist), camX = cx, camZ = cz;
+    // in a lane, a doorway, the tunnel or the studio: the camera comes in front of the wall behind it, and stays under
+    // the ceiling (the boxes are grown a little so the near plane never cuts into a wall)
+    { const k = W0.ray(me.x, tgtY, me.z, camX, camY, camZ, 0.22); if (k < 1) { const f = Math.max(0.12, k - 0.04); camX = me.x + (camX - me.x) * f; camZ = me.z + (camZ - me.z) * f; camY = tgtY + (camY - tgtY) * f; } }
+    { const ceil = city.ceilingAt(camX, camZ, me.gy + 1); if (camY > ceil - 0.3) camY = Math.max(tgtY - 0.2, ceil - 0.3); }
     camPos.set(camX, camY, camZ);
     cam.position.lerp(camPos, 1 - Math.exp(-dt * 24));
     // what it looks at keeps up with the writer: only the slightest give, so the camera feels quick
     lookTo.set(me.x + Math.cos(camO.yaw) * 0.55, tgtY, me.z - Math.sin(camO.yaw) * 0.55);
     camLook.lerp(lookTo, paint || bust ? 1 : 1 - Math.exp(-dt * 40));
     cam.lookAt(camLook);
-    city.update(dt, t, cam);
+    focusV.set(me.x, me.gy + me.y, me.z); city.update(dt, t, cam, focusV);
+    // a shop door: the trigger is marked on the ground (phase 3 opens the shops)
+    if (!paint && !bust) { const d = doorAt(); if (d && t >= tipHold) prompt(`${d.name} · OPENS SOON`); }
     city.beforeRender(r, scene, cam);
     grade.tick(t);
     comp.render(dt);
@@ -675,7 +694,7 @@ let camY = Math.max(0.35, tgtY + Math.sin(camO.pitch) * camO.dist), camX = Math.
       // the writer goes to the wall, in front of where the piece starts
       stopAuto(false); stroke = null; line = null; btn = 0;
       const w = wallOf.get(list[0].wall)!, a0 = list[0].pts[0][0] - w.w / 2;
-      if (!paint || paint.spot !== w || Math.abs(alongOf(w, me.x, me.z) - a0) > 3) { me.x = w.center.x + w.normal.x * 0.7 + w.normal.z * a0; me.z = w.center.z + w.normal.z * 0.7 - w.normal.x * a0; me.heading = Math.atan2(-w.normal.x, -w.normal.z); squareUp(w); }
+      if (!paint || paint.spot !== w || Math.abs(alongOf(w, me.x, me.z) - a0) > 3) { me.x = w.center.x + w.normal.x * 0.7 + w.normal.z * a0; me.z = w.center.z + w.normal.z * 0.7 - w.normal.x * a0; me.heading = Math.atan2(-w.normal.x, -w.normal.z); const g = W0.groundAt(me.x, me.z, w.center.y - w.h / 2 + 0.3); if (!Number.isNaN(g)) me.gy = g; squareUp(w); }
       auto = { list, i: 0, k: 0, t: 0, gap: 0.4, speed: o.speed, group: 'p' + ++autoN, done: res };
     } catch (e) { rej(e); }
   });
@@ -683,10 +702,15 @@ let camY = Math.max(0.35, tgtY + Math.sin(camO.pitch) * camO.dist), camX = Math.
   say(''); hud();
   frame();
 
-  return {
+  const api: Game = {
     canvas,
     where: () => { const p = writer.tip(tipV); return { x: me.x, z: me.z, y: me.gy + me.y, yaw: camO.yaw, heading: me.heading, anim: writer.playing(), speed: mv.speed, tip: p ? [p.x, p.y, p.z] as [number, number, number] : null }; },
-    alarm: () => law.alarm(me),
+    alarm: () => law.alarm({ x: me.x, z: me.z, gy: me.gy }),
+    places: () => city.plan.places.map((p) => ({ ...p })),
+    teleport: (id) => { const p = city.plan.places.find((q) => q.id === id || q.name.toLowerCase() === String(id).toLowerCase()); if (!p) return null; api.goto(p.x, p.z, p.yaw, 0.12, p.y); return { id: p.id, name: p.name, x: p.x, z: p.z, y: p.y }; },
+    at: () => { let best = city.plan.places[0], bd = 1e9; for (const p of city.plan.places) { const d = Math.hypot(p.x - me.x, p.z - me.z) + Math.abs(p.y - me.gy) * 3; if (d < bd) { bd = d; best = p; } } const d = doorAt(); return { place: best.id, dist: +bd.toFixed(1), door: d ? d.id : '', ground: +me.gy.toFixed(2), inside: city.ceilingAt(me.x, me.z, me.gy + 1) < Infinity }; },
+    map: (width = 1600) => city.map(r, width),
+    train: () => city.train(),
     // a picture of the game: render a frame and copy it in the same step (the drawing buffer is not kept)
     snap: (width = 768) => {
       city.beforeRender(r, scene, cam); comp.render(0);
@@ -732,9 +756,13 @@ let camY = Math.max(0.35, tgtY + Math.sin(camO.pitch) * camO.dist), camX = Math.
     cops: (on: boolean) => law.setOn(on),
     /** The game's sound, for a recorder: connect node to a MediaStreamDestination made on ctx. */
     audio: () => { const b = sound(); return b ? { ctx: b.ctx, node: b.out } : null; },
-    goto: (x, z, yaw, pitch) => { if (paint) togglePaint();   // painting holds the writer at the wall: put the can down first
+    goto: (x, z, yaw, pitch, y) => { if (paint) togglePaint();   // painting holds the writer at the wall: put the can down first
       mv.speed = 0; mv.yawRate = 0; mv.side = 0;
-      me.x = x; me.z = z; if (yaw != null) { camO.yaw = yaw; me.heading = yaw + Math.PI; } if (pitch != null) camO.pitch = pitch; },
+      // the level: the one asked for, else the highest there is here (the bridge, not the towpath under it)
+      const g = W0.groundAt(x, z, y ?? 60);
+      me.x = x; me.z = z; me.gy = Number.isNaN(g) ? (y ?? 0) : g; me.y = 0; me.vy = 0; me.airborne = false; mv.takeoff = 0;
+      if (yaw != null) { camO.yaw = yaw; me.heading = yaw + Math.PI; } if (pitch != null) camO.pitch = pitch;
+      cam.position.set(me.x + Math.sin(camO.yaw) * camO.dist, me.gy + 2, me.z + Math.cos(camO.yaw) * camO.dist); camLook.set(me.x, me.gy + 1.45, me.z); },
     stop: () => {
       stopped = true; cancelAnimationFrame(raf); ro.disconnect();
       canvas.removeEventListener('keydown', kd); canvas.removeEventListener('keyup', ku);
@@ -743,4 +771,5 @@ let camY = Math.max(0.35, tgtY + Math.sin(camO.pitch) * camO.dist), camX = Math.
       const gm = (ghost.material as THREE.MeshBasicMaterial).map; if (gm) gm.dispose();
     },
   };
+  return api;
 }

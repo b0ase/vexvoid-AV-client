@@ -1,7 +1,8 @@
 vexvoid-game.js: game/src (TypeScript) bundled by scripts/build-game.sh with esbuild 0.27.2 (darwin-arm64, npm
 integrity checked) and three 0.182.0 (MIT, npm sha512-GbHabT+Irv+ihI1/f5kIIsZ+Ef9Sl5A1Y7imvS5RQjWgtTPfPnZ43JmlYI7NtCRDK9zir20lQpfg8/9Yd02OvQ==).
-sha256 dce092f8d8bed91c6455751ee8899abd0d503cdf3c1977d35f6f699c2da9c5c7
-The city (game/src/city*.ts) is forked from tokenblaster.lol @88d14f1 src/lib/galleryGame (ESCAPE FROM TERRORNODE, NPG Ltd).
+sha256 c8c293f9495bf934ffea71c0ca0000f4000ffa6e68b61c4d1e0fd96a98fb8e9b
+The district (game/src/plan.ts, world.ts, district.ts, districtTex.ts) is our own, all surfaces drawn in code. city.ts (forked from
+tokenblaster.lol @88d14f1, ESCAPE FROM TERRORNODE, NPG Ltd) is no longer used by the game; cityAssets.ts/cityShaders.ts still lend it shaders.
 sketches: game/sketches/*.json, our own starter sketches (stroke data, written by game/sketches/make.mjs), bundled in.
 tex/: Poly Haven concrete_floor_02 and large_floor_tiles_02 (CC0), via tokenblaster.lol public/doubleo/tex.
 anims/ual.glb: Quaternius Universal Animation Library clips (CC0), see anims/CREDITS.md.

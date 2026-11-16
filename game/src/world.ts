@@ -168,7 +168,7 @@ export function makeNav(w: World, r = 0.35, cell = 0.5) {
   const push = (n: number, f: number) => { heap.push(n); hf.push(f); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (hf[p] <= hf[i]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; [hf[p], hf[i]] = [hf[i], hf[p]]; i = p; } };
   const pop = () => { const top = heap[0]; const ln = heap.pop()!, lf = hf.pop()!; if (heap.length) { heap[0] = ln; hf[0] = lf; let i = 0; for (;;) { const a = 2 * i + 1, b = a + 1; let m = i; if (a < heap.length && hf[a] < hf[m]) m = a; if (b < heap.length && hf[b] < hf[m]) m = b; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; [hf[m], hf[i]] = [hf[i], hf[m]]; i = m; } } return top; };
   const DIRS = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, 1.4142], [1, -1, 1.4142], [-1, 1, 1.4142], [-1, -1, 1.4142]];
-  const levelNear = (c: number, y: number) => { for (let l = 0; l < L; l++) { const v = ys[c * L + l]; if (!Number.isNaN(v) && Math.abs(v - y) <= STEP) return c * L + l; } return -1; };
+  const levelNear = (c: number, y: number) => { let best = -1, bd = STEP + 1e-6; for (let l = 0; l < L; l++) { const v = ys[c * L + l]; if (Number.isNaN(v)) continue; const d = Math.abs(v - y); if (d <= bd) { bd = d; best = c * L + l; } } return best; };
   /** Points (x, z, y) from a to b, or null if there is no way within maxNodes. */
   const path = (ax: number, az: number, ay: number, bx: number, bz: number, by: number, maxNodes = 60000) => {
     const s = nodeOf(ax, az, ay), t = nodeOf(bx, bz, by);
