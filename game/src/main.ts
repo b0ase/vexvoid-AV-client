@@ -34,7 +34,7 @@ import { makeSpray, footprint, COLOURS, COLOUR_NAMES, type Can, type Stroke, typ
 import { makeLaw, type LawState } from './cops';
 import { makeHud, keyed, kc, hudScale } from './hud';
 import { makeMusic, type MusicState, type Track } from './music';
-import { makeBook, sketchOf, fit, drawSketch, secsOf, cleanName, type Sketch, type SketchKind, type SketchStore, type BookState } from './sketchbook';
+import { makeBook, slotsOf, sketchOf, fit, drawSketch, secsOf, cleanName, type Sketch, type SketchKind, type SketchStore, type BookState } from './sketchbook';
 
 export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) => void; onHud?: (s: string) => void; onRec?: () => void;
   /** Where the walls' paint is kept (default: this browser). */
@@ -83,9 +83,10 @@ export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?:
   /** Put a sketch up: on `wall` (none: the wall being painted, or the nearest), centred on `at` (metres from the wall's
    *  bottom left; none: where the can points, or in front of the writer), size x its own size (made smaller to fit),
    *  speed 1 2 4 animated (0: at once). Resolves true when it is all up, false if it was stopped (moving, busted). */
-  blast: (idOrName: string, o?: { wall?: string; at?: [number, number]; size?: number; speed?: number; kind?: SketchKind }) => Promise<boolean>;
+  /** colours: the sketch's colour slots repainted, by slot ({ 0: '#0c0c0e' }) or by its own colour ({ '#f4f4f4': '#9a9a9e' }); remembered for that sketch. */
+  blast: (idOrName: string, o?: { wall?: string; at?: [number, number]; size?: number; speed?: number; kind?: SketchKind; colours?: unknown }) => Promise<boolean>;
   /** The sketchbook panel: open it, pick, speed, size; returns its state and where a blast would go now. */
-  sketchbook: (o?: Partial<BookState>) => BookState & { blasting: string; armed: boolean; plan: { wall: string; at: [number, number]; scale: number; fitted: boolean } | null };
+  sketchbook: (o?: Partial<BookState> & { colours?: unknown }) => BookState & { colours: { slots: string[]; now: string[] }; blasting: string; armed: boolean; plan: { wall: string; at: [number, number]; scale: number; fitted: boolean } | null };
   /** How the writer moves: speed, heading, and how the soles meet the ground (stats since the last reset). */
   /** Tuning: the speed a moving clip was made for. */
   tuneGait: (clip: string, v: number) => void;
@@ -298,6 +299,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const book = makeBook(host, {
     // picking a card (even the same one again) arms it: its ghost shows on the wall where a click would put it
     onPick: () => { disarmed = false; },
+    canColour: () => can.colour,
     onBlast: () => blastNow(), onChange: () => { hud(); }, focus: () => canvas.focus(),
     onSave: (name, kind) => { saveWall({ name, kind }).catch((e) => note(String(e.message || e).toUpperCase(), 2.5)); },
     onDelete: (id) => { const s = book.byId(id); void book.remove(id).then((ok) => { if (ok && s) note(`DELETED ${s.name}`); }); },
@@ -310,7 +312,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   ghost.visible = false; scene.add(ghost);
   let ghostOf = '';
   const ghostPic = (sk: Sketch) => {
-    if (ghostOf === sk.id) return; ghostOf = sk.id;
+    const gk = sk.id + '|' + slotsOf(sk).join(','); if (ghostOf === gk) return; ghostOf = gk;   // a recolour redraws it
     const cv = document.createElement('canvas'); cv.width = 512; cv.height = Math.max(32, Math.min(512, Math.round(512 * sk.h / sk.w)));
     drawSketch(cv, sk, { bg: null, pad: 0 });
     const m = ghost.material as THREE.MeshBasicMaterial; if (m.map) m.map.dispose();
@@ -773,10 +775,10 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     sketch: (q, kind) => { const s = findSketch(q, kind); return s ? JSON.parse(JSON.stringify(s)) : null; },
     saveSketch: async (o = {}) => infoOf(await saveWall(o)),
     deleteSketch: (id) => book.remove(id),
-    blast: async (q, o = {}) => { await book.loaded; const s = findSketch(q, o.kind); if (!s) throw new Error('no sketch ' + q); book.choose(s.id); return blast(s, o); },
+    blast: async (q, o = {}) => { await book.loaded; const s = findSketch(q, o.kind); if (!s) throw new Error('no sketch ' + q); if (o.colours !== undefined) book.setColours(s.id, o.colours); book.choose(s.id); return blast(book.pick() || s, o); },
     sketchbook: (o) => {
-      if (o) { if (o.kind) book.setKind(o.kind); if (o.pick) book.choose(o.pick); if (o.speed) book.speed(o.speed); if (o.size) book.size(o.size); if (o.open != null) { book.setOpen(o.open); if (o.open) disarmed = false; } }
-      return { ...book.state, blasting, armed: book.state.open && !auto && !disarmed && !!book.pick(), plan: disarmed ? null : plan };
+      if (o) { if (o.kind) book.setKind(o.kind); if (o.pick) book.choose(o.pick); if (o.colours !== undefined) book.setColours(book.state.pick, o.colours); if (o.speed) book.speed(o.speed); if (o.size) book.size(o.size); if (o.open != null) { book.setOpen(o.open); if (o.open) disarmed = false; } }
+      return { ...book.state, colours: book.colours(), blasting, armed: book.state.open && !auto && !disarmed && !!book.pick(), plan: disarmed ? null : plan };
     },
     can: (o) => {
       if (o) { if (o.cap) can.cap = o.cap; if (o.dist != null) can.dist = Math.max(0.05, Math.min(0.6, o.dist)); if (o.buff != null) can.buff = o.buff; if (o.colour && COLOURS.includes(o.colour)) { colourI = COLOURS.indexOf(o.colour); can.colour = o.colour; } hud(); }
