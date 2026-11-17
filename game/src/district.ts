@@ -452,7 +452,7 @@ export function buildDistrict({ renderer, scene, high, look }: { renderer: THREE
     instanced(new THREE.CylinderGeometry(0.033, 0.033, 0.21, 12), std({ color: '#c4c6ca', roughness: 0.3, metalness: 0.8 }), cans);
     // sketches pinned on the north wall, drawn from the starter sketches (pencil on paper)
     (starters as unknown as Sketch[]).forEach((sk, i) => {
-      const t = track(paperTex((c) => drawSketch(c, sk, { bg: null, pad: 4 }), i * 13 + 5));
+      const t = track(paperTex((c) => drawSketch(c, sk, { bg: null, pad: 4, fog: 0.12 }), i * 13 + 5));
       const g = new THREE.PlaneGeometry(0.62, 0.44); g.rotateZ((R() - 0.5) * 0.12); g.translate(-20.6 + (i % 5) * 0.85 + (R() - 0.5) * 0.1, 1.55 + Math.floor(i / 5) * 0.62 + (R() - 0.5) * 0.08, st.z0 + 0.31);
       const m = new THREE.Mesh(track(g), track(new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 }))); group.add(m);
     });
@@ -621,7 +621,10 @@ export function buildDistrict({ renderer, scene, high, look }: { renderer: THREE
     // the flood's mast stands by the tunnel gate, off the line from the tunnel to the wall (it used to block the view)
     const fx = h.x + 6, fz = z + 10.9;
     box(iron, fx - 0.1, fx + 0.1, 0, 9.6, fz - 0.1, fz + 0.1, 'iron', false);
-    const fl = new THREE.SpotLight('#ffffff', high ? 260 : 160, 32, 0.9, 0.8, 1.2); fl.position.set(fx, 9.5, fz - 0.2); fl.target.position.set(h.x, 3, z); group.add(fl, fl.target);
+    // White paint under it must stay under the bloom threshold (it blew out at 260 cd: paint ~3x the threshold), so the
+    // flood is softer and thrown a little high: its hot spot sits above the band where pieces go, the paint in the
+    // falloff below it, the wall still lit and the yard still dark.
+    const fl = new THREE.SpotLight('#ffffff', high ? 105 : 70, 34, 0.95, 1.0, 1.2); fl.position.set(fx, 9.5, fz - 0.2); fl.target.position.set(h.x, 5.2, z); group.add(fl, fl.target);
     addGlow(fx, 9.5, fz - 0.3, 1.6, 1.8);
   }
 

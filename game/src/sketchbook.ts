@@ -73,7 +73,9 @@ export const mapOf = (sk: Sketch, m: unknown): (string | null)[] => {
   return out;
 };
 
-export function drawSketch(cv: HTMLCanvasElement, sk: Sketch, o: { bg?: string | null; pad?: number } = {}) {
+/** Draws a sketch flat. fog: how strongly the fog passes (a fat cap far from the wall: a piece's glow and fade) show,
+ *  1 as painted; small pictures (cards, pinned paper) turn it down, or the glow reads as a grey cloud over the letters. */
+export function drawSketch(cv: HTMLCanvasElement, sk: Sketch, o: { bg?: string | null; pad?: number; fog?: number } = {}) {
   const W = cv.width, H = cv.height, pad = o.pad ?? 6, k = Math.min((W - 2 * pad) / sk.w, (H - 2 * pad) / sk.h);
   const ox = (W - sk.w * k) / 2, oy = (H - sk.h * k) / 2;
   const layer = document.createElement('canvas'); layer.width = W; layer.height = H;
@@ -82,7 +84,9 @@ export function drawSketch(cv: HTMLCanvasElement, sk: Sketch, o: { bg?: string |
   for (const s of sk.strokes) {
     if (s.pts.length < 1) continue;
     g.globalCompositeOperation = s.buff ? 'destination-out' : 'source-over';
-    g.globalAlpha = s.buff ? 1 : s.pressure < 1 ? 0.45 : 0.95;
+    const fog = !s.buff && s.cap === 3 && s.dist >= 0.25;
+    if (fog && (o.fog ?? 1) <= 0) continue;
+    g.globalAlpha = (s.buff ? 1 : s.pressure < 1 ? 0.45 : 0.95) * (fog ? o.fog ?? 1 : 1);
     g.strokeStyle = s.colour; g.lineWidth = Math.max(0.8, footprint(s).width * k);
     g.beginPath();
     s.pts.forEach(([x, y], i) => { const px = ox + x * k, py = H - (oy + y * k); if (i) g.lineTo(px, py); else g.moveTo(px, py); });
@@ -196,7 +200,7 @@ export function makeBook(host: HTMLElement, cb: Cb, store: SketchStore = localSk
   const thumbs = new Map<string, HTMLCanvasElement>();
   const thumb = (s: Sketch) => {
     const key = s.id + '|' + mapFor(s.id).join(','); let c = thumbs.get(key);
-    if (!c) { c = document.createElement('canvas'); c.width = 488; c.height = Math.round(Math.max(70, Math.min(150, 488 * s.h / s.w))); drawSketch(c, painted(s)!, { pad: 10 }); thumbs.set(key, c); }
+    if (!c) { c = document.createElement('canvas'); c.width = 488; c.height = Math.round(Math.max(70, Math.min(150, 488 * s.h / s.w))); drawSketch(c, painted(s)!, { pad: 10, fog: 0.12 }); thumbs.set(key, c); }
     return c;
   };
   const changed = () => { render(); cb.onChange(); };
