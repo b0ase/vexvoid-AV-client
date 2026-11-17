@@ -120,6 +120,7 @@ export const sketch = (id, name, kind, strokes, about) => {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
   for (const s of strokes) for (const [x, y] of s.pts) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y) }
   const m = 0.08
-  for (const s of strokes) s.pts = thin(s.pts).map(([x, y, t]) => [+(x - x0 + m).toFixed(3), +(y - y0 + m).toFixed(3), +t.toFixed(2)])
+  const tol = kind === 'piece' ? 0.0022 : 0.0012   // a piece's lines are wider: a looser fit keeps its data small
+  for (const s of strokes) s.pts = thin(s.pts, tol).map(([x, y, t]) => [+(x - x0 + m).toFixed(3), +(y - y0 + m).toFixed(3), +t.toFixed(2)])
   return { id, name, kind, about, w: +(x1 - x0 + 2 * m).toFixed(3), h: +(y1 - y0 + 2 * m).toFixed(3), strokes }
 }

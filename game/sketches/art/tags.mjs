@@ -6,7 +6,7 @@
 //   blade hand: skinny, sharp, fast: V3X with a crown and sparks.   round hand: VOID run together.   NPG with an arrow.
 import { WHITE, BLACK, CHROME, rand, jitter, stroke, dot } from './can.mjs'
 import { sketch, drips, prepare, fillPass, edgePass, bottoms, scatter } from './paint.mjs'
-import { at } from './raster.mjs'
+import { at, resample } from './raster.mjs'
 import { vmarkStrokes } from './vmark.mjs'
 
 // Catmull-Rom through control points
@@ -139,6 +139,73 @@ function brushTag(id, name, text, o) {
   return sketch(id, name, 'tag', out, o.about)
 }
 
+// ---- the pen hands: a chisel nib held at one angle, so the width follows the direction of the pull (heavy where the
+// stroke runs across the nib, a hairline where it runs along it), pressed on at the start and flicked off to nothing ----
+const nibShape = (P, nib, W, w0, on, off) => {
+  const cum = [0]; for (let i = 1; i < P.length; i++) cum.push(cum[i - 1] + Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]))
+  const L = cum[cum.length - 1], nv = [Math.cos(nib), Math.sin(nib)], polys = []
+  const wAt = (i) => { const t = cum[i]; return Math.min(1, t / Math.max(1e-6, on) * 0.7 + 0.3) * Math.min(1, (L - t) / Math.max(1e-6, off)) }
+  for (let i = 1; i < P.length; i++) {
+    const a = P[i - 1], b = P[i], ka = wAt(i - 1), kb = wAt(i), dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1, n = [-dy / l, dx / l]
+    const va = [nv[0] * W * ka / 2, nv[1] * W * ka / 2], vb = [nv[0] * W * kb / 2, nv[1] * W * kb / 2]
+    polys.push([[a[0] + va[0], a[1] + va[1]], [b[0] + vb[0], b[1] + vb[1]], [b[0] - vb[0], b[1] - vb[1]], [a[0] - va[0], a[1] - va[1]]])
+    const ma = w0 * ka / 2, mb = w0 * kb / 2
+    polys.push([[a[0] + n[0] * ma, a[1] + n[1] * ma], [b[0] + n[0] * mb, b[1] + n[1] * mb], [b[0] - n[0] * mb, b[1] - n[1] * mb], [a[0] - n[0] * ma, a[1] - n[1] * ma]])
+  }
+  return polys
+}
+/** A tag in a pen hand. word: { s: [{ pts, curve?, on?, off?, speed?, hold0? }] } in unit cap height; o: h, lean, nib
+ *  (radians), W (nib width, m), w0 (hairline, m), colour, feet (drip points, unit), extra(T, can). */
+function penTag(id, name, word, o) {
+  const h = o.h, lean = o.lean ?? 0.2, T = ([u, v]) => [(u + v * lean) * h, v * h]
+  const laid = word.s.map((st) => { const P = resample((st.curve ? smooth(st.pts, 10) : st.pts).map(T), 0.004); return { st, P, polys: nibShape(P, st.nib ?? o.nib, (st.W ?? 1) * o.W, o.w0, (st.on ?? 0.04), (st.off ?? 0.12) * h) } })
+  const { F, L, Uf } = prepare(laid.map((l) => ({ polys: l.polys })), { margin: 0.2 })
+  const can = { cap: 1, dist: 0.05, colour: o.colour ?? WHITE }, out = []
+  laid.forEach((l, i) => {
+    // the pull: the can down the line at the hand's speed (held a beat where it presses on)
+    out.push(stroke(l.P, can, { speed: (o.speed ?? 2.4) * (l.st.speed ?? 1), corner: 0.7, step: 0.008, hold0: l.st.hold0 ?? 0.05, ease: 0.04 }))
+    // then the heavy parts filled and their edges cut crisp
+    const nib = l.st.nib ?? o.nib, nv = [Math.cos(nib), Math.sin(nib)], half = (l.st.W ?? 1) * o.W / 2
+    for (let k = 0.011; k < half - 0.006; k += 0.011) for (const sg of [1, -1]) {
+      const P2 = l.P.map(([x, y]) => [x + nv[0] * k * sg, y + nv[1] * k * sg])
+      let r = []; const flush = () => { if (r.length > 3) out.push(stroke(r, can, { speed: (o.speed ?? 2.4) * 1.6, corner: 0.5, step: 0.008 })); r = [] }
+      for (const q of P2) { if (at(F, L[i].f, q[0], q[1]) < -0.007) r.push(q); else flush() } flush()
+    }
+    out.push(...edgePass(F, L[i].f, 0.008, { ...can, dist: 0.045 }, { speed: 1.8, corner: 0.8, min: 0.05 }))
+  })
+  // the paint pooled where the strokes pressed on runs; drips off the feet
+  const runs = (word.feet || []).map(([u, v], k) => { const [x, y] = T([u, v]); return [x + jitter(0.006), y + 0.01, (0.06 + ((k * 7) % 5) / 5 * 0.3) * (o.dripLen ?? 1)] })
+  out.push(...drips(runs, { cap: 1, dist: 0.05, colour: can.colour }, { speed: 0.9, hold: 0.1, up: 0.0 }))
+  if (o.extra) out.push(...o.extra(T, can, { F, Uf }))
+  return sketch(id, name, 'tag', out, o.about)
+}
+// V3X, the blade hand: tall, sharp corners, the nib steep; the V flicked in from a crown, the 3 cut in two angular
+// bowls, the X's second blade carried on into an underline that flicks up under the V
+const V3X = { s: [
+  { pts: [[-0.16, 1.16], [-0.02, 1.02], [0.2, -0.02], [0.52, 1.1], [0.6, 1.32]], off: 0.22, hold0: 0.08 },
+  { pts: [[0.68, 0.94], [0.98, 1.04], [0.76, 0.6], [1.02, 0.5], [1.0, 0.12], [0.62, -0.02], [0.52, 0.08]], off: 0.1 },
+  { pts: [[1.12, 1.08], [1.56, -0.04], [1.7, -0.16]], off: 0.14 },
+  { pts: [[1.64, 1.12], [1.06, -0.06], [0.4, -0.2], [-0.1, -0.16], [-0.2, -0.04]], off: 0.3, speed: 1.3 },
+  { pts: [[0.0, 1.24], [-0.08, 1.48]], on: 0.01, off: 0.1, W: 0.7, speed: 1.2 }, { pts: [[0.13, 1.22], [0.15, 1.58]], on: 0.01, off: 0.12, W: 0.7, speed: 1.2 }, { pts: [[0.27, 1.2], [0.38, 1.44]], on: 0.01, off: 0.1, W: 0.7, speed: 1.2 },
+], feet: [[0.2, 0], [0.62, 0], [1.54, 0]] }
+// VOID, the round hand: one flowing pull V into O into I, loops at the joins, the D's belly swung wide; a halo over
+// the I, an underline that flicks up at the end
+const VOIDW = { s: [
+  { pts: [[-0.06, 1.08], [0.04, 0.6], [0.16, 0.0], [0.26, 0.42], [0.38, 0.86], [0.52, 1.0], [0.66, 0.86], [0.7, 0.42], [0.58, 0.02], [0.44, 0.04], [0.38, 0.44], [0.46, 0.84], [0.62, 1.0], [0.8, 0.96], [0.84, 0.5], [0.82, 0.02], [0.9, -0.06]], curve: true, off: 0.08, hold0: 0.08 },
+  { pts: [[1.02, 1.0], [1.0, 0.3], [0.98, -0.02]], off: 0.04 },
+  { pts: [[0.92, 0.98], [1.18, 1.0], [1.38, 0.74], [1.38, 0.3], [1.16, 0.02], [0.9, 0.0], [0.74, 0.08]], curve: true, off: 0.16 },
+  { pts: [[-0.04, -0.12], [0.6, -0.18], [1.2, -0.14], [1.52, 0.04]], curve: true, off: 0.24, W: 0.8, speed: 1.4 },
+], feet: [[0.16, 0], [0.58, 0.02], [0.98, -0.02], [1.16, 0.02]] }
+// NPG, the chisel hand: compact and slanted, N straight into P, the G closed with a spike; an arrow under it
+const NPGW = { s: [
+  { pts: [[0.0, -0.02], [0.02, 1.02], [0.42, 0.0], [0.46, 1.08], [0.52, 1.24]], off: 0.14, hold0: 0.08 },
+  { pts: [[0.64, -0.02], [0.66, 1.02]], off: 0.04 },
+  { pts: [[0.62, 1.0], [0.9, 0.98], [1.0, 0.76], [0.9, 0.54], [0.64, 0.5]], curve: true, off: 0.06 },
+  { pts: [[1.42, 0.88], [1.26, 1.02], [1.08, 0.82], [1.06, 0.22], [1.22, 0.0], [1.4, 0.16], [1.42, 0.44], [1.24, 0.46], [1.62, 0.46]], curve: true, off: 0.12 },
+  { pts: [[-0.08, -0.14], [0.8, -0.12], [1.66, -0.08]], off: 0.02, W: 0.6, speed: 1.6 },
+  { pts: [[1.5, 0.02], [1.68, -0.08], [1.52, -0.2]], on: 0.01, off: 0.02, W: 0.6, speed: 0.9 },
+], feet: [[0.0, 0], [0.42, 0], [0.64, 0], [1.22, 0]] }
+
 function tag(id, name, text, hand, o) {
   const laid = write(text, hand, o)
   const can = { cap: o.cap ?? 2, dist: o.dist ?? 0.07, colour: o.colour ?? WHITE }
@@ -158,26 +225,20 @@ export const TAGS = [
       return drips(runs, { cap: 1, dist: 0.05, colour: can.colour }, { speed: 0.9, hold: 0.1, up: 0.0 })
     } }) },
   { id: 'tag-vexvoid-brush', make: () => brushTag('tag-vexvoid-brush', 'VEXVOID BRUSH', 'VEXVOID', { h: 0.75, bounce: [0, -0.02, 0.03, 0, -0.03, 0.02, 0.02], about: 'brush hand: heavy angular VEXVOID, strokes pressed on and flicked off to points, drips and splatter' }) },
-  { id: 'tag-v3x', make: () => tag('tag-v3x', 'V3X', '#', { '#': FLOW.v3x }, {
-    h: 0.45, lean: 0.24, cap: 1, dist: 0.085, colour: BLACK, speed: 2.6, hold0: 0.04, wob: 0, squash: [1.15], about: 'blade hand: sharp black V3X in one pull, a crown of thorns, white sparks',
-    extra: (laid) => {
-      const r = right(laid), t = top(laid), W = { cap: 1, dist: 0.06, colour: WHITE }
-      const spark = (x, y, k) => [stroke([[x, y - k], [x, y + k]], W, { speed: 1.2 }), stroke([[x - k * 0.7, y], [x + k * 0.7, y]], W, { speed: 1.2 }), dot(x, y, W, 0.08)]
-      return [...spark(r + 0.06, t - 0.12, 0.07), ...spark(0.16, t - 0.05, 0.045), ...spark(r * 0.55, -0.1, 0.035)]
+  { id: 'tag-v3x', make: () => penTag('tag-v3x', 'V3X', V3X, {
+    h: 0.5, lean: 0.22, nib: 1.05, W: 0.075, w0: 0.016, speed: 2.6, about: 'blade hand: sharp V3X, the V flicked in under a crown, the X carried on into an underline, sparks',
+    extra: (T) => {
+      const W = { cap: 1, dist: 0.06, colour: CHROME }, spark = (x, y, k) => [stroke([[x, y - k], [x, y + k]], W, { speed: 1.2 }), stroke([[x - k * 0.7, y], [x + k * 0.7, y]], W, { speed: 1.2 }), dot(x, y, W, 0.08)]
+      const [a, b] = T([1.86, 1.0]), [c, d] = T([0.36, 1.5])
+      return [...spark(a, b, 0.06), ...spark(c, d, 0.04)]
     } }) },
-  { id: 'tag-void', make: () => tag('tag-void', 'VOID', '#', { '#': FLOW.void }, {
-    h: 0.5, lean: 0.26, cap: 2, dist: 0.07, speed: 2.4, hold0: 0.06, corner: 0.45, wob: 0, squash: [1.35], about: 'round hand: VOID in one flowing pull, a halo, an underline that flicks up',
-    extra: (laid, can) => {
-      const r = right(laid), t = top(laid), thin = { ...can, cap: 1, dist: 0.055 }
-      const halo = Array.from({ length: 25 }, (_, i) => { const a = -0.4 + i / 24 * Math.PI * 2.1; return [0.62 + Math.cos(a) * 0.15 + Math.sin(a) * 0.02, t + 0.06 + Math.sin(a) * 0.045] })
-      return [stroke(halo, thin, { speed: 1.6 }),
-        stroke(smooth([[-0.02, -0.07], [r * 0.45, -0.12], [r * 0.9, -0.08], [r + 0.08, 0.06]], 8), thin, { speed: 2.6, corner: 0.2, ease: 0.1 })]
+  { id: 'tag-void', make: () => penTag('tag-void', 'VOID', VOIDW, {
+    h: 0.52, lean: 0.24, nib: 0.62, W: 0.07, w0: 0.016, speed: 2.4, about: 'round hand: VOID in one flowing pull, a halo over the I, an underline that flicks up',
+    extra: (T, can) => {
+      const halo = Array.from({ length: 29 }, (_, i) => { const a = -0.5 + i / 28 * Math.PI * 2.15; return T([0.86 + Math.cos(a) * 0.17, 1.24 + Math.sin(a) * 0.06]) })
+      return [stroke(halo, can, { speed: 1.6, hold0: 0.04 }), dot(...T([0.86, 1.24]), can, 0.1)]
     } }) },
-  { id: 'tag-npg', make: () => tag('tag-npg', 'NPG', 'NPG', DRIP, {
-    h: 0.42, lean: 0.3, gap: 0.08, cap: 1, dist: 0.09, colour: CHROME, speed: 2.4, hold0: 0.04, bounce: [0, 0.05, -0.03], squash: [0.85, 0.85, 0.85], about: 'chrome skinny NPG with an arrow under it',
-    extra: (laid, can) => {
-      const r = right(laid)
-      return [stroke([[-0.04, -0.07], [r + 0.14, -0.04]], can, { speed: 2.6 }), stroke([[r + 0.04, 0.03], [r + 0.15, -0.04], [r + 0.05, -0.11]], can, { speed: 1.6, corner: 0.9 })]
-    } }) },
+  { id: 'tag-npg', make: () => penTag('tag-npg', 'NPG', NPGW, {
+    h: 0.44, lean: 0.3, nib: 0.45, W: 0.07, w0: 0.016, colour: CHROME, speed: 2.4, about: 'chisel hand: chrome NPG, N into P, a spiked G, an arrow under it' }) },
   { id: 'tag-vmark', make: () => sketch('tag-vmark', 'V MARK', 'tag', vmarkStrokes(0, 0, 0.5, { colour: WHITE, dist: 0.06 }), 'the V mark: a blade V with a crown, filled quick') },
 ]

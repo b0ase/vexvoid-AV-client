@@ -59,3 +59,37 @@ export const blade = (a, b, w, ea = null, eb = null) => {
 export const wedge = (p, dir, len, w) => { const L = Math.hypot(dir[0], dir[1]), u = [dir[0] / L, dir[1] / L], n = [-u[1] * w / 2, u[0] * w / 2], m = [p[0] - u[0] * 0.06, p[1] - u[1] * 0.06]; return [[m[0] + n[0], m[1] + n[1]], [p[0] + u[0] * len, p[1] + u[1] * len], [m[0] - n[0], m[1] - n[1]]] }
 /** An arrowhead with its tip at `tip`, pointing along dir, `len` long and `wide` across its barbs, notched behind. */
 export const arrowHead = (tip, dir, len, wide, notch = 0.35) => { const L = Math.hypot(dir[0], dir[1]), u = [dir[0] / L, dir[1] / L], n = [-u[1], u[0]], b = [tip[0] - u[0] * len, tip[1] - u[1] * len], c = [tip[0] - u[0] * len * (1 - notch), tip[1] - u[1] * len * (1 - notch)]; return [tip, [b[0] + n[0] * wide / 2, b[1] + n[1] * wide / 2], c, [b[0] - n[0] * wide / 2, b[1] - n[1] * wide / 2]] }
+/** A point on the Bezier curve through control points c at t (de Casteljau). */
+export const bez = (c, t) => { const p = c.map((q) => q.slice()); for (let k = p.length - 1; k > 0; k--) for (let i = 0; i < k; i++) p[i] = [p[i][0] + (p[i + 1][0] - p[i][0]) * t, p[i][1] + (p[i + 1][1] - p[i][1]) * t]; return p[0] }
+/**
+ * A sabre: a curved, tapered blade along the Bezier through ctrl, its width following ws (widths spread evenly along it,
+ * smoothly between; 0 = a point). The wildstyle stroke: pressed on fat, swept round, flicked off to a point.
+ * Returns { poly, axis, ws }.
+ */
+export const sabre = (ctrl, ws, n = 32) => {
+  const axis = Array.from({ length: n + 1 }, (_, i) => bez(ctrl, i / n))
+  const wAt = (t) => { const f = t * (ws.length - 1), i = Math.min(ws.length - 2, Math.floor(f)), u = f - i, s = u * u * (3 - 2 * u); return ws[i] + (ws[i + 1] - ws[i]) * s }
+  const L = [], R = []
+  axis.forEach((p, i) => {
+    const a = axis[Math.max(0, i - 1)], b = axis[Math.min(n, i + 1)], dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1, w = wAt(i / n) / 2
+    L.push([p[0] - dy / l * w, p[1] + dx / l * w]); R.push([p[0] + dy / l * w, p[1] - dx / l * w])
+  })
+  return { poly: [...L, ...R.reverse()], axis, wAt }
+}
+/**
+ * A tapered blade: a bar from a to b, wa wide at a and wb wide at b, each end sliced along a set direction
+ * ({ cut: [dx, dy] }), brought to a point ({ point: length }) or square (null).
+ */
+export const tblade = (a, b, wa, wb, ea = null, eb = null) => {
+  const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy), u = [dx / L, dy / L], n = [-u[1], u[0]]
+  const la = [a[0] + n[0] * wa / 2, a[1] + n[1] * wa / 2], lb = [b[0] + n[0] * wb / 2, b[1] + n[1] * wb / 2]
+  const ra = [a[0] - n[0] * wa / 2, a[1] - n[1] * wa / 2], rb = [b[0] - n[0] * wb / 2, b[1] - n[1] * wb / 2]
+  const dl = [lb[0] - la[0], lb[1] - la[1]], dr = [rb[0] - ra[0], rb[1] - ra[1]]
+  const ends = (p, e, sgn, l, r) => {
+    if (e && e.point) return [l, [p[0] + u[0] * e.point * sgn, p[1] + u[1] * e.point * sgn], r]
+    if (e && e.cut) return [meet(la, dl, p, e.cut) || l, meet(ra, dr, p, e.cut) || r]
+    return [l, r]
+  }
+  const A = ends(a, ea, -1, la, ra), B = ends(b, eb, 1, lb, rb)
+  return [...A.slice().reverse(), ...B]
+}
