@@ -9,16 +9,23 @@
  *   const hud = makeHud(host); hud.dock({ ... }); hud.near(html, x, y); hud.help(true); hud.dispose()
  */
 /** What a click on the dock does (the same as the keys): set by the game once its controls exist. */
-export type DockActions = { torch: () => void; cap: (c: 1 | 2 | 3) => void; colour: (i: number) => void; colourNext: () => void; dist: (m: number) => void; buff: () => void; undo: () => void; book: () => void; help: () => void; focus: () => void };
-export type DockState = { on: boolean; cap: 1 | 2 | 3; colour: number; colours: string[]; names: string[]; dist: number; line: string; buff: boolean; undo: number; book: boolean; help: boolean; torch?: boolean };
+export type DockActions = { torch: () => void; photo: () => void; gallery: () => void; cap: (c: 1 | 2 | 3) => void; colour: (i: number) => void; colourNext: () => void; dist: (m: number) => void; buff: () => void; undo: () => void; book: () => void; help: () => void; focus: () => void };
+export type DockState = { on: boolean; cap: 1 | 2 | 3; colour: number; colours: string[]; names: string[]; dist: number; line: string; buff: boolean; undo: number; book: boolean; help: boolean; torch?: boolean;
+  /** Walking about (not painting): only the tiles that work then (PHOTO, GALLERY) show. photos: how many there are. */
+  walk?: boolean; photos?: number; gallery?: boolean };
 
 const CSS = `
 .vxh{--s:1;position:absolute;inset:0;pointer-events:none;font-family:"SF Pro Text",-apple-system,system-ui,"Helvetica Neue",Arial,sans-serif;color:#fff;-webkit-font-smoothing:antialiased}
 .vxh-dock{position:absolute;left:16px;bottom:16px;display:flex;gap:6px;padding:8px;background:rgba(8,8,10,.62);border:1px solid rgba(255,255,255,.16);border-radius:12px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 10px 30px rgba(0,0,0,.45);transform:scale(var(--s));transform-origin:0 100%;opacity:0;translate:0 8px;transition:opacity .18s ease,translate .18s ease}
-.vxh-dock.on{opacity:1;translate:0 0;pointer-events:auto}
+.vxh-dock.on,.vxh-dock.walk{opacity:1;translate:0 0;pointer-events:auto}
+.vxh-dock.walk .vxh-t:not([data-w]){display:none}
+.vxh-dock.walk{padding:6px;gap:5px;background:rgba(8,8,10,.46)}
+.vxh-dock :is(.vxh-t[data-k=photo],.vxh-t[data-k=gallery]){cursor:pointer}
 .vxh-dock.on .vxh-t{cursor:pointer}
-.vxh-dock.on .vxh-t:hover{background:rgba(255,255,255,.12);box-shadow:inset 0 0 0 1px rgba(255,255,255,.28)}
-.vxh-dock.on .vxh-t.act:hover{background:#fff}
+.vxh-dock:is(.on,.walk) .vxh-t:hover{background:rgba(255,255,255,.12);box-shadow:inset 0 0 0 1px rgba(255,255,255,.28)}
+.vxh-dock:is(.on,.walk) .vxh-t.act:hover{background:#fff}
+.vxh-dock .vxh-t[data-k=photo]::before{content:"";position:absolute;left:-4px;top:10px;bottom:10px;width:1px;background:rgba(255,255,255,.16)}
+.vxh-dock.walk .vxh-t[data-k=photo]::before{display:none}
 .vxh-dock .vxh-kc[data-cap]{cursor:pointer;position:relative}
 .vxh-dock .vxh-kc[data-cap]::after{content:"";position:absolute;inset:-7px -3px}
 .vxh-dock .vxh-kc[data-cap]:hover{background:rgba(255,255,255,.3)}
@@ -32,6 +39,9 @@ const CSS = `
 @keyframes vxhpop{0%{background:rgba(255,255,255,.28)}100%{}}
 .vxh-t svg{width:40px;height:40px;display:block;overflow:visible}
 .vxh-l{margin-top:3px;font-size:10px;font-weight:700;letter-spacing:.14em;line-height:12px;white-space:nowrap;opacity:.92}
+/* a narrower view: slimmer tiles, so the dock (ten tiles with PHOTO and GALLERY) still clears the sketchbook panel */
+.vxh.narrow .vxh-t{width:60px}
+.vxh.narrow .vxh-l{letter-spacing:.09em}
 .vxh-k{margin-top:4px;display:flex;gap:3px;align-items:center;height:18px}
 .vxh-kc{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;box-sizing:border-box;border:1px solid rgba(255,255,255,.62);border-bottom-width:2px;border-radius:4px;font-size:9.5px;font-weight:700;line-height:1;letter-spacing:.03em;color:#fff;background:rgba(255,255,255,.07);white-space:nowrap}
 .vxh-kc.on{background:#fff;color:#0a0a0b;border-color:#fff}
@@ -86,12 +96,14 @@ const buffIcon = () => `<svg viewBox="0 0 40 40">${can(4, true)}<path d="M24 30 
 const undoIcon = () => `<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15 H25 A8 8 0 0 1 25 31 H15"/><path d="M17 10 L12 15 L17 20"/></svg>`;
 const bookIcon = () => `<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M20 12 Q14 8.5 6 10 V31 Q14 29.5 20 33 Q26 29.5 34 31 V10 Q26 8.5 20 12 Z"/><path d="M20 12 V33"/><path d="M9.5 15 Q13 14.5 16.5 16 M9.5 20 Q13 19.5 16.5 21 M23.5 16 Q27 14.5 30.5 15 M23.5 21 Q27 19.5 30.5 20" stroke-width="1.1" opacity=".6"/></svg>`;
 const torchIcon = () => `<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6 17 H18 L22 13 V27 L18 23 H6 Z"/><path d="M9 20 H14" stroke-width="1.2" opacity=".6"/><path d="M25 14 L35 9 M25 20 H36 M25 26 L35 31" stroke-width="1.6" stroke-linecap="round" opacity=".75"/></svg>`;
+const photoIcon = () => `<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M5 13.5 H12.5 L15.5 9.5 H24.5 L27.5 13.5 H35 V31 H5 Z"/><circle cx="20" cy="21.8" r="5.6"/><circle cx="20" cy="21.8" r="2.2" stroke-width="1.1" opacity=".6"/><path d="M30 17.5 H32" stroke-linecap="round"/></svg>`;
+const galleryIcon = () => `<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="6" y="8" width="12" height="10" rx="1.2"/><rect x="22" y="8" width="12" height="10" rx="1.2"/><rect x="6" y="22" width="12" height="10" rx="1.2"/><rect x="22" y="22" width="12" height="10" rx="1.2"/><path d="M7.5 16.5 L11 13 L13.5 15 L16.5 12" stroke-width="1.1" opacity=".6"/></svg>`;
 const helpIcon = () => `<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="13" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M15.8 16.5 A4.3 4.3 0 1 1 21.5 20.6 Q20 21.3 20 23.3 V24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="20" cy="28.6" r="1.5" fill="currentColor"/></svg>`;
 
 const HELP: [string, string][] = [
   ['LMB', 'SPRAY'], ['RMB', 'LIGHT COAT'], ['SHIFT', 'STRAIGHT LINE'], ['WHEEL', 'CAN DISTANCE'],
   ['1 2 3', 'CAP'], ['TAB', 'COLOUR'], ['X', 'BUFF CAN'], ['Z', 'UNDO'],
-  ['A D', 'STEP ALONG'], ['W S', 'VIEW IN / OUT'], ['← →', 'LOOK'], ['B', 'SKETCHBOOK'], ['F', 'DONE'], ['M', 'MUSIC ON / OFF'], ['T', 'TORCH (THEY SEE IT)'], ['H', 'CLOSE HELP'],
+  ['A D', 'STEP ALONG'], ['W S', 'VIEW IN / OUT'], ['← →', 'LOOK'], ['B', 'SKETCHBOOK'], ['Q', 'PHOTO'], ['L', 'GALLERY'], ['O', 'PHOTO MODE'], ['F', 'DONE'], ['M', 'MUSIC ON / OFF'], ['T', 'TORCH (THEY SEE IT)'], ['H', 'CLOSE HELP'],
   ['LMB', 'CLICK THE DOCK: EVERY TILE'],
 ];
 
@@ -103,12 +115,16 @@ export function makeHud(host: HTMLElement) {
   const style = document.createElement('style'); style.textContent = CSS; root.appendChild(style);
   const dockEl = document.createElement('div'); dockEl.className = 'vxh-dock'; dockEl.dataset.vxHud = 'dock';
   const tile = (k: string) => { const t = document.createElement('div'); t.className = 'vxh-t'; t.dataset.k = k; t.innerHTML = '<div class="vxh-i"></div><div class="vxh-l"></div><div class="vxh-k"></div>'; dockEl.appendChild(t); return { t, i: t.children[0] as HTMLElement, l: t.children[1] as HTMLElement, k: t.children[2] as HTMLElement }; };
-  const T = { cap: tile('cap'), colour: tile('colour'), dist: tile('dist'), buff: tile('buff'), undo: tile('undo'), book: tile('book'), torch: tile('torch'), help: tile('help') };
+  const T = { cap: tile('cap'), colour: tile('colour'), dist: tile('dist'), buff: tile('buff'), undo: tile('undo'), book: tile('book'), torch: tile('torch'), photo: tile('photo'), gallery: tile('gallery'), help: tile('help') };
+  T.photo.t.dataset.w = '1'; T.gallery.t.dataset.w = '1';   // these two show while walking too
   const badge = document.createElement('div'); badge.className = 'vxh-badge'; T.undo.t.appendChild(badge);
+  const nBadge = document.createElement('div'); nBadge.className = 'vxh-badge'; nBadge.style.display = 'none'; T.gallery.t.appendChild(nBadge);
   T.buff.i.innerHTML = buffIcon(); T.buff.l.textContent = 'BUFF'; T.buff.k.innerHTML = kc('X');
   T.undo.i.innerHTML = undoIcon(); T.undo.l.textContent = 'UNDO'; T.undo.k.innerHTML = kc('Z');
   T.book.i.innerHTML = bookIcon(); T.book.l.textContent = 'SKETCH'; T.book.k.innerHTML = kc('B');
   T.torch.i.innerHTML = torchIcon(); T.torch.l.textContent = 'TORCH'; T.torch.k.innerHTML = kc('T');
+  T.photo.i.innerHTML = photoIcon(); T.photo.l.textContent = 'PHOTO'; T.photo.k.innerHTML = kc('Q');
+  T.gallery.i.innerHTML = galleryIcon(); T.gallery.l.textContent = 'GALLERY'; T.gallery.k.innerHTML = kc('L');
   T.help.i.innerHTML = helpIcon(); T.help.l.textContent = 'HELP'; T.help.k.innerHTML = kc('H');
   T.dist.k.innerHTML = kc('WHEEL');
   const nearEl = document.createElement('div'); nearEl.className = 'vxh-near'; nearEl.dataset.vxPrompt = 'near';
@@ -129,10 +145,12 @@ export function makeHud(host: HTMLElement) {
     act.dist(Math.round((0.05 + f * 0.55) * 200) / 200);
   };
   dockEl.addEventListener('pointerdown', (e) => {
-    e.preventDefault(); e.stopPropagation(); if (!act || !last.on) return;
+    e.preventDefault(); e.stopPropagation(); if (!act || !(last.on || last.walk)) return;
     const el = e.target as Element, tile = el.closest('.vxh-t') as HTMLElement | null; if (!tile) return;
-    const k = tile.dataset.k, capK = el.closest('[data-cap]') as HTMLElement | null, seg = el.closest('.seg') as SVGElement | null;
-    if (k === 'cap') act.cap(capK ? (Number(capK.dataset.cap) as 1 | 2 | 3) : ((((last.cap || 2) % 3) + 1) as 1 | 2 | 3));
+    const k = tile.dataset.k; if (!last.on && !tile.dataset.w) return;
+    const capK = el.closest('[data-cap]') as HTMLElement | null, seg = el.closest('.seg') as SVGElement | null;
+    if (k === 'photo') act.photo(); else if (k === 'gallery') act.gallery();
+    else if (k === 'cap') act.cap(capK ? (Number(capK.dataset.cap) as 1 | 2 | 3) : ((((last.cap || 2) % 3) + 1) as 1 | 2 | 3));
     else if (k === 'colour') { if (seg) act.colour(Number(seg.dataset.c)); else act.colourNext(); }
     else if (k === 'dist') { distDrag = true; dockEl.setPointerCapture(e.pointerId); gaugeAt(e); }
     else if (k === 'buff') act.buff(); else if (k === 'undo') act.undo(); else if (k === 'book') act.book(); else if (k === 'torch') act.torch(); else if (k === 'help') act.help();
@@ -144,16 +162,19 @@ export function makeHud(host: HTMLElement) {
   dockEl.addEventListener('contextmenu', (e) => e.preventDefault());
   // the wheel over the dock still sets the distance (the picture under it does not get the wheel)
   dockEl.addEventListener('wheel', (e) => { e.preventDefault(); if (act && last.on && last.dist != null) act.dist(Math.round(Math.max(0.05, Math.min(0.6, last.dist + e.deltaY * 0.0005)) * 200) / 200); }, { passive: false });
-  for (const [k, t] of [['cap', 'CAP: CLICK TO CHANGE · 1 2 3'], ['colour', 'COLOUR: CLICK ONE · TAB'], ['dist', 'DISTANCE: DRAG OR CLICK THE GAUGE · WHEEL'], ['buff', 'BUFF CAN · X'], ['undo', 'UNDO · Z'], ['book', 'SKETCHBOOK · B'], ['torch', 'TORCH · T (they see you further)'], ['help', 'HELP · H']] as const) T[k].t.title = t;
+  for (const [k, t] of [['cap', 'CAP: CLICK TO CHANGE · 1 2 3'], ['colour', 'COLOUR: CLICK ONE · TAB'], ['dist', 'DISTANCE: DRAG OR CLICK THE GAUGE · WHEEL'], ['buff', 'BUFF CAN · X'], ['undo', 'UNDO · Z'], ['book', 'SKETCHBOOK · B'], ['torch', 'TORCH · T (they see you further)'], ['photo', 'TAKE A PHOTO · Q (a clean picture, no HUD)'], ['gallery', 'YOUR PHOTOS · L'], ['help', 'HELP · H']] as const) T[k].t.title = t;
   const pop = (t: HTMLElement) => { t.classList.remove('pop'); void t.offsetWidth; t.classList.add('pop'); };
   return {
     el: root,
     /** Make the dock clickable: what each tile does. */
     bind: (a: DockActions) => { act = a; },
     /** Scale the panels to the view (small windows get smaller panels, never clipped ones). */
-    resize: (w: number, h: number) => root.style.setProperty('--s', String(hudScale(w, h).toFixed(3))),
+    resize: (w: number, h: number) => { root.style.setProperty('--s', String(hudScale(w, h).toFixed(3))); root.classList.toggle('narrow', w < 1000); },
     dock: (s: DockState) => {
       if (s.on !== last.on) dockEl.classList.toggle('on', s.on);
+      if (!!s.walk !== !!last.walk || s.on !== last.on) dockEl.classList.toggle('walk', !!s.walk && !s.on);
+      if (s.photos !== last.photos) { nBadge.textContent = String(s.photos || 0); nBadge.style.display = s.photos ? '' : 'none'; }
+      if (s.gallery !== last.gallery) T.gallery.t.classList.toggle('act', !!s.gallery);
       if (s.cap !== last.cap) { T.cap.i.innerHTML = capIcon(s.cap); T.cap.l.textContent = ['', 'SKINNY', 'MEDIUM', 'FAT'][s.cap]; T.cap.k.innerHTML = [1, 2, 3].map((c) => kc(String(c), c === s.cap ? 'on' : '').replace('<span ', `<span data-cap="${c}" title="${['', 'SKINNY', 'MEDIUM', 'FAT'][c]} CAP" `)).join(''); if (last.cap) pop(T.cap.t); }
       if (s.colour !== last.colour || s.buff !== last.buff) { T.colour.i.innerHTML = ringIcon(s.colours, s.colour); T.colour.l.textContent = s.names[s.colour]; T.colour.k.innerHTML = kc('TAB', s.buff ? 'dim' : ''); T.colour.t.style.opacity = s.buff ? '.45' : ''; if (last.colour != null && s.colour !== last.colour) pop(T.colour.t); }
       if (s.dist !== last.dist || s.line !== last.line) { T.dist.i.innerHTML = gaugeIcon(s.dist); T.dist.l.textContent = `${Math.round(s.dist * 100)} CM`; T.dist.t.dataset.line = s.line; }
@@ -169,6 +190,8 @@ export function makeHud(host: HTMLElement) {
       if (html !== nearNow) { nearNow = html; nearEl.innerHTML = html; nearEl.style.display = html ? 'flex' : 'none'; }
       if (html) { const b = host.getBoundingClientRect(), r = nearEl.getBoundingClientRect(); nearEl.style.left = `${Math.max(8, Math.min(b.width - r.width - 8, x + 22))}px`; nearEl.style.top = `${Math.max(8, Math.min(b.height - r.height - 8, y + 16))}px`; }
     },
+    /** The dock tile for a key (for the shutter's pulse). */
+    pulse: (k: 'photo' | 'gallery') => pop(T[k].t),
     dispose: () => root.remove(),
   };
 }

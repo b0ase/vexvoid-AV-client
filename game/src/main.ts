@@ -18,6 +18,9 @@
  * The SKETCHBOOK (./sketchbook.ts): B opens a panel of sketches (tags, throw-ups, pieces); pick one, aim at a wall and
  * click (or G) and the writer puts it up stroke by stroke ("blast"), at 1x 2x 4x, sized to fit; moving stops it, Z takes
  * it back in one go. N (or SAVE WALL) keeps what is on the wall being painted as a new sketch.
+ * Vex's PHONE (./phone/: camera.ts, gallery.ts, photos.ts; the hub to come): Q (or the dock's PHOTO tile) takes a clean picture, no HUD, at up to 3840 px wide,
+ * kept as a PNG (this browser, the desktop's VexVoid Photos folder, the player's account); L (or GALLERY) shows them all.
+ * O is photo mode: time stops, the HUD goes, WASD / the arrows / a drag orbit the camera and the wheel zooms; Q shoots.
  * Built by scripts/build-game.sh into vx/game/vexvoid-game.js (window.VXGAME).
  */
 import * as THREE from 'three';
@@ -36,6 +39,9 @@ import { makeLaw, type LawState } from './cops';
 import { makeHud, keyed, kc, hudScale } from './hud';
 import { makeMusic, type MusicState, type Track } from './music';
 import { makeLoading } from './loading';
+import { localPhotos, merged, type Photo, type PhotoStore, type PhotoCloud } from './phone/photos';
+import { makeGallery, type GalleryState } from './phone/gallery';
+import { makeCamera, type PhotoTaken } from './phone/camera';
 import { makeBook, slotsOf, sketchOf, fit, drawSketch, secsOf, cleanName, type Sketch, type SketchKind, type SketchStore, type BookState } from './sketchbook';
 
 export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) => void; onHud?: (s: string) => void; onRec?: () => void;
@@ -46,7 +52,12 @@ export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) =
   /** What happens to the writer, for a host that keeps a player's history: seen, caught, got away. */
   onEvent?: (ev: 'alert' | 'busted' | 'escaped') => void;
   /** The soundtrack: VexVoid's own tracks by default (./playlist.ts), a host's own list, or false for none. */
-  music?: Track[] | false };
+  music?: Track[] | false;
+  /** Where the player's photos are kept (default: this browser). */
+  photos?: PhotoStore;
+  /** The player's account, beside this browser (the web game signed in): photos go to both, the gallery lists both. */
+  photoCloud?: PhotoCloud };
+export type { PhotoTaken };
 export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?: number) => string; inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string; at?: number | null; view?: { yaw: number; pitch: number; dist: number; bone?: string; h?: number; fov?: number } | null }) => void; where: () => { x: number; z: number; y: number; yaw: number; heading: number; anim: string; speed: number; tip: [number, number, number] | null };
   /** Call the law on the writer now: the patrol car pulls up nearest them and two officers give chase (testing an escape). */
   alarm: () => void;
@@ -62,6 +73,19 @@ export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?:
   train: () => { x: number; z: number; on: boolean };
   /** The soundtrack (on by default; M toggles it; the choice is kept per viewer): on/off, next track; returns what plays. */
   music: (o?: { on?: boolean; next?: boolean }) => MusicState | null;
+  /** Take a photo now (as Q does): a clean frame, no HUD, `width` px wide (default twice the view, up to 3840). Resolves
+   *  once it is kept: its id, size, bytes, where it is kept (browser, account, disk) and, on disk, its file. */
+  photo: (o?: { width?: number }) => Promise<PhotoTaken>;
+  /** Every photo the player has, newest first. */
+  photos: () => Promise<Photo[]>;
+  /** A photo as a data URL (the PNG, or its thumbnail): for an agent to look at. */
+  photoData: (id: string, thumb?: boolean) => Promise<string | null>;
+  /** Delete one of the player's photos. */
+  deletePhoto: (id: string) => Promise<boolean>;
+  /** The gallery panel (L): open or close it, view one photo big (view: an id; null back to the grid). */
+  gallery: (o?: { open?: boolean; view?: string | null }) => GalleryState;
+  /** Photo mode (O): time stops, the HUD goes, the camera orbits and zooms for framing; Q shoots. */
+  photoMode: (on?: boolean) => { on: boolean };
   /** The torch (T): on/off; a lit torch is seen from further by the law. */
   torch: (on?: boolean) => { on: boolean; intensity?: number; at?: number[]; dir?: number[] };
   /** Render knobs for tests and tuning: ambient occlusion, bloom, the real lights near the writer, the street reflection. */
@@ -229,7 +253,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const REACH = 2.4;
   const camO = { yaw: home.yaw, pitch: 0.12, dist: 3.4 };
   const keys = new Set<string>(); let shiftNow = false;
-  const MOVE = ['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Shift', ' ', 'c', 'f', 'm', 'p', 't', 'r', '1', '2', '3', '4', '5', '6', '7', 'z', 'x', 'h', 'Tab', 'Escape', 'b', 'g', 'v', 'n', '[', ']', '-', '=', '+', 'Enter'];
+  const MOVE = ['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Shift', ' ', 'c', 'f', 'm', 'p', 't', 'r', '1', '2', '3', '4', '5', '6', '7', 'z', 'x', 'h', 'Tab', 'Escape', 'b', 'g', 'v', 'n', '[', ']', '-', '=', '+', 'Enter', 'q', 'l', 'o'];
   // painting: F at a wall squares up to it; the mouse aims, holding it sprays; the wheel sets the can's distance
   type W = (typeof city.walls)[number];
   const can: Can = { colour: COLOURS[0], cap: 2, dist: 0.2, pressure: 1, buff: false };
@@ -262,6 +286,8 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const say2 = (text: string, secs: number) => { flash = { text, until: t + secs }; };
   const cm = (m: number) => { const c = m * 100; return c < 10 ? c.toFixed(1) : String(Math.round(c)); };
   const hudText = () => {
+    if (photoMode) return 'PHOTO MODE · Q SHOOT · DRAG OR WASD ORBIT · WHEEL ZOOM · O DONE';
+    if (gallery.isOpen()) return 'PHOTOS · ARROWS PICK · ENTER VIEW · S SAVE · DEL DELETE · L CLOSE';
     if (flash.until > t) return flash.text;
     const L = law.state(), cells = Math.min(5, Math.ceil(L.heat * 5 - 0.001));
     const what = { off: 'PATROL OFF', calm: L.seen ? 'SEEN' : L.heat >= 0.6 ? 'WANTED' : 'CALM', alerted: 'ALERT', chase: 'CHASE', searching: 'SEARCHING', busted: 'BUSTED' }[L.chase];
@@ -269,8 +295,8 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     const bk = book.state.open ? (() => { const s = book.pick(); return `SKETCHBOOK · ${s ? s.name + ' ' + s.kind.toUpperCase() : 'PICK ONE'} · ${book.state.speed}× · SIZE ${Math.round(book.state.size * 100)}% · B CLOSE · `; })() : '';
     if (bk) return bk + (paint ? `PAINTING ${paint.id.toUpperCase()} · F DONE · ` : 'WASD MOVE · F AT A WALL · ') + lawS;
     return (paint
-      ? `PAINTING ${paint.id.toUpperCase()} · ${can.buff ? 'BUFF' : COLOUR_NAMES[colourI]} · ${CAPS[can.cap]} CAP · ${Math.round(can.dist * 100)} CM · H HELP · F DONE`
-      : 'WASD MOVE · SHIFT SPRINT · C CROUCH · SPACE JUMP · DRAG LOOK · F AT ANY WALL TO PAINT · B SKETCHBOOK · T TORCH') + ' · ' + lawS + (opts.onRec ? ' · R RECORD' : '') + (music ? (music.state().on ? ' · M MUSIC OFF' : ' · M MUSIC ON') : '');
+      ? `PAINTING ${paint.id.toUpperCase()} · ${can.buff ? 'BUFF' : COLOUR_NAMES[colourI]} · ${CAPS[can.cap]} CAP · ${Math.round(can.dist * 100)} CM · Q PHOTO · H HELP · F DONE`
+      : 'WASD MOVE · SHIFT SPRINT · C CROUCH · SPACE JUMP · DRAG LOOK · F AT ANY WALL TO PAINT · B SKETCHBOOK · T TORCH · Q PHOTO · L GALLERY · O PHOTO MODE') + ' · ' + lawS + (opts.onRec ? ' · R RECORD' : '') + (music ? (music.state().on ? ' · M MUSIC OFF' : ' · M MUSIC ON') : '');
   };
   const hud = () => { const s = hudText(); if (s !== lastHud) { lastHud = s; if (opts.onHud) opts.onHud(s); } };
   const fwd = new THREE.Vector3(0, 0, -1), side = new THREE.Vector3();
@@ -397,12 +423,59 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     if (paint) note(gone ? `UNDONE · ${spray.undoable(ids)} MORE` : 'NOTHING TO UNDO');
     return gone ? gone.length : 0;
   };
+
+  // ===== Vex's PHONE (./phone/): the camera and the gallery, each its own module; here only keys, the dock and the API.
+  // Q takes a photo, walking or painting (or busted: that is a picture too); L shows them; O is photo mode
+  const photoStore: PhotoStore = opts.photos || (opts.photoCloud ? merged(localPhotos, opts.photoCloud) : localPhotos);
+  let photoMode = false;
+  const gallery = makeGallery(host, { store: () => photoStore, focus: () => canvas.focus(), note: (s, secs) => note(s, secs), onChange: () => { const st = gallery.state(); if (st.open && !st.loading) camera.setCount(st.count); hud(); } });
+  const camera = makeCamera({
+    host, renderer: r, composer: comp, store: photoStore,
+    render: () => { city.beforeRender(r, scene, cam); comp.render(0); },
+    resize: (W, H) => city.resize(W, H), view: () => ({ w, h }),
+    hide: () => [reticle, dot, preview, ghost], sound, place: () => api.at().place,
+    note: (s, secs) => note(s, secs), pulse: () => hudUi.pulse('photo'),
+    onSaved: () => { gallery.added(); hud(); },
+  });
+  const takePhoto = (o: { width?: number } = {}) => camera.take(o);
+  const snapNow = () => { void takePhoto().catch(() => { /* said on screen */ }); };
+  const openGallery = (on: boolean, id?: string | null) => {
+    if (on) { keys.clear(); btn = 0; shiftNow = false; if (photoMode) setPhotoMode(false); }
+    gallery.open(on, id); hud();
+  };
+  const setPhotoMode = (on: boolean) => {
+    if (on === photoMode) return;
+    if (on) { if (paint) togglePaint(); if (gallery.isOpen()) gallery.open(false); keys.clear(); btn = 0; }
+    photoMode = on;
+    for (const e of [hudUi.el, tip, book.el]) e.style.visibility = on ? 'hidden' : '';
+    camera.modeHint(on, t);
+    if (!on) { camO.dist = Math.max(1.2, Math.min(7, camO.dist)); camO.pitch = Math.max(-0.35, Math.min(0.75, camO.pitch)); note('PHOTO MODE OFF', 1.4); }
+    hud();
+  };
   const onKey = (e: KeyboardEvent, down: boolean) => {
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    // the gallery has the keys while it is open: arrows pick, Enter views, Delete deletes, S saves, C copies, L / Esc close
+    if (gallery.isOpen() && !e.metaKey && !e.ctrlKey && (MOVE.includes(k) || ['Delete', 'Backspace', 'Home', 'End', 'y'].includes(k))) {
+      e.preventDefault(); e.stopPropagation();
+      if (down && !e.repeat && k === 'q') snapNow(); else if (down && k !== 'Shift') gallery.key(k);
+      return;
+    }
     if (!MOVE.includes(k)) return;
+    if ((k === 'q' || k === 'l' || k === 'o') && (e.metaKey || e.ctrlKey || e.altKey)) return;   // ⌘Q quits, ⌘L ... belong to the app
     e.preventDefault(); e.stopPropagation();
     if (down && !e.repeat && k === 'r') { if (opts.onRec) opts.onRec(); return; } // recording belongs to whoever mounted the game
+    if (down && !e.repeat && k === 'q') { snapNow(); return; }   // a photo: walking, painting, even being nicked
     if (bust) return; // nothing to do while you are being nicked
+    if (down && !e.repeat && k === 'l') { openGallery(true); return; }
+    if (down && !e.repeat && k === 'o') { setPhotoMode(!photoMode); return; }
+    // photo mode: time stands still; WASD and the arrows orbit the camera (the frame reads them), Esc leaves
+    if (photoMode) {
+      if (down && !e.repeat && k === 'Escape') setPhotoMode(false);
+      else if (['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(k)) { if (down) keys.add(k); else keys.delete(k); }
+      else if (down && !e.repeat && k === 't') setTorch(!torch.on);
+      else if (down && !e.repeat && k === 'm' && music) music.toggle();
+      return;
+    }
     // a sketch going up stops when the writer moves (what is up stays; Z takes it back)
     if (down && !e.repeat && auto && auto.group[0] === 'p' && ['a', 'd', ' ', 'c', 'f', 'Escape'].includes(k)) stopAuto(false);
     if (down && !e.repeat && k === 't') setTorch(!torch.on);
@@ -439,6 +512,8 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     book: () => { book.setOpen(!book.state.open); if (book.state.open) { disarmed = false; note(paint ? 'PICK A SKETCH · CLICK THE WALL TO BLAST' : 'PICK A SKETCH · WALK UP TO A WALL'); } },
     help: () => { if (paint) { help = !help; hud(); } },
     torch: () => setTorch(!torch.on),
+    photo: () => snapNow(),
+    gallery: () => openGallery(!gallery.isOpen()),
     focus: () => canvas.focus(),
   });
   const kd = (e: KeyboardEvent) => onKey(e, true), ku = (e: KeyboardEvent) => onKey(e, false);
@@ -464,7 +539,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   canvas.addEventListener('mousedown', (e) => { if (e.button === 1) e.preventDefault(); });
   // looking round while painting stays on the wall: so far either side of square to it
   const lookBy = (dyaw: number, dpitch: number) => {
-    camO.yaw += dyaw; camO.pitch = Math.max(-0.35, Math.min(0.75, camO.pitch + dpitch));
+    camO.yaw += dyaw; camO.pitch = Math.max(-0.35, Math.min(photoMode ? 1.35 : 0.75, camO.pitch + dpitch));
     if (paint) { const y0 = Math.atan2(paint.spot.normal.x, paint.spot.normal.z); let d = camO.yaw - y0; d = Math.atan2(Math.sin(d), Math.cos(d)); camO.yaw = y0 + Math.max(-1.1, Math.min(1.1, d)); }
   };
   canvas.addEventListener('pointermove', (e) => {
@@ -480,7 +555,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   };
   canvas.addEventListener('pointerup', endDrag);
   canvas.addEventListener('pointercancel', endDrag);
-  canvas.addEventListener('wheel', (e) => { e.preventDefault(); if (paint) { can.dist = Math.round(Math.max(0.05, Math.min(0.6, can.dist + e.deltaY * 0.0005)) * 200) / 200; hud(); return; } camO.dist = Math.max(1.2, Math.min(7, camO.dist * Math.exp(e.deltaY * 0.001))); }, { passive: false });
+  canvas.addEventListener('wheel', (e) => { e.preventDefault(); if (paint) { can.dist = Math.round(Math.max(0.05, Math.min(0.6, can.dist + e.deltaY * 0.0005)) * 200) / 200; hud(); return; } camO.dist = Math.max(photoMode ? 0.8 : 1.2, Math.min(photoMode ? 14 : 7, camO.dist * Math.exp(e.deltaY * 0.001))); }, { passive: false });
 
   const ro = new ResizeObserver(() => {
     ({ w, h } = size());
@@ -502,10 +577,16 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const frame = () => {
     if (stopped) return;
     raf = requestAnimationFrame(frame);
-    const rdt = Math.min(0.05, clock.getDelta()), dt = bust && bust.t < 1.4 ? rdt * 0.3 : rdt; t += rdt;
+    const rdt = Math.min(0.05, clock.getDelta()), dt = photoMode ? 0 : bust && bust.t < 1.4 ? rdt * 0.3 : rdt, cdt = photoMode ? rdt : dt; t += rdt;   // photo mode: time stands still, the camera moves
     const left = keys.has('ArrowLeft'), rightK = keys.has('ArrowRight'), upK = keys.has('ArrowUp'), downK = keys.has('ArrowDown');
-    const ax = bust ? 0 : (keys.has('d') || (!paint && rightK) ? 1 : 0) - (keys.has('a') || (!paint && left) ? 1 : 0);
-    const az = bust ? 0 : (keys.has('w') || (!paint && upK) ? 1 : 0) - (keys.has('s') || (!paint && downK) ? 1 : 0);
+    if (photoMode) {   // orbit and tilt round the writer; the wheel zooms (above)
+      const oy = (keys.has('a') || left ? 1 : 0) - (keys.has('d') || rightK ? 1 : 0), op = (keys.has('w') || upK ? 1 : 0) - (keys.has('s') || downK ? 1 : 0);
+      if (oy || op) lookBy(oy * 1.5 * rdt, op * 0.9 * rdt);
+      camera.tick(t);
+    }
+    const still = !!bust || photoMode || gallery.isOpen();
+    const ax = still ? 0 : (keys.has('d') || (!paint && rightK) ? 1 : 0) - (keys.has('a') || (!paint && left) ? 1 : 0);
+    const az = still ? 0 : (keys.has('w') || (!paint && upK) ? 1 : 0) - (keys.has('s') || (!paint && downK) ? 1 : 0);
     const sprint = keys.has('Shift') && !me.crouch && !paint;
     // movement is relative to where the camera looks
     fwd.set(-Math.sin(camO.yaw), 0, -Math.cos(camO.yaw)); side.set(Math.cos(camO.yaw), 0, -Math.sin(camO.yaw));
@@ -662,15 +743,16 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       prompt(t < tipHold ? tipNote : nw ? (sk ? `[F] THEN CLICK THE WALL TO BLAST ${sk.name}` : '[F] PAINT THIS WALL') : sk ? 'WALK UP TO A WALL TO BLAST ' + sk.name : '');
     }
     writer.steady(!!paint && mv.speed < 0.05);
-    hudUi.dock({ on: !!paint && !bust, cap: can.cap, colour: colourI, colours: COLOURS, names: COLOUR_NAMES, dist: can.dist, line: cm(footprint(can).width), buff: !!can.buff, undo: paint ? spray.undoable(runOf(paint.spot).ids) : 0, book: !!book.state.open, help, torch: torch.on });
+    hudUi.dock({ walk: !paint && !bust && !photoMode && !gallery.isOpen(), photos: camera.count(), gallery: gallery.isOpen(), on: !!paint && !bust && !gallery.isOpen(), cap: can.cap, colour: colourI, colours: COLOURS, names: COLOUR_NAMES, dist: can.dist, line: cm(footprint(can).width), buff: !!can.buff, undo: paint ? spray.undoable(runOf(paint.spot).ids) : 0, book: !!book.state.open, help, torch: torch.on });
     // the line under the picture sits above the dock, and in the middle of what the sketchbook panel leaves free
     tip.style.bottom = paint ? `${Math.round(16 + 124 * hudScale(w, h))}px` : '9%';
     tip.style.left = book.state.open ? 'calc((100% - 296px) / 2)' : '50%'; tip.style.maxWidth = book.state.open ? 'calc(100% - 330px)' : 'calc(100% - 32px)';
     spray.update(dt, me);
     law.pushOut(me, 0.35);
-    const ev = law.update(dt, t, { x: me.x, z: me.z, y: me.y, gy: me.gy, crouch: me.crouch, painting: !!paint, spraying: sprayingNow, torch: torch.on, vx: paint ? 0 : Math.sin(me.heading) * mv.speed, vz: paint ? 0 : Math.cos(me.heading) * mv.speed });
+    const ev = photoMode ? '' : law.update(dt, t, { x: me.x, z: me.z, y: me.y, gy: me.gy, crouch: me.crouch, painting: !!paint, spraying: sprayingNow, torch: torch.on, vx: paint ? 0 : Math.sin(me.heading) * mv.speed, vz: paint ? 0 : Math.cos(me.heading) * mv.speed });
     if (ev && opts.onEvent) try { opts.onEvent(ev); } catch { /* the host's business */ }
     if (ev === 'busted') {
+      if (gallery.isOpen()) gallery.open(false);
       // a sketch half put up stays on the wall (owner, 16 Nov), undoable as one step; hand painting is still buffed
       const blastWall = auto && auto.group[0] === 'p' ? auto.list[Math.min(auto.i, auto.list.length - 1)].wall : '';
       bust = { t: 0, spot: blastWall && blastWall === lastSpray ? '' : lastSpray, kept: blastWall };
@@ -755,10 +837,10 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     camPos.set(camX, camY, camZ);
     // pulled in by a wall: straight there if the eased camera would be behind it, else ease as usual
     if (pulled && camPos.distanceToSquared(headV.set(me.x, tgtY, me.z)) < cam.position.distanceToSquared(headV)) cam.position.copy(camPos);
-    else cam.position.lerp(camPos, 1 - Math.exp(-dt * 24));
+    else cam.position.lerp(camPos, 1 - Math.exp(-cdt * 24));
     // what it looks at keeps up with the writer: only the slightest give, so the camera feels quick
     lookTo.set(me.x + Math.cos(camO.yaw) * 0.55, tgtY, me.z - Math.sin(camO.yaw) * 0.55);
-    camLook.lerp(lookTo, paint || bust ? 1 : 1 - Math.exp(-dt * 40));
+    camLook.lerp(lookTo, paint || bust ? 1 : 1 - Math.exp(-cdt * 40));
     cam.lookAt(camLook);
     camGame.position.copy(cam.position); camGame.quaternion.copy(cam.quaternion); camGame.aspect = cam.aspect; camGame.fov = fov0 || cam.fov; camGame.updateMatrixWorld(); camGame.updateProjectionMatrix();
     if (shotView) {
@@ -866,6 +948,17 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     cops: (on: boolean) => law.setOn(on),
     /** The game's sound, for a recorder: connect node to a MediaStreamDestination made on ctx. */
     torch: (on) => { if (on != null && !!on !== torch.on) setTorch(!!on); return { on: torch.on, intensity: +torchL.intensity.toFixed(1), at: torchL.position.toArray().map((v) => +v.toFixed(2)), dir: torchDir.toArray().map((v) => +v.toFixed(2)) }; },
+    photo: (o = {}) => takePhoto(o),
+    photos: () => photoStore.list(),
+    photoData: async (id, thumb) => { const b = await photoStore.blob(id, !!thumb); if (!b) return null; return new Promise<string>((res, rej) => { const f = new FileReader(); f.onload = () => res(String(f.result)); f.onerror = () => rej(f.error); f.readAsDataURL(b); }); },
+    deletePhoto: async (id) => { const ok = await photoStore.remove(id); if (ok) { camera.setCount(camera.count() - 1); if (gallery.isOpen()) await gallery.refresh(); hud(); } return ok; },
+    gallery: (o = {}) => {
+      if (o.open === false) openGallery(false);
+      else if (!gallery.isOpen() && (o.open || o.view !== undefined)) openGallery(true, o.view ?? null);
+      else if (o.view !== undefined) gallery.view(o.view);
+      return gallery.state();
+    },
+    photoMode: (on) => { if (on != null) setPhotoMode(!!on); return { on: photoMode }; },
     music: (o = {}) => { if (!music) return null; if (o.on != null) music.set(!!o.on); if (o.next) music.next(); return music.state(); },
     audio: () => { const b = sound(); return b ? { ctx: b.ctx, node: b.out } : null; },
     goto: (x, z, yaw, pitch, y) => { if (paint) togglePaint();   // painting holds the writer at the wall: put the can down first
@@ -879,6 +972,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       stopped = true; cancelAnimationFrame(raf); ro.disconnect();
       canvas.removeEventListener('keydown', kd); canvas.removeEventListener('keyup', ku); window.removeEventListener('blur', letGo); document.removeEventListener('visibilitychange', onVis);
       scene.remove(torchL, torchL.target, beam); beam.geometry.dispose(); (beam.material as THREE.Material).dispose(); music?.stop(); hissOn(false); law.dispose(); book.dispose(); if (bus) void bus.ctx.close(); spray.dispose(); writer.dispose(); city.dispose(); look.dispose(); comp.dispose(); r.dispose(); canvas.remove(); tip.remove(); hudUi.dispose();
+      gallery.dispose(); camera.dispose();
       for (const o of [reticle, dot, preview, ghost, ghostFrame]) { o.geometry.dispose(); (o.material as THREE.Material).dispose(); }
       const gm = (ghost.material as THREE.MeshBasicMaterial).map; if (gm) gm.dispose();
     },
