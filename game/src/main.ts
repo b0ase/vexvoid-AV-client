@@ -29,7 +29,8 @@ import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { buildDistrict } from './district';
 import { STEP } from './world';
 import { loadLook, makeGradePass } from './look';
-import { loadWriter, type GaitInfo } from './writer';
+import { loadWriter, type GaitInfo, type GripReport } from './writer';
+import type { ArmReport } from './bodyProxy';
 import { makeSpray, footprint, COLOURS, COLOUR_NAMES, type Can, type Stroke, type WallStore } from './spray';
 import { makeLaw, type LawState } from './cops';
 import { makeHud, keyed, kc, hudScale } from './hud';
@@ -46,7 +47,7 @@ export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) =
   onEvent?: (ev: 'alert' | 'busted' | 'escaped') => void;
   /** The soundtrack: VexVoid's own tracks by default (./playlist.ts), a host's own list, or false for none. */
   music?: Track[] | false };
-export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?: number) => string; inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string }) => void; where: () => { x: number; z: number; y: number; yaw: number; heading: number; anim: string; speed: number; tip: [number, number, number] | null };
+export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?: number) => string; inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string; at?: number | null; view?: { yaw: number; pitch: number; dist: number; bone?: string; h?: number; fov?: number } | null }) => void; where: () => { x: number; z: number; y: number; yaw: number; heading: number; anim: string; speed: number; tip: [number, number, number] | null };
   /** Call the law on the writer now: the patrol car pulls up nearest them and two officers give chase (testing an escape). */
   alarm: () => void;
   /** The district's named places (the studio is home; the shops; the tunnel, the rail, the warehouse, the scaffolds...). */
@@ -95,6 +96,16 @@ export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?:
   tuneGait: (clip: string, v: number) => void;
   /** The head on the body (tests): drift from its rest place on the chest (m), neck and head turn (rad), neck gap change (m). */
   head: (o?: { steady?: boolean }) => { drift: number; neck: number; head: number; gap: number; hood: number; worst: string; pts: number; wob: number };
+  arms: () => ArmReport;
+  grip: () => GripReport;
+  /** Keep the writer's arms out of the trunk and pack (default on); off shows the clips as they are. */
+  fixArms: (on: boolean) => void;
+  /** A can in the writer's right hand (default on). */
+  carry: (on: boolean) => void;
+  far: (side: 0 | 1) => { d: number; info: string };
+  ik: () => Record<string, number>;
+  /** Where bones are now (world), by short name ('RightHand', 'RightHandIndex3' ...), for tests. */
+  bones: (names: string[]) => Record<string, [number, number, number] | null>;
   gait: (reset?: boolean) => GaitInfo & { move: { speed: number; vx: number; vz: number; heading: number; yawRate: number; airborne: boolean; crouch: boolean; gy: number } };
   /** Take back the last stroke on a wall (none given: the wall being painted). Returns how many strokes went. */
   undo: (id?: string) => number;
@@ -141,13 +152,13 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const hudUi = makeHud(host);
 
   const scene = new THREE.Scene();
-  const cam = new THREE.PerspectiveCamera(62, 16 / 9, 0.05, 900);
+  const cam = new THREE.PerspectiveCamera(62, 16 / 9, 0.05, 900), camGame = cam.clone();
   const look = await loadLook(r, opts.base + 'tex/');
   const city = buildDistrict({ renderer: r, scene, high, look });
   const W0 = city.world, home = city.plan.places[0];
   say('Dressing the writer…');
   const writer = await loadWriter(opts.base + 'anims/ual.glb', high, opts.base + 'models/writer.glb');
-  scene.add(writer.root, writer.can);
+  scene.add(writer.root, writer.can); writer.carry(true);   // a writer always has a can in hand
   // the feet fit the ground at the writer's own level (a kerb, a step; not the bridge over the towpath)
   writer.setGround((x, z) => { const g = W0.groundAt(x, z, me.gy + 0.3); return Number.isNaN(g) ? me.gy : g; }, FIT_FEET);
   const spray = makeSpray(scene, city.walls, opts.store);
@@ -217,7 +228,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   // how far along the wall either side of the writer the can reaches; further, A D step along (no stepping by itself)
   const REACH = 2.4;
   const camO = { yaw: home.yaw, pitch: 0.12, dist: 3.4 };
-  const keys = new Set<string>();
+  const keys = new Set<string>(); let shiftNow = false;
   const MOVE = ['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Shift', ' ', 'c', 'f', 'm', 'p', 't', 'r', '1', '2', '3', '4', '5', '6', '7', 'z', 'x', 'h', 'Tab', 'Escape', 'b', 'g', 'v', 'n', '[', ']', '-', '=', '+', 'Enter'];
   // painting: F at a wall squares up to it; the mouse aims, holding it sprays; the wheel sets the can's distance
   type W = (typeof city.walls)[number];
@@ -415,6 +426,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     // a jump: a moment's gather (the body dips), then up
     if (down && !e.repeat && k === ' ' && !me.airborne && !mv.takeoff) { mv.takeoff = GAIT.gather; me.crouch = false; writer.land(0.25); writer.play('Jump_Start', 0.06, true); }
     if (down) keys.add(k); else keys.delete(k);
+    if (k === 'Shift') shiftNow = down;
   };
   // the dock answers the mouse too (owner: "select the spraycan controls with my mouse"): each tile does what its key does
   hudUi.bind({
@@ -432,9 +444,15 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const kd = (e: KeyboardEvent) => onKey(e, true), ku = (e: KeyboardEvent) => onKey(e, false);
   canvas.addEventListener('keydown', kd);
   canvas.addEventListener('keyup', ku);
-  canvas.addEventListener('blur', () => { keys.clear(); btn = 0; });
+  // the straight line follows Shift as the mouse sees it (every pointer event says whether Shift is down), so a keyup
+  // lost to another window can never leave every stroke straight; leaving the window lets go of everything
+  const letGo = () => { keys.clear(); btn = 0; shiftNow = false; };
+  canvas.addEventListener('blur', letGo);
+  window.addEventListener('blur', letGo);
+  const onVis = () => { if (document.visibilityState !== 'visible') letGo(); };
+  document.addEventListener('visibilitychange', onVis);
   let drag: { x: number; y: number } | null = null;
-  const aim = (e: PointerEvent) => { const b = canvas.getBoundingClientRect(); mouse.set(((e.clientX - b.left) / b.width) * 2 - 1, -((e.clientY - b.top) / b.height) * 2 + 1); };
+  const aim = (e: PointerEvent) => { shiftNow = e.shiftKey; const b = canvas.getBoundingClientRect(); mouse.set(((e.clientX - b.left) / b.width) * 2 - 1, -((e.clientY - b.top) / b.height) * 2 + 1); };
   canvas.addEventListener('pointerdown', (e) => {
     canvas.focus(); aim(e); canvas.setPointerCapture(e.pointerId);
     if (e.button === 1) e.preventDefault();
@@ -477,7 +495,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   // spot: the wall they buff (what was being painted by hand); kept: a wall with a half-blasted sketch, which stays
   let bust: { t: number; spot: string; kept: string } | null = null;
   const camPos = new THREE.Vector3(home.x + Math.sin(home.yaw) * 3.4, home.y + 2, home.z + Math.cos(home.yaw) * 3.4), camLook = new THREE.Vector3(), scr = new THREE.Vector3();
-  let landT = 0, forceAnim = '', idleT = 0, camH = 1.45;
+  let landT = 0, forceAnim = '', idleT = 0, camH = 1.45, shotView: { yaw: number; pitch: number; dist: number; bone?: string; h?: number; fov?: number } | null = null, fov0 = 0;
   const lookTo = new THREE.Vector3(), tipV = new THREE.Vector3(), focusV = new THREE.Vector3(), headV = new THREE.Vector3();
   const doorAt = () => city.plan.doors.find((d) => me.x > d.x0 - 0.3 && me.x < d.x1 + 0.3 && me.z > d.z0 - 0.3 && me.z < d.z1 + 0.3 && Math.abs(me.gy) < 0.5) || null;
   cam.position.copy(camPos);
@@ -557,7 +575,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       let dh = Math.atan2(-n.x, -n.z) - mv.offset - me.heading; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); me.heading += dh * Math.min(1, dt * 10);
       // aim: where the mouse points on this wall or the next one along. Anywhere along it paints (the writer steps after
       // the can); only height is out of reach
-      ray.setFromCamera(mouse, cam);
+      ray.setFromCamera(mouse, shotView ? camGame : cam);   // (a picture camera never moves the aim)
       let h = auto || bust ? null : spray.hit(ray, run.ids);
       // not through a vending machine or a pier: what is hidden behind something solid is out of the can's way
       if (h) { const c = cam.position, len = Math.hypot(h.point.x - c.x, h.point.z - c.z); if ((1 - sightTo(c.x, c.z, c.y, h.point.x, h.point.z, h.point.y, h.wall)) * len > 0.3) h = null; }
@@ -576,7 +594,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
         ghost.rotation.set(0, Math.atan2(h.wall.normal.x, h.wall.normal.z), 0); ghost.scale.set(armed.w * plan.scale, armed.h * plan.scale, 1);
       }
       let P: THREE.Vector3 | null = null, vol = 1, h0 = h;
-      if (down && h) { ray.setFromCamera(down, cam); const q = spray.hit(ray, [h.id]); if (q && q.point.y < top) h0 = q; }
+      if (down && h) { ray.setFromCamera(down, shotView ? camGame : cam); const q = spray.hit(ray, [h.id]); if (q && q.point.y < top) h0 = q; }
       down = null;
       if (auto) {
         preview.visible = false;
@@ -597,7 +615,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       } else {
         // Shift: a straight line from where the button went down to where it is let go (near enough level or upright
         // becomes exactly so), then sprayed in one even pass
-        if (pressing && keys.has('Shift') && !line && h && reach) { spray.end(); stroke = null; line = { id: h.id, x: h0!.x, y: h0!.y, press: btn & 1 ? 1 : 0.5 }; }
+        if (pressing && shiftNow && !line && h && reach) { spray.end(); stroke = null; line = { id: h.id, x: h0!.x, y: h0!.y, press: btn & 1 ? 1 : 0.5 }; }
         let end: { x: number; y: number } | null = null;
         if (line) {
           if (h && h.id === line.id && reach) { let dx = h.x - line.x, dy = h.y - line.y; if (Math.abs(dy) < Math.abs(dx) * 0.07) dy = 0; else if (Math.abs(dx) < Math.abs(dy) * 0.07) dx = 0; end = { x: line.x + dx, y: line.y + dy }; }
@@ -605,7 +623,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
             const len = end ? Math.hypot(end.x - line.x, end.y - line.y) : 0;
             if (end && len > 0.02) { auto = { list: [{ wall: line.id, can: { ...can, pressure: line.press }, pts: [[line.x, line.y, 0], [end.x, end.y, len / 2.4]] }], i: 0, k: 0, t: 0, gap: 0, speed: 1, group: '', done: () => {} }; sprayed = true; }
             line = null;
-          } else if (!keys.has('Shift')) line = null;
+          } else if (!shiftNow) line = null;
         }
         preview.visible = !!(line && end);
         if (line && end) { const g = preview.geometry.attributes.position as THREE.BufferAttribute; spray.point(line.id, line.x, line.y, lineA).addScaledVector(n, 0.02); g.setXYZ(0, lineA.x, lineA.y, lineA.z); spray.point(line.id, end.x, end.y, lineA).addScaledVector(n, 0.02); g.setXYZ(1, lineA.x, lineA.y, lineA.z); g.needsUpdate = true; }
@@ -625,7 +643,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       prompt(t < tipHold ? tipNote : auto ? (blasting ? `BLASTING ${blasting} · [A] [D] TO STOP` : '') : armed && !h ? 'POINT AT THE WALL TO PLACE IT' : !h ? 'POINT AT THE WALL' : '');
       // by the reticle: a keycap and a verb, only when there is something to do
       const sep = '<span class="sep"></span>';
-      const near = auto || !h ? '' : armed ? `${kc('LMB')}BLAST ${armed.name}${plan && plan.fitted ? ' · SIZED TO FIT' : ''}` : line ? `${kc('SHIFT')}STRAIGHT LINE · LET GO TO SPRAY` : tooHigh ? 'TOO HIGH · AIM LOWER' : tooFar ? `${kc('A')}${kc('D')}STEP ALONG` : !sprayed ? `${kc('LMB')}SPRAY${sep}${kc('RMB')}LIGHT${sep}${kc('F')}DONE${sep}TOOLS: CLICK THE DOCK` : keys.has('Shift') && !pressing ? `${kc('LMB')}DRAG A STRAIGHT LINE` : '';
+      const near = auto || !h ? '' : armed ? `${kc('LMB')}BLAST ${armed.name}${plan && plan.fitted ? ' · SIZED TO FIT' : ''}` : line ? `${kc('SHIFT')}STRAIGHT LINE · LET GO TO SPRAY` : tooHigh ? 'TOO HIGH · AIM LOWER' : tooFar ? `${kc('A')}${kc('D')}STEP ALONG` : !sprayed ? `${kc('LMB')}SPRAY${sep}${kc('RMB')}LIGHT${sep}${kc('F')}DONE${sep}TOOLS: CLICK THE DOCK` : shiftNow && !pressing ? `${kc('LMB')}DRAG A STRAIGHT LINE` : '';
       if (near && P) { scr.copy(P).project(cam); hudUi.near(near, (scr.x + 1) / 2 * canvas.clientWidth, (1 - scr.y) / 2 * canvas.clientHeight); } else hudUi.near('');
       reticle.visible = !!P && !armed; dot.visible = !!P;
       if (P) {
@@ -635,7 +653,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
         (reticle.material as THREE.MeshBasicMaterial).color.set(col); (dot.material as THREE.MeshBasicMaterial).color.set(col);
         // the arm goes up with the can wherever the aim is on the wall; the hand stops the can's distance off it
         // full weight hovering too, so pressing the button does not move the can
-        writer.aim(aimHand.copy(P).addScaledVector(n, can.dist + 0.03), P, 1);
+        writer.aim(aimHand.copy(P).addScaledVector(n, can.dist), P, 1, sprayingNow);   // the nozzle the can's distance off the wall
       } else writer.aim(null);
       hissOn(sprayingNow, 0.55 + 0.45 * vol);
     } else {
@@ -742,6 +760,12 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     lookTo.set(me.x + Math.cos(camO.yaw) * 0.55, tgtY, me.z - Math.sin(camO.yaw) * 0.55);
     camLook.lerp(lookTo, paint || bust ? 1 : 1 - Math.exp(-dt * 40));
     cam.lookAt(camLook);
+    camGame.position.copy(cam.position); camGame.quaternion.copy(cam.quaternion); camGame.aspect = cam.aspect; camGame.fov = fov0 || cam.fov; camGame.updateMatrixWorld(); camGame.updateProjectionMatrix();
+    if (shotView) {
+      const v = shotView, f = (v.bone && writer.bonePos(v.bone, focusV)) || focusV.set(me.x, me.gy + me.y + (v.h ?? 1.0), me.z), a = me.heading + v.yaw;
+      cam.position.set(f.x + Math.sin(a) * Math.cos(v.pitch) * v.dist, f.y + Math.sin(v.pitch) * v.dist, f.z + Math.cos(a) * Math.cos(v.pitch) * v.dist); cam.lookAt(f);
+      if (!fov0) fov0 = cam.fov; const fv = v.fov || fov0; if (cam.fov !== fv) { cam.fov = fv; cam.updateProjectionMatrix(); }
+    } else if (fov0 && cam.fov !== fov0) { cam.fov = fov0; cam.updateProjectionMatrix(); fov0 = 0; }
     focusV.set(me.x, me.gy + me.y, me.z); city.update(dt, t, cam, focusV);
     // a shop door: the trigger is marked on the ground (phase 3 opens the shops)
     if (!paint && !bust) { const d = doorAt(); if (d && t >= tipHold) prompt(`${d.name} · OPENS SOON`); }
@@ -788,9 +812,12 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       return c.toDataURL('image/jpeg', 0.82);
     },
     // look at the writer: camera yaw/pitch/distance, which way they face, a clip to hold (for judging the model)
-    inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string }) => {
+    // view: a fixed camera for pictures, round the writer (yaw from straight in front of them, pitch up, metres), aimed
+    // at a bone ('RightHand') or at a height on the body; at: hold the clip at this time
+    inspect: (o) => {
       if (o.yaw != null) camO.yaw = o.yaw; if (o.pitch != null) camO.pitch = o.pitch; if (o.dist != null) camO.dist = o.dist;
-      if (o.heading != null) me.heading = o.heading; forceAnim = o.anim || '';
+      if (o.heading != null) me.heading = o.heading; if (o.anim !== undefined) forceAnim = o.anim || '';
+      if (o.at !== undefined) writer.freeze(o.at); if (o.view !== undefined) shotView = o.view;
     },
     /** Paint a stroke on a wall: points (u, v) 0..1 across and up it. */
     paint: (id, pts, o = {}) => { stroke = null; spray.path(id, pts, { colour: o.colour || COLOURS[0], cap: o.cap || 2, dist: o.dist ?? 0.2, pressure: o.pressure ?? 1, buff: !!o.buff }); },
@@ -800,6 +827,13 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     undo: (id) => undo(id),
     tuneGait: (clip: string, v: number) => writer.tune(clip, v),
     head: (o) => writer.head(o),
+    arms: () => writer.arms(),
+    fixArms: (on) => writer.fixArms(on),
+    carry: (on) => writer.carry(on),
+    far: (side) => writer.far(side),
+    ik: () => writer.ik(),
+    bones: (names) => Object.fromEntries(names.map((n) => { const p = writer.bonePos(n, new THREE.Vector3()); return [n, p ? [p.x, p.y, p.z] as [number, number, number] : null]; })),
+    grip: () => writer.grip(),
     gait: (reset) => ({ ...writer.gait(reset), move: { speed: mv.speed, vx: Math.sin(me.heading) * mv.speed, vz: Math.cos(me.heading) * mv.speed, heading: me.heading, yawRate: mv.yawRate, airborne: me.airborne, crouch: me.crouch, gy: me.gy } }),
     sketches: () => book.all().map(infoOf),
     sketch: (q, kind) => { const s = findSketch(q, kind); return s ? JSON.parse(JSON.stringify(s)) : null; },
@@ -843,7 +877,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       cam.position.set(me.x + Math.sin(camO.yaw) * camO.dist, me.gy + 2, me.z + Math.cos(camO.yaw) * camO.dist); camLook.set(me.x, me.gy + 1.45, me.z); },
     stop: () => {
       stopped = true; cancelAnimationFrame(raf); ro.disconnect();
-      canvas.removeEventListener('keydown', kd); canvas.removeEventListener('keyup', ku);
+      canvas.removeEventListener('keydown', kd); canvas.removeEventListener('keyup', ku); window.removeEventListener('blur', letGo); document.removeEventListener('visibilitychange', onVis);
       scene.remove(torchL, torchL.target, beam); beam.geometry.dispose(); (beam.material as THREE.Material).dispose(); music?.stop(); hissOn(false); law.dispose(); book.dispose(); if (bus) void bus.ctx.close(); spray.dispose(); writer.dispose(); city.dispose(); look.dispose(); comp.dispose(); r.dispose(); canvas.remove(); tip.remove(); hudUi.dispose();
       for (const o of [reticle, dot, preview, ghost, ghostFrame]) { o.geometry.dispose(); (o.material as THREE.Material).dispose(); }
       const gm = (ghost.material as THREE.MeshBasicMaterial).map; if (gm) gm.dispose();

@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { bodyProxy, type ArmReport } from './bodyProxy';
 
 export type Writer = {
   root: THREE.Group;
@@ -41,10 +42,26 @@ export type Writer = {
   gait: (reset?: boolean) => GaitInfo;
   /** Set the speed a moving clip was made for (m/s), for tuning. */
   tune: (clip: string, v: number) => void;
-  /** Raise the right arm with a can to spray: the hand goes to `hand`, the nozzle points at `at` (null lowers it). */
-  aim: (hand: THREE.Vector3 | null, at?: THREE.Vector3, weight?: number) => void;
+  /** Raise the right arm with the can to spray: the nozzle goes to `nozzle` and points at `at` (null lowers it);
+   *  pressing: the index finger presses the actuator. */
+  aim: (nozzle: THREE.Vector3 | null, at?: THREE.Vector3, weight?: number, pressing?: boolean) => void;
+  /** Carry a can in the right hand (fingers closed round it, on the hand's grip socket in every clip). */
+  carry: (on: boolean) => void;
+  /** Keep the arms out of the trunk and pack (on by default; off to see the clips as they are). */
+  fixArms: (on: boolean) => void;
   /** Where the can's nozzle is now (world), or null when the can is down. */
   tip: (out: THREE.Vector3) => THREE.Vector3 | null;
+  /** The arms against the trunk and pack, as skinned now: how deep (m) the arm's own vertices go in, per side and part. */
+  arms: () => ArmReport;
+  /** The can against the hand holding it, as skinned now: fingers into the can (pen, m), the nearest the hand comes to
+   *  its surface (gap, m), how much of the way round the hand touches it (wrap 0..1). */
+  grip: () => GripReport;
+  far: (side: 0 | 1) => { d: number; info: string };
+  ik: () => Record<string, number>;
+  /** For pictures: hold the clip being played at this time (seconds), or null to let it run. */
+  freeze: (t: number | null) => void;
+  /** Where a bone is now (world), e.g. 'RightHand'. */
+  bonePos: (name: string, out: THREE.Vector3) => THREE.Vector3 | null;
   /** The can in the hand (a scene-level object: add it to the scene once). */
   can: THREE.Object3D;
   update: (dt: number) => void;
@@ -52,6 +69,9 @@ export type Writer = {
 };
 
 const HEIGHT = 1.78;
+export type GripReport = { shown: boolean; pen: number; gap: number; wrap: number; n: number };
+// the spray can's body in its own frame (metres): radius and where the cylinder runs along its axis
+const CAN = { r: 0.033, y0: -0.165, y1: 0.025 };
 export type GaitInfo = { on: boolean; rest: number[]; clips: Record<string, { v: number; stride: number; lift?: number[]; zr?: number[] }>; speed: number; mix: string; bodyOff: number;
   feet: { err: number; contact: boolean; slip: number; pen?: number }[];
   stats: { frames: number; sinkMean: number; sinkMax: number; sinkP95: number; floatMean: number; slipMean: number; slipP90: number; slipMax: number; contacts: number } };
@@ -121,8 +141,22 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
   // were built in (`bind`, a matrix per bone), metres per skeleton unit (`scale`) and where a can sits in the hand (`grip`)
   let model: GLTF | null = null;
   if (modelUrl) try { model = await load(modelUrl); } catch (e) { console.warn('writer model', e); }
-  let vx: { scale?: number; rest?: Record<string, number[]>; bind?: Record<string, number[]>; grip?: number[] } = {};
+  // pass 2 adds: finger bones (`extra`: parent + offset), their turns for each hand pose (`fingers`), the can's shape
+  // (`can`) and the clips' hip heights for the longer legs (`hipsY`, per clip, one value a key)
+  let vx: { scale?: number; rest?: Record<string, number[]>; bind?: Record<string, number[]>; grip?: number[]; extra?: Record<string, { parent: string; t: number[] }>;
+    fingers?: Record<string, Record<string, number[]>>; can?: { r: number; b0: number; b1: number; dome: number; actR: number; top: number; nozY: number }; hipsY?: Record<string, number[]> } = {};
   model?.scene.traverse((o) => { if (typeof o.userData.vx === 'string') try { vx = JSON.parse(o.userData.vx); } catch { /* an older model: none */ } });
+  // the loader strips ':' and other reserved characters from node names ('mixamorig:LeftHand' -> 'mixamorigLeftHand'),
+  // but the model's own data names bones as Blender wrote them. Until 18 Nov nothing matched, so the bind pose, the
+  // tidied joints and the grip were never used in the game: the A-posed meshes were bound as if in the clips' T-pose
+  // (every clip turned the arms on into the body) and the can floated off the hand. Key everything by the loaded names.
+  {
+    const nm = (n: string) => THREE.PropertyBinding.sanitizeNodeName(n);
+    const re = <T>(o?: Record<string, T>) => (o ? Object.fromEntries(Object.entries(o).map(([k, v]) => [nm(k), v])) : o);
+    vx.rest = re(vx.rest); vx.bind = re(vx.bind); vx.hipsY = vx.hipsY;
+    vx.extra = vx.extra ? Object.fromEntries(Object.entries(vx.extra).map(([k, v]) => [nm(k), { ...v, parent: nm(v.parent) }])) : vx.extra;
+    vx.fingers = vx.fingers ? Object.fromEntries(Object.entries(vx.fingers).map(([k, v]) => [k, re(v)!])) : vx.fingers;
+  }
   const armSrc = gltf.scene.getObjectByName('Armature') || gltf.scene.children[0];
   const hipsSrc = armSrc.children[0];
 
@@ -137,6 +171,11 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
     return b;
   };
   const hips = mk(hipsSrc);
+  // the finger bones the model brings (the clip library has none): under each hand, turned by the game itself
+  for (const [name, e] of Object.entries(vx.extra || {})) {
+    const par = bones.find((b) => b.name === e.parent); if (!par) continue;
+    const b = new THREE.Bone(); b.name = name; b.position.fromArray(e.t); par.add(b); bones.push(b);
+  }
   const arm = new THREE.Object3D();
   arm.position.copy(armSrc.position); arm.quaternion.copy(armSrc.quaternion); arm.scale.copy(armSrc.scale);
   arm.add(hips);
@@ -169,6 +208,14 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       // the model's atlas (second UV set): baked occlusion, seams and wear, multiplied into the cloth and used as its occlusion
       const std = mat as THREE.MeshStandardMaterial;
       if (src.map && std.isMeshStandardMaterial && !std.map) { std.map = src.map; std.aoMap = src.map; std.aoMapIntensity = 1; std.needsUpdate = true; }
+      // the model's cloth folds (a normal map on the atlas's UV set, pass 2) take the place of the tiling weave; the shell
+      // keeps its ripstop in a thin clear coat, so the street's lights still catch the weave
+      if (src.normalMap && std.isMeshStandardMaterial) {
+        const weave = std.normalMap; std.normalMap = src.normalMap; std.normalScale.copy(src.normalScale);
+        const ph = mat as THREE.MeshPhysicalMaterial;
+        if (weave && ph.isMeshPhysicalMaterial && src.name === 'Hoodie') { ph.clearcoat = 0.16; ph.clearcoatRoughness = 0.5; ph.clearcoatNormalMap = weave; ph.clearcoatNormalScale.set(0.7, 0.7); }
+        std.needsUpdate = true;
+      }
       const m = new THREE.SkinnedMesh(geo, mat); m.name = sm.name; m.userData.slot = src.name;
       meshes.push(m); owned.push(geo, mat);
     });
@@ -317,7 +364,11 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
   // bound in the pose the model was built in (its own bind matrices), not the clip file's rest pose
   const inv = vx.bind ? bones.map((b) => (vx.bind![b.name] ? new THREE.Matrix4().fromArray(vx.bind![b.name]).invert() : b.matrixWorld.clone().invert())) : undefined;
   const skeleton = new THREE.Skeleton(bones, inv);
-  for (const m of meshes) m.bind(skeleton);
+  // (bind with the mesh's own matrix: bind(skeleton) alone makes three recompute the inverses from the skeleton's rest
+  // pose and throws the model's bind pose away, which until 18 Nov bound the A-posed body as if it were in the clips'
+  // rest pose: every clip then turned the arms on through the trunk)
+  for (const m of meshes) { m.updateMatrixWorld(true); m.bind(skeleton, m.matrixWorld); }
+  const body = bodyProxy(meshes, bones, vx.scale || 1);
 
   // stand on the ground at 1.78 m, feet at y = 0
   const k = vx.scale || HEIGHT / Hs;
@@ -330,7 +381,8 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
   const clips = new Map<string, THREE.AnimationClip>();
   const rest = hips.position.clone();
   for (const c of gltf.animations) {
-    for (const tr of c.tracks) if (/Hips\.position$/.test(tr.name)) for (let i = 0; i < tr.values.length; i += 3) { tr.values[i] = rest.x; tr.values[i + 2] = rest.z; }
+    const hy = vx.hipsY?.[c.name];   // the longer legs: the hips ride higher, so the standing foot stays where the clip had it
+    for (const tr of c.tracks) if (/Hips\.position$/.test(tr.name)) for (let i = 0; i < tr.values.length; i += 3) { tr.values[i] = rest.x; tr.values[i + 2] = rest.z; if (hy && hy.length === tr.values.length / 3) tr.values[i + 1] = hy[i / 3]; }
     clips.set(c.name, c);
   }
   const mixer = new THREE.AnimationMixer(char);
@@ -366,21 +418,31 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       }
     }
   }
-  let life = 0, lt = 0;
+  let life = 0, lt = 0, frozen: number | null = null;
   // spraying: the right arm reaches for the wall (two-bone IK over whatever clip plays) with a can in the hand
   const rArm = B('RightArm'), rFore = B('RightForeArm'), rHand = B('RightHand'), spine2 = B('Spine2');
+  // THE CAN IN THE HAND (owner, 18 Nov: "Vex needs to HOLD the spraycans"): the can sits on the right hand's grip
+  // socket (from the model: the middle of the fist), carried by the hand bone every frame through every clip, and the
+  // fingers close round it (their turns come from the model, solved round this same can); the index finger rises onto
+  // the actuator while the can is up, and presses while spraying
+  const C = vx.can || { r: 0.033, b0: -0.142, b1: 0.018, dome: 0.04, actR: 0.0115, top: 0.062, nozY: 0.054 };
+  CAN.r = C.r; CAN.y0 = C.b0; CAN.y1 = C.b1;
   const can = new THREE.Group();
+  const nozLocal = new THREE.Vector3(0, C.nozY, C.actR + 0.004);
   {
-    const metal = new THREE.MeshPhysicalMaterial({ color: '#c4c6cc', roughness: 0.28, metalness: 0.9, clearcoat: 0.6, clearcoatRoughness: 0.25 });
-    const white = new THREE.MeshStandardMaterial({ color: '#f2f2f2', roughness: 0.5 });
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.033, 0.033, 0.19, 20), metal);
-    const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.033, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), metal); shoulder.position.y = 0.095;
-    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.01, 0.02, 12), white); cap.position.y = 0.135;
-    const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.012, 8), white); nozzle.rotation.x = Math.PI / 2; nozzle.position.set(0, 0.138, 0.01);
-    for (const m of [body, shoulder, cap, nozzle]) { m.castShadow = shadow; can.add(m); }
-    // the can is drawn upright with its nozzle facing +Z: lookAt points the nozzle at the wall; the grip sits low on the body
-    for (const m of can.children) m.position.y -= 0.07;
-    owned.push(body.geometry, shoulder.geometry, cap.geometry, nozzle.geometry, metal, white);
+    // (brushed, not chrome: a polished can under a street lamp bloomed into a white bar)
+    const metal = new THREE.MeshPhysicalMaterial({ color: '#a8aab0', roughness: 0.42, metalness: 0.85, clearcoat: 0.25, clearcoatRoughness: 0.35 });
+    const white = new THREE.MeshStandardMaterial({ color: '#e6e6e6', roughness: 0.55 });
+    const dark = new THREE.MeshStandardMaterial({ color: '#2a2a2e', roughness: 0.4 });
+    // the body by its outline, turned round its axis: rolled base, body, domed shoulder, valve cup
+    const prof: THREE.Vector2[] = [new THREE.Vector2(0, C.b0 + 0.004), new THREE.Vector2(C.r * 0.8, C.b0), new THREE.Vector2(C.r * 0.95, C.b0 + 0.002), new THREE.Vector2(C.r, C.b0 + 0.007)];
+    for (let i = 0; i <= 8; i++) { const a = (i / 8) * Math.PI / 2; prof.push(new THREE.Vector2(0.0135 + (C.r - 0.0135) * Math.cos(a), C.b1 + (C.dome - C.b1) * Math.sin(a))); }
+    prof.push(new THREE.Vector2(0.0135, C.dome + 0.002), new THREE.Vector2(0, C.dome + 0.002));
+    const body = new THREE.Mesh(new THREE.LatheGeometry(prof, 28), metal);
+    const act = new THREE.Mesh(new THREE.CylinderGeometry(C.actR - 0.0015, C.actR, C.top - C.dome, 18), white); act.position.y = (C.top + C.dome) / 2;
+    const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.0022, 0.0022, 0.004, 8), dark); nozzle.rotation.x = Math.PI / 2; nozzle.position.set(0, C.nozY, C.actR + 0.001);
+    for (const m of [body, act, nozzle]) { m.castShadow = shadow; can.add(m); }
+    owned.push(body.geometry, act.geometry, nozzle.geometry, metal, white, dark);
   }
   can.visible = false;
   const iA = new THREE.Vector3(), iB = new THREE.Vector3(), iC = new THREE.Vector3(), iT = new THREE.Vector3(), iE = new THREE.Vector3(), iP = new THREE.Vector3();
@@ -390,30 +452,130 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
     qa.setFromUnitVectors(from, to); bone.getWorldQuaternion(qb); bone.parent!.getWorldQuaternion(qp);
     bone.quaternion.slerp(qp.invert().multiply(qa.multiply(qb)), w); bone.updateMatrixWorld(true);
   };
-  // the can sits in the hand's grip: the hand turns so the nozzle (along the fingers) points at the wall
+  // turn a bone by a world rotation about its own joint
+  const spin = (bone: THREE.Bone, q: THREE.Quaternion) => { bone.getWorldQuaternion(qb); bone.parent!.getWorldQuaternion(qp); bone.quaternion.copy(qp.invert().multiply(qa.copy(q).multiply(qb))); bone.updateMatrixWorld(true); };
+  // the grip socket in the right hand's frame (skeleton units), and its turn: the can's +Y is up its axis, +Z its nozzle
   let gripPos: THREE.Vector3 | null = null; const gripRot = new THREE.Quaternion(), gripInv = new THREE.Quaternion();
   if (vx.grip && vx.bind?.[rHand.name]) {
     const g = new THREE.Matrix4().fromArray(vx.bind[rHand.name]).invert().multiply(new THREE.Matrix4().fromArray(vx.grip));
     gripPos = new THREE.Vector3(); g.decompose(gripPos, gripRot, new THREE.Vector3()); gripInv.copy(gripRot).invert();
   }
+  // which way the forearm runs in the hand's own frame (a straight wrist), for choosing an elbow that keeps it straight
+  const foreInHand = (() => { if (!vx.bind?.[rHand.name] || !vx.bind?.[rFore.name]) return new THREE.Vector3(0, 1, 0); const h = new THREE.Matrix4().fromArray(vx.bind[rHand.name]), f = new THREE.Matrix4().fromArray(vx.bind[rFore.name]); const d = new THREE.Vector3().setFromMatrixPosition(h).sub(new THREE.Vector3().setFromMatrixPosition(f)); return d.applyQuaternion(new THREE.Quaternion().setFromRotationMatrix(h).invert()).normalize(); })();
+  // the fingers: their turns per pose and hand, from the model
+  const fq = (pose: string, b: THREE.Bone) => { const a = vx.fingers?.[pose]?.[b.name]; return a ? new THREE.Quaternion(a[0], a[1], a[2], a[3]) : null; };
+  const fingers = bones.filter((b) => vx.fingers?.relax?.[b.name]).map((b) => ({ b, right: /Right/.test(b.name), index: /Index/.test(b.name), relax: fq('relax', b)!, grip: fq('grip', b) || fq('relax', b)!, press: fq('press', b) || fq('grip', b) || fq('relax', b)! }));
+  let carryOn = false, carryW = 0, pressOn = false, pressW = 0, armsFix = true;
   const gM = new THREE.Matrix4(), gQ = new THREE.Quaternion(), gH = new THREE.Quaternion(), UP = new THREE.Vector3(0, 1, 0);
-  const aimHand = new THREE.Vector3(), aimAt = new THREE.Vector3();
-  let aimOn = false, aimTo = 1, aimW = 0;
-  const ik = (w: number) => {
-    root.updateMatrixWorld(true);
+  const aimHand = new THREE.Vector3(), aimAt = new THREE.Vector3(), wristT = new THREE.Vector3(), tv2 = new THREE.Vector3(), tv3 = new THREE.Vector3();
+  let aimOn = false, aimTo = 1, aimW = 0, swivel = NaN;
+  // ARMS OUTSIDE THE BODY (owner, 18 Nov: "VEX'S ARMS shouldn't travel through his body"). The trunk and pack as a
+  // shape (bodyProxy) and the arm as capsules round its bones (radii from the sleeve, the cuff, the fist and the can)
+  const R_UP = 0.064, R_FORE = 0.056, R_HAND = 0.046, R_CAN = 0.036, CLEAR = 0.006;
+  const kS = vx.scale || 1;
+  const armPen = (a: THREE.Vector3, b: THREE.Vector3, r: number, t0: number, n: number, worst: { pen: number; p: THREE.Vector3; dir: THREE.Vector3 }) => {
+    for (let i = 0; i < n; i++) { const t = t0 + (1 - t0) * (n === 1 ? 1 : i / (n - 1)); tv2.copy(a).lerp(b, t); const d = body.depth(tv2); const pen = d.pen + r + CLEAR; if (pen > worst.pen) { worst.pen = pen; worst.p.copy(tv2); worst.dir.copy(d.dir); } }
+  };
+  const W1 = { pen: 0, p: new THREE.Vector3(), dir: new THREE.Vector3() };
+  const canAxis = (out0: THREE.Vector3, out1: THREE.Vector3) => { if (!gripPos) return false; rHand.getWorldQuaternion(gQ).multiply(gripRot); out0.copy(gripPos); rHand.localToWorld(out0); out1.set(0, 1, 0).applyQuaternion(gQ); return true; };
+  // a clip's arm through the trunk: the upper arm turns out about the shoulder until the elbow side clears, then the
+  // forearm about the elbow until the forearm, the fist and the can clear (a few small passes)
+  const sideArms = (['Left', 'Right'] as const).map((s) => ({ s, arm: B(s + 'Arm'), fore: B(s + 'ForeArm'), hand: B(s + 'Hand') }));
+  const ax = new THREE.Vector3(), qr = new THREE.Quaternion(), cA = new THREE.Vector3(), cU = new THREE.Vector3(), hTip = new THREE.Vector3();
+  const pushOut = (sa: (typeof sideArms)[number], fixUpper = true, passes = 3) => {
+    for (let pass = 0; pass < passes; pass++) {
+      root.updateMatrixWorld(true); body.prep();
+      sa.arm.getWorldPosition(iA); sa.fore.getWorldPosition(iB); sa.hand.getWorldPosition(iC);
+      hTip.copy(iC).sub(iB).normalize().multiplyScalar(0.085).add(iC);
+      const carrying = sa.s === 'Right' && carryW > 0.5 && canAxis(cA, cU);
+      W1.pen = 0; if (fixUpper) armPen(iA, iB, R_UP, 0.5, 4, W1);
+      if (W1.pen > 0.001) { ax.subVectors(W1.p, iA); const L = ax.length(); tv3.copy(ax); ax.cross(W1.dir); if (ax.lengthSq() < 1e-8) ax.crossVectors(tv3, UP); ax.normalize(); if (ax.lengthSq() > 0.5) { spin(sa.arm, qr.setFromAxisAngle(ax, Math.atan2(W1.pen, L) * 1.12)); continue; } }
+      W1.pen = 0; armPen(iB, iC, R_FORE, 0.15, 4, W1); armPen(iC, hTip, R_HAND, 0, 3, W1);
+      if (carrying) { tv3.copy(cA).addScaledVector(cU, CAN.y0 * 0.9); armPen(cA, tv3, R_CAN, 0, 3, W1); }
+      if (W1.pen > 0.001) { ax.subVectors(W1.p, iB); const L = ax.length(); tv3.copy(ax); ax.cross(W1.dir); if (ax.lengthSq() < 1e-8) ax.crossVectors(tv3, UP); ax.normalize(); if (ax.lengthSq() > 0.5) { spin(sa.fore, qr.setFromAxisAngle(ax, Math.atan2(W1.pen, L) * 1.12)); continue; } }
+      break;
+    }
+  };
+  // the spray arm: the hand turns so the can is upright with its nozzle at the wall, the wrist goes where that puts the
+  // nozzle at the can's distance (kept outside the trunk), and of all the elbows that reach it the one that keeps the
+  // arm out of the body and the wrist straightest (eased, so it never jumps)
+  // reaching across the body the shoulder has to come round: the chest turns toward the can (the smallest turn that
+  // lets the arm clear the trunk), eased from frame to frame
+  let reachTw = 0;
+  const qS1 = new THREE.Quaternion(), qS2 = new THREE.Quaternion(), qTw = new THREE.Quaternion(), Y1 = new THREE.Vector3(0, 1, 0), hand0 = new THREE.Vector3();
+  const setTw = (tw: number) => { spine1.quaternion.copy(qS1).multiply(qTw.setFromAxisAngle(Y1, tw * 0.45)); spine2.quaternion.copy(qS2).multiply(qTw.setFromAxisAngle(Y1, tw * 0.55)); root.updateMatrixWorld(true); body.prep(); };
+  // the circle of elbows that reach the wrist target from where the shoulder is now: the best one, its cost and how
+  // deep the arm goes into the trunk there
+  const elbows = () => {
     rArm.getWorldPosition(iA); rFore.getWorldPosition(iB); rHand.getWorldPosition(iC);
     const l1 = iA.distanceTo(iB), l2 = iB.distanceTo(iC);
-    iT.copy(aimHand).sub(iA); const d = Math.max(0.05, Math.min(iT.length(), (l1 + l2) * 0.995)); iT.normalize();
+    iT.copy(wristT).sub(iA); const d = Math.max(0.05, Math.min(iT.length(), (l1 + l2) * 0.995)); iT.normalize();
     const cosA = Math.max(-1, Math.min(1, (l1 * l1 + d * d - l2 * l2) / (2 * l1 * d))), sinA = Math.sqrt(1 - cosA * cosA);
-    // the elbow drops down and out to the right of the body
     spine2.getWorldPosition(iP); iP.subVectors(iA, iP).setY(0).normalize().multiplyScalar(0.7); iP.y = -1;
-    iP.addScaledVector(iT, -iP.dot(iT)).normalize();
-    iE.copy(iA).addScaledVector(iT, l1 * cosA).addScaledVector(iP, l1 * sinA);
+    iP.addScaledVector(iT, -iP.dot(iT)).normalize(); ax.crossVectors(iT, iP).normalize();
+    const want = tv3.copy(foreInHand).applyQuaternion(gH);
+    hand0.copy(iA).addScaledVector(iT, d);
+    let best = 0, bestC = Infinity, bestPen = Infinity;
+    for (let k = 0; k < 18; k++) {
+      const ph = (k / 18) * Math.PI * 2, e = iE.copy(iA).addScaledVector(iT, l1 * cosA).addScaledVector(iP, l1 * sinA * Math.cos(ph)).addScaledVector(ax, l1 * sinA * Math.sin(ph));
+      W1.pen = 0; armPen(iA, e, R_UP, 0.4, 5, W1); armPen(e, hand0, R_FORE, 0.1, 5, W1);
+      const bend = 1 - tv2.subVectors(hand0, e).normalize().dot(want);
+      const c = W1.pen * 40 + bend * 0.35 + (1 - Math.cos(ph)) * 0.25;               // out of the body, then a straight wrist, then down and out
+      if (c < bestC) { bestC = c; best = ph; bestPen = W1.pen; }
+    }
+    return { best, pen: bestPen, l1, d, cosA, sinA };   // (iA, iT, iP, ax stay set for the chosen target)
+  };
+  // the spray arm: the hand turns so the can is upright with its nozzle at the wall, the wrist goes where that puts the
+  // nozzle at the can's distance (kept outside the trunk), and of all the elbows that reach it the one that keeps the
+  // arm out of the body and the wrist straightest (eased, so it never jumps)
+  // where the wrist goes for a nozzle at N pointing at the wall point: the hand upright, the can its distance off
+  const wristFor = (N: THREE.Vector3) => {
+    gQ.setFromRotationMatrix(gM.lookAt(aimAt, N, UP)); gH.copy(gQ).multiply(gripInv);
+    wristT.copy(N).sub(tv2.copy(nozLocal).applyQuaternion(gQ));
+    if (gripPos) wristT.sub(tv2.copy(gripPos).multiplyScalar(kS).applyQuaternion(gH));
+    for (let i = 0; i < 2; i++) { const d = body.depth(wristT); const pen = d.pen + R_HAND + CLEAR; if (pen > 0) wristT.addScaledVector(d.dir, pen); }   // the fist never in the trunk
+  };
+  let ikN = 0, ikBest: { tw: number; pull: number; sw: number; c: number } | null = null;
+  let reachPull = 0, reachSw = 0, ikInfo: Record<string, number> = {}; const nozT = new THREE.Vector3(), shA = new THREE.Vector3();
+  const ik = (w: number, dt: number) => {
+    root.updateMatrixWorld(true); body.prep();
+    qS1.copy(spine1.quaternion); qS2.copy(spine2.quaternion);
+    // across the body and out of reach, no elbow keeps a straight arm out of the chest: the chest turns toward the can
+    // and the can comes back toward the shoulder (it still points at the spot: the paint goes where the aim is); the
+    // least of both that clears the trunk
+    let bestTw = 0, bestPull = 0, bestSw = 0, bestC = Infinity;
+    const place = (pull: number, sw: number) => {
+      rArm.getWorldPosition(shA); nozT.copy(aimHand).lerp(shA, pull * 0.7); wristFor(nozT);
+      if (sw > 0) {   // out of reach across the chest: the reach swings toward the chest's front and falls short
+        spine2.getWorldDirection(tv3); tv2.subVectors(wristT, shA); const L = tv2.length(), a = tv2.angleTo(tv3);
+        if (a > 1e-3) { ax.crossVectors(tv2, tv3).normalize(); tv2.applyAxisAngle(ax, Math.min(sw, a)); wristT.copy(shA).add(tv2.setLength(L)); }
+      }
+    };
+    if (ikN++ % 3 === 0 || !ikBest) {   // (searched every third frame; between, the last answer)
+      search: for (const pull of [0, 0.3, 0.55, 0.8, 1.0]) for (const tw of [0, 0.35, 0.7, 1.0]) {
+        setTw(tw);
+        for (const sw of [0, 0.4, 0.8, 1.2, 1.6]) {
+          place(pull, sw);
+          const c = elbows().pen * 40 + tw * 0.08 + pull * 0.1 + sw * 0.12;
+          if (c < bestC) { bestC = c; bestTw = tw; bestPull = pull; bestSw = sw; }
+          if (c < 0.05) break search;
+        }
+      }
+      ikBest = { tw: bestTw, pull: bestPull, sw: bestSw, c: bestC };
+    } else { bestTw = ikBest.tw; bestPull = ikBest.pull; bestSw = ikBest.sw; bestC = ikBest.c; }
+    const k = Math.min(1, dt * 8); reachTw += (bestTw * w - reachTw) * k; reachPull += (bestPull - reachPull) * k; reachSw += (bestSw - reachSw) * k;
+    setTw(reachTw); place(reachPull, reachSw);
+    const E = elbows(); ikInfo = { tw: +reachTw.toFixed(2), pull: +reachPull.toFixed(2), sw: +reachSw.toFixed(2), pen: +E.pen.toFixed(3), cost: +bestC.toFixed(3), d: +E.d.toFixed(3), reach: +(E.l1 + iB.distanceTo(iC)).toFixed(3) };
+    if (Number.isNaN(swivel)) swivel = E.best; else { let dd = E.best - swivel; dd = Math.atan2(Math.sin(dd), Math.cos(dd)); swivel += Math.max(-0.25, Math.min(0.25, dd)); }
+    iE.copy(iA).addScaledVector(iT, E.l1 * E.cosA).addScaledVector(iP, E.l1 * E.sinA * Math.cos(swivel)).addScaledVector(ax, E.l1 * E.sinA * Math.sin(swivel));
+    rFore.getWorldPosition(iB);
     turn(rArm, iB.clone().sub(iA).normalize(), iE.sub(iA).normalize(), w);
     rFore.getWorldPosition(iB); rHand.getWorldPosition(iC);
-    iE.copy(iA).addScaledVector(iT, d);
+    iE.copy(iA).addScaledVector(iT, E.d);
     turn(rFore, iC.clone().sub(iB).normalize(), iE.sub(iB).normalize(), w);
     rHand.getWorldPosition(iC);
+    // the hand: holding the can upright, pointing at the spot
+    rHand.parent!.getWorldQuaternion(qp); qb.copy(qp).invert().multiply(gH); rHand.quaternion.slerp(qb, w); rHand.updateMatrixWorld(true);
   };
   // ---- the feet: points on each sole, carried by the foot and toe bones, so the game knows where the soles are ----
   type SP = { bone: THREE.Bone; p: THREE.Vector3; w: THREE.Vector3; last: THREE.Vector3 };
@@ -610,7 +772,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       play(name, fade, once);
     },
     playing: () => (locoOn ? mixName : curName), can,
-    tip: (out) => (can.visible ? can.localToWorld(out.set(0, 0.068, 0.016)) : null),
+    tip: (out) => (can.visible ? can.localToWorld(out.copy(nozLocal)) : null),
     loco: (speed, crouch) => {
       locoStart(); locoS = speed; crouchT = crouch;
       if (!locoOn) { locoOn = true; if (cur) cur.fadeOut(0.18); cur = null; curName = ''; }
@@ -643,16 +805,36 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       if (reset) Object.assign(S, { frames: 0, sink: [], sinkSum: 0, sinkMax: 0, floatSum: 0, floatN: 0, slips: [], slipSum: 0, slipMax: 0, contacts: 0 });
       return out;
     },
-    aim: (hand, at, weight = 1) => {
-      aimOn = !!hand; if (hand) { aimHand.copy(hand); aimAt.copy(at || hand); aimTo = weight; }
+    arms: () => { root.updateMatrixWorld(true); return body.measure(); },
+    ik: () => ikInfo,
+    far: (side) => { root.updateMatrixWorld(true); const r = body.far(side); r.info += ` | bind hits ${bones.filter((b) => vx.bind?.[b.name]).length}/${bones.length} e.g. ${bones[9]?.name} keys ${Object.keys(vx.bind || {}).slice(8, 10)}`; return r; },
+    freeze: (t) => { frozen = t; },
+    bonePos: (name, out) => { const b = bones.find((x) => x.name.replace(/^mixamorig:?/, '') === name); return b ? b.getWorldPosition(out) : null; },
+    grip: () => {
+      const o: GripReport = { shown: can.visible, pen: 0, gap: 0, wrap: 0, n: 0 }; if (!can.visible) return o;
+      can.updateMatrixWorld(true); const inv = can.matrixWorld.clone().invert(), v = new THREE.Vector3(), bins = new Set<number>(); let gap = Infinity;
+      for (const a of body.arms) {
+        if (a.side !== 1 || a.part !== 'hand') continue;
+        a.m.getVertexPosition(a.i, v); v.applyMatrix4(a.m.matrixWorld).applyMatrix4(inv); o.n++;
+        const rho = Math.hypot(v.x, v.z), inY = v.y >= CAN.y0 && v.y <= CAN.y1;
+        if (inY) o.pen = Math.max(o.pen, CAN.r - rho);
+        gap = Math.min(gap, inY ? Math.max(0, rho - CAN.r) : Math.hypot(Math.max(0, rho - CAN.r), v.y < CAN.y0 ? CAN.y0 - v.y : v.y - CAN.y1));
+        if (inY && Math.abs(rho - CAN.r) < 0.008) bins.add(Math.floor(((Math.atan2(v.x, v.z) + Math.PI) / (2 * Math.PI)) * 24) % 24);
+      }
+      o.gap = gap === Infinity ? 0 : gap; o.wrap = bins.size / 24; return o;
     },
+    aim: (nozzle, at, weight = 1, pressing = false) => {
+      aimOn = !!nozzle; pressOn = !!pressing; if (nozzle) { aimHand.copy(nozzle); aimAt.copy(at || nozzle); aimTo = weight; }
+    },
+    carry: (on) => { carryOn = on; },
+    fixArms: (on) => { armsFix = on; },
     update: (dt) => {
       locoTick(dt);
       // the procedural layers below (twist, the idle look, the steady head, foot and arm IK) are deltas on the clips'
       // pose: put the pose the mixer made last frame back first (the mixer writes a bone only when its value changed),
       // so nothing can pile up from frame to frame
       if (poseOk) for (let i = 0; i < bones.length; i++) bones[i].quaternion.copy(poseQ[i]);
-      mixer.update(dt);
+      if (frozen != null && cur && !locoOn) { cur.time = Math.min(frozen, cur.getClip().duration); cur.setEffectiveWeight(1); mixer.update(0); } else mixer.update(dt);
       for (let i = 0; i < bones.length; i++) poseQ[i].copy(bones[i].quaternion); poseOk = true;
       twistS += (Math.max(-1.3, Math.min(1.3, twistA)) - twistS) * Math.min(1, dt * 12);   // eased: no snap of the neck
       if (Math.abs(twistS) > 1e-3) { const ch: [THREE.Bone, number][] = [[spine0, 0.3], [spine1, 0.3], [spine2, 0.25], [neckB, 0.15]]; for (const [b, k] of ch) b.rotateY(twistS * k); }
@@ -666,17 +848,29 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       steadyHead(dt);
       if (ground) { if (feetOn) fitFeet(dt); else soleNow(); measure(dt); }
       aimW += ((aimOn ? aimTo : 0) - aimW) * Math.min(1, dt * 9);
+      carryW += ((carryOn ? 1 : 0) - carryW) * Math.min(1, dt * 10);
+      // the arms out of the trunk as the clip has them (both), then the spray arm reaches for the wall over that
+      if (armsFix) { if (!(aimW > 0.99)) pushOut(sideArms[1]); pushOut(sideArms[0]); }
       if (aimW > 0.01) {
-        ik(aimW);
-        can.visible = aimW > 0.3;
-        if (gripPos) {
-          gQ.setFromRotationMatrix(gM.lookAt(aimAt, iC, UP)); // the can upright, its nozzle at the wall
-          rHand.parent!.getWorldQuaternion(qp); gH.copy(qp).invert().multiply(gQ).multiply(gripInv);
-          rHand.quaternion.slerp(gH, aimW); rHand.updateMatrixWorld(true);
-          rHand.getWorldQuaternion(gQ).multiply(gripRot); can.quaternion.copy(gQ);
-          can.position.copy(gripPos); rHand.localToWorld(can.position); can.position.add(iP.set(0, 0.075, 0).applyQuaternion(gQ));
-        } else { can.position.copy(iC).lerp(iB, -0.15); can.lookAt(aimAt); }
-      } else can.visible = false;
+        ik(aimW, dt);
+        // whatever the reach could not avoid, the arm is pushed out of the trunk like a clip's arm; then the hand turns
+        // back so the can points at the spot from where it is
+        if (armsFix) {
+          pushOut(sideArms[1], true, 10);
+          if (gripPos) { rHand.getWorldPosition(tv2); rHand.getWorldQuaternion(qb); tv3.copy(gripPos).multiplyScalar(kS).applyQuaternion(qb).add(tv2); gQ.setFromRotationMatrix(gM.lookAt(aimAt, tv3, UP)); gH.copy(gQ).multiply(gripInv); rHand.parent!.getWorldQuaternion(qp); qb.copy(qp).invert().multiply(gH); rHand.quaternion.slerp(qb, aimW); rHand.updateMatrixWorld(true); }
+        }
+      } else { swivel = NaN; reachTw = 0; reachPull = 0; reachSw = 0; ikBest = null; }
+      // the fingers: relaxed; the right hand closed round its can; the index finger up on the actuator while the can is
+      // up at a wall, pressing while it sprays
+      pressW += ((aimW > 0.3 && carryW > 0.5 ? (pressOn ? 1 : 0.88) : 0) - pressW) * Math.min(1, dt * 14);
+      for (const f of fingers) { f.b.quaternion.copy(f.relax); if (f.right) { f.b.quaternion.slerp(f.grip, carryW); if (f.index && pressW > 0.001) f.b.quaternion.slerp(f.press, pressW); } }
+      // the can rides the hand's grip socket: wherever the hand goes, it goes
+      can.visible = carryOn ? carryW > 0.5 : aimW > 0.3;
+      if (can.visible && gripPos) {
+        root.updateMatrixWorld(true);
+        rHand.getWorldQuaternion(gQ).multiply(gripRot); can.quaternion.copy(gQ);
+        can.position.copy(gripPos); rHand.localToWorld(can.position);
+      }
     },
     dispose: () => { mixer.stopAllAction(); owned.forEach((d) => d.dispose()); },
   };
