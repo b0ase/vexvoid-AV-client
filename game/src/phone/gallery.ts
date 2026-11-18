@@ -77,7 +77,7 @@ const CSS = `
 .vxg.tall .vxg-hd{gap:8px;padding:10px}
 .vxg.tall .vxg-hd b{font-size:11px;letter-spacing:.2em}
 .vxg.tall .vxg-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:10px}
-.vxg.tall .vxg-card .cap{flex-direction:column;gap:3px}
+.vxg.tall .vxg-card .cap,.vxg.sm .vxg-card .cap{flex-direction:column;gap:3px}
 .vxg.tall .vxg-ft{display:none}
 .vxg.tall .vxg-v .stage{padding:8px 8px 60px}
 .vxg.tall .vxg-nav{top:auto;bottom:8px;transform:none;height:40px;width:56px}
@@ -149,7 +149,7 @@ export function makeGallery(host: HTMLElement, cb: Cb) {
       const c = document.createElement('div'); c.className = 'vxg-card'; c.dataset.id = p.id;
       const im = document.createElement('img'); im.className = 'im'; im.alt = ''; im.draggable = false; im.dataset.id = p.id; io.observe(im);
       const cap = document.createElement('div'); cap.className = 'cap';
-      const a = document.createElement('span'); a.innerHTML = '<b></b>'; (a.firstChild as HTMLElement).textContent = when(p.t).split(' · ')[0] + ' · ' + when(p.t).split(' · ')[1].slice(0, 5);
+      const a = document.createElement('span'); a.innerHTML = '<b></b>'; (a.firstChild as HTMLElement).textContent = when(p.t).split(' · ')[0].replace(/ \d{4}$/, '') + ' · ' + when(p.t).split(' · ')[1].slice(0, 5);   // the year is in the big view
       const b = document.createElement('span'); b.textContent = (p.place || '').toUpperCase().replace(/-/g, ' ');
       cap.append(a, b); c.append(im, cap);
       c.addEventListener('click', () => { sel = i; markSel(); show(p.id); cb.focus(); });

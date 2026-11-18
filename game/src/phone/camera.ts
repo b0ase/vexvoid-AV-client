@@ -47,8 +47,8 @@ export function makeCamera(o: Opts) {
   flash.style.cssText = 'position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:6';
   // the photo just kept, small, top left for a moment
   const toast = document.createElement('div'); toast.dataset.vxHud = 'photo-toast';
-  toast.style.cssText = `position:absolute;left:16px;top:16px;width:clamp(120px,15vw,184px);padding:5px 5px 7px;background:rgba(8,8,10,.72);border:1px solid rgba(255,255,255,.28);border-radius:8px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#fff;font:700 9.5px/1.2 ${UI};letter-spacing:.2em;pointer-events:none;z-index:5;opacity:0;transform:translateY(-6px);transition:opacity .25s ease,transform .25s ease;box-shadow:0 10px 30px rgba(0,0,0,.45)`;
-  toast.innerHTML = '<img alt="" style="display:block;width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:4px;background:#000"><div style="margin-top:7px;display:flex;justify-content:space-between;gap:6px;white-space:nowrap"><span>PHOTO SAVED</span><span style="opacity:.6">L GALLERY</span></div>';
+  toast.style.cssText = `position:absolute;left:16px;top:16px;width:clamp(120px,15vw,184px);padding:5px 5px 7px;background:rgba(8,8,10,.72);border:1px solid rgba(255,255,255,.28);border-radius:8px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#fff;font:700 9.5px/1.2 ${UI};letter-spacing:.2em;pointer-events:none;z-index:3;opacity:0;transform:translateY(-6px);transition:opacity .25s ease,transform .25s ease;box-shadow:0 10px 30px rgba(0,0,0,.45);box-sizing:border-box;overflow:hidden`;
+  toast.innerHTML = '<img alt="" style="display:block;width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:4px;background:#000"><div style="margin-top:7px;display:flex;justify-content:space-between;gap:6px;white-space:nowrap"><span style="overflow:hidden;text-overflow:ellipsis">PHOTO SAVED</span><span style="opacity:.6;flex:none">L GALLERY</span></div>';
   // photo mode's one line (faded after a moment)
   const hint = document.createElement('div'); hint.dataset.vxHud = 'photo-mode';
   hint.style.cssText = `position:absolute;left:50%;top:14px;transform:translateX(-50%);display:none;align-items:center;gap:7px;padding:7px 12px;background:rgba(8,8,10,.55);border:1px solid rgba(255,255,255,.2);border-radius:9px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#fff;font:700 10.5px/1 ${UI};letter-spacing:.18em;white-space:nowrap;pointer-events:none;z-index:5;transition:opacity .6s ease;max-width:calc(100% - 24px);overflow:hidden`;
@@ -56,7 +56,7 @@ export function makeCamera(o: Opts) {
   host.append(flash, toast, hint);
   const showToast = (b: Blob, sub?: string) => {
     const im = toast.querySelector('img')!, u = URL.createObjectURL(b); im.onload = () => URL.revokeObjectURL(u); im.src = u;
-    (toast.querySelector('span') as HTMLElement).textContent = sub ? 'SAVED · ' + sub.replace(/^IN /, '') : 'PHOTO SAVED';
+    (toast.querySelector('span') as HTMLElement).textContent = sub ? 'SAVED · ' + sub.replace(/^IN /, '').split(' · ')[0] : 'PHOTO SAVED';   // the reason is in the note line
     toast.style.opacity = '1'; toast.style.transform = 'none'; clearTimeout(toastT);
     toastT = window.setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateY(-6px)'; }, 2600);
   };
