@@ -28,7 +28,8 @@ SRC = argv[0] if argv else 'vx/game/anims/ual.glb'
 OUT = argv[1] if len(argv) > 1 else 'vx/game/models/writer.glb'
 RENDER = argv[2] if len(argv) > 2 else ''   # a folder: also render turnarounds, close-ups and clip poses there
 TAG = argv[3] if len(argv) > 3 else 'p'     # the pictures' prefix (p1, p2 ...)
-K = 2.9                                     # metres per skeleton unit: the hood's top comes to about 1.8 m
+SHOTS = [x for x in os.environ.get('WRITER_SHOTS', '').split(',') if x]   # only the pictures whose names start so
+K = 2.6                                     # metres per skeleton unit (pass 2: with the longer legs the hood's top comes to about 1.8 m)
 
 # ───────────────────────────── the skeleton and its clips ─────────────────────────────
 G2B = np.array([[1, 0, 0], [0, 0, -1], [0, 1, 0]], float)   # glTF (x right, y up, z front) to Blender (z up, facing -y)
@@ -69,7 +70,7 @@ TIDIED = set()
 for b in BONES:
     if b.startswith('Left'):
         r = 'Right' + b[4:]; mean = (REST[b] + REST[r] * FLIP) / 2
-        if b == 'LeftUpLeg': mean[0] = 0.105
+        if b == 'LeftUpLeg': mean[0] = 0.092
         REST[b] = mean; REST[r] = mean * FLIP; TIDIED |= {b, r}
 
 def quat_mat(q):
@@ -82,14 +83,16 @@ def sample(track, t):
         if a.dot(b) < 0: b = -b
         q = a * (1 - f) + b * f; return q / np.linalg.norm(q)
     return a * (1 - f) + b * f
-def pose(clip, t):
+FPOSE = {}   # finger turns for pictures (set once the hands exist)
+def pose(clip, t, rest=None):
     """Where every joint is at time t of a clip: {bone: (rotation 3x3, position)} in Blender axes, metres. As the game
-    plays them: the hips keep their height track but stay over the same spot."""
-    out = {}
+    plays them: the hips keep their height track but stay over the same spot. rest: joint offsets (default REST)."""
+    out = {}; REST_ = rest or REST
     for b in BONES:
         Rp, pp = out[PARENT[b]] if PARENT[b] else (np.eye(3), np.zeros(3))
         R = Rp @ (G2B @ quat_mat(sample(clip[(b, 'rotation')], t)) @ G2B.T) if (b, 'rotation') in clip else Rp
-        off = REST[b]
+        if b in FPOSE: R = R @ FPOSE[b]
+        off = REST_[b]
         if b == 'Hips' and (b, 'translation') in clip: off = np.array([off[0], off[1], sample(clip[(b, 'translation')], t)[1] * K])
         out[b] = (R, pp + Rp @ off)
     return out
@@ -102,6 +105,26 @@ def rot_to(a, b):
     k = v / s; Kx = np.array([[0, -k[2], k[1]], [k[2], 0, -k[0]], [-k[1], k[0], 0]])
     return np.eye(3) + Kx * s + Kx @ Kx * (1 - c)
 def rot_z(a): c, s = math.cos(a), math.sin(a); return np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
+# PROPORTIONS (pass 2, owner: "the character still needs a lot of work"): the library's figure is squat, hip joints at
+# 40% of standing height and hands that end at the hips. A lean young writer: legs half as long again and longer arms.
+# The clips only turn bones, so they play on the longer limbs as they are; only the hips' height track has to change,
+# so for every key of it the standing foot (the lower ankle) stays where the clip had it (HIPSY, sent to the game).
+LEG_S, UPARM_S, FOREARM_S = 1.5, 1.45, 1.3
+REST0 = {b: v.copy() for b, v in REST.items()}
+for _s in ('Left', 'Right'):
+    REST[_s + 'Leg'] = REST[_s + 'Leg'] * LEG_S; REST[_s + 'Foot'] = REST[_s + 'Foot'] * LEG_S
+    REST[_s + 'ForeArm'] = REST[_s + 'ForeArm'] * UPARM_S; REST[_s + 'Hand'] = REST[_s + 'Hand'] * FOREARM_S
+HIPSY = {}
+def _lift(clip, t):
+    a, b = pose(clip, t, REST0), pose(clip, t, REST)
+    side = min(('Left', 'Right'), key=lambda s_: a[s_ + 'Foot'][1][2])
+    return a[side + 'Foot'][1][2] - b[side + 'Foot'][1][2]
+for _name, _clip in CLIPS.items():
+    if ('Hips', 'translation') not in _clip: continue
+    ts, vals = _clip[('Hips', 'translation')]; vals = vals.copy()
+    for i, t in enumerate(ts): vals[i, 1] += _lift(_clip, min(t, ts[-1] - 1e-4)) / K
+    _clip[('Hips', 'translation')] = (ts, vals); HIPSY[_name] = [round(float(v), 5) for v in vals[:, 1]]
+HIPS_LIFT = _lift({k: v for k, v in CLIPS['Idle_Loop'].items() if k != ('Hips', 'translation')}, 0.0)   # for clips with no height track
 IDLE = pose(CLIPS['Idle_Loop'], 0.0)
 AIM = {  # where each left limb bone points in the bind pose (x out to the left, -y forward, z up)
     'LeftArm': (math.sin(math.radians(24)), -0.04, -math.cos(math.radians(24))),
@@ -139,6 +162,7 @@ J = {b: BIND[b][1] for b in BONES}                           # the joints the mo
 CX = J['Hips'][0]                                            # the figure's centre line
 print('WRITER joints (m):', {b: [round(float(v), 3) for v in J[b]] for b in ('Hips', 'Spine', 'Spine1', 'Spine2', 'Head', 'LeftArm', 'LeftForeArm', 'LeftHand', 'LeftUpLeg', 'LeftLeg', 'LeftFoot', 'LeftToeBase')})
 
+
 # ───────────────────────────── small tools ─────────────────────────────
 def sstep(a, b, x): t = np.clip((np.asarray(x, float) - a) / (b - a), 0, 1); return t * t * (3 - 2 * t)
 def bump(c, w, x): return np.exp(-((np.asarray(x, float) - c) / w) ** 2)
@@ -154,7 +178,7 @@ def curve(xs, ys):
         y = (2 * t ** 3 - 3 * t ** 2 + 1) * ys[i] + (t ** 3 - 2 * t ** 2 + t) * h * m[i] + (-2 * t ** 3 + 3 * t ** 2) * ys[i + 1] + (t ** 3 - t ** 2) * h * m[i + 1]
         return y[..., 0] if one else y
     return f
-FOLD = 1.5   # how deep the cloth's folds are cut: they must still read from the game camera, three metres back
+FOLD = 0.9   # how deep the cloth's folds are cut into the mesh (pass 2: the sharp creases are in the normal map now)
 def crease(x): return 1 - 2 * np.abs(np.sin(np.asarray(x) / 2)) ** 0.75   # a fold's profile: a sharp ridge, a round valley; -1..1
 def unit(v): v = np.asarray(v, float); return v / np.maximum(1e-12, np.linalg.norm(v, axis=-1, keepdims=True))
 def sup(c, n): return np.sign(c) * np.abs(c) ** (2.0 / n)   # a superellipse: n = 2 round, higher squarer
@@ -175,6 +199,40 @@ def weights(**kw):
     n = len(np.atleast_1d(next(iter(kw.values())))); W = np.zeros((n, NB))
     for b, w in kw.items(): W[:, BI[b]] += np.clip(np.asarray(w, float), 0, None)
     return W / np.maximum(1e-9, W.sum(1, keepdims=True))
+
+# ───────────────────────────── finger bones (pass 2) ─────────────────────────────
+# The library has no fingers, so the hands get their own bones: three a finger, three for the thumb. The game adds them
+# under each hand (vx.extra) and turns them itself: relaxed, closed round the can, the index finger on the actuator.
+# They rest in the hand's own frame (built straight), so turning them is all the pose there is.
+HF = unit(J['LeftHand'] - J['LeftForeArm'])                    # along the fingers
+hn = np.array([-1.0, 0, 0]); HN = unit(hn - HF * hn.dot(HF))   # out of the palm: toward the thigh
+HT = np.cross(HF, HN); HT = HT if HT[1] < 0 else -HT           # the thumb's side: forward
+def hand_pt(f, n, t): return J['LeftHand'] + np.outer(f, HF) + np.outer(n, HN) + np.outer(t, HT)
+def rotm(axis, ang):
+    k = unit(np.asarray(axis, float)); Kx = np.array([[0, -k[2], k[1]], [k[2], 0, -k[0]], [-k[1], k[0], 0]])
+    return np.eye(3) + math.sin(ang) * Kx + (1 - math.cos(ang)) * Kx @ Kx
+# name, knuckle (along the hand, across), phalanx lengths, half width, splay (degrees toward the thumb)
+FINGERS = [('Index', 0.093, 0.0245, (0.043, 0.025, 0.021), 0.0104, 2.0), ('Middle', 0.097, 0.0075, (0.047, 0.029, 0.022), 0.0108, 0.0),
+           ('Ring', 0.093, -0.0095, (0.044, 0.027, 0.021), 0.0102, -2.0), ('Pinky', 0.084, -0.0255, (0.035, 0.021, 0.019), 0.0092, -5.0)]
+CHAINS = {}   # name: dict(bones, joints [3 joints + tip], dir, axis (flexion), width, pad (palm side))
+for nm, f0, t0, lens, wd, spl in FINGERS:
+    d = unit(math.cos(math.radians(spl)) * HF + math.sin(math.radians(spl)) * HT); j1 = hand_pt(np.array([f0]), np.array([0.0]), np.array([t0]))[0]
+    js = [j1]; [js.append(js[-1] + d * L) for L in lens]
+    pad = unit(HN - d * HN.dot(d))
+    CHAINS[nm] = dict(bones=['LeftHand' + nm + str(i) for i in (1, 2, 3)], joints=js, dir=d, axis=unit(np.cross(d, pad)), width=wd, pad=pad, lens=lens)
+_cmc = hand_pt(np.array([0.012]), np.array([0.011]), np.array([0.019]))[0]; _mcp = hand_pt(np.array([0.05]), np.array([0.021]), np.array([0.042]))[0]
+_d2 = unit(0.8 * unit(_mcp - _cmc) + 0.3 * HF); _pad = unit(0.55 * HN - 0.83 * HT); _pad = unit(_pad - _d2 * _pad.dot(_d2))
+CHAINS['Thumb'] = dict(bones=['LeftHandThumb1', 'LeftHandThumb2', 'LeftHandThumb3'], joints=[_cmc, _mcp, _mcp + _d2 * 0.033, _mcp + _d2 * 0.061], dir=_d2, axis=unit(np.cross(_d2, _pad)), width=0.0118, pad=_pad, lens=(float(np.linalg.norm(_mcp - _cmc)), 0.033, 0.028))
+EXTRA = []
+for side in ('Left', 'Right'):
+    for nm, ch in CHAINS.items():
+        par = side + 'Hand'
+        for i, b in enumerate(ch['bones']):
+            bb = side + b[4:]; jp = ch['joints'][i] if side == 'Left' else np.array([2 * CX - ch['joints'][i][0], ch['joints'][i][1], ch['joints'][i][2]])
+            BONES.append(bb); PARENT[bb] = par; FULL[bb] = 'mixamorig:' + bb
+            BIND[bb] = (BIND[side + 'Hand'][0], jp); J[bb] = jp; REST[bb] = BIND[par][0].T @ (jp - BIND[par][1]); EXTRA.append(bb); par = bb
+BI = {b: i for i, b in enumerate(BONES)}; NB = len(BONES)
+MIR = np.array([BI[b.replace('Left', '@').replace('Right', 'Left').replace('@', 'Right')] for b in BONES])
 
 # ───────────────────────────── meshes: grids of points, collected per exported object ─────────────────────────────
 MESHES = {}; PIECES = []
@@ -240,11 +298,11 @@ def spine_w(X):
     sh = 0.75 * sstep(0.07, 0.2, dx) * sstep(zS - 0.12, zS + 0.0, z)
     left = X[:, 0] > CX
     return weights(Hips=1 - a, Spine=a * (1 - b), Spine1=b * (1 - c), Spine2=c * (1 - sh), LeftShoulder=c * sh * left, RightShoulder=c * sh * ~left)
-HEM = zP - 0.045   # the jacket's hem: a waist-length blouson, short enough that a lifted thigh clears it
+HEM = zP - 0.02    # the jacket's hem: a waist-length shell, short enough that a lifted thigh clears it
 TZ = [HEM, HEM + 0.05, HEM + 0.11, zP + 0.26, zS - 0.13, zS - 0.02, zS + 0.05, zS + 0.095, zN + 0.0]
-t_a = curve(TZ, [0.2, 0.202, 0.218, 0.216, 0.222, 0.224, 0.212, 0.16, 0.1])     # half width
-t_f = curve(TZ, [0.125, 0.127, 0.142, 0.138, 0.146, 0.138, 0.118, 0.098, 0.085])     # depth to the front
-t_b = curve(TZ, [0.112, 0.114, 0.128, 0.124, 0.134, 0.13, 0.12, 0.106, 0.095])     # depth to the back
+t_a = curve(TZ, [0.166, 0.167, 0.172, 0.166, 0.176, 0.18, 0.168, 0.124, 0.084])     # half width (pass 2: lean, not puffy)
+t_f = curve(TZ, [0.104, 0.105, 0.11, 0.106, 0.116, 0.11, 0.097, 0.082, 0.071])     # depth to the front
+t_b = curve(TZ, [0.096, 0.098, 0.104, 0.102, 0.11, 0.108, 0.102, 0.09, 0.08])     # depth to the back
 t_y = curve(TZ, [J['Hips'][1] - 0.005, J['Hips'][1] - 0.005, J['Hips'][1] - 0.01, J['Spine1'][1], J['Spine2'][1] + 0.02, J['Spine2'][1] + 0.035, J['LeftArm'][1] - 0.02, J['Head'][1] - 0.02, J['Head'][1] - 0.012])
 t_n = curve(TZ, [2.6, 2.6, 2.7, 2.7, 2.6, 2.4, 2.2, 2.1, 2.0])
 def torso_surface(z, th):
@@ -282,7 +340,7 @@ def limb_path(names, lead=0.12):
 arm_path, arm_d = limb_path(['LeftArm', 'LeftForeArm', 'LeftHand']); sE, sW = arm_d[1], arm_d[2]
 NS = 28; th_s = np.arange(NS) / NS * 2 * math.pi
 s_s = np.concatenate([np.linspace(-0.1, 0.0, 6)[:-1], np.linspace(0.0, sW - 0.075, 38)[:-1], np.linspace(sW - 0.075, sW - 0.01, 7)])
-r_sleeve = curve([-0.1, -0.07, -0.02, 0.06, sE - 0.03, sE + 0.06, sW - 0.1, sW - 0.075, sW - 0.055, sW - 0.01], [0.012, 0.055, 0.08, 0.081, 0.07, 0.067, 0.064, 0.06, 0.049, 0.047])
+r_sleeve = curve([-0.1, -0.07, -0.02, 0.06, sE - 0.03, sE + 0.06, sW - 0.1, sW - 0.075, sW - 0.055, sW - 0.01], [0.012, 0.05, 0.064, 0.062, 0.056, 0.054, 0.05, 0.047, 0.041, 0.039])
 Ps, Cs, Ts, EFs, EOs = tube(arm_path, s_s, r_sleeve(s_s) * 0.95, r_sleeve(s_s), th_s)
 def sleeve_folds(P):
     n = grid_normals(P, True); s = np.broadcast_to(s_s[:, None], P.shape[:2]); th = np.broadcast_to(th_s[None], P.shape[:2])
@@ -305,14 +363,14 @@ def sleeve_w(P):
     return weights(LeftShoulder=(1 - arm) * 0.6, Spine2=(1 - arm) * 0.4, LeftArm=arm * (1 - fore), LeftForeArm=arm * fore)
 grid(body, Ps, 'Hoodie', sleeve_w(Ps), mirror=True, cap0=True, name='sleeve')
 # the cuff: an elastic band with its own thickness, turned in at the end
-s_c = np.array([sW - 0.065, sW - 0.058, sW - 0.03, sW - 0.006, sW - 0.002, sW - 0.006]); r_c = np.array([0.047, 0.054, 0.054, 0.053, 0.048, 0.04])
+s_c = np.array([sW - 0.065, sW - 0.058, sW - 0.03, sW - 0.006, sW - 0.002, sW - 0.006]); r_c = np.array([0.039, 0.045, 0.045, 0.044, 0.04, 0.033])
 Pc = tube(arm_path, s_c, r_c * 0.95, r_c, th_s)[0]
 grid(body, Pc, 'Trim', weights(LeftForeArm=np.ones(Pc.shape[0] * Pc.shape[1])), mirror=True, name='cuff')
 
 # ───────────────────────────── trousers ─────────────────────────────
 # the seat: from the waistband (under the jacket) round the hips and closed between the legs
 SZ = [zH - 0.06, zH - 0.05, zH - 0.02, zH + 0.04, zP + 0.04, zP + 0.12]
-s_a = curve(SZ, [0.02, 0.06, 0.14, 0.186, 0.186, 0.175]); s_f = curve(SZ, [0.03, 0.06, 0.095, 0.105, 0.105, 0.1]); s_b = curve(SZ, [0.03, 0.07, 0.106, 0.11, 0.104, 0.098])
+s_a = curve(SZ, [0.02, 0.055, 0.128, 0.16, 0.162, 0.158]); s_f = curve(SZ, [0.03, 0.055, 0.084, 0.094, 0.096, 0.094]); s_b = curve(SZ, [0.03, 0.065, 0.096, 0.101, 0.098, 0.094])
 NP_ = 48; th_p = np.arange(NP_) / NP_ * 2 * math.pi; z_p = np.concatenate([np.linspace(SZ[0], SZ[2], 6)[:-1], np.linspace(SZ[2], SZ[5], 12)])
 cp = np.cos(th_p)[None]
 Pp = np.stack([CX + s_a(z_p)[:, None] * sup(np.sin(th_p), 2.3)[None], (J['Hips'][1] - 0.0) - np.where(cp > 0, s_f(z_p)[:, None], s_b(z_p)[:, None]) * sup(cp, 2.3), np.broadcast_to(z_p[:, None], (len(z_p), NP_))], -1)
@@ -323,7 +381,7 @@ leg_path, leg_d = limb_path(['LeftUpLeg', 'LeftLeg', 'LeftFoot']); sK, sA = leg_
 NL = 36; th_l = np.arange(NL) / NL * 2 * math.pi
 CUFF = sA - 0.075                                             # where the leg ends: just above the ankle, over the trainer's collar
 s_l = np.concatenate([np.linspace(-0.1, 0.02, 6)[:-1], np.linspace(0.02, CUFF - 0.02, 50)[:-1], np.linspace(CUFF - 0.02, CUFF + 0.045, 7)])
-r_leg = curve([-0.1, -0.07, 0.0, 0.1, sK - 0.06, sK + 0.04, sK + 0.1, CUFF - 0.06, CUFF - 0.02, CUFF, CUFF + 0.045], [0.02, 0.07, 0.09, 0.088, 0.074, 0.071, 0.068, 0.066, 0.063, 0.053, 0.051])
+r_leg = curve([-0.1, -0.07, 0.0, 0.1, sK - 0.06, sK + 0.04, sK + 0.1, CUFF - 0.06, CUFF - 0.02, CUFF, CUFF + 0.045], [0.02, 0.064, 0.077, 0.073, 0.06, 0.058, 0.056, 0.054, 0.052, 0.046, 0.044])
 Pl, Cl, Tl, EFl, EOl = tube(leg_path, s_l, r_leg(s_l), r_leg(s_l) * 0.97, th_l)
 def leg_folds(P):
     n = grid_normals(P, True); s = np.broadcast_to(s_l[:, None], P.shape[:2]); th = np.broadcast_to(th_l[None], P.shape[:2])
@@ -389,11 +447,12 @@ HY, HZ = J['Head'][1], zN                                    # the base of the n
 HU = [0.0, 0.15, 0.4, 0.65, 0.85, 1.0]
 # (owner, 16 Nov: the old hood closed round the face like Kenny's, under the chin and over the nose. A real hoodie:
 #  the opening runs from the brow down to the throat, leaning back at the bottom, and the hood falls to the shoulders)
-h_c = curve(HU, [(HY - 0.158, HZ + 0.128), (HY - 0.122, HZ + 0.14), (HY - 0.05, HZ + 0.168), (HY - 0.0, HZ + 0.118), (HY + 0.012, HZ + 0.04), (HY + 0.012, HZ - 0.07)])
+# (pass 2: the head is a real size on the longer body, so the hood is lower, slimmer and closer round it)
+h_c = curve(HU, [(HY - 0.138, HZ + 0.075), (HY - 0.106, HZ + 0.088), (HY - 0.044, HZ + 0.113), (HY - 0.002, HZ + 0.07), (HY + 0.012, HZ + 0.01), (HY + 0.014, HZ - 0.068)])
 h_ang = curve(HU, np.radians([-14, -4, 22, 62, 86, 90]))
-h_a = curve(HU, [0.088, 0.112, 0.13, 0.134, 0.132, 0.165])     # half width
-h_top = curve(HU, [0.108, 0.122, 0.13, 0.122, 0.112, 0.115])     # over the head, then down the back
-h_bot = curve(HU, [0.158, 0.15, 0.12, 0.066, 0.075, 0.09])     # down the throat (open), then round the neck
+h_a = curve(HU, [0.082, 0.103, 0.117, 0.12, 0.123, 0.152])     # half width
+h_top = curve(HU, [0.097, 0.108, 0.116, 0.111, 0.104, 0.108])     # over the head, then down the back
+h_bot = curve(HU, [0.138, 0.13, 0.104, 0.058, 0.068, 0.085])     # down the throat (open), then round the neck
 NH = 40; psi = np.arange(NH) / NH * 2 * math.pi; u_h = np.concatenate([np.linspace(0, 0.15, 5)[:-1], np.linspace(0.15, 1.0, 26)])
 def hood_ring(u):
     c = h_c(u); a = h_ang(u); cu = np.cos(psi); top = cu > 0
@@ -424,45 +483,179 @@ patch(hood, Ph, grid_normals(Ph, True), np.arange(3, 8), np.arange(NH + 1), 0.00
 def ellipsoid(c, r, nu=20, nv=12, v0=-1.0, v1=1.0, u0=0.0, u1=2 * math.pi):
     v = np.linspace(v0, v1, nv) * math.pi / 2; u = np.linspace(u0, u1, nu, endpoint=(u1 - u0) < 2 * math.pi - 1e-6)
     return np.array(c) + np.stack([r[0] * np.outer(np.cos(v), np.sin(u)), -r[1] * np.outer(np.cos(v), np.cos(u)), r[2] * np.outer(np.sin(v), np.ones(len(u)))], -1)
-SK = (CX, HY - 0.048, HZ + 0.172)                               # the middle of the skull
-Pv = ellipsoid(SK, (0.08, 0.097, 0.112), 24, 14, -0.97, 0.97)
+SK = (CX, HY - 0.042, HZ + 0.112)                               # the middle of the skull
+Pv = ellipsoid(SK, (0.075, 0.092, 0.104), 24, 14, -0.97, 0.97)
 grid(body, Pv, 'Void', one('Head', Pv), cap0=True, cap1=True, name='head')
-Pm = ellipsoid((SK[0], SK[1] - 0.004, SK[2] - 0.012), (0.086, 0.103, 0.11), 25, 10, -0.85, 0.12, -1.75, 1.75)
+Pm = ellipsoid((SK[0], SK[1] - 0.004, SK[2] - 0.012), (0.081, 0.098, 0.102), 25, 10, -0.85, 0.12, -1.75, 1.75)
 grid(body, Pm, 'Mask', one('Head', Pm), closed=False, name='mask')
-neck_pts = np.array([[CX, HY - 0.02, HZ - 0.06], [CX, HY - 0.03, HZ + 0.03], [CX, HY - 0.045, HZ + 0.09]])
-Pn = sweep(resample(neck_pts, 6), 0.062, 0.066, 20, (0, -1, 0)); zz = Pn[..., 2].ravel()
+neck_pts = np.array([[CX, HY - 0.02, HZ - 0.06], [CX, HY - 0.028, HZ + 0.0], [CX, HY - 0.04, HZ + 0.045]])
+Pn = sweep(resample(neck_pts, 6), 0.055, 0.058, 20, (0, -1, 0)); zz = Pn[..., 2].ravel()
 grid(body, Pn, 'Mask', weights(Head=sstep(HZ - 0.02, HZ + 0.05, zz), Spine2=1 - sstep(HZ - 0.02, HZ + 0.05, zz)), name='gaiter')
 # drawcords: out of the hood's edge, down the chest, with toggles
 strings = Mesh('SM_Char_Writer_String')
 for sgn in (1, -1):
-    top_ = np.array([CX + sgn * 0.05, HY - 0.185, HZ + 0.075]); pts = [top_, top_ + np.array([sgn * 0.004, -0.012, -0.05]), top_ + np.array([sgn * 0.012, -0.004, -0.12]), top_ + np.array([sgn * 0.016, 0.0, -0.2])]
+    top_ = np.array([CX + sgn * 0.046, HY - 0.162, HZ + 0.03]); pts = [top_, top_ + np.array([sgn * 0.004, -0.012, -0.05]), top_ + np.array([sgn * 0.012, -0.004, -0.12]), top_ + np.array([sgn * 0.016, 0.0, -0.2])]
     Pd = sweep(resample(pts, 10), 0.0035, 0.0035, 6, (1, 0, 0)); grid(strings, Pd, 'Detail', spine_w(Pd.reshape(-1, 3)), cap1=True, name='cord')
     Pd = sweep(resample([pts[3] + np.array([0, 0, 0.012]), pts[3] + np.array([0, 0, -0.018])], 3), 0.007, 0.007, 8, (1, 0, 0)); grid(strings, Pd, 'Detail', spine_w(Pd.reshape(-1, 3)), cap0=True, cap1=True, name='toggle')
 
-# ───────────────────────────── gloved hands: fingers curled round a can ─────────────────────────────
-HF = unit(J['LeftHand'] - J['LeftForeArm'])                    # along the fingers
-hn = np.array([-1.0, 0, 0]); HN = unit(hn - HF * hn.dot(HF))   # out of the palm: toward the thigh
-HT = np.cross(HF, HN); HT = HT if HT[1] < 0 else -HT           # the thumb's side: forward
-def hand_pt(f, n, t): return J['LeftHand'] + np.outer(f, HF) + np.outer(n, HN) + np.outer(t, HT)
-fq = np.array([-0.055, -0.03, 0.0, 0.018, 0.04, 0.062, 0.08, 0.09, 0.094])
-Pg = sweep(hand_pt(fq, 0.01 * sstep(0.02, 0.1, fq), 0 * fq), [0.03, 0.03, 0.029, 0.034, 0.04, 0.043, 0.043, 0.038, 0.025], [0.027, 0.027, 0.023, 0.021, 0.02, 0.019, 0.018, 0.014, 0.008], 20, HN, 2.6)
-grid(body, Pg, 'Gloves', weights(LeftHand=sstep(-0.035, 0.0, np.repeat(fq, 20)), LeftForeArm=1 - sstep(-0.035, 0.0, np.repeat(fq, 20))), mirror=True, cap1=True, name='palm')
-FINGERS = [(0.0315, (0.04, 0.026, 0.022), (22, 38, 24), 0.0098, 0.1), (0.0105, (0.044, 0.029, 0.023), (28, 44, 28), 0.0102, 0.03), (-0.0105, (0.041, 0.027, 0.022), (34, 48, 30), 0.0098, -0.04), (-0.0305, (0.032, 0.02, 0.019), (40, 50, 32), 0.0088, -0.12)]
-for ti, lens, flex, rad, splay in FINGERS:
-    f, n, a = 0.086 - abs(ti) * 0.14, 0.008, 0.0; pts = [(f - 0.014, n - 0.002)]
-    for L, fx in zip(lens, flex):
-        a += math.radians(fx); pts.append((f, n)); f += L * math.cos(a); n += L * math.sin(a)
-    pts.append((f, n)); pts = np.array(pts); line = resample(hand_pt(pts[:, 0], pts[:, 1], ti + splay * (pts[:, 0] - 0.08)), 11)
-    Pf = sweep(line, rad * np.array([1, 1.04, 1, 1, 1.04, 0.97, 0.95, 0.99, 0.93, 0.85, 0.55]), rad * np.array([1, 1, 0.97, 0.95, 0.98, 0.92, 0.9, 0.93, 0.88, 0.8, 0.5]), 8, HT)
-    grid(body, Pf, 'Gloves', one('LeftHand', Pf), mirror=True, cap1=True, name='finger')
-tp = hand_pt(np.array([0.012, 0.036, 0.062, 0.084, 0.098]), np.array([0.006, 0.02, 0.038, 0.058, 0.074]), np.array([0.026, 0.047, 0.056, 0.054, 0.046]))
-Pth = sweep(resample(tp, 10), 0.0118 * np.array([1.3, 1.2, 1.08, 1, 1.03, 0.97, 0.95, 0.9, 0.82, 0.55]), 0.0118 * np.array([1.25, 1.12, 1, 0.97, 1, 0.93, 0.9, 0.86, 0.78, 0.5]), 8, HF)
-grid(body, Pth, 'Gloves', one('LeftHand', Pth), mirror=True, cap1=True, name='thumb')
-# a padded panel on the back of the hand and a strap round the wrist
-patch(body, Pg, grid_normals(Pg, True), np.arange(4, 8), np.arange(6, 15), 0.004, 'Detail', weights(LeftHand=sstep(-0.035, 0.0, np.repeat(fq, 20)), LeftForeArm=1 - sstep(-0.035, 0.0, np.repeat(fq, 20))), 'knuckle', mirror=True)
-ws = lambda r: sweep(hand_pt(np.array([-0.014, 0.004]), np.zeros(2), np.zeros(2)), 0.03 * r, 0.024 * r, 20, HN, 2.6)
-Pws = np.concatenate([ws(0.95)[:1], ws(1.13), ws(0.95)[1:]]); grid(body, Pws, 'Detail', one('LeftHand', Pws), mirror=True, name='wrist-strap')
-GRIP = dict(at=hand_pt(np.array([0.066]), np.array([0.058]), np.array([0.0]))[0], axis=HT, nozzle=HF)   # where a can sits in the right hand's twin
+# ── the spray can: one shape for the cans on the pack, the can in the hand and the grip the fingers close round.
+# A 400 ml can: 66 mm across, a rolled base, the body, a domed shoulder, the valve cup and the actuator on top. Measured
+# along its axis from the grip socket (the middle of the fist), so the body runs below the socket and the top above.
+CAN_R, CAN_B0, CAN_B1 = 0.033, -0.142, 0.018           # radius; where the body starts and ends on the axis (m)
+CAN_DOME, CAN_ACT_R, CAN_TOP = 0.040, 0.0115, 0.062     # the shoulder's top; the actuator's radius; its top
+CAN_NOZ_Y = 0.054                                        # the nozzle's height on the actuator
+def can_radius(y):
+    """The can's radius at a height on its axis (0 outside it)."""
+    y = np.asarray(y, float); r = np.zeros_like(y)
+    body = (y >= CAN_B0) & (y <= CAN_B1); r[body] = CAN_R * (0.88 + 0.12 * sstep(CAN_B0, CAN_B0 + 0.006, y[body]))
+    dome = (y > CAN_B1) & (y <= CAN_DOME); r[dome] = 0.0135 + (CAN_R - 0.0135) * np.sqrt(np.clip(1 - ((y[dome] - CAN_B1) / (CAN_DOME - CAN_B1)) ** 2, 0, 1))
+    act = (y > CAN_DOME) & (y <= CAN_TOP); r[act] = CAN_ACT_R
+    return r
+def can_mesh(mesh, at, ax, side, W, name='can'):
+    """A can on a mesh: its socket at `at`, its axis `ax`, `side` any direction across it; W: one weight row for all."""
+    ax = unit(np.asarray(ax, float)); hs = np.array([CAN_B0, CAN_B0 + 0.002, CAN_B0 + 0.006, CAN_B0 + 0.012, CAN_B1 - 0.004, CAN_B1, CAN_B1 + 0.008, CAN_B1 + 0.015, CAN_DOME - 0.003, CAN_DOME])
+    rs_ = can_radius(hs); rs_[0] = 0.026; rs_[-1] = 0.0135
+    P = sweep(np.asarray(at, float) + np.outer(hs, ax), rs_, rs_, 24, side); grid(mesh, P, 'Can', W.repeat(P.shape[0] * 24, 0), cap0=True, cap1=True, name=name)
+    ha = np.array([CAN_DOME - 0.001, CAN_DOME + 0.001, CAN_TOP - 0.002, CAN_TOP]); ra = np.array([0.0125, CAN_ACT_R, CAN_ACT_R, CAN_ACT_R - 0.002])
+    Pa = sweep(np.asarray(at, float) + np.outer(ha, ax), ra, ra, 16, side); grid(mesh, Pa, 'Cap', W.repeat(Pa.shape[0] * 16, 0), cap0=True, cap1=True, name='cap')
+
+# ───────────────────────────── gloved hands (pass 2): a palm, knuckles, jointed fingers ─────────────────────────────
+# Work gloves on a real hand: a palm that is wider than it is thick, padded at the heel and the thumb, knuckles that
+# stand up on the back; fingers of three phalanges that swell at the joints, flatten into pads and end in round tips.
+# Each finger rides its own bones, so it bends at its knuckles instead of curling like a noodle.
+NPM = 28; ph_p = np.arange(NPM) / NPM * 2 * math.pi
+f_p = np.concatenate([np.linspace(-0.035, 0.0, 5)[:-1], np.linspace(0.0, 0.088, 16)[:-1], np.linspace(0.088, 0.104, 5)])
+PK = [-0.035, -0.015, 0.0, 0.03, 0.06, 0.085, 0.095, 0.104]
+pw_ = curve(PK, [0.029, 0.03, 0.033, 0.039, 0.0425, 0.043, 0.04, 0.028]); pct_ = curve(PK, [0, 0, 0.001, 0.002, 0.001, -0.0005, -0.001, -0.001])
+phb = curve(PK, [0.018, 0.017, 0.0155, 0.0135, 0.012, 0.012, 0.011, 0.007]); php = curve(PK, [0.018, 0.0175, 0.017, 0.016, 0.0142, 0.0128, 0.011, 0.006])
+cph, sph = np.cos(ph_p)[None], np.sin(ph_p)[None]; FF = f_p[:, None]
+TT = pct_(f_p)[:, None] + pw_(f_p)[:, None] * sup(cph, 2.6); NN = np.where(sph > 0, php(f_p)[:, None], phb(f_p)[:, None]) * sup(sph, 2.6)
+NN = NN + (sph > 0) * (0.0065 * bump(FF, 0.022, 0.02) * sstep(0.004, 0.03, TT) + 0.0035 * bump(FF, 0.045, 0.022) * sstep(-0.012, -0.03, TT)) * np.clip(sph, 0, 1) ** 0.5   # thenar and heel pads
+for nm, f0, t0, lens, wd, spl in FINGERS: NN = NN - (sph < 0) * 0.0035 * bump(FF, f0 - 0.004, 0.009) * bump(TT, t0, 0.0075)                      # knuckles
+Pg = J['LeftHand'] + FF[..., None] * HF + NN[..., None] * HN + TT[..., None] * HT
+def palm_w(P):
+    q = P - J['LeftHand']; f = (q @ HF).ravel(); t = (q @ HT).ravel(); kw = {'LeftForeArm': 1 - sstep(-0.03, -0.004, f)}
+    hand = sstep(-0.03, -0.004, f).copy(); thumb = 0.6 * bump(f, 0.02, 0.022) * sstep(0.004, 0.028, t) * hand; kw['LeftHandThumb1'] = thumb; hand = hand - thumb
+    for nm, f0, t0, lens, wd, spl in FINGERS:
+        k = 0.5 * sstep(f0 - 0.016, f0 + 0.002, f) * bump(t, t0, 0.009) * hand; kw['LeftHand' + nm + '1'] = k; hand = hand - k
+    kw['LeftHand'] = hand; return weights(**kw)
+Wpalm = palm_w(Pg)
+grid(body, Pg, 'Gloves', Wpalm, mirror=True, cap1=True, name='palm')
+NFG = 14; ph_f = np.arange(NFG) / NFG * 2 * math.pi
+def finger_tube(ch, start):
+    """A gloved finger along its (straight) chain: rings from inside the palm to a round tip."""
+    js = ch['joints']; d = ch['dir']; padn = ch['pad']; side_ = unit(np.cross(d, padn)); L = sum(ch['lens']); wd = ch['width']; sj = np.cumsum([0] + list(ch['lens']))
+    s_ = np.concatenate([np.linspace(start, 0.0, 3)[:-1], np.linspace(0.0, L - wd, 20)[:-1], L - wd + wd * np.sin(np.linspace(0, 1, 7) * math.pi / 2)])
+    w = wd * (1.0 + 0.06 * (bump(s_, sj[1], 0.005) + bump(s_, sj[2], 0.004)) - 0.035 * (bump(s_, (sj[0] + sj[1]) / 2, 0.01) + bump(s_, (sj[1] + sj[2]) / 2, 0.007)) + 0.04 * (s_ < 0))
+    w = w * (1 - 0.12 * s_ / L)
+    if ch is CHAINS['Thumb']: w = w * (1 + 0.45 * (1 - sstep(0.0, sj[1] + 0.004, s_)))   # the thumb's root is the ball of the thumb
+    rnd = np.sqrt(np.clip(1 - ((s_ - (L - wd)) / wd) ** 2, 0.0, 1)) ; w = np.where(s_ > L - wd, w * np.maximum(rnd, 0.08), w)
+    c, sn = np.cos(ph_f)[None], np.sin(ph_f)[None]
+    h = np.where(sn > 0, 0.9, 0.84) * w[:, None] + (sn > 0) * 0.0012 * (bump(s_, (sj[0] + sj[1]) / 2, 0.009) + bump(s_, (sj[1] + sj[2]) / 2, 0.006) + bump(s_, L - 0.009, 0.005))[:, None]
+    h = h + (sn < 0) * 0.0011 * (bump(s_, sj[1], 0.004) + bump(s_, sj[2], 0.0035))[:, None]                                          # the joints stand up behind
+    P = js[0] + s_[:, None, None] * d + (w[:, None] * sup(c, 2.3))[..., None] * side_ + (h * sup(sn, 2.3))[..., None] * padn
+    sr = np.repeat(s_, NFG); b1, b2, b3 = ch['bones']
+    k2 = sstep(sj[1] - 0.005, sj[1] + 0.005, sr); k3 = sstep(sj[2] - 0.004, sj[2] + 0.004, sr); hb = 1 - sstep(-0.008, 0.006, sr)
+    W = weights(**{'LeftHand': hb, b1: (1 - hb) * (1 - k2), b2: (1 - hb) * k2 * (1 - k3), b3: (1 - hb) * k3})
+    return P, W
+for nm, ch in CHAINS.items():
+    P_, W_ = finger_tube(ch, -0.014 if nm != 'Thumb' else 0.0)
+    grid(body, P_, 'Gloves', W_, mirror=True, cap1=True, name='finger' if nm != 'Thumb' else 'thumb')
+# a padded panel over the knuckles, and a strap round the wrist
+cols = [j for j in range(NPM) if math.sin(ph_p[j]) < -0.45]; patch(body, Pg, grid_normals(Pg, True), np.where((f_p > 0.05) & (f_p < 0.09))[0], np.array(cols), 0.0028, 'Detail', Wpalm, 'knuckle', mirror=True)
+ws = lambda r: sweep(hand_pt(np.array([-0.016, 0.002]), np.zeros(2), np.zeros(2)), 0.0315 * r, 0.0215 * r, 20, HN, 2.6)
+Pws = np.concatenate([ws(0.95)[:1], ws(1.12), ws(0.95)[1:]]); grid(body, Pws, 'Detail', one('LeftHand', Pws), mirror=True, name='wrist-strap')
+
+# ── the grip: a can in the fist. The socket (the middle of the fist) lies across the palm under the first phalanges,
+# its axis toward the thumb; each finger closes round it, joint by joint, until it meets the can; the thumb wraps the
+# other way; for spraying the index finger rises onto the actuator. Solved here in the hand's own frame, sent as turns.
+# (a spray grip, not a baton: the actuator comes level with the index finger, the middle finger sits round the shoulder,
+#  ring and little finger round the body, and most of the can hangs below the fist)
+CAN_C = hand_pt(np.array([0.066]), np.array([0.0165 + CAN_R - 0.0015]), np.array([-0.034]))[0]; CAN_U = HT
+def can_pen(P, r):
+    """How deep points P (n, 3) with radius r go into the can at the left hand's socket (negative: clear)."""
+    q = P - CAN_C; y = q @ CAN_U; rho = np.linalg.norm(q - np.outer(y, CAN_U), axis=1); rad = can_radius(y)
+    return np.where(rad > 0, rad + r - rho, -1.0)
+def fk(ch, Ms):
+    js = ch['joints']; out = [js[0]]; Q = np.eye(3)
+    for k in range(3): Q = Q @ Ms[k]; out.append(out[-1] + Q @ (js[k + 1] - js[k]))
+    return out
+def seg_pts(pts, k, n=7): return pts[k] + np.outer(np.linspace(0.15 if k == 0 else 0.0, 1.0, n), pts[k + 1] - pts[k])
+def wrap(ch, lim=(95, 105, 80), clear=0.0008):
+    th = [0.0, 0.0, 0.0]; r = ch['width'] * 0.88
+    for k in range(3):
+        best = 0.0
+        for ang in np.arange(0.0, lim[k] + 0.01, 0.5):
+            th[k] = math.radians(ang); pts = fk(ch, [rotm(ch['axis'], a) for a in th])
+            if max(can_pen(seg_pts(pts, j), r).max() for j in range(k, 3)) > -clear: break
+            best = th[k]
+        th[k] = best
+    return th
+def descend(cost, x, step=0.08, it=400):
+    x = np.array(x, float); c = cost(x)
+    while step > 1e-4 and it > 0:
+        moved = False
+        for i in range(len(x)):
+            for sg in (1, -1):
+                y = x.copy(); y[i] += sg * step; cy = cost(y); it -= 1
+                if cy < c: x, c, moved = y, cy, True
+        if not moved: step *= 0.5
+    return x, c
+GRIPS = {}
+for nm in ('Index', 'Middle', 'Ring', 'Pinky'):
+    ch = CHAINS[nm]; th = wrap(ch); GRIPS[nm] = [rotm(ch['axis'], a) for a in th]
+    print('WRITER grip', nm, [round(math.degrees(a)) for a in th])
+# the nozzle points away from where the index finger comes over the top (an actuator turns on its valve)
+_q = CAN_C - CHAINS['Index']['joints'][0]; CAN_NOZ = unit(_q - CAN_U * _q.dot(CAN_U))
+# the thumb: its metacarpal turned out of the palm along the near side of the can (and down to the body), twisted so it
+# bends toward the knuckles, then its two joints close round the can the other way from the fingers
+tch = CHAINS['Thumb']
+def thumb_grip(beta):
+    dm = unit(tch['joints'][1] - tch['joints'][0]); dm2 = unit(math.sin(beta) * HF + math.cos(beta) * HN - 0.5 * HT)
+    R1 = rot_to(dm, dm2); a1 = R1 @ tch['axis']; want = unit(np.cross(dm2, HF)); want = unit(want - dm2 * want.dot(dm2))
+    psi = math.atan2(np.dot(np.cross(a1, want), dm2), np.dot(a1, want)); return rotm(dm2, psi) @ R1
+best = None
+for beta in np.arange(-0.6, 0.9, 0.02):
+    M1 = thumb_grip(beta); pts = fk(tch, [M1, np.eye(3), np.eye(3)])
+    if max(can_pen(seg_pts(pts, k), 0.0112).max() for k in range(3)) > -0.0008: break
+    best = beta
+_tM1 = thumb_grip(best if best is not None else 0.0)
+_tch2 = dict(tch); _th = [0.0, 0.0]
+for k in (1, 2):
+    b_ = 0.0
+    for ang in np.arange(0.0, 95.01, 0.5):
+        _th[k - 1] = math.radians(ang); pts = fk(tch, [_tM1, rotm(tch['axis'], _th[0]), rotm(tch['axis'], _th[1])])
+        if max(can_pen(seg_pts(pts, j), 0.0112).max() for j in range(k, 3)) > -0.0008: break
+        b_ = _th[k - 1]
+    _th[k - 1] = b_
+GRIPS['Thumb'] = [_tM1, rotm(tch['axis'], _th[0]), rotm(tch['axis'], _th[1])]
+print('WRITER grip thumb beta %.2f, joints' % (best or 0), [round(math.degrees(a)) for a in _th])
+# the index finger on the actuator: its last pad on the top, just behind the nozzle
+ich = CHAINS['Index']; _top = CAN_C + CAN_U * (CAN_TOP + 0.0082) - CAN_NOZ * 0.003
+_IL = ((-0.8, 0.8), (-0.2, 1.6), (0.0, 1.8), (0.0, 1.3))
+def index_Ms(x): x = [min(hi, max(lo, v)) for v, (lo, hi) in zip(x, _IL)]; return [rotm(HN, x[0]) @ rotm(ich['axis'], x[1]), rotm(ich['axis'], x[2]), rotm(ich['axis'], x[3])]
+def index_cost(x):
+    pts = fk(ich, index_Ms(x)); pad = pts[2] + 0.55 * (pts[3] - pts[2]); pen = max(can_pen(seg_pts(pts, k), 0.0086).max() for k in range(3))
+    lim = sum(max(0, v - hi) + max(0, lo - v) for v, (lo, hi) in zip(x, _IL))
+    return np.sum((pad - _top) ** 2) + 40 * max(0.0, pen + 0.0006) ** 2 + 1e-2 * lim
+_ix, _ic = min((descend(index_cost, [a0_, b0_, 0.6, 0.3]) for a0_ in (-0.4, -0.2, 0.0, 0.2, 0.4) for b0_ in (0.1, 0.5, 0.9, 1.3)), key=lambda r: r[1]); PRESS = index_Ms(_ix)
+print('WRITER press index miss %.1f mm, angles' % (1000 * math.sqrt(max(0, _ic))), [round(math.degrees(v)) for v in _ix])
+RELAX = {'Index': (12, 18, 10), 'Middle': (16, 22, 12), 'Ring': (20, 28, 14), 'Pinky': (24, 32, 16)}
+POSES = {'relax': {nm: [rotm(CHAINS[nm]['axis'], math.radians(a)) for a in RELAX[nm]] for nm in RELAX}}
+_tin = min((rotm(HN, a_) for a_ in (-0.3, 0.3)), key=lambda M: fk(tch, [M, np.eye(3), np.eye(3)])[3] @ HT)   # relaxed, the thumb lies in toward the index
+POSES['relax']['Thumb'] = [_tin, rotm(tch['axis'], math.radians(14)), rotm(tch['axis'], math.radians(16))]
+POSES['grip'] = GRIPS; POSES['press'] = dict(GRIPS, Index=PRESS)
+FLIPM = np.diag([-1.0, 1, 1])
+def local_turns(pose, side):
+    """{bone: turn in its own frame (Blender axes)} for one hand: M (a turn in the bind's world) seen from the hand."""
+    out = {}
+    for nm, Ms in pose.items():
+        for i, M in enumerate(Ms):
+            Ms_ = FLIPM @ M @ FLIPM if side == 'Right' else M; H = BIND[side + 'Hand'][0]
+            out[side + CHAINS[nm]['bones'][i][4:]] = H.T @ Ms_ @ H
+    return out
+FPOSE = {**local_turns(POSES['relax'], 'Left'), **local_turns(POSES['grip'], 'Right')}   # the renders: left relaxed, right on a can
+GRIP = dict(at=CAN_C, axis=CAN_U, nozzle=CAN_NOZ)   # where a can sits in the left hand (the right hand holds its twin)
 
 # ───────────────────────────── trouser details ─────────────────────────────
 Wl = leg_w(Pl); Nl = grid_normals(Pl, True)
@@ -513,7 +706,7 @@ for q0 in np.linspace(0.01, 0.115, 6):                                          
 # ───────────────────────────── the backpack, its straps, and the cans ─────────────────────────────
 pack = Mesh('SM_Char_Writer_Pack')
 PKZ = [zS - 0.37, zS - 0.35, zS - 0.3, zS - 0.1, zS + 0.0, zS + 0.035, zS + 0.05]
-p_a = curve(PKZ, [0.09, 0.125, 0.14, 0.138, 0.13, 0.115, 0.07]); p_d = curve(PKZ, [0.03, 0.055, 0.068, 0.064, 0.056, 0.045, 0.02])
+p_a = curve(PKZ, [0.08, 0.108, 0.12, 0.118, 0.112, 0.1, 0.06]); p_d = curve(PKZ, [0.025, 0.044, 0.053, 0.051, 0.045, 0.035, 0.016])
 z_k = np.concatenate([np.linspace(PKZ[0], PKZ[2], 5)[:-1], np.linspace(PKZ[2], PKZ[4], 12)[:-1], np.linspace(PKZ[4], PKZ[6], 5)]); NK = 36; th_k = np.arange(NK) / NK * 2 * math.pi
 back_y = lambda z: t_y(z) + t_b(z)                              # the jacket's back
 Pk = np.stack([CX + p_a(z_k)[:, None] * sup(np.sin(th_k), 4.5)[None], (back_y(z_k) + p_d(z_k) - 0.012)[:, None] - p_d(z_k)[:, None] * sup(np.cos(th_k), 3.5)[None], np.broadcast_to(z_k[:, None], (len(z_k), NK))], -1)
@@ -523,18 +716,18 @@ grid(pack, Pk, 'Pack', Wk, cap0=True, cap1=True, name='pack'); Nk = grid_normals
 rk = lambda a, b: np.where((z_k >= a) & (z_k <= b))[0]; ck = lambda a, b: np.arange(int(round(a / (2 * math.pi) * NK)), int(round(b / (2 * math.pi) * NK)) + 1)
 patch(pack, Pk, Nk, rk(zS - 0.33, zS - 0.17), ck(math.pi - 0.95, math.pi + 0.95), 0.022, 'Pack', Wk, 'pack-pocket', edge=0.0)       # the front pocket
 patch(pack, Pk, Nk, rk(zS - 0.12, zS - 0.085), ck(math.pi - 1.2, math.pi + 1.2), 0.004, 'Reflect', Wk, 'pack-tape')                  # reflective tape: the mark you see from behind
-patch(pack, Pk, Nk, rk(zS - 0.37, zS - 0.2), ck(math.pi / 2 - 0.5, math.pi / 2 + 0.5), 0.02, 'Pack', Wk, 'side-pocket', edge=0.0)   # a mesh pocket each side, a can in each
-patch(pack, Pk, Nk, rk(zS - 0.37, zS - 0.2), ck(1.5 * math.pi - 0.5, 1.5 * math.pi + 0.5), 0.02, 'Pack', Wk, 'side-pocket', edge=0.0)
-top_roll = np.array([[CX - 0.125, back_y(zS) + 0.05, zS + 0.045], [CX, back_y(zS) + 0.052, zS + 0.05], [CX + 0.125, back_y(zS) + 0.05, zS + 0.045]])
-box_tube(pack, resample(top_roll, 7), 0.03, 0.026, 12, (0, 0, 1), 'Pack', Wk[-NK:].mean(0)[None].repeat(7 * 12, 0), pw=2.6, name='roll-top')
-box_tube(pack, resample([[CX, back_y(zS) + 0.05, zS + 0.08], [CX, back_y(zS) + 0.105, zS + 0.03], [CX, back_y(zS) + 0.125, zS - 0.08]], 8), 0.014, 0.003, 6, (0, 1, 0.3), 'Detail', Wk[-NK:].mean(0)[None].repeat(48, 0), name='roll-strap')
-def can(base, tilt_x, tilt_y, k):
-    ax = unit(np.array([math.sin(math.radians(tilt_y)), math.sin(math.radians(tilt_x)), 1.0])); hs = np.array([0.0, 0.004, 0.012, 0.15, 0.172, 0.182, 0.186]); rs_ = np.array([0.026, 0.032, 0.033, 0.033, 0.03, 0.016, 0.014])
-    Pcn = sweep(base + np.outer(hs, ax), rs_, rs_, 16, (0, 1, 0)); grid(pack, Pcn, 'Can', one('Spine2', Pcn), cap0=True, cap1=True, name='can')
-    hs2 = np.array([0.184, 0.186, 0.214, 0.218]); r2 = np.array([0.012, 0.0165, 0.0165, 0.012])
-    Pcp = sweep(base + np.outer(hs2, ax), r2, r2, 12, (0, 1, 0)); grid(pack, Pcp, 'Cap', one('Spine2', Pcp), cap0=True, cap1=True, name='cap')
-can(np.array([CX + 0.168, back_y(zS - 0.3) + 0.058, zS - 0.345]), 3, 5, 0); can(np.array([CX - 0.168, back_y(zS - 0.3) + 0.058, zS - 0.345]), 3, -5, 1)
-can(np.array([CX + 0.045, back_y(zS) + 0.06, zS - 0.09]), 8, 10, 2)
+# two spare cans, each standing in an elastic mesh pocket on a side of the pack (they sit in it: the pocket wraps the
+# lower half of the can and its band grips it), leaning out a touch so the caps clear the arms
+Wpk = spine_w(np.array([[CX, 0, J['Spine2'][2] + 0.03]]))
+for sgn in (1, -1):
+    zb = zS - 0.385; zm = zb + 0.08; ax = unit(np.array([sgn * 0.08, 0.04, 1.0]))
+    base = np.array([CX + sgn * (p_a(zm) + CAN_R + 0.002), back_y(zm) + p_d(zm) * 0.95 - 0.01, zb])
+    sock = base - ax * CAN_B0                                   # the can's socket, from where its base stands
+    can_mesh(pack, sock, ax, (0, 1, 0), Wpk, 'pack-can')
+    hp = np.array([-0.006, 0.0, 0.03, 0.07, 0.098, 0.104, 0.106]); rp = np.array([0.02, CAN_R + 0.006, CAN_R + 0.008, CAN_R + 0.007, CAN_R + 0.004, CAN_R + 0.0045, CAN_R + 0.002])
+    Pq = sweep(base + np.outer(hp, ax), rp * 1.02, rp, 24, (0, 1, 0)); Pq = Pq + grid_normals(Pq, True) * (0.0025 * fbm(Pq, 0.03, 81.0 + sgn))[..., None]
+    grid(pack, Pq[:-2], 'Pack', Wpk.repeat((len(hp) - 2) * 24, 0), cap0=True, name='can-pocket')
+    grid(pack, Pq[-3:], 'Trim', Wpk.repeat(3 * 24, 0), name='can-pocket-band')
 # straps: over each shoulder from the top of the pack, down the chest, and back under the arm, lying on the jacket
 def on_torso(th, z, off): p = torso_surface(z, th); e = 1e-3; n = unit(np.cross(torso_surface(z, th + e) - p, torso_surface(z + e, th) - p)); return p + n * off, n
 for sgn in (1, -1):
@@ -664,9 +857,20 @@ for o in OBJS:
 def to_gl(R, p): M = np.eye(4); M[:3, :3] = G2B.T @ R @ G2B; M[:3, 3] = G2B.T @ p / K; return [round(float(x), 6) for x in M.T.ravel()]
 # where a spray can sits in the right hand: its middle, its axis (up the thumb side), its nozzle (along the fingers)
 def gl_frame(x, y, z, at): M = np.eye(4); M[:3, 0], M[:3, 1], M[:3, 2], M[:3, 3] = G2B.T @ x, G2B.T @ y, G2B.T @ z, G2B.T @ at / K; return [round(float(v), 6) for v in M.T.ravel()]
-_gr = gl_frame(HN * FLIP, HT * FLIP, HF * FLIP, GRIP['at'] * FLIP + np.array([2 * CX, 0, 0]))
+# the right hand's socket: y up the can, z out of the nozzle, x across (right-handed after the mirror)
+_y, _z = CAN_U * FLIP, CAN_NOZ * FLIP; _gr = gl_frame(np.cross(_y, _z), _y, _z, GRIP['at'] * FLIP + np.array([2 * CX, 0, 0]))
 print('WRITER grip handedness', round(float(np.linalg.det(np.array(_gr).reshape(4, 4).T[:3, :3])), 3))
-arm['vx'] = json.dumps({'scale': K, 'grip': _gr, 'rest': {FULL[b]: [round(float(x), 6) for x in G2B.T @ REST[b] / K] for b in sorted(TIDIED | {'LeftToeBase', 'RightToeBase'})}, 'bind': {FULL[b]: to_gl(*BIND[b]) for b in BONES}})
+_rest = {FULL[b]: [round(float(x), 6) for x in G2B.T @ REST[b] / K] for b in sorted(TIDIED | {'LeftToeBase', 'RightToeBase'})}
+_rest[FULL['Hips']] = [round(float(x), 6) for x in G2B.T @ (REST['Hips'] + np.array([0, 0, HIPS_LIFT])) / K]
+def gl_quat(L):
+    M = G2B.T @ L @ G2B; w = math.sqrt(max(0.0, 1 + M[0, 0] + M[1, 1] + M[2, 2])) / 2; x = math.sqrt(max(0.0, 1 + M[0, 0] - M[1, 1] - M[2, 2])) / 2
+    y = math.sqrt(max(0.0, 1 - M[0, 0] + M[1, 1] - M[2, 2])) / 2; z = math.sqrt(max(0.0, 1 - M[0, 0] - M[1, 1] + M[2, 2])) / 2
+    x = math.copysign(x, M[2, 1] - M[1, 2]); y = math.copysign(y, M[0, 2] - M[2, 0]); z = math.copysign(z, M[1, 0] - M[0, 1]); n = math.sqrt(x * x + y * y + z * z + w * w)
+    return [round(v / n, 6) for v in (x, y, z, w)]
+_fingers = {k: {FULL[b]: gl_quat(L) for side in ('Left', 'Right') for b, L in local_turns(P, side).items()} for k, P in POSES.items()}
+_extra = {FULL[b]: {'parent': FULL[PARENT[b]], 't': [round(float(x), 6) for x in G2B.T @ REST[b] / K]} for b in EXTRA}
+_can = dict(r=CAN_R, b0=CAN_B0, b1=CAN_B1, dome=CAN_DOME, actR=CAN_ACT_R, top=CAN_TOP, nozY=CAN_NOZ_Y)
+arm['vx'] = json.dumps({'scale': K, 'grip': _gr, 'rest': _rest, 'hipsY': HIPSY, 'extra': _extra, 'fingers': _fingers, 'can': _can, 'bind': {FULL[b]: to_gl(*BIND[b]) for b in BONES}})
 bpy.ops.object.select_all(action='DESELECT')
 for o in OBJS + [arm]: o.select_set(True)
 bpy.ops.export_scene.gltf(filepath=OUT, export_format='GLB', use_selection=True, export_animations=False, export_skins=True, export_yup=True,
@@ -677,6 +881,13 @@ print(f'WRITER OK {OUT} meshes={len(OBJS)} tris={tris} verts={sum(len(o.data.ver
 # ───────────────────────────── pictures, to judge it by ─────────────────────────────
 if RENDER:
     os.makedirs(RENDER, exist_ok=True)
+    # for the pictures only (the game draws its own): a can in the right hand's socket, on the hand bone
+    rc = Mesh('SM_RenderCan'); can_mesh(rc, GRIP['at'] * FLIP + np.array([2 * CX, 0, 0]), CAN_U * FLIP, (0, 1, 0), weights(RightHand=np.ones(1)), 'hand-can')
+    V = np.concatenate(rc.V); W = np.concatenate(rc.W); me = bpy.data.meshes.new(rc.name); me.from_pydata((V / K).tolist(), [], rc.F); used = sorted(set(rc.M))
+    for mi in used: me.materials.append(BM[MATS[mi]])
+    me.polygons.foreach_set('material_index', [used.index(mi) for mi in rc.M]); me.polygons.foreach_set('use_smooth', [True] * len(rc.F))
+    o = bpy.data.objects.new(rc.name, me); bpy.context.collection.objects.link(o); top = np.argsort(-W, 1)[:, :4]; w4 = W[np.arange(len(W))[:, None], top]; w4 /= w4.sum(1, keepdims=True)
+    rc.V_all = V; rc.W4 = (top, w4); OBJS.append(o)
     for n in MATS:
         if n != 'Void': with_atlas(BM[n], True)
     ATLAS_IMG.save_render(os.path.join(RENDER, TAG + '-atlas.jpg'))
@@ -699,6 +910,7 @@ if RENDER:
     def shoot(name, ang, target=(CX, -0.03, 0.92), dist=5.0, lens=70, res=(560, 900), elev=0.0):
         a = math.radians(ang); e = math.radians(elev); d = Vector((math.sin(a) * math.cos(e), -math.cos(a) * math.cos(e), math.sin(e)))
         cam.data.lens = lens; cam.location = (Vector(target) + d * dist) / K; cam.rotation_euler = (-d).to_track_quat('-Z', 'Y').to_euler()
+        if SHOTS and not any(name.startswith(x) for x in SHOTS): return
         sc.render.resolution_x, sc.render.resolution_y = res; sc.render.filepath = os.path.join(RENDER, f'{TAG}-{name}.png'); bpy.ops.render.render(write_still=True)
     def set_pose(P):
         """Skin every mesh to a pose (or back to the bind pose with None), exactly as the game does."""
@@ -713,9 +925,24 @@ if RENDER:
                 V = out
             o.data.vertices.foreach_set('co', (V / K).ravel()); o.data.update()
             mesh.low = float(V[:, 2].min())
+    def bind_fingers():
+        """The bind pose, with the fingers as posed now (relaxed left; the right round its can)."""
+        P = {b: BIND[b] for b in BONES}
+        for b in BONES:
+            if b in EXTRA:
+                Rp, pp = P[PARENT[b]]; Rp0 = BIND[PARENT[b]][0]
+                P[b] = (Rp @ Rp0.T @ BIND[b][0] @ FPOSE[b] if b in FPOSE else Rp @ Rp0.T @ BIND[b][0], pp + Rp @ REST[b])
+        return P
+    IDLE0 = bind_fingers(); set_pose(IDLE0)
     for name, ang in (('front', 0), ('side', 90), ('back', 180), ('three-quarter', 35), ('back-quarter', 145)): shoot(name, ang)
     shoot('hood', 25, (CX, -0.06, zN + 0.12), 1.6, 70, (640, 640), 5); shoot('hood-back', 160, (CX, -0.0, zN + 0.05), 1.9, 70, (640, 640), 10)
+    set_pose(IDLE0)
     shoot('hand', 115, tuple(J['LeftHand'] + np.array([0, 0, -0.06])), 0.6, 70, (640, 640), 10); shoot('hand-palm', -60, tuple(J['LeftHand'] + np.array([0, 0, -0.06])), 0.6, 70, (640, 640), 0); shoot('shoes', 40, (CX, -0.05, 0.1), 1.5, 70, (760, 520), 18)
+    _rh = tuple(J['RightHand'] + np.array([0, 0, -0.07]))
+    for nm_, a_, e_ in (('grip-out', -115, 10), ('grip-front', -20, 15), ('grip-in', 160, 5), ('grip-palm', -70, -30)): shoot(nm_, a_, _rh, 0.55, 70, (640, 640), e_)
+    FPOSE.update(local_turns(POSES['press'], 'Right')); set_pose(bind_fingers())
+    for nm_, a_, e_ in (('press-out', -115, 20), ('press-front', -20, 25)): shoot(nm_, a_, _rh, 0.55, 70, (640, 640), e_)
+    FPOSE.update(local_turns(POSES['grip'], 'Right')); set_pose(None)
     for clip, t in (('Idle_Loop', 0.0), ('Jog_Fwd_Loop', 0.2), ('Jog_Fwd_Loop', 0.55), ('Sprint_Loop', 0.15), ('Sprint_Loop', 0.45), ('Crouch_Idle_Loop', 0.0), ('Crouch_Fwd_Loop', 0.6), ('Jump_Loop', 0.3), ('Walk_Loop', 0.4), ('Spell_Simple_Idle_Loop', 0.5)):
         Pz = pose(CLIPS[clip], t); set_pose(Pz); hz = Pz['Spine1'][1][2]; nm = clip.replace('_Loop', '').replace('_', '') + str(int(t * 100))
         print('WRITER pose', nm, 'lowest point %.3f m' % min(m_.low for m_ in MESHES.values()))

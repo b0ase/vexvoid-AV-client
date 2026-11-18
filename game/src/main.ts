@@ -98,6 +98,14 @@ export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?:
   head: (o?: { steady?: boolean }) => { drift: number; neck: number; head: number; gap: number; hood: number; worst: string; pts: number; wob: number };
   arms: () => ArmReport;
   grip: () => GripReport;
+  /** Keep the writer's arms out of the trunk and pack (default on); off shows the clips as they are. */
+  fixArms: (on: boolean) => void;
+  /** A can in the writer's right hand (default on). */
+  carry: (on: boolean) => void;
+  far: (side: 0 | 1) => { d: number; info: string };
+  ik: () => Record<string, number>;
+  /** Where bones are now (world), by short name ('RightHand', 'RightHandIndex3' ...), for tests. */
+  bones: (names: string[]) => Record<string, [number, number, number] | null>;
   gait: (reset?: boolean) => GaitInfo & { move: { speed: number; vx: number; vz: number; heading: number; yawRate: number; airborne: boolean; crouch: boolean; gy: number } };
   /** Take back the last stroke on a wall (none given: the wall being painted). Returns how many strokes went. */
   undo: (id?: string) => number;
@@ -150,7 +158,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const W0 = city.world, home = city.plan.places[0];
   say('Dressing the writer…');
   const writer = await loadWriter(opts.base + 'anims/ual.glb', high, opts.base + 'models/writer.glb');
-  scene.add(writer.root, writer.can);
+  scene.add(writer.root, writer.can); writer.carry(true);   // a writer always has a can in hand
   // the feet fit the ground at the writer's own level (a kerb, a step; not the bridge over the towpath)
   writer.setGround((x, z) => { const g = W0.groundAt(x, z, me.gy + 0.3); return Number.isNaN(g) ? me.gy : g; }, FIT_FEET);
   const spray = makeSpray(scene, city.walls, opts.store);
@@ -645,7 +653,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
         (reticle.material as THREE.MeshBasicMaterial).color.set(col); (dot.material as THREE.MeshBasicMaterial).color.set(col);
         // the arm goes up with the can wherever the aim is on the wall; the hand stops the can's distance off it
         // full weight hovering too, so pressing the button does not move the can
-        writer.aim(aimHand.copy(P).addScaledVector(n, can.dist + 0.03), P, 1);
+        writer.aim(aimHand.copy(P).addScaledVector(n, can.dist), P, 1, sprayingNow);   // the nozzle the can's distance off the wall
       } else writer.aim(null);
       hissOn(sprayingNow, 0.55 + 0.45 * vol);
     } else {
@@ -820,6 +828,11 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     tuneGait: (clip: string, v: number) => writer.tune(clip, v),
     head: (o) => writer.head(o),
     arms: () => writer.arms(),
+    fixArms: (on) => writer.fixArms(on),
+    carry: (on) => writer.carry(on),
+    far: (side) => writer.far(side),
+    ik: () => writer.ik(),
+    bones: (names) => Object.fromEntries(names.map((n) => { const p = writer.bonePos(n, new THREE.Vector3()); return [n, p ? [p.x, p.y, p.z] as [number, number, number] : null]; })),
     grip: () => writer.grip(),
     gait: (reset) => ({ ...writer.gait(reset), move: { speed: mv.speed, vx: Math.sin(me.heading) * mv.speed, vz: Math.cos(me.heading) * mv.speed, heading: me.heading, yawRate: mv.yawRate, airborne: me.airborne, crouch: me.crouch, gy: me.gy } }),
     sketches: () => book.all().map(infoOf),

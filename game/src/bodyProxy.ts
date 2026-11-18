@@ -78,7 +78,9 @@ export function bodyProxy(meshes: THREE.SkinnedMesh[], bones: THREE.Bone[], k: n
     for (let j = 0; j < p.length; j += 3) {
       let inside = false;
       if (t) { const yf = (p[j + 1] - t.y0) / DY; if (yf >= -0.5 && yf <= t.ny - 0.5) inside = Math.hypot(p[j], p[j + 2]) < look(t, yf, ((Math.atan2(p[j], p[j + 2]) + Math.PI) / (2 * Math.PI)) * NA - 0.5) + 0.035; }
-      (inside ? on : bag).push(p[j], p[j + 1], p[j + 2]);
+      // on the jacket: part of the trunk; behind the back: the bag; anything else (a strap over the shoulder top, where
+      // the trunk table stops) is left out, or the bag's table would swell up round the shoulder and the arm's root
+      if (inside) on.push(p[j], p[j + 1], p[j + 2]); else if (p[j + 2] < -0.07) bag.push(p[j], p[j + 1], p[j + 2]);
     }
     if (on.length) per.set(bone, [...(per.get(bone) || []), ...on]);
     if (bag.length > 30) { let cx = 0, cz = 0; for (let j = 0; j < bag.length; j += 3) { cx += bag[j]; cz += bag[j + 2]; } cx /= bag.length / 3; cz /= bag.length / 3; tabs.push(build(bone, bag, cx, cz, 'pack')); }
@@ -108,6 +110,17 @@ export function bodyProxy(meshes: THREE.SkinnedMesh[], bones: THREE.Bone[], k: n
       }
       return out;
     },
+    /** For tests: the arm vertices furthest from their hand bone (m), with their bind place and weights. */
+    far: (side: 0 | 1) => {
+      const hb = B(side ? 'RightHand' : 'LeftHand').getWorldPosition(new THREE.Vector3()); let best = 0, info = '';
+      for (const a of arms) {
+        if (a.side !== side || a.part !== 'hand') continue;
+        a.m.getVertexPosition(a.i, v); v.applyMatrix4(a.m.matrixWorld); const d = v.distanceTo(hb);
+        if (d > best) { best = d; const si = a.m.geometry.attributes.skinIndex, sw = a.m.geometry.attributes.skinWeight; info = `${a.m.name}#${a.i} bind ${q.fromBufferAttribute(a.m.geometry.attributes.position, a.i).multiplyScalar(k).toArray().map((x) => x.toFixed(3))} ` + [0, 1, 2, 3].map((c) => `${short(bones[si.getComponent(a.i, c)]?.name || '?')}:${sw.getComponent(a.i, c).toFixed(2)}`).join(' '); }
+      }
+      const hbI = skel.boneInverses[bones.indexOf(B(side ? 'RightHand' : 'LeftHand'))].clone().invert(), hp = new THREE.Vector3().setFromMatrixPosition(hbI).multiplyScalar(k);
+      return { d: best, info: info + ` | hand bind at ${hp.toArray().map((x) => x.toFixed(3))} scale ${k}` };
+    },
     /** The arm's own vertices (as skinned now) against the trunk: deepest per side and part, and how many are > 1 cm in. */
     measure: (): ArmReport => {
       api.prep();
@@ -119,7 +132,7 @@ export function bodyProxy(meshes: THREE.SkinnedMesh[], bones: THREE.Bone[], k: n
         if (d > max) { max = d; worst = key + ' ' + a.bone; at = `${a.m.name}#${a.i} bind ${new THREE.Vector3().fromBufferAttribute(a.m.geometry.attributes.position, a.i).multiplyScalar(k).toArray().map((x) => x.toFixed(3))} ${out.bone} local ${out.loc} r ${out.r} world ${v.toArray().map((x) => x.toFixed(2))}`; }
       }
       const bp = (n: string) => B(n).getWorldPosition(new THREE.Vector3()).toArray().map((x) => +x.toFixed(2)).join(',');
-      at += ` | Spine ${bp('Spine')} RHand ${bp('RightHand')} LHand ${bp('LeftHand')} RArm ${bp('RightArm')}`;
+      at += ` | Hips ${bp('Hips')} Spine ${bp('Spine')} RHand ${bp('RightHand')} LHand ${bp('LeftHand')} RArm ${bp('RightArm')} LFoot ${bp('LeftFoot')} RFoot ${bp('RightFoot')} LLeg ${bp('LeftLeg')} Head ${bp('Head')}`;
       return { max, worst, parts, at, tabs: tabs.map((t) => `${short(t.bone.name)}${t.kind === 'pack' ? ' pack' : ''} y ${t.y0.toFixed(2)}..${(t.y0 + t.ny * DY).toFixed(2)} rmax ${Math.max(...t.r).toFixed(2)}`).join('; ') };
     },
   };
