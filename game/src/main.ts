@@ -220,7 +220,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   // how far along the wall either side of the writer the can reaches; further, A D step along (no stepping by itself)
   const REACH = 2.4;
   const camO = { yaw: home.yaw, pitch: 0.12, dist: 3.4 };
-  const keys = new Set<string>();
+  const keys = new Set<string>(); let shiftNow = false;
   const MOVE = ['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Shift', ' ', 'c', 'f', 'm', 'p', 't', 'r', '1', '2', '3', '4', '5', '6', '7', 'z', 'x', 'h', 'Tab', 'Escape', 'b', 'g', 'v', 'n', '[', ']', '-', '=', '+', 'Enter'];
   // painting: F at a wall squares up to it; the mouse aims, holding it sprays; the wheel sets the can's distance
   type W = (typeof city.walls)[number];
@@ -418,6 +418,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     // a jump: a moment's gather (the body dips), then up
     if (down && !e.repeat && k === ' ' && !me.airborne && !mv.takeoff) { mv.takeoff = GAIT.gather; me.crouch = false; writer.land(0.25); writer.play('Jump_Start', 0.06, true); }
     if (down) keys.add(k); else keys.delete(k);
+    if (k === 'Shift') shiftNow = down;
   };
   // the dock answers the mouse too (owner: "select the spraycan controls with my mouse"): each tile does what its key does
   hudUi.bind({
@@ -435,9 +436,15 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const kd = (e: KeyboardEvent) => onKey(e, true), ku = (e: KeyboardEvent) => onKey(e, false);
   canvas.addEventListener('keydown', kd);
   canvas.addEventListener('keyup', ku);
-  canvas.addEventListener('blur', () => { keys.clear(); btn = 0; });
+  // the straight line follows Shift as the mouse sees it (every pointer event says whether Shift is down), so a keyup
+  // lost to another window can never leave every stroke straight; leaving the window lets go of everything
+  const letGo = () => { keys.clear(); btn = 0; shiftNow = false; };
+  canvas.addEventListener('blur', letGo);
+  window.addEventListener('blur', letGo);
+  const onVis = () => { if (document.visibilityState !== 'visible') letGo(); };
+  document.addEventListener('visibilitychange', onVis);
   let drag: { x: number; y: number } | null = null;
-  const aim = (e: PointerEvent) => { const b = canvas.getBoundingClientRect(); mouse.set(((e.clientX - b.left) / b.width) * 2 - 1, -((e.clientY - b.top) / b.height) * 2 + 1); };
+  const aim = (e: PointerEvent) => { shiftNow = e.shiftKey; const b = canvas.getBoundingClientRect(); mouse.set(((e.clientX - b.left) / b.width) * 2 - 1, -((e.clientY - b.top) / b.height) * 2 + 1); };
   canvas.addEventListener('pointerdown', (e) => {
     canvas.focus(); aim(e); canvas.setPointerCapture(e.pointerId);
     if (e.button === 1) e.preventDefault();
@@ -600,7 +607,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       } else {
         // Shift: a straight line from where the button went down to where it is let go (near enough level or upright
         // becomes exactly so), then sprayed in one even pass
-        if (pressing && keys.has('Shift') && !line && h && reach) { spray.end(); stroke = null; line = { id: h.id, x: h0!.x, y: h0!.y, press: btn & 1 ? 1 : 0.5 }; }
+        if (pressing && shiftNow && !line && h && reach) { spray.end(); stroke = null; line = { id: h.id, x: h0!.x, y: h0!.y, press: btn & 1 ? 1 : 0.5 }; }
         let end: { x: number; y: number } | null = null;
         if (line) {
           if (h && h.id === line.id && reach) { let dx = h.x - line.x, dy = h.y - line.y; if (Math.abs(dy) < Math.abs(dx) * 0.07) dy = 0; else if (Math.abs(dx) < Math.abs(dy) * 0.07) dx = 0; end = { x: line.x + dx, y: line.y + dy }; }
@@ -608,7 +615,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
             const len = end ? Math.hypot(end.x - line.x, end.y - line.y) : 0;
             if (end && len > 0.02) { auto = { list: [{ wall: line.id, can: { ...can, pressure: line.press }, pts: [[line.x, line.y, 0], [end.x, end.y, len / 2.4]] }], i: 0, k: 0, t: 0, gap: 0, speed: 1, group: '', done: () => {} }; sprayed = true; }
             line = null;
-          } else if (!keys.has('Shift')) line = null;
+          } else if (!shiftNow) line = null;
         }
         preview.visible = !!(line && end);
         if (line && end) { const g = preview.geometry.attributes.position as THREE.BufferAttribute; spray.point(line.id, line.x, line.y, lineA).addScaledVector(n, 0.02); g.setXYZ(0, lineA.x, lineA.y, lineA.z); spray.point(line.id, end.x, end.y, lineA).addScaledVector(n, 0.02); g.setXYZ(1, lineA.x, lineA.y, lineA.z); g.needsUpdate = true; }
@@ -628,7 +635,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       prompt(t < tipHold ? tipNote : auto ? (blasting ? `BLASTING ${blasting} · [A] [D] TO STOP` : '') : armed && !h ? 'POINT AT THE WALL TO PLACE IT' : !h ? 'POINT AT THE WALL' : '');
       // by the reticle: a keycap and a verb, only when there is something to do
       const sep = '<span class="sep"></span>';
-      const near = auto || !h ? '' : armed ? `${kc('LMB')}BLAST ${armed.name}${plan && plan.fitted ? ' · SIZED TO FIT' : ''}` : line ? `${kc('SHIFT')}STRAIGHT LINE · LET GO TO SPRAY` : tooHigh ? 'TOO HIGH · AIM LOWER' : tooFar ? `${kc('A')}${kc('D')}STEP ALONG` : !sprayed ? `${kc('LMB')}SPRAY${sep}${kc('RMB')}LIGHT${sep}${kc('F')}DONE${sep}TOOLS: CLICK THE DOCK` : keys.has('Shift') && !pressing ? `${kc('LMB')}DRAG A STRAIGHT LINE` : '';
+      const near = auto || !h ? '' : armed ? `${kc('LMB')}BLAST ${armed.name}${plan && plan.fitted ? ' · SIZED TO FIT' : ''}` : line ? `${kc('SHIFT')}STRAIGHT LINE · LET GO TO SPRAY` : tooHigh ? 'TOO HIGH · AIM LOWER' : tooFar ? `${kc('A')}${kc('D')}STEP ALONG` : !sprayed ? `${kc('LMB')}SPRAY${sep}${kc('RMB')}LIGHT${sep}${kc('F')}DONE${sep}TOOLS: CLICK THE DOCK` : shiftNow && !pressing ? `${kc('LMB')}DRAG A STRAIGHT LINE` : '';
       if (near && P) { scr.copy(P).project(cam); hudUi.near(near, (scr.x + 1) / 2 * canvas.clientWidth, (1 - scr.y) / 2 * canvas.clientHeight); } else hudUi.near('');
       reticle.visible = !!P && !armed; dot.visible = !!P;
       if (P) {
@@ -857,7 +864,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       cam.position.set(me.x + Math.sin(camO.yaw) * camO.dist, me.gy + 2, me.z + Math.cos(camO.yaw) * camO.dist); camLook.set(me.x, me.gy + 1.45, me.z); },
     stop: () => {
       stopped = true; cancelAnimationFrame(raf); ro.disconnect();
-      canvas.removeEventListener('keydown', kd); canvas.removeEventListener('keyup', ku);
+      canvas.removeEventListener('keydown', kd); canvas.removeEventListener('keyup', ku); window.removeEventListener('blur', letGo); document.removeEventListener('visibilitychange', onVis);
       scene.remove(torchL, torchL.target, beam); beam.geometry.dispose(); (beam.material as THREE.Material).dispose(); music?.stop(); hissOn(false); law.dispose(); book.dispose(); if (bus) void bus.ctx.close(); spray.dispose(); writer.dispose(); city.dispose(); look.dispose(); comp.dispose(); r.dispose(); canvas.remove(); tip.remove(); hudUi.dispose();
       for (const o of [reticle, dot, preview, ghost, ghostFrame]) { o.geometry.dispose(); (o.material as THREE.Material).dispose(); }
       const gm = (ghost.material as THREE.MeshBasicMaterial).map; if (gm) gm.dispose();
