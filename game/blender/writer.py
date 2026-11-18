@@ -347,7 +347,7 @@ def sleeve_folds(P):
     front = np.cos(th); out_ = np.sin(th); d = np.zeros(s.shape); wob = fbm(P, 0.11, 2.0); amp = 0.75 + 0.5 * fbm(P, 0.07, 9.0)
     live = sstep(-0.02, 0.06, s) * (1 - sstep(sW - 0.075, sW - 0.06, s))          # none on the shoulder cap or the cuff
     # long drags that spiral down from the shoulder
-    d += live * 0.004 * amp * crease(s / 0.13 * 2 * math.pi + th * 1.0 + 4.5 * wob)
+    d += live * 0.002 * amp * crease(s / 0.13 * 2 * math.pi + th * 1.0 + 4.5 * wob)
     # the elbow: two or three sharp creases inside the bend, smooth and proud over the point
     e = bump(sE, 0.055, s)
     d += live * e * sstep(0.0, 0.9, front) * 0.007 * crease((s - sE) / 0.034 * 2 * math.pi + 1.2 * out_ + 3.0 * wob)
@@ -394,7 +394,7 @@ def leg_folds(P):
     d += live * kn * 0.009 * sstep(0.1, 0.9, front)
     d += live * kn * sstep(0.1, 0.9, -front) * 0.007 * crease((s - sK) / 0.036 * 2 * math.pi + 1.2 * out_ + 3.0 * wob)
     # long slanting drags down the shin, then the cloth breaks over the cuff
-    d += live * sstep(sK + 0.03, sK + 0.1, s) * 0.0035 * amp * crease((s - sK) / 0.15 * 2 * math.pi + th * 1.0 + 4.5 * wob)
+    d += live * sstep(sK + 0.03, sK + 0.1, s) * 0.002 * amp * crease((s - sK) / 0.15 * 2 * math.pi + th * 1.0 + 4.5 * wob)
     g = sstep(CUFF - 0.17, CUFF - 0.07, s)
     d += live * g * (0.005 + 0.007 * amp * crease((s - CUFF) / 0.065 * 2 * math.pi + th * 1.0 + 1.6 * np.sin(th + 0.4) + 4.0 * wob))
     d += live * 0.004 * fbm(P, 0.16, 39.0)
@@ -450,14 +450,14 @@ HU = [0.0, 0.15, 0.4, 0.65, 0.85, 1.0]
 # (pass 2: the head is a real size on the longer body, so the hood is lower, slimmer and closer round it)
 h_c = curve(HU, [(HY - 0.138, HZ + 0.075), (HY - 0.106, HZ + 0.088), (HY - 0.044, HZ + 0.113), (HY - 0.002, HZ + 0.07), (HY + 0.012, HZ + 0.01), (HY + 0.014, HZ - 0.068)])
 h_ang = curve(HU, np.radians([-14, -4, 22, 62, 86, 90]))
-h_a = curve(HU, [0.082, 0.103, 0.117, 0.12, 0.123, 0.152])     # half width
-h_top = curve(HU, [0.097, 0.108, 0.116, 0.111, 0.104, 0.108])     # over the head, then down the back
+h_a = curve(HU, [0.082, 0.104, 0.122, 0.127, 0.134, 0.165])     # half width (pass 2: fuller behind, flowing onto the shoulders)
+h_top = curve(HU, [0.097, 0.108, 0.115, 0.112, 0.106, 0.11])     # over the head, then down the back
 h_bot = curve(HU, [0.138, 0.13, 0.104, 0.058, 0.068, 0.085])     # down the throat (open), then round the neck
 NH = 40; psi = np.arange(NH) / NH * 2 * math.pi; u_h = np.concatenate([np.linspace(0, 0.15, 5)[:-1], np.linspace(0.15, 1.0, 26)])
 def hood_ring(u):
     c = h_c(u); a = h_ang(u); cu = np.cos(psi); top = cu > 0
     up = np.array([0, math.sin(a), math.cos(a)]); r = np.where(top, h_top(u), h_bot(u))
-    peak = 0.01 * bump(0.5, 0.1, u) * np.clip(cu, 0, 1) ** 6                                   # the soft point at the back of the crown
+    peak = 0.006 * bump(0.5, 0.1, u) * np.clip(cu, 0, 1) ** 6                                   # the soft point at the back of the crown
     seam = -0.004 * (bump(0.55, 0.07, psi) + bump(2 * math.pi - 0.55, 0.07, psi)) * top * sstep(0.1, 0.25, u)   # the centre panel's two seams
     P = np.array([CX, c[0], c[1]]) + np.outer(h_a(u) * sup(np.sin(psi), 2.3), [1, 0, 0]) + np.outer((r + peak + seam) * sup(cu, 2.2), up)
     brim = sstep(0.25, 0.95, cu) * (1 - sstep(0.0, 0.14, u))                                    # the stiffened peak over the brow
@@ -468,7 +468,7 @@ def hood_ring(u):
 Ph = np.array([hood_ring(u) for u in u_h])
 # folds: the hood slumps on the shoulders behind, and the cloth is never drum-tight
 uu = np.broadcast_to(u_h[:, None], Ph.shape[:2]); pp = np.broadcast_to(psi[None], Ph.shape[:2]); nh = grid_normals(Ph, True)
-dh = 0.005 * sstep(0.62, 0.75, uu) * (1 - sstep(0.93, 1.0, uu)) * np.clip(np.cos(pp), 0, 1) * crease((uu - 0.7) / 0.13 * 2 * math.pi + 2.0 * np.sin(pp) + 4 * fbm(Ph, 0.1, 51.0))
+dh = 0.004 * sstep(0.55, 0.75, uu) * (1 - sstep(0.93, 1.0, uu)) * np.clip(np.cos(pp), 0, 1) * crease(pp * 6 + 4 * fbm(Ph, 0.1, 51.0))   # (pass 2: folds fall down the back, not round it)
 dh += 0.004 * fbm(Ph, 0.09, 53.0) * sstep(0.05, 0.2, uu)
 Ph = Ph + nh * dh[..., None]
 # the opening's edge: the cloth turns in over a drawcord channel, then the lining runs back inside
@@ -484,7 +484,7 @@ def ellipsoid(c, r, nu=20, nv=12, v0=-1.0, v1=1.0, u0=0.0, u1=2 * math.pi):
     v = np.linspace(v0, v1, nv) * math.pi / 2; u = np.linspace(u0, u1, nu, endpoint=(u1 - u0) < 2 * math.pi - 1e-6)
     return np.array(c) + np.stack([r[0] * np.outer(np.cos(v), np.sin(u)), -r[1] * np.outer(np.cos(v), np.cos(u)), r[2] * np.outer(np.sin(v), np.ones(len(u)))], -1)
 SK = (CX, HY - 0.042, HZ + 0.112)                               # the middle of the skull
-Pv = ellipsoid(SK, (0.075, 0.092, 0.104), 24, 14, -0.97, 0.97)
+Pv = ellipsoid(SK, (0.074, 0.09, 0.097), 24, 14, -0.97, 0.97)
 grid(body, Pv, 'Void', one('Head', Pv), cap0=True, cap1=True, name='head')
 Pm = ellipsoid((SK[0], SK[1] - 0.004, SK[2] - 0.012), (0.081, 0.098, 0.102), 25, 10, -0.85, 0.12, -1.75, 1.75)
 grid(body, Pm, 'Mask', one('Head', Pm), closed=False, name='mask')
@@ -530,14 +530,14 @@ pw_ = curve(PK, [0.029, 0.03, 0.033, 0.039, 0.0425, 0.043, 0.04, 0.028]); pct_ =
 phb = curve(PK, [0.018, 0.017, 0.0155, 0.0135, 0.012, 0.012, 0.011, 0.007]); php = curve(PK, [0.018, 0.0175, 0.017, 0.016, 0.0142, 0.0128, 0.011, 0.006])
 cph, sph = np.cos(ph_p)[None], np.sin(ph_p)[None]; FF = f_p[:, None]
 TT = pct_(f_p)[:, None] + pw_(f_p)[:, None] * sup(cph, 2.6); NN = np.where(sph > 0, php(f_p)[:, None], phb(f_p)[:, None]) * sup(sph, 2.6)
-NN = NN + (sph > 0) * (0.0065 * bump(FF, 0.022, 0.02) * sstep(0.004, 0.03, TT) + 0.0035 * bump(FF, 0.045, 0.022) * sstep(-0.012, -0.03, TT)) * np.clip(sph, 0, 1) ** 0.5   # thenar and heel pads
-for nm, f0, t0, lens, wd, spl in FINGERS: NN = NN - (sph < 0) * 0.0035 * bump(FF, f0 - 0.004, 0.009) * bump(TT, t0, 0.0075)                      # knuckles
+NN = NN + (sph > 0) * (0.0065 * bump(0.022, 0.02, FF) * sstep(0.004, 0.03, TT) + 0.0035 * bump(0.045, 0.022, FF) * sstep(-0.012, -0.03, TT)) * np.clip(sph, 0, 1) ** 0.5   # thenar and heel pads
+for nm, f0, t0, lens, wd, spl in FINGERS: NN = NN - (sph < 0) * 0.0035 * bump(f0 - 0.004, 0.009, FF) * bump(t0, 0.0075, TT)                      # knuckles
 Pg = J['LeftHand'] + FF[..., None] * HF + NN[..., None] * HN + TT[..., None] * HT
 def palm_w(P):
     q = P - J['LeftHand']; f = (q @ HF).ravel(); t = (q @ HT).ravel(); kw = {'LeftForeArm': 1 - sstep(-0.03, -0.004, f)}
-    hand = sstep(-0.03, -0.004, f).copy(); thumb = 0.6 * bump(f, 0.02, 0.022) * sstep(0.004, 0.028, t) * hand; kw['LeftHandThumb1'] = thumb; hand = hand - thumb
+    hand = sstep(-0.03, -0.004, f).copy(); thumb = 0.6 * bump(0.02, 0.022, f) * sstep(0.004, 0.028, t) * hand; kw['LeftHandThumb1'] = thumb; hand = hand - thumb
     for nm, f0, t0, lens, wd, spl in FINGERS:
-        k = 0.5 * sstep(f0 - 0.016, f0 + 0.002, f) * bump(t, t0, 0.009) * hand; kw['LeftHand' + nm + '1'] = k; hand = hand - k
+        k = 0.5 * sstep(f0 - 0.016, f0 + 0.002, f) * bump(t0, 0.009, t) * hand; kw['LeftHand' + nm + '1'] = k; hand = hand - k
     kw['LeftHand'] = hand; return weights(**kw)
 Wpalm = palm_w(Pg)
 grid(body, Pg, 'Gloves', Wpalm, mirror=True, cap1=True, name='palm')
@@ -546,13 +546,13 @@ def finger_tube(ch, start):
     """A gloved finger along its (straight) chain: rings from inside the palm to a round tip."""
     js = ch['joints']; d = ch['dir']; padn = ch['pad']; side_ = unit(np.cross(d, padn)); L = sum(ch['lens']); wd = ch['width']; sj = np.cumsum([0] + list(ch['lens']))
     s_ = np.concatenate([np.linspace(start, 0.0, 3)[:-1], np.linspace(0.0, L - wd, 20)[:-1], L - wd + wd * np.sin(np.linspace(0, 1, 7) * math.pi / 2)])
-    w = wd * (1.0 + 0.06 * (bump(s_, sj[1], 0.005) + bump(s_, sj[2], 0.004)) - 0.035 * (bump(s_, (sj[0] + sj[1]) / 2, 0.01) + bump(s_, (sj[1] + sj[2]) / 2, 0.007)) + 0.04 * (s_ < 0))
+    w = wd * (1.0 + 0.06 * (bump(sj[1], 0.005, s_) + bump(sj[2], 0.004, s_)) - 0.035 * (bump((sj[0] + sj[1]) / 2, 0.01, s_) + bump((sj[1] + sj[2]) / 2, 0.007, s_)) + 0.04 * (s_ < 0))
     w = w * (1 - 0.12 * s_ / L)
     if ch is CHAINS['Thumb']: w = w * (1 + 0.45 * (1 - sstep(0.0, sj[1] + 0.004, s_)))   # the thumb's root is the ball of the thumb
     rnd = np.sqrt(np.clip(1 - ((s_ - (L - wd)) / wd) ** 2, 0.0, 1)) ; w = np.where(s_ > L - wd, w * np.maximum(rnd, 0.08), w)
     c, sn = np.cos(ph_f)[None], np.sin(ph_f)[None]
-    h = np.where(sn > 0, 0.9, 0.84) * w[:, None] + (sn > 0) * 0.0012 * (bump(s_, (sj[0] + sj[1]) / 2, 0.009) + bump(s_, (sj[1] + sj[2]) / 2, 0.006) + bump(s_, L - 0.009, 0.005))[:, None]
-    h = h + (sn < 0) * 0.0011 * (bump(s_, sj[1], 0.004) + bump(s_, sj[2], 0.0035))[:, None]                                          # the joints stand up behind
+    h = np.where(sn > 0, 0.9, 0.84) * w[:, None] + (sn > 0) * 0.0012 * (bump((sj[0] + sj[1]) / 2, 0.009, s_) + bump((sj[1] + sj[2]) / 2, 0.006, s_) + bump(L - 0.009, 0.005, s_))[:, None]
+    h = h + (sn < 0) * 0.0011 * (bump(sj[1], 0.004, s_) + bump(sj[2], 0.0035, s_))[:, None]                                          # the joints stand up behind
     P = js[0] + s_[:, None, None] * d + (w[:, None] * sup(c, 2.3))[..., None] * side_ + (h * sup(sn, 2.3))[..., None] * padn
     sr = np.repeat(s_, NFG); b1, b2, b3 = ch['bones']
     k2 = sstep(sj[1] - 0.005, sj[1] + 0.005, sr); k3 = sstep(sj[2] - 0.004, sj[2] + 0.004, sr); hb = 1 - sstep(-0.008, 0.006, sr)
@@ -778,6 +778,78 @@ def stretch(G, w, h):
     """A grid of values (rings, around) blown up to h x w pixels."""
     xs = np.linspace(0, G.shape[1] - 1, w); a = np.array([np.interp(xs, np.arange(G.shape[1]), row) for row in G])
     ys = np.linspace(0, G.shape[0] - 1, h); return np.array([np.interp(ys, np.arange(G.shape[0]), col) for col in a.T]).T
+# ── cloth folds as a normal map (pass 2: "it stops reading as clay"): the creases a shell jacket and cargo trousers
+# really have, too sharp and too many for the mesh: drag lines that spiral down the sleeves, the elbow's and knee's
+# stacked creases, cloth breaking over the cuffs and the hem, gathers at the waist, the drape of the hood, and a fine
+# crinkle over the nylon; panels get a raised edge. Heights per pixel of each piece's patch of the atlas (same layout,
+# second UV set), turned into tangent-space normals.
+_pm = np.random.default_rng(3).permutation(256); _pm = np.concatenate([_pm, _pm]); _pv = np.random.default_rng(4).random(512) * 2 - 1
+def vnoise(Q, scale, seed=0):
+    """Smooth value noise, -1..1, at points Q (..., 3) (vectorised: the bake runs per pixel)."""
+    q = Q / scale + seed; i = np.floor(q).astype(np.int64); f = q - i; u = f * f * (3 - 2 * f); out = 0.0
+    for dx in (0, 1):
+        for dy in (0, 1):
+            for dz in (0, 1):
+                hsh = _pv[_pm[_pm[_pm[(i[..., 0] + dx) & 255] + ((i[..., 1] + dy) & 255)] + ((i[..., 2] + dz) & 255)]]
+                out = out + hsh * np.where(dx, u[..., 0], 1 - u[..., 0]) * np.where(dy, u[..., 1], 1 - u[..., 1]) * np.where(dz, u[..., 2], 1 - u[..., 2])
+    return out
+def crinkle(Q, amp):
+    """Many small sharp creases (nylon that has been worn): valleys along the zero lines of two noises."""
+    return -amp * ((1 - np.abs(vnoise(Q, 0.035, 1.7))) ** 6 + 0.6 * (1 - np.abs(vnoise(Q, 0.014, 5.3))) ** 6)
+FOLDP = {'sleeve': s_s, 'leg': s_l, 'jacket': z_t, 'seat': z_p, 'hood': u_hx}
+NIMG = np.zeros((ATLAS, ATLAS, 3)); NIMG[..., 2] = 1.0
+def fold_height(pc, w, h):
+    """The fold relief (m) over a piece's patch of the atlas, h x w pixels; and metres per pixel across and along."""
+    R, N = pc['R'], pc['N']; P = pc['P']; Pc = np.concatenate([P, P[:, :1]], 1) if pc['closed'] else P
+    cu = np.linspace(0, Pc.shape[1] - 1, w); rv = np.linspace(0, R - 1, h)
+    c0 = np.clip(np.floor(cu).astype(int), 0, Pc.shape[1] - 2); fc = (cu - c0)[None, :, None]; r0 = np.clip(np.floor(rv).astype(int), 0, max(0, R - 2)); fr = (rv - r0)[:, None, None]
+    r1 = np.minimum(r0 + 1, R - 1)
+    Q = (Pc[r0][:, c0] * (1 - fc) + Pc[r0][:, c0 + 1] * fc) * (1 - fr) + (Pc[r1][:, c0] * (1 - fc) + Pc[r1][:, c0 + 1] * fc) * fr
+    th = (cu / max(1, Pc.shape[1] - 1) * 2 * math.pi)[None, :] if pc['closed'] else None
+    seg = np.linalg.norm(np.diff(Pc, axis=1), axis=2).sum(1); circ = np.interp(rv, np.arange(R), seg)[:, None]
+    mx = circ / max(1, w - 1) * np.ones((1, w)); my = pc['h'] / max(1, h - 1)
+    nm = pc['name']; H = np.zeros((h, w))
+    if nm in FOLDP and pc['closed']:
+        sp = np.interp(rv, np.arange(R), FOLDP[nm])[:, None]; front = np.cos(th); out_ = np.sin(th); wob = 1.6 * vnoise(Q, 0.12, 2.0) + 0.6 * vnoise(Q, 0.05, 9.0)
+        patch_ = 0.25 + 0.75 * sstep(-0.35, 0.45, vnoise(Q, 0.09, 4.4))   # cloth folds in places, not in rings all the way round
+        if nm == 'sleeve':
+            live = sstep(-0.02, 0.06, sp) * (1 - sstep(sW - 0.075, sW - 0.06, sp))
+            H += live * patch_ * 0.0009 * crease(sp / 0.13 * 2 * math.pi + th + 4.5 * wob)
+            H += live * patch_ * bump(sE, 0.06, sp) * sstep(-0.1, 0.9, front) * 0.003 * crease((sp - sE) / 0.022 * 2 * math.pi + 1.4 * out_ + 3 * wob)
+            H += live * (0.4 + 0.6 * patch_) * sstep(sW - 0.2, sW - 0.09, sp) * 0.0026 * crease((sp - sW) / 0.04 * 2 * math.pi + th + 1.5 * np.sin(th + 0.7) + 4 * wob)
+            H += live * patch_ * bump(0.02, 0.04, sp) * sstep(0.55, 0.98, -out_) * 0.0013 * crease(sp / 0.03 * 2 * math.pi - 5 * front + 3 * wob)   # drag lines out of the armpit
+            H += crinkle(Q, 0.0006)
+        elif nm == 'leg':
+            live = sstep(0.0, 0.08, sp) * (1 - sstep(CUFF - 0.012, CUFF, sp))
+            H += live * patch_ * (1 - sstep(0.04, 0.24, sp)) * 0.0016 * crease(sp / 0.06 * 2 * math.pi - out_ * 7 + 3 * wob) * sstep(0.0, 0.8, front)   # whiskers fanning from the crotch
+            H += live * patch_ * bump(sK, 0.07, sp) * sstep(0.0, 0.9, -front) * 0.003 * crease((sp - sK) / 0.026 * 2 * math.pi + 1.2 * out_ + 3 * wob)
+            H += live * bump(sK, 0.08, sp) * sstep(0.2, 1.0, front) * 0.0012 * crease((sp - sK) / 0.05 * 2 * math.pi + 2 * wob)
+            H += live * patch_ * sstep(sK + 0.03, sK + 0.12, sp) * 0.0008 * crease((sp - sK) / 0.14 * 2 * math.pi + th + 4.5 * wob)
+            H += live * (0.4 + 0.6 * patch_) * sstep(CUFF - 0.2, CUFF - 0.08, sp) * 0.0026 * crease((sp - CUFF) / 0.045 * 2 * math.pi + th + 1.6 * np.sin(th + 0.4) + 4 * wob)
+            H += crinkle(Q, 0.0003)
+        elif nm == 'jacket':
+            g = sstep(HEM + 0.045, HEM + 0.06, sp) * (1 - sstep(HEM + 0.08, HEM + 0.2, sp)); H += g * patch_ * 0.0022 * crease(th * 14 + 4 * wob)
+            side = np.abs(out_); H += patch_ * bump(zP + 0.17, 0.09, sp) * (0.3 + 0.7 * side) * 0.0024 * crease((sp - zP) / 0.05 * 2 * math.pi + 2.2 * out_ + 4 * wob)
+            H += patch_ * bump(zS - 0.14, 0.1, sp) * sstep(0.3, 0.95, side) * 0.0022 * crease((sp - zS) / 0.05 * 2 * math.pi - side * 5 + 3 * wob)
+            H += crinkle(Q, 0.0006)
+        elif nm == 'hood':
+            # a hood hangs: soft folds fall from the crown down the back and pile where it meets the shoulders
+            H += patch_ * sstep(0.45, 0.7, sp) * (1 - sstep(0.95, 1.0, sp)) * np.clip(np.cos(th), 0, 1) * 0.0022 * crease(th * 7 + 3 * wob)
+            H += sstep(0.82, 0.95, sp) * 0.0018 * crease(th * 11 + 2 * wob)
+            H += crinkle(Q, 0.0005)
+        elif nm == 'seat':
+            H += 0.0018 * bump(zH - 0.03, 0.05, sp) * crease(th * 9 + 3 * wob) + crinkle(Q, 0.0003)
+    elif pc['mat'] in ('Hoodie', 'Pack', 'Trousers'): H += crinkle(Q, 0.0004)
+    elif pc['mat'] == 'Gloves': H += crinkle(Q, 0.00025)
+    if not pc['closed']:   # a sewn panel: its edge stands up
+        U, Vv = np.meshgrid(np.linspace(0, 1, w), np.linspace(0, 1, h)); e = np.minimum(np.minimum(U, 1 - U) * w, np.minimum(Vv, 1 - Vv) * h)
+        H += 0.0009 * sstep(0.0, 3.5, e)
+    return H, mx, my
+for pc, x, y, w, h in RECTS:
+    Hh, mx, my = fold_height(pc, w, h)
+    gx = np.gradient(Hh, axis=1) / np.maximum(1e-5, mx); gy = np.gradient(Hh, axis=0) / max(1e-5, my)
+    Nn = np.stack([-gx, -gy, np.ones_like(Hh)], -1); Nn /= np.linalg.norm(Nn, axis=-1, keepdims=True)
+    NIMG[y - 2:y + h + 2, x - 2:x + w + 2] = np.pad(Nn, ((2, 2), (2, 2), (0, 0)), mode='edge')
 for pc, x, y, w, h in RECTS:
     ao = occlusion(pc['P'], pc['nrm'])
     if pc['closed']: ao = np.concatenate([ao, ao[:, :1]], 1)
@@ -811,6 +883,14 @@ BM = {n: mat(n, (LOOKS[n][0],) * 3, LOOKS[n][1]) for n in MATS}
 ATLAS_IMG = bpy.data.images.new('writer-atlas', ATLAS, ATLAS); _px = np.ones((ATLAS * ATLAS, 4), np.float32); _px[:, :3] = IMG.ravel()[:, None]; ATLAS_IMG.pixels.foreach_set(_px.ravel())
 ATLAS_IMG.filepath_raw = os.path.join(bpy.app.tempdir, 'writer-atlas.jpg'); ATLAS_IMG.file_format = 'JPEG'; bpy.context.scene.render.image_settings.quality = 88; ATLAS_IMG.save()
 ATLAS_IMG = bpy.data.images.load(ATLAS_IMG.filepath_raw); ATLAS_IMG.pack()
+NORM_IMG = bpy.data.images.new('writer-normal', ATLAS, ATLAS); _px = np.ones((ATLAS * ATLAS, 4), np.float32); _px[:, :3] = (NIMG.reshape(-1, 3) * 0.5 + 0.5)
+NORM_IMG.pixels.foreach_set(_px.ravel()); NORM_IMG.filepath_raw = os.path.join(bpy.app.tempdir, 'writer-normal.jpg'); NORM_IMG.file_format = 'JPEG'; NORM_IMG.save()
+NORM_IMG = bpy.data.images.load(NORM_IMG.filepath_raw); NORM_IMG.colorspace_settings.name = 'Non-Color'; NORM_IMG.pack()
+def with_normal(M):
+    nt = M.node_tree; b = nt.nodes['Principled BSDF']; tex = nt.nodes.new('ShaderNodeTexImage'); tex.image = NORM_IMG; tex.name = 'folds'
+    uvn = nt.nodes.new('ShaderNodeUVMap'); uvn.uv_map = 'Atlas'; nt.links.new(uvn.outputs['UV'], tex.inputs['Vector'])
+    nm_ = nt.nodes.new('ShaderNodeNormalMap'); nm_.uv_map = 'Atlas'; nm_.inputs['Strength'].default_value = 1.0
+    nt.links.new(tex.outputs['Color'], nm_.inputs['Color']); nt.links.new(nm_.outputs['Normal'], b.inputs['Normal'])
 def with_atlas(M, multiply):
     """Wire the atlas into a material: straight into the base colour (for the export), or multiplied (for our pictures)."""
     nt = M.node_tree; b = nt.nodes['Principled BSDF']; tex = nt.nodes.get('atlas')
@@ -823,6 +903,7 @@ def with_atlas(M, multiply):
     else: nt.links.new(tex.outputs['Color'], b.inputs['Base Color'])
 for n in MATS:
     if n != 'Void': with_atlas(BM[n], False)
+    if n in ('Hoodie', 'Trousers', 'Gloves', 'Trim', 'Pack', 'Detail', 'Shoes'): with_normal(BM[n])
 OBJS = []
 for mesh in MESHES.values():
     V = np.concatenate(mesh.V); W = np.concatenate(mesh.W)
@@ -890,7 +971,7 @@ if RENDER:
     rc.V_all = V; rc.W4 = (top, w4); OBJS.append(o)
     for n in MATS:
         if n != 'Void': with_atlas(BM[n], True)
-    ATLAS_IMG.save_render(os.path.join(RENDER, TAG + '-atlas.jpg'))
+    ATLAS_IMG.save_render(os.path.join(RENDER, TAG + '-atlas.jpg')); NORM_IMG.save_render(os.path.join(RENDER, TAG + '-normal.jpg'))
     sc = bpy.context.scene; sc.render.engine = 'BLENDER_EEVEE'; sc.render.film_transparent = False
     try: sc.eevee.taa_render_samples = 24; sc.eevee.use_shadows = True; sc.eevee.use_raytracing = True
     except Exception as e: print('eevee', e)

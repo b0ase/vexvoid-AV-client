@@ -208,6 +208,14 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       // the model's atlas (second UV set): baked occlusion, seams and wear, multiplied into the cloth and used as its occlusion
       const std = mat as THREE.MeshStandardMaterial;
       if (src.map && std.isMeshStandardMaterial && !std.map) { std.map = src.map; std.aoMap = src.map; std.aoMapIntensity = 1; std.needsUpdate = true; }
+      // the model's cloth folds (a normal map on the atlas's UV set, pass 2) take the place of the tiling weave; the shell
+      // keeps its ripstop in a thin clear coat, so the street's lights still catch the weave
+      if (src.normalMap && std.isMeshStandardMaterial) {
+        const weave = std.normalMap; std.normalMap = src.normalMap; std.normalScale.copy(src.normalScale);
+        const ph = mat as THREE.MeshPhysicalMaterial;
+        if (weave && ph.isMeshPhysicalMaterial && src.name === 'Hoodie') { ph.clearcoat = 0.16; ph.clearcoatRoughness = 0.5; ph.clearcoatNormalMap = weave; ph.clearcoatNormalScale.set(0.7, 0.7); }
+        std.needsUpdate = true;
+      }
       const m = new THREE.SkinnedMesh(geo, mat); m.name = sm.name; m.userData.slot = src.name;
       meshes.push(m); owned.push(geo, mat);
     });
@@ -422,8 +430,9 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
   const can = new THREE.Group();
   const nozLocal = new THREE.Vector3(0, C.nozY, C.actR + 0.004);
   {
-    const metal = new THREE.MeshPhysicalMaterial({ color: '#c4c6cc', roughness: 0.28, metalness: 0.9, clearcoat: 0.6, clearcoatRoughness: 0.25 });
-    const white = new THREE.MeshStandardMaterial({ color: '#f2f2f2', roughness: 0.5 });
+    // (brushed, not chrome: a polished can under a street lamp bloomed into a white bar)
+    const metal = new THREE.MeshPhysicalMaterial({ color: '#a8aab0', roughness: 0.42, metalness: 0.85, clearcoat: 0.25, clearcoatRoughness: 0.35 });
+    const white = new THREE.MeshStandardMaterial({ color: '#e6e6e6', roughness: 0.55 });
     const dark = new THREE.MeshStandardMaterial({ color: '#2a2a2e', roughness: 0.4 });
     // the body by its outline, turned round its axis: rolled base, body, domed shoulder, valve cup
     const prof: THREE.Vector2[] = [new THREE.Vector2(0, C.b0 + 0.004), new THREE.Vector2(C.r * 0.8, C.b0), new THREE.Vector2(C.r * 0.95, C.b0 + 0.002), new THREE.Vector2(C.r, C.b0 + 0.007)];
@@ -480,10 +489,10 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       hTip.copy(iC).sub(iB).normalize().multiplyScalar(0.085).add(iC);
       const carrying = sa.s === 'Right' && carryW > 0.5 && canAxis(cA, cU);
       W1.pen = 0; if (fixUpper) armPen(iA, iB, R_UP, 0.5, 4, W1);
-      if (W1.pen > 0.001) { ax.subVectors(W1.p, iA); const L = ax.length(); ax.cross(W1.dir).normalize(); if (ax.lengthSq() > 0.5) { spin(sa.arm, qr.setFromAxisAngle(ax, Math.atan2(W1.pen, L) * 1.05)); continue; } }
+      if (W1.pen > 0.001) { ax.subVectors(W1.p, iA); const L = ax.length(); tv3.copy(ax); ax.cross(W1.dir); if (ax.lengthSq() < 1e-8) ax.crossVectors(tv3, UP); ax.normalize(); if (ax.lengthSq() > 0.5) { spin(sa.arm, qr.setFromAxisAngle(ax, Math.atan2(W1.pen, L) * 1.12)); continue; } }
       W1.pen = 0; armPen(iB, iC, R_FORE, 0.15, 4, W1); armPen(iC, hTip, R_HAND, 0, 3, W1);
       if (carrying) { tv3.copy(cA).addScaledVector(cU, CAN.y0 * 0.9); armPen(cA, tv3, R_CAN, 0, 3, W1); }
-      if (W1.pen > 0.001) { ax.subVectors(W1.p, iB); const L = ax.length(); ax.cross(W1.dir).normalize(); if (ax.lengthSq() > 0.5) { spin(sa.fore, qr.setFromAxisAngle(ax, Math.atan2(W1.pen, L) * 1.05)); continue; } }
+      if (W1.pen > 0.001) { ax.subVectors(W1.p, iB); const L = ax.length(); tv3.copy(ax); ax.cross(W1.dir); if (ax.lengthSq() < 1e-8) ax.crossVectors(tv3, UP); ax.normalize(); if (ax.lengthSq() > 0.5) { spin(sa.fore, qr.setFromAxisAngle(ax, Math.atan2(W1.pen, L) * 1.12)); continue; } }
       break;
     }
   };
@@ -847,7 +856,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
         // whatever the reach could not avoid, the arm is pushed out of the trunk like a clip's arm; then the hand turns
         // back so the can points at the spot from where it is
         if (armsFix) {
-          pushOut(sideArms[1], true, 6);
+          pushOut(sideArms[1], true, 10);
           if (gripPos) { rHand.getWorldPosition(tv2); rHand.getWorldQuaternion(qb); tv3.copy(gripPos).multiplyScalar(kS).applyQuaternion(qb).add(tv2); gQ.setFromRotationMatrix(gM.lookAt(aimAt, tv3, UP)); gH.copy(gQ).multiply(gripInv); rHand.parent!.getWorldQuaternion(qp); qb.copy(qp).invert().multiply(gH); rHand.quaternion.slerp(qb, aimW); rHand.updateMatrixWorld(true); }
         }
       } else { swivel = NaN; reachTw = 0; reachPull = 0; reachSw = 0; ikBest = null; }
