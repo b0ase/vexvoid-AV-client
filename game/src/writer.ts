@@ -30,7 +30,7 @@ export type Writer = {
   twist: (a: number) => void;
   /** The head on the body, for tests: drift (m) of the head bone from its rest place in the chest's frame, the neck's
    *  and head's turn from rest (rad), and how much the head-to-neck distance has changed (m). */
-  head: (o?: { steady?: boolean }) => { drift: number; neck: number; head: number; gap: number; hood: number; worst: string; pts: number; wob: number };
+  head: (o?: { steady?: boolean; silhouette?: boolean; square?: boolean }) => { drift: number; neck: number; head: number; gap: number; hood: number; worst: string; pts: number; wob: number; sil?: Silhouette };
   /** A landing: the body gives a little (k 0..1, how hard). */
   land: (k: number) => void;
   /** Hold still (painting): the standing clips stop breathing and swaying, so a raised can stays where it is aimed. */
@@ -69,7 +69,12 @@ export type Writer = {
 };
 
 const HEIGHT = 1.78;
-export type GripReport = { shown: boolean; pen: number; gap: number; wrap: number; n: number };
+/** The figure as seen from behind (pass 3): per 2 cm band of height above the soles, the widest the body reaches either
+ *  side of the hips' middle (half width, m) and how far back it reaches behind it (m); and from those the head's width
+ *  (the hood round the skull), the shoulders' width, the neck (the narrowest band between them) and the column (how far
+ *  down from the crown the figure stays no wider than 1.2 x the head: a "periscope" neck is a long column). Arms out. */
+export type Silhouette = { bands: [number, number, number][]; top: number; headW: number; shoulderW: number; neckW: number; ratio: number; column: number; shoulderDrop: number[] };
+export type GripReport = { shown: boolean; pen: number; gap: number; wrap: number; n: number; tilt?: number; fore?: number; palm?: number };
 // the spray can's body in its own frame (metres): radius and where the cylinder runs along its axis
 const CAN = { r: 0.033, y0: -0.165, y1: 0.025 };
 export type GaitInfo = { on: boolean; rest: number[]; clips: Record<string, { v: number; stride: number; lift?: number[]; zr?: number[] }>; speed: number; mix: string; bodyOff: number;
@@ -114,6 +119,9 @@ const LOOK: Record<string, () => THREE.Material> = {
   // cotton and canvas: a soft sheen at grazing angles, the thing that makes cloth read as cloth
   // the jacket is a technical shell: a tight ripstop with a sheen, so the street's rim lights draw its folds
   Hoodie: () => new THREE.MeshPhysicalMaterial({ color: '#4a4b51', roughness: 0.6, metalness: 0, sheen: 0.9, sheenRoughness: 0.45, sheenColor: new THREE.Color('#a4a5ad'), normalScale: new THREE.Vector2(0.45, 0.45), ...weave('ripstop', 44) }),
+  // the hoodie under the shell (pass 3): its hood is up and out over the jacket. Matte heather cotton, a lighter grey
+  // than the black shell, so the hood reads as its own garment and the shoulders as the jacket's
+  Cotton: () => new THREE.MeshPhysicalMaterial({ color: '#8d8e93', roughness: 0.93, metalness: 0, sheen: 0.6, sheenRoughness: 0.8, sheenColor: new THREE.Color('#6c6d72'), normalScale: new THREE.Vector2(0.6, 0.6), ...weave('knit', 80) }),
   Trousers: () => new THREE.MeshPhysicalMaterial({ color: '#5d5e64', roughness: 0.84, metalness: 0, sheen: 0.5, sheenRoughness: 0.65, sheenColor: new THREE.Color('#84848a'), normalScale: new THREE.Vector2(0.5, 0.5), ...weave('twill', 30) }),
   Gloves: () => new THREE.MeshStandardMaterial({ color: '#34353a', roughness: 0.55, metalness: 0, normalScale: new THREE.Vector2(0.4, 0.4), ...weave('knit', 70) }),
   Trim: () => new THREE.MeshStandardMaterial({ color: '#2a2b30', roughness: 0.9, metalness: 0, normalScale: new THREE.Vector2(0.8, 0.8), ...weave('knit', 60) }),
@@ -418,6 +426,28 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       }
     }
   }
+  // the silhouette from behind (for tests: see Silhouette). Every skinned vertex but the forearms, hands and fingers.
+  const armIdx = new Set(bones.map((b, i) => (/(ForeArm|Hand)/.test(b.name) ? i : -1)).filter((i) => i >= 0));
+  const silhouette = (): Silhouette => {
+    root.updateMatrixWorld(true); for (const m of meshes) m.skeleton?.update();
+    const inv = root.matrixWorld.clone().invert(), v = new THREE.Vector3(), hipsW = hips.getWorldPosition(new THREE.Vector3()).applyMatrix4(inv);
+    const N = 100, half = new Array(N).fill(0), back = new Array(N).fill(0); let top = 0;
+    for (const m of meshes) {
+      const si = m.geometry.attributes.skinIndex, sw = m.geometry.attributes.skinWeight, n = m.geometry.attributes.position.count;
+      for (let i = 0; i < n; i++) {
+        let bi = si.getX(i), bw = sw.getX(i); for (let c = 1; c < 4; c++) if (sw.getComponent(i, c) > bw) { bw = sw.getComponent(i, c); bi = si.getComponent(i, c); }
+        if (armIdx.has(bi)) continue;
+        m.getVertexPosition(i, v); v.applyMatrix4(m.matrixWorld).applyMatrix4(inv);
+        const k = Math.floor(v.y / 0.02); if (k < 0 || k >= N) continue; top = Math.max(top, v.y);
+        half[k] = Math.max(half[k], Math.abs(v.x - hipsW.x)); back[k] = Math.max(back[k], -(v.z - hipsW.z));
+      }
+    }
+    const at = (z0: number, z1: number, f: (a: number[]) => number) => f(half.slice(Math.max(0, Math.floor(z0 / 0.02)), Math.floor(z1 / 0.02) + 1).filter((x) => x > 0));
+    const headW = at(top - 0.16, top - 0.04, (a) => Math.max(...a)), shoulderW = at(top - 0.42, top - 0.28, (a) => Math.max(...a)), neckW = at(top - 0.28, top - 0.16, (a) => Math.min(...a));
+    let column = 0; for (let k = Math.floor(top / 0.02); k >= 0; k--) { if (half[k] > headW * 1.2) { column = top - (k + 1) * 0.02; break; } }
+    const r = (x: number) => Math.round(x * 1000) / 1000;
+    return { bands: half.map((h, k) => [r(k * 0.02), r(h), r(back[k])] as [number, number, number]).filter((b) => b[0] > top - 0.6 && b[1] > 0), top: r(top), headW: r(headW), shoulderW: r(shoulderW), neckW: r(neckW), ratio: r(shoulderW / headW), column: r(column), shoulderDrop: shoulderDrop.map(r) };
+  };
   let life = 0, lt = 0, frozen: number | null = null;
   // spraying: the right arm reaches for the wall (two-bone IK over whatever clip plays) with a can in the hand
   const rArm = B('RightArm'), rFore = B('RightForeArm'), rHand = B('RightHand'), spine2 = B('Spine2');
@@ -703,6 +733,33 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
     const a = shR.angleTo(shQ); if (a > STEADY.cap) { shR.slerp(shQ, STEADY.cap / a); shQ.copy(shR); }
     headB.quaternion.copy(shP.invert().multiply(shQ)); headB.updateMatrixWorld(true);
   };
+  // SQUARE SHOULDERS (pass 3, owner: from behind the neck looked "kinda... not right"): the library's clips shrug both
+  // collar bones, the arm joints riding 3-4 cm higher against the chest than the model was built, so the jacket's
+  // shoulders pushed up round the hood and sloped away. Each frame the collar bone turns back down until its arm joint
+  // is where the model has it (lowered only, never raised; the clip's own forward/back roll is kept).
+  const shoulderFix = (['Left', 'Right'] as const).map((s) => {
+    const sh = B(s + 'Shoulder'), armB = B(s + 'Arm'), b = vx.bind;
+    if (!b?.[spine2.name] || !b[armB.name] || !b[neckB.name]) return null;
+    const inv = new THREE.Matrix4().fromArray(b[spine2.name]).invert();
+    const arm = new THREE.Vector3().setFromMatrixPosition(new THREE.Matrix4().fromArray(b[armB.name])).applyMatrix4(inv);
+    const up = new THREE.Vector3().setFromMatrixPosition(new THREE.Matrix4().fromArray(b[neckB.name])).applyMatrix4(inv).normalize();
+    return { sh, armB, arm, up, h: arm.dot(up) };
+  });
+  const sqA = new THREE.Vector3(), sqS = new THREE.Vector3(), sqU = new THREE.Vector3(), sqT = new THREE.Vector3();
+  let shoulderDrop = [0, 0], squareOn = true;
+  const squareShoulders = () => {
+    if (!squareOn) return;
+    root.updateMatrixWorld(true);
+    shoulderFix.forEach((f, i) => {
+      if (!f) return;
+      f.armB.getWorldPosition(sqA); const loc = spine2.worldToLocal(sqT.copy(sqA)); const ex = loc.dot(f.up) - f.h;
+      shoulderDrop[i] = ex; if (ex < 0.002) return;
+      // the chest's up in the world, and the arm joint lowered along it by the excess (skeleton units to world: kS)
+      spine2.getWorldQuaternion(qb); sqU.copy(f.up).applyQuaternion(qb);
+      f.sh.getWorldPosition(sqS); sqT.copy(sqA).addScaledVector(sqU, -ex * kS * 0.95);
+      turn(f.sh, sqA.sub(sqS).normalize(), sqT.sub(sqS).normalize(), 1);
+    });
+  };
   let baseY = char.position.y;
   const iU = new THREE.Vector3(), qF = new THREE.Quaternion();
   const legIK = (lg: { up: THREE.Bone; knee: THREE.Bone; foot: THREE.Bone }, lift: number) => {
@@ -782,6 +839,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
     twist: (a) => { twistA = a; },
     head: (o) => {
       if (o && o.steady != null) STEADY.on = !!o.steady;
+      if (o && o.square != null) squareOn = !!o.square;   // (tests: the clips' shrug as it was, for a before/after)
       root.updateMatrixWorld(true);
       const hp = headB.getWorldPosition(hdV[0]), np = neckB.getWorldPosition(hdV[1]), rest = spine2.localToWorld(hdV[2].copy(headRest.inChest));
       const ang = (q: THREE.Quaternion) => 2 * Math.acos(Math.min(1, Math.abs(q.w)));
@@ -792,7 +850,9 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       // the head's turn against the body since the last call (a wobble shows as big changes, frame to frame)
       const hr = root.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(headB.getWorldQuaternion(new THREE.Quaternion()));
       const wob = lastHR ? lastHR.angleTo(hr) : 0; lastHR = hr;
-      return { drift, neck: ang(neckB.quaternion), head: ang(headB.quaternion), gap, hood, worst, pts: hoodPts.length, wob };
+      const out: ReturnType<Writer['head']> = { drift, neck: ang(neckB.quaternion), head: ang(headB.quaternion), gap, hood, worst, pts: hoodPts.length, wob };
+      if (o?.silhouette) out.sil = silhouette();
+      return out;
     },
     land: (k) => { dip = Math.min(dip, -0.09 * Math.max(0, Math.min(1, k))); },
     grounded: (on) => { onGround = on; },
@@ -846,6 +906,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
         neckB.rotateY(look * 0.18 * life); headB.rotateY(look * 0.22 * life); headB.rotateX((Math.sin(lt * 0.37) * 0.06 + 0.03) * life);
       }
       steadyHead(dt);
+      squareShoulders();
       if (ground) { if (feetOn) fitFeet(dt); else soleNow(); measure(dt); }
       aimW += ((aimOn ? aimTo : 0) - aimW) * Math.min(1, dt * 9);
       carryW += ((carryOn ? 1 : 0) - carryW) * Math.min(1, dt * 10);

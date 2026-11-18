@@ -15,7 +15,8 @@ gathered over high-top trainers, gloves, a backpack with cans. Everything is mod
   weights   written by rule, not by heat: each ring of a sleeve or a leg knows how far along the limb it is.
   textures  one atlas (second UV set) with baked occlusion, seams, panels and wear; the first UV set is real-size for
             the game's tiling weave.
-Materials are named for the game (Hoodie, Trousers, Gloves, Shoes, Sole, Void, Trim, Mask, Pack, Can, Cap, Reflect),
+Materials are named for the game (Hoodie = the shell jacket, Cotton = the hoodie's hood, Trousers, Gloves, Shoes, Sole, Void,
+Trim, Mask, Pack, Can, Cap, Reflect),
 which swaps in its own. Mesh names matter to the police (game/src/cops.ts hides Hood, Pack, Can, Cap, String).
 Improve the character here: change a number, rerun with a render folder, look at the pictures, rebuild the game.
 """
@@ -114,6 +115,10 @@ REST0 = {b: v.copy() for b, v in REST.items()}
 for _s in ('Left', 'Right'):
     REST[_s + 'Leg'] = REST[_s + 'Leg'] * LEG_S; REST[_s + 'Foot'] = REST[_s + 'Foot'] * LEG_S
     REST[_s + 'ForeArm'] = REST[_s + 'ForeArm'] * UPARM_S; REST[_s + 'Hand'] = REST[_s + 'Hand'] * FOREARM_S
+# (pass 3, owner: the neck from behind looks "kinda... not right"): the library's neck joint sits 26 cm over the chest
+# joint, so the head rode high over sloping shoulders. The neck is a little shorter, so the head sits down in the hood.
+NECK_S = 0.92
+REST['Neck'] = REST['Neck'] * NECK_S
 HIPSY = {}
 def _lift(clip, t):
     a, b = pose(clip, t, REST0), pose(clip, t, REST)
@@ -238,7 +243,7 @@ MIR = np.array([BI[b.replace('Left', '@').replace('Right', 'Left').replace('@', 
 MESHES = {}; PIECES = []
 class Mesh:
     def __init__(s, name): s.name = name; s.V = []; s.W = []; s.F = []; s.M = []; s.UV = []; s.UP = []; s.PID = []; s.n = 0; MESHES[name] = s
-MATS = ['Hoodie', 'Trousers', 'Gloves', 'Shoes', 'Sole', 'Void', 'Trim', 'Mask', 'Pack', 'Can', 'Cap', 'Reflect', 'Detail']
+MATS = ['Hoodie', 'Trousers', 'Gloves', 'Shoes', 'Sole', 'Void', 'Trim', 'Mask', 'Pack', 'Can', 'Cap', 'Reflect', 'Detail', 'Cotton']
 def grid(mesh, P, mat, W, closed=True, cap0=False, cap1=False, out=None, mirror=False, name='', paint=None, texel=1.0):
     """Add a grid of points P (rings, around, 3) to a mesh as quads. W: weights (rings*around, bones). closed: the rings
     join up. cap0/cap1: close the first/last ring with a fan. mirror: add the right-hand twin too. paint: how the atlas
@@ -299,19 +304,35 @@ def spine_w(X):
     left = X[:, 0] > CX
     return weights(Hips=1 - a, Spine=a * (1 - b), Spine1=b * (1 - c), Spine2=c * (1 - sh), LeftShoulder=c * sh * left, RightShoulder=c * sh * ~left)
 HEM = zP - 0.02    # the jacket's hem: a waist-length shell, short enough that a lifted thigh clears it
-TZ = [HEM, HEM + 0.05, HEM + 0.11, zP + 0.26, zS - 0.13, zS - 0.02, zS + 0.05, zS + 0.095, zN + 0.0]
-t_a = curve(TZ, [0.166, 0.167, 0.172, 0.166, 0.176, 0.18, 0.168, 0.124, 0.084])     # half width (pass 2: lean, not puffy)
-t_f = curve(TZ, [0.104, 0.105, 0.11, 0.106, 0.116, 0.11, 0.097, 0.082, 0.071])     # depth to the front
-t_b = curve(TZ, [0.096, 0.098, 0.104, 0.102, 0.11, 0.108, 0.102, 0.09, 0.08])     # depth to the back
-t_y = curve(TZ, [J['Hips'][1] - 0.005, J['Hips'][1] - 0.005, J['Hips'][1] - 0.01, J['Spine1'][1], J['Spine2'][1] + 0.02, J['Spine2'][1] + 0.035, J['LeftArm'][1] - 0.02, J['Head'][1] - 0.02, J['Head'][1] - 0.012])
-t_n = curve(TZ, [2.6, 2.6, 2.7, 2.7, 2.6, 2.4, 2.2, 2.1, 2.0])
+# (pass 3: square shoulders. Pass 2's jacket narrowed in a dome from the armpits to the neck, so the shoulders sloped
+#  away under the hood. Now the shoulder line runs out level to the deltoids and the trapezius slopes in to the neck.)
+TZ = [HEM, HEM + 0.05, HEM + 0.11, zP + 0.26, zS - 0.13, zS - 0.02, zS + 0.03, zS + 0.055, zS + 0.075, zN + 0.0]
+t_a = curve(TZ, [0.166, 0.167, 0.172, 0.168, 0.184, 0.2, 0.197, 0.17, 0.124, 0.074])     # half width (pass 2: lean, not puffy)
+t_f = curve(TZ, [0.104, 0.105, 0.11, 0.106, 0.116, 0.112, 0.1, 0.09, 0.08, 0.068])     # depth to the front
+t_b = curve(TZ, [0.096, 0.098, 0.104, 0.102, 0.11, 0.11, 0.104, 0.096, 0.086, 0.074])     # depth to the back
+t_y = curve(TZ, [J['Hips'][1] - 0.005, J['Hips'][1] - 0.005, J['Hips'][1] - 0.01, J['Spine1'][1], J['Spine2'][1] + 0.02, J['Spine2'][1] + 0.035, J['LeftArm'][1] - 0.02, J['LeftArm'][1] - 0.021, J['Head'][1] - 0.015, J['Head'][1] - 0.012])
+t_n = curve(TZ, [2.6, 2.6, 2.7, 2.7, 2.6, 2.6, 2.7, 2.5, 2.2, 2.0])
 def torso_surface(z, th):
     """The jacket body: a point for each height z and angle th round the trunk (0 front, a quarter turn = his left)."""
     z, th = np.broadcast_arrays(np.asarray(z, float), np.asarray(th, float)); c = np.cos(th); n = t_n(z)
     x = CX + t_a(z) * sup(np.sin(th), n); y = t_y(z) - np.where(c > 0, t_f(z), t_b(z)) * sup(c, n)
     return np.stack([x, y, z], -1)
 NT = 64; th_t = np.arange(NT) / NT * 2 * math.pi
-z_t = np.concatenate([np.linspace(TZ[0], TZ[2], 7)[:-1], np.linspace(TZ[2], TZ[5], 22)[:-1], np.linspace(TZ[5], TZ[8], 12)])
+z_t = np.concatenate([np.linspace(TZ[0], TZ[2], 7)[:-1], np.linspace(TZ[2], TZ[5], 22)[:-1], np.linspace(TZ[5], TZ[9], 15)])
+_THF = np.linspace(0, 2 * math.pi, 361)
+def torso_r(z, phi):
+    """How far the jacket's surface is from the trunk's middle line (CX, t_y(z)) at heights z, toward polar angles phi
+    (0 = straight ahead, a quarter turn = his left). For laying the hood and the sleeves' seams on it."""
+    z = np.atleast_1d(np.asarray(z, float)); phi = np.atleast_1d(np.asarray(phi, float))
+    S = torso_surface(z[:, None], _THF[None]); dx = S[..., 0] - CX; dy = -(S[..., 1] - t_y(z)[:, None])
+    ps = np.unwrap(np.arctan2(dx, dy), axis=1); rs = np.hypot(dx, dy); out = np.empty(len(z))
+    for i in range(len(z)):
+        p = (phi[i] - ps[i, 0]) % (2 * math.pi) + ps[i, 0]; out[i] = np.interp(p, ps[i], rs[i])
+    return out
+def polar(P):
+    """Each point's height, polar angle round the trunk's middle line and distance from it."""
+    P = np.asarray(P, float).reshape(-1, 3); dx = P[:, 0] - CX; dy = -(P[:, 1] - t_y(P[:, 2]))
+    return P[:, 2], np.arctan2(dx, dy), np.hypot(dx, dy)
 Pt = torso_surface(z_t[:, None], th_t[None])
 def torso_folds(P):
     n = grid_normals(P, True); z = P[..., 2]; th = np.broadcast_to(th_t[None], z.shape); front = np.cos(th); side = np.abs(np.sin(th))
@@ -339,8 +360,10 @@ def limb_path(names, lead=0.12):
     return curve(xs, ys), d
 arm_path, arm_d = limb_path(['LeftArm', 'LeftForeArm', 'LeftHand']); sE, sW = arm_d[1], arm_d[2]
 NS = 28; th_s = np.arange(NS) / NS * 2 * math.pi
-s_s = np.concatenate([np.linspace(-0.1, 0.0, 6)[:-1], np.linspace(0.0, sW - 0.075, 38)[:-1], np.linspace(sW - 0.075, sW - 0.01, 7)])
-r_sleeve = curve([-0.1, -0.07, -0.02, 0.06, sE - 0.03, sE + 0.06, sW - 0.1, sW - 0.075, sW - 0.055, sW - 0.01], [0.012, 0.05, 0.064, 0.062, 0.056, 0.054, 0.05, 0.047, 0.041, 0.039])
+# (pass 3: the cap is a set-in sleeve's, rounding over the deltoid and gone into the body: pass 2's ran on up the line of
+#  the arm toward the neck, which made one long slope from the hood down the arm)
+s_s = np.concatenate([np.linspace(-0.08, 0.0, 6)[:-1], np.linspace(0.0, sW - 0.075, 38)[:-1], np.linspace(sW - 0.075, sW - 0.01, 7)])
+r_sleeve = curve([-0.08, -0.055, -0.025, 0.05, sE - 0.03, sE + 0.06, sW - 0.1, sW - 0.075, sW - 0.055, sW - 0.01], [0.01, 0.036, 0.058, 0.064, 0.056, 0.054, 0.05, 0.047, 0.041, 0.039])
 Ps, Cs, Ts, EFs, EOs = tube(arm_path, s_s, r_sleeve(s_s) * 0.95, r_sleeve(s_s), th_s)
 def sleeve_folds(P):
     n = grid_normals(P, True); s = np.broadcast_to(s_s[:, None], P.shape[:2]); th = np.broadcast_to(th_s[None], P.shape[:2])
@@ -441,44 +464,81 @@ for sgn in (1, -1):                                                             
     patch(body, Pt, Nt, rz(HEM + 0.1, HEM + 0.22), np.sort(sgn * ct(0.5, 1.05)), 0.005, 'Hoodie', Wt, 'pocket')
 patch(body, Pt, Nt, rz(zS - 0.06, zS + 0.0), ct(math.pi - 0.75, math.pi + 0.75), 0.004, 'Hoodie', Wt, 'yoke')  # a back yoke under the pack's top
 
-# ───────────────────────────── the hood: a tube that turns from the face to the neck ─────────────────────────────
+# ───────────────────────────── the pack's straps (laid out here: the hood drapes over them) ─────────────────────────────
+def on_torso(th, z, off): p = torso_surface(z, th); e = 1e-3; n = unit(np.cross(torso_surface(z, th + e) - p, torso_surface(z + e, th) - p)); return p + n * off, n
+PACK_DZ = -0.11   # (pass 3: the pack rides lower, under the shoulder blades, so the hood can drape onto the upper back)
+STRAPS = []
+for sgn in (1, -1):
+    # up from the pack's top, over the trapezius (not up the neck, as in pass 2), down the chest and back under the arm
+    keys = np.array([[2.78, zS - 0.08], [2.6, zS - 0.01], [2.45, zS + 0.035], [2.15, zS + 0.056], [1.57, zS + 0.063], [1.0, zS + 0.056], [0.7, zS + 0.03], [0.55, zS - 0.04], [0.55, zS - 0.19], [0.72, zS - 0.28], [1.4, zS - 0.345], [2.3, zS - 0.365]])
+    kk = resample(np.concatenate([keys, np.zeros((len(keys), 1))], 1), 40); pts, nn = on_torso(sgn * kk[:, 0], kk[:, 1], 0.009)
+    STRAPS.append((pts, nn))
+
+# ───────────────────────────── the hood: from the face over the head, then a cowl draped on the shoulders ─────────────────────────────
 hood = Mesh('SM_Char_Writer_Hood')
 HY, HZ = J['Head'][1], zN                                    # the base of the neck; the skull sits forward and above it
-HU = [0.0, 0.15, 0.4, 0.65, 0.85, 1.0]
 # (owner, 16 Nov: the old hood closed round the face like Kenny's, under the chin and over the nose. A real hoodie:
 #  the opening runs from the brow down to the throat, leaning back at the bottom, and the hood falls to the shoulders)
-# (pass 2: the head is a real size on the longer body, so the hood is lower, slimmer and closer round it)
-h_c = curve(HU, [(HY - 0.138, HZ + 0.075), (HY - 0.106, HZ + 0.088), (HY - 0.044, HZ + 0.113), (HY - 0.002, HZ + 0.07), (HY + 0.012, HZ + 0.01), (HY + 0.014, HZ - 0.068)])
-h_ang = curve(HU, np.radians([-14, -4, 22, 62, 86, 90]))
-h_a = curve(HU, [0.082, 0.104, 0.122, 0.127, 0.134, 0.165])     # half width (pass 2: fuller behind, flowing onto the shoulders)
-h_top = curve(HU, [0.097, 0.108, 0.115, 0.112, 0.106, 0.11])     # over the head, then down the back
-h_bot = curve(HU, [0.138, 0.13, 0.104, 0.058, 0.068, 0.085])     # down the throat (open), then round the neck
-NH = 40; psi = np.arange(NH) / NH * 2 * math.pi; u_h = np.concatenate([np.linspace(0, 0.15, 5)[:-1], np.linspace(0.15, 1.0, 26)])
+# (pass 3, owner: from behind the hood was "a periscope neck": a tall tube dropping straight into the pack. A hood that
+#  is up hangs off the head and its back falls open onto the shoulders and the upper back, gathering where it lands:
+#  below the back of the skull the rings widen out to the shoulders and are laid onto the jacket, with folds)
+HU = [0.0, 0.15, 0.4, 0.62, 0.78, 0.9, 1.0]
+h_c = curve(HU, [(HY - 0.138, HZ + 0.075), (HY - 0.106, HZ + 0.088), (HY - 0.044, HZ + 0.113), (HY - 0.006, HZ + 0.072), (HY + 0.012, HZ + 0.022), (HY + 0.016, HZ - 0.03), (HY + 0.014, HZ - 0.078)])
+h_ang = curve(HU, np.radians([-14, -4, 22, 60, 80, 88, 90]))
+h_a = curve(HU, [0.082, 0.104, 0.118, 0.13, 0.152, 0.176, 0.19])     # half width: the head, then out over the shoulders
+h_top = curve(HU, [0.097, 0.108, 0.113, 0.112, 0.118, 0.13, 0.142])    # over the head, then down onto the upper back
+h_bot = curve(HU, [0.138, 0.13, 0.104, 0.058, 0.064, 0.074, 0.082])    # down the throat (open), then onto the chest
+NH = 48; psi = np.arange(NH) / NH * 2 * math.pi
+u_h = np.concatenate([np.linspace(0, 0.15, 5)[:-1], np.linspace(0.15, 0.72, 18)[:-1], np.linspace(0.72, 1.0, 12)])
 def hood_ring(u):
     c = h_c(u); a = h_ang(u); cu = np.cos(psi); top = cu > 0
     up = np.array([0, math.sin(a), math.cos(a)]); r = np.where(top, h_top(u), h_bot(u))
     peak = 0.006 * bump(0.5, 0.1, u) * np.clip(cu, 0, 1) ** 6                                   # the soft point at the back of the crown
-    seam = -0.004 * (bump(0.55, 0.07, psi) + bump(2 * math.pi - 0.55, 0.07, psi)) * top * sstep(0.1, 0.25, u)   # the centre panel's two seams
-    P = np.array([CX, c[0], c[1]]) + np.outer(h_a(u) * sup(np.sin(psi), 2.3), [1, 0, 0]) + np.outer((r + peak + seam) * sup(cu, 2.2), up)
+    seam = -0.004 * (bump(0.55, 0.07, psi) + bump(2 * math.pi - 0.55, 0.07, psi)) * top * sstep(0.1, 0.25, u) * (1 - sstep(0.7, 0.85, u))   # the centre panel's two seams
+    pw = 2.3 - 0.35 * bump(0.42, 0.16, u)                                                       # a round crown, not a box
+    P = np.array([CX, c[0], c[1]]) + np.outer(h_a(u) * sup(np.sin(psi), pw), [1, 0, 0]) + np.outer((r + peak + seam) * sup(cu, 2.2), up)
+    P[:, 2] += 0.045 * sstep(0.2, 1.0, -cu) * sstep(0.75, 1.0, u)                               # the neckline rises to the throat in front
     brim = sstep(0.25, 0.95, cu) * (1 - sstep(0.0, 0.14, u))                                    # the stiffened peak over the brow
     P[:, 1] -= 0.045 * brim; P[:, 2] -= 0.012 * brim
     chin = sstep(0.3, 1.0, -cu) * (1 - sstep(0.0, 0.2, u))                                      # the open bottom tucks back to the throat
     P[:, 1] += 0.012 * chin
     return P
 Ph = np.array([hood_ring(u) for u in u_h])
-# folds: the hood slumps on the shoulders behind, and the cloth is never drum-tight
-uu = np.broadcast_to(u_h[:, None], Ph.shape[:2]); pp = np.broadcast_to(psi[None], Ph.shape[:2]); nh = grid_normals(Ph, True)
-dh = 0.004 * sstep(0.55, 0.75, uu) * (1 - sstep(0.93, 1.0, uu)) * np.clip(np.cos(pp), 0, 1) * crease(pp * 6 + 4 * fbm(Ph, 0.1, 51.0))   # (pass 2: folds fall down the back, not round it)
+uu = np.broadcast_to(u_h[:, None], Ph.shape[:2]); pp = np.broadcast_to(psi[None], Ph.shape[:2])
+# the cowl: from below the back of the skull the cloth is laid onto the jacket (and over the straps), more and more
+# toward its edge; where it lands it gathers in soft folds that run down from the neck
+def drape(P, w, off):
+    """Points P (n, 3) pulled toward the jacket's surface by w (0..1), to `off` outside it, and never inside it."""
+    z, ph, rho = polar(P); want = torso_r(z, ph) + off; r2 = rho + (want - rho) * w; r2 = np.maximum(r2, torso_r(z, ph) + 0.004)
+    Q = P.copy(); Q[:, 0] = CX + np.sin(ph) * r2; Q[:, 1] = t_y(z) - np.cos(ph) * r2
+    for pts, nn in STRAPS:   # over a strap: lifted clear of it, eased off at its edges
+        d = Q[:, None] - pts[None]; k = np.argmin((d ** 2).sum(-1), 1); dd = Q - pts[k]; n_ = nn[k]
+        along = np.gradient(pts, axis=0)[k]; side_ = unit(np.cross(n_, unit(along))); lat = np.abs((dd * side_).sum(1)); h = (dd * n_).sum(1)
+        lift = (0.02 - h) * (1 - sstep(0.02, 0.034, lat)) * (h > -0.02); Q += n_ * np.clip(lift, 0, None)[:, None]
+    return Q
+wd = sstep(0.66, 0.97, uu) ** 1.5                                                                       # how much each point lies on the body
+gather = bump(1.0, 0.16, uu) * (0.5 + 0.5 * np.abs(np.cos(pp)))
+off = 0.006 + 0.008 * gather * np.clip(crease(pp * 9 + 3.5 * fbm(Ph, 0.08, 57.0)) * 0.5 + 0.5, 0, 1)   # folds stand off the shoulders
+Ph = drape(Ph.reshape(-1, 3), wd.ravel(), off.ravel()).reshape(Ph.shape)
+# folds: the hood slumps behind the head, the cowl gathers, and the cloth is never drum-tight
+nh = grid_normals(Ph, True)
+dh = 0.004 * sstep(0.5, 0.7, uu) * (1 - sstep(0.85, 0.95, uu)) * np.clip(np.cos(pp), 0, 1) * crease(pp * 6 + 4 * fbm(Ph, 0.1, 51.0))
 dh += 0.004 * fbm(Ph, 0.09, 53.0) * sstep(0.05, 0.2, uu)
 Ph = Ph + nh * dh[..., None]
+# the edge where it lies on the jacket: the cloth turns under, so it has a thickness and no gap shows
+last = Ph[-1]; zl, pl, _ = polar(last); under = last.copy(); rr_ = torso_r(zl, pl) + 0.002
+under[:, 0] = CX + np.sin(pl) * rr_; under[:, 1] = t_y(zl) - np.cos(pl) * rr_; under[:, 2] -= 0.004
+roll = (last + under) / 2 + (last - Ph[-2]) * 0.2
+Ph = np.concatenate([Ph, roll[None], under[None]]); u_h2 = np.concatenate([u_h, [1.0, 1.0]])
 # the opening's edge: the cloth turns in over a drawcord channel, then the lining runs back inside
 c0 = Ph[0].mean(0)
 lip = c0 + (Ph[0] - c0) * 0.93 + np.array([0, -0.01, 0]); inner = c0 + (Ph[0] - c0) * 0.87 + np.array([0, 0.004, 0]); deep = c0 + (Ph[0] - c0) * 0.9 + np.array([0, 0.05, 0])
-Ph = np.concatenate([deep[None], inner[None], lip[None], Ph]); u_hx = np.concatenate([[0, 0, 0], u_h])
-wh = 1 - sstep(0.5, 0.95, np.broadcast_to(u_hx[:, None], Ph.shape[:2]).ravel())
-Wh = weights(Head=wh, Neck=(1 - wh) * 0.35, Spine2=(1 - wh) * 0.65)
-grid(hood, Ph, 'Hoodie', Wh, name='hood')
-patch(hood, Ph, grid_normals(Ph, True), np.arange(3, 8), np.arange(NH + 1), 0.004, 'Hoodie', Wh, 'hood-hem')   # the bound edge
+Ph = np.concatenate([deep[None], inner[None], lip[None], Ph]); u_hx = np.concatenate([[0, 0, 0], u_h2])
+# weights: the head carries the hood round the skull, the neck the nape, the body (chest and shoulders) the cowl
+_u = np.broadcast_to(u_hx[:, None], Ph.shape[:2]).ravel(); cw = sstep(0.72, 0.93, _u); hw = (1 - sstep(0.45, 0.8, _u)) * (1 - cw)
+Wsp = spine_w(Ph.reshape(-1, 3)) * cw[:, None]; Wh = weights(Head=hw, Neck=(1 - hw) * (1 - cw)); Wh = Wh * (1 - cw)[:, None] + Wsp; Wh /= Wh.sum(1, keepdims=True)
+grid(hood, Ph, 'Cotton', Wh, name='hood')
+patch(hood, Ph, grid_normals(Ph, True), np.arange(3, 8), np.arange(NH + 1), 0.004, 'Cotton', Wh, 'hood-hem')   # the bound edge
 # inside: a head with nothing on it, and a mask and gaiter over where a face would be. Only darkness.
 def ellipsoid(c, r, nu=20, nv=12, v0=-1.0, v1=1.0, u0=0.0, u1=2 * math.pi):
     v = np.linspace(v0, v1, nv) * math.pi / 2; u = np.linspace(u0, u1, nu, endpoint=(u1 - u0) < 2 * math.pi - 1e-6)
@@ -705,8 +765,8 @@ for q0 in np.linspace(0.01, 0.115, 6):                                          
 
 # ───────────────────────────── the backpack, its straps, and the cans ─────────────────────────────
 pack = Mesh('SM_Char_Writer_Pack')
-PKZ = [zS - 0.37, zS - 0.35, zS - 0.3, zS - 0.1, zS + 0.0, zS + 0.035, zS + 0.05]
-p_a = curve(PKZ, [0.08, 0.108, 0.12, 0.118, 0.112, 0.1, 0.06]); p_d = curve(PKZ, [0.025, 0.044, 0.053, 0.051, 0.045, 0.035, 0.016])
+PKZ = [zS + PACK_DZ + d for d in (-0.37, -0.35, -0.3, -0.1, 0.0, 0.035, 0.05)]
+p_a = curve(PKZ, [0.08, 0.108, 0.12, 0.118, 0.112, 0.1, 0.06]); p_d = curve(PKZ, [0.025, 0.044, 0.053, 0.05, 0.04, 0.028, 0.012])
 z_k = np.concatenate([np.linspace(PKZ[0], PKZ[2], 5)[:-1], np.linspace(PKZ[2], PKZ[4], 12)[:-1], np.linspace(PKZ[4], PKZ[6], 5)]); NK = 36; th_k = np.arange(NK) / NK * 2 * math.pi
 back_y = lambda z: t_y(z) + t_b(z)                              # the jacket's back
 Pk = np.stack([CX + p_a(z_k)[:, None] * sup(np.sin(th_k), 4.5)[None], (back_y(z_k) + p_d(z_k) - 0.012)[:, None] - p_d(z_k)[:, None] * sup(np.cos(th_k), 3.5)[None], np.broadcast_to(z_k[:, None], (len(z_k), NK))], -1)
@@ -714,13 +774,13 @@ Pk = Pk + grid_normals(Pk, True) * (0.004 * fbm(Pk, 0.1, 71.0))[..., None]
 Wk = spine_w(np.broadcast_to(np.array([CX, 0, 1.0]), (len(z_k) * NK, 3)) * 0 + np.stack([np.full(len(z_k) * NK, CX), np.zeros(len(z_k) * NK), np.repeat(np.clip(z_k, J['Spine2'][2] + 0.03, 9), NK)], -1))
 grid(pack, Pk, 'Pack', Wk, cap0=True, cap1=True, name='pack'); Nk = grid_normals(Pk, True)
 rk = lambda a, b: np.where((z_k >= a) & (z_k <= b))[0]; ck = lambda a, b: np.arange(int(round(a / (2 * math.pi) * NK)), int(round(b / (2 * math.pi) * NK)) + 1)
-patch(pack, Pk, Nk, rk(zS - 0.33, zS - 0.17), ck(math.pi - 0.95, math.pi + 0.95), 0.022, 'Pack', Wk, 'pack-pocket', edge=0.0)       # the front pocket
-patch(pack, Pk, Nk, rk(zS - 0.12, zS - 0.085), ck(math.pi - 1.2, math.pi + 1.2), 0.004, 'Reflect', Wk, 'pack-tape')                  # reflective tape: the mark you see from behind
+patch(pack, Pk, Nk, rk(zS + PACK_DZ - 0.33, zS + PACK_DZ - 0.17), ck(math.pi - 0.95, math.pi + 0.95), 0.022, 'Pack', Wk, 'pack-pocket', edge=0.0)       # the front pocket
+patch(pack, Pk, Nk, rk(zS + PACK_DZ - 0.12, zS + PACK_DZ - 0.085), ck(math.pi - 1.2, math.pi + 1.2), 0.004, 'Reflect', Wk, 'pack-tape')                  # reflective tape: the mark you see from behind
 # two spare cans, each standing in an elastic mesh pocket on a side of the pack (they sit in it: the pocket wraps the
 # lower half of the can and its band grips it), leaning out a touch so the caps clear the arms
 Wpk = spine_w(np.array([[CX, 0, J['Spine2'][2] + 0.03]]))
 for sgn in (1, -1):
-    zb = zS - 0.385; zm = zb + 0.08; ax = unit(np.array([sgn * 0.08, 0.04, 1.0]))
+    zb = zS + PACK_DZ - 0.385; zm = zb + 0.08; ax = unit(np.array([sgn * 0.08, 0.04, 1.0]))
     base = np.array([CX + sgn * (p_a(zm) + CAN_R + 0.002), back_y(zm) + p_d(zm) * 0.95 - 0.01, zb])
     sock = base - ax * CAN_B0                                   # the can's socket, from where its base stands
     can_mesh(pack, sock, ax, (0, 1, 0), Wpk, 'pack-can')
@@ -729,10 +789,7 @@ for sgn in (1, -1):
     grid(pack, Pq[:-2], 'Pack', Wpk.repeat((len(hp) - 2) * 24, 0), cap0=True, name='can-pocket')
     grid(pack, Pq[-3:], 'Trim', Wpk.repeat(3 * 24, 0), name='can-pocket-band')
 # straps: over each shoulder from the top of the pack, down the chest, and back under the arm, lying on the jacket
-def on_torso(th, z, off): p = torso_surface(z, th); e = 1e-3; n = unit(np.cross(torso_surface(z, th + e) - p, torso_surface(z + e, th) - p)); return p + n * off, n
-for sgn in (1, -1):
-    keys = np.array([[2.72, zS - 0.02], [2.6, zS + 0.07], [2.2, zS + 0.108], [1.57, zS + 0.118], [0.95, zS + 0.108], [0.6, zS + 0.07], [0.52, zS - 0.05], [0.56, zS - 0.19], [0.75, zS - 0.27], [1.4, zS - 0.32], [2.3, zS - 0.33]])
-    kk = resample(np.concatenate([keys, np.zeros((len(keys), 1))], 1), 40); pts, nn = on_torso(sgn * kk[:, 0], kk[:, 1], 0.009)
+for (pts, nn), sgn in zip(STRAPS, (1, -1)):
     box_tube(pack, pts, 0.021 * (1 - 0.35 * sstep(26, 34, np.arange(40))), 0.005, 8, nn, 'Pack', spine_w(pts.repeat(8, 0)), name='strap')
     pb, nb_ = on_torso(np.array([sgn * 0.54]), np.array([zS - 0.21]), 0.016); box_tube(pack, np.array([pb[0] + [0, 0, 0.02], pb[0] - [0, 0, 0.02]]), 0.016, 0.006, 8, nb_[0], 'Detail', spine_w(np.repeat(pb, 16, 0)), name='buckle')
 ths = np.linspace(-0.5, 0.5, 9); pts, nn = on_torso(ths, np.full(9, zS - 0.1), 0.012)
@@ -839,7 +896,7 @@ def fold_height(pc, w, h):
             H += crinkle(Q, 0.0005)
         elif nm == 'seat':
             H += 0.0018 * bump(zH - 0.03, 0.05, sp) * crease(th * 9 + 3 * wob) + crinkle(Q, 0.0003)
-    elif pc['mat'] in ('Hoodie', 'Pack', 'Trousers'): H += crinkle(Q, 0.0004)
+    elif pc['mat'] in ('Hoodie', 'Pack', 'Trousers', 'Cotton'): H += crinkle(Q, 0.0004)
     elif pc['mat'] == 'Gloves': H += crinkle(Q, 0.00025)
     if not pc['closed']:   # a sewn panel: its edge stands up
         U, Vv = np.meshgrid(np.linspace(0, 1, w), np.linspace(0, 1, h)); e = np.minimum(np.minimum(U, 1 - U) * w, np.minimum(Vv, 1 - Vv) * h)
@@ -877,7 +934,7 @@ def mat(name, rgb, rough):
     M = bpy.data.materials.new(name); M.use_nodes = True; b = M.node_tree.nodes.get('Principled BSDF')
     b.inputs['Base Color'].default_value = (*rgb, 1); b.inputs['Roughness'].default_value = rough; return M
 LOOKS = {'Hoodie': (0.035, 0.6), 'Trousers': (0.07, 0.8), 'Gloves': (0.03, 0.6), 'Shoes': (0.7, 0.5), 'Sole': (0.8, 0.6), 'Void': (0.0, 1.0), 'Trim': (0.02, 0.8),
-         'Mask': (0.01, 0.9), 'Pack': (0.03, 0.5), 'Can': (0.6, 0.3), 'Cap': (0.85, 0.5), 'Reflect': (0.8, 0.3), 'Detail': (0.012, 0.45)}
+         'Mask': (0.01, 0.9), 'Pack': (0.03, 0.5), 'Can': (0.6, 0.3), 'Cap': (0.85, 0.5), 'Reflect': (0.8, 0.3), 'Detail': (0.012, 0.45), 'Cotton': (0.16, 0.95)}
 BM = {n: mat(n, (LOOKS[n][0],) * 3, LOOKS[n][1]) for n in MATS}
 # the atlas goes out inside the .glb as each material's base colour texture, on the second UV set
 ATLAS_IMG = bpy.data.images.new('writer-atlas', ATLAS, ATLAS); _px = np.ones((ATLAS * ATLAS, 4), np.float32); _px[:, :3] = IMG.ravel()[:, None]; ATLAS_IMG.pixels.foreach_set(_px.ravel())
@@ -903,7 +960,7 @@ def with_atlas(M, multiply):
     else: nt.links.new(tex.outputs['Color'], b.inputs['Base Color'])
 for n in MATS:
     if n != 'Void': with_atlas(BM[n], False)
-    if n in ('Hoodie', 'Trousers', 'Gloves', 'Trim', 'Pack', 'Detail', 'Shoes'): with_normal(BM[n])
+    if n in ('Hoodie', 'Trousers', 'Gloves', 'Trim', 'Pack', 'Detail', 'Shoes', 'Cotton'): with_normal(BM[n])
 OBJS = []
 for mesh in MESHES.values():
     V = np.concatenate(mesh.V); W = np.concatenate(mesh.W)
@@ -941,7 +998,7 @@ def gl_frame(x, y, z, at): M = np.eye(4); M[:3, 0], M[:3, 1], M[:3, 2], M[:3, 3]
 # the right hand's socket: y up the can, z out of the nozzle, x across (right-handed after the mirror)
 _y, _z = CAN_U * FLIP, CAN_NOZ * FLIP; _gr = gl_frame(np.cross(_y, _z), _y, _z, GRIP['at'] * FLIP + np.array([2 * CX, 0, 0]))
 print('WRITER grip handedness', round(float(np.linalg.det(np.array(_gr).reshape(4, 4).T[:3, :3])), 3))
-_rest = {FULL[b]: [round(float(x), 6) for x in G2B.T @ REST[b] / K] for b in sorted(TIDIED | {'LeftToeBase', 'RightToeBase'})}
+_rest = {FULL[b]: [round(float(x), 6) for x in G2B.T @ REST[b] / K] for b in sorted(TIDIED | {'LeftToeBase', 'RightToeBase', 'Neck'})}
 _rest[FULL['Hips']] = [round(float(x), 6) for x in G2B.T @ (REST['Hips'] + np.array([0, 0, HIPS_LIFT])) / K]
 def gl_quat(L):
     M = G2B.T @ L @ G2B; w = math.sqrt(max(0.0, 1 + M[0, 0] + M[1, 1] + M[2, 2])) / 2; x = math.sqrt(max(0.0, 1 + M[0, 0] - M[1, 1] - M[2, 2])) / 2
