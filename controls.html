@@ -4505,7 +4505,7 @@
         async src(id, big) { const fs = require('fs'), f = gmPhotoFile(id, !big); return fs.existsSync(f) ? gmPhotoUrl(f) : (!big && fs.existsSync(gmPhotoFile(id)) ? gmPhotoUrl(gmPhotoFile(id)) : null); },
         async blob(id, thumb) { const fs = require('fs'), f = gmPhotoFile(id, !!thumb); return fs.existsSync(f) ? new Blob([fs.readFileSync(f)], { type: 'image/png' }) : null; },
         async remove(id) {
-          const fs = require('fs'), path = require('path'), f = gmPhotoFile(id); if (!fs.existsSync(f)) return false;
+          if (!gmPhotoOk(id)) return false; const fs = require('fs'), path = require('path'), f = gmPhotoFile(id); if (!fs.existsSync(f)) return false;
           fs.unlinkSync(f); for (const x of [gmPhotoFile(id, true), path.join(gmPhotoDir, '.thumbs', id + '.json')]) try { fs.unlinkSync(x); } catch (e) {}
           try { if (imageLibrary.length) initializeImagesTab(); } catch (e) {}
           return true;
