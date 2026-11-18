@@ -1,7 +1,8 @@
 /**
  * The game's soundtrack: VexVoid's own releases (one take of each, as in vx/catalogue.json, all produced by b0ase),
  * streamed from the VexVoid music bucket (public, CORS open). A host can pass its own list instead (MountOpts.music).
- * Regenerate from the catalogue if releases are added.
+ * Regenerate from the catalogue if releases are added. chadCN-2 and shadCN-1 are left out (owner 18 Nov 2026: not VexVoid's
+ * sound, vocal tracks); keep them out when regenerating.
  */
 export const MUSIC_BASE = 'https://api.b0ase.com/storage/v1/object/public/music/vexvoid/';
 export const PLAYLIST: [title: string, file: string][] = [
@@ -27,13 +28,11 @@ export const PLAYLIST: [title: string, file: string][] = [
   ["Whispering Echoes", "Whispering%20Echoes.mp3"],
   ["Whispering Shadows", "Whispering%20Shadows.mp3"],
   ["Whispers in the Smoke", "Whispers%20in%20the%20Smoke.mp3"],
-  ["chadCN-2", "chadCN-2.mp3"],
   ["Echoes in the Mist", "Echoes%20in%20the%20Mist.mp3"],
   ["Echoes of the Hidden Blade", "Echoes%20of%20the%20Hidden%20Blade.mp3"],
   ["Echoes of the Void", "Echoes%20of%20the%20Void.mp3"],
   ["Ghost in the Echoes", "Ghost%20in%20the%20Echoes.mp3"],
   ["Insect Symphony", "Insect%20Symphony.mp3"],
-  ["shadCN-1", "shadCN-1.mp3"],
   ["Shadowed Depths", "Shadowed%20Depths.mp3"],
   ["Shadowed Rhythms", "Shadowed%20Rhythms.mp3"],
   ["Shadows of the Streets", "Shadows%20of%20the%20Streets.mp3"],
