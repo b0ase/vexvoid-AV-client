@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { bodyProxy, type ArmReport } from './bodyProxy';
 
 export type Writer = {
   root: THREE.Group;
@@ -45,6 +46,15 @@ export type Writer = {
   aim: (hand: THREE.Vector3 | null, at?: THREE.Vector3, weight?: number) => void;
   /** Where the can's nozzle is now (world), or null when the can is down. */
   tip: (out: THREE.Vector3) => THREE.Vector3 | null;
+  /** The arms against the trunk and pack, as skinned now: how deep (m) the arm's own vertices go in, per side and part. */
+  arms: () => ArmReport;
+  /** The can against the hand holding it, as skinned now: fingers into the can (pen, m), the nearest the hand comes to
+   *  its surface (gap, m), how much of the way round the hand touches it (wrap 0..1). */
+  grip: () => GripReport;
+  /** For pictures: hold the clip being played at this time (seconds), or null to let it run. */
+  freeze: (t: number | null) => void;
+  /** Where a bone is now (world), e.g. 'RightHand'. */
+  bonePos: (name: string, out: THREE.Vector3) => THREE.Vector3 | null;
   /** The can in the hand (a scene-level object: add it to the scene once). */
   can: THREE.Object3D;
   update: (dt: number) => void;
@@ -52,6 +62,9 @@ export type Writer = {
 };
 
 const HEIGHT = 1.78;
+export type GripReport = { shown: boolean; pen: number; gap: number; wrap: number; n: number };
+// the spray can's body in its own frame (metres): radius and where the cylinder runs along its axis
+const CAN = { r: 0.033, y0: -0.165, y1: 0.025 };
 export type GaitInfo = { on: boolean; rest: number[]; clips: Record<string, { v: number; stride: number; lift?: number[]; zr?: number[] }>; speed: number; mix: string; bodyOff: number;
   feet: { err: number; contact: boolean; slip: number; pen?: number }[];
   stats: { frames: number; sinkMean: number; sinkMax: number; sinkP95: number; floatMean: number; slipMean: number; slipP90: number; slipMax: number; contacts: number } };
@@ -318,6 +331,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
   const inv = vx.bind ? bones.map((b) => (vx.bind![b.name] ? new THREE.Matrix4().fromArray(vx.bind![b.name]).invert() : b.matrixWorld.clone().invert())) : undefined;
   const skeleton = new THREE.Skeleton(bones, inv);
   for (const m of meshes) m.bind(skeleton);
+  const body = bodyProxy(meshes, bones, vx.scale || 1);
 
   // stand on the ground at 1.78 m, feet at y = 0
   const k = vx.scale || HEIGHT / Hs;
@@ -366,7 +380,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       }
     }
   }
-  let life = 0, lt = 0;
+  let life = 0, lt = 0, frozen: number | null = null;
   // spraying: the right arm reaches for the wall (two-bone IK over whatever clip plays) with a can in the hand
   const rArm = B('RightArm'), rFore = B('RightForeArm'), rHand = B('RightHand'), spine2 = B('Spine2');
   const can = new THREE.Group();
@@ -643,6 +657,22 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       if (reset) Object.assign(S, { frames: 0, sink: [], sinkSum: 0, sinkMax: 0, floatSum: 0, floatN: 0, slips: [], slipSum: 0, slipMax: 0, contacts: 0 });
       return out;
     },
+    arms: () => { root.updateMatrixWorld(true); return body.measure(); },
+    freeze: (t) => { frozen = t; },
+    bonePos: (name, out) => { const b = bones.find((x) => x.name.replace(/^mixamorig:?/, '') === name); return b ? b.getWorldPosition(out) : null; },
+    grip: () => {
+      const o: GripReport = { shown: can.visible, pen: 0, gap: 0, wrap: 0, n: 0 }; if (!can.visible) return o;
+      can.updateMatrixWorld(true); const inv = can.matrixWorld.clone().invert(), v = new THREE.Vector3(), bins = new Set<number>(); let gap = Infinity;
+      for (const a of body.arms) {
+        if (a.side !== 1 || a.part !== 'hand') continue;
+        a.m.getVertexPosition(a.i, v); v.applyMatrix4(a.m.matrixWorld).applyMatrix4(inv); o.n++;
+        const rho = Math.hypot(v.x, v.z), inY = v.y >= CAN.y0 && v.y <= CAN.y1;
+        if (inY) o.pen = Math.max(o.pen, CAN.r - rho);
+        gap = Math.min(gap, inY ? Math.max(0, rho - CAN.r) : Math.hypot(Math.max(0, rho - CAN.r), v.y < CAN.y0 ? CAN.y0 - v.y : v.y - CAN.y1));
+        if (inY && Math.abs(rho - CAN.r) < 0.008) bins.add(Math.floor(((Math.atan2(v.x, v.z) + Math.PI) / (2 * Math.PI)) * 24) % 24);
+      }
+      o.gap = gap === Infinity ? 0 : gap; o.wrap = bins.size / 24; return o;
+    },
     aim: (hand, at, weight = 1) => {
       aimOn = !!hand; if (hand) { aimHand.copy(hand); aimAt.copy(at || hand); aimTo = weight; }
     },
@@ -652,7 +682,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       // pose: put the pose the mixer made last frame back first (the mixer writes a bone only when its value changed),
       // so nothing can pile up from frame to frame
       if (poseOk) for (let i = 0; i < bones.length; i++) bones[i].quaternion.copy(poseQ[i]);
-      mixer.update(dt);
+      if (frozen != null && cur && !locoOn) { cur.time = Math.min(frozen, cur.getClip().duration); cur.setEffectiveWeight(1); mixer.update(0); } else mixer.update(dt);
       for (let i = 0; i < bones.length; i++) poseQ[i].copy(bones[i].quaternion); poseOk = true;
       twistS += (Math.max(-1.3, Math.min(1.3, twistA)) - twistS) * Math.min(1, dt * 12);   // eased: no snap of the neck
       if (Math.abs(twistS) > 1e-3) { const ch: [THREE.Bone, number][] = [[spine0, 0.3], [spine1, 0.3], [spine2, 0.25], [neckB, 0.15]]; for (const [b, k] of ch) b.rotateY(twistS * k); }

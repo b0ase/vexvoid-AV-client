@@ -29,7 +29,8 @@ import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { buildDistrict } from './district';
 import { STEP } from './world';
 import { loadLook, makeGradePass } from './look';
-import { loadWriter, type GaitInfo } from './writer';
+import { loadWriter, type GaitInfo, type GripReport } from './writer';
+import type { ArmReport } from './bodyProxy';
 import { makeSpray, footprint, COLOURS, COLOUR_NAMES, type Can, type Stroke, type WallStore } from './spray';
 import { makeLaw, type LawState } from './cops';
 import { makeHud, keyed, kc, hudScale } from './hud';
@@ -46,7 +47,7 @@ export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) =
   onEvent?: (ev: 'alert' | 'busted' | 'escaped') => void;
   /** The soundtrack: VexVoid's own tracks by default (./playlist.ts), a host's own list, or false for none. */
   music?: Track[] | false };
-export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?: number) => string; inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string }) => void; where: () => { x: number; z: number; y: number; yaw: number; heading: number; anim: string; speed: number; tip: [number, number, number] | null };
+export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?: number) => string; inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string; at?: number | null; view?: { yaw: number; pitch: number; dist: number; bone?: string; h?: number; fov?: number } | null }) => void; where: () => { x: number; z: number; y: number; yaw: number; heading: number; anim: string; speed: number; tip: [number, number, number] | null };
   /** Call the law on the writer now: the patrol car pulls up nearest them and two officers give chase (testing an escape). */
   alarm: () => void;
   /** The district's named places (the studio is home; the shops; the tunnel, the rail, the warehouse, the scaffolds...). */
@@ -95,6 +96,8 @@ export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?:
   tuneGait: (clip: string, v: number) => void;
   /** The head on the body (tests): drift from its rest place on the chest (m), neck and head turn (rad), neck gap change (m). */
   head: (o?: { steady?: boolean }) => { drift: number; neck: number; head: number; gap: number; hood: number; worst: string; pts: number; wob: number };
+  arms: () => ArmReport;
+  grip: () => GripReport;
   gait: (reset?: boolean) => GaitInfo & { move: { speed: number; vx: number; vz: number; heading: number; yawRate: number; airborne: boolean; crouch: boolean; gy: number } };
   /** Take back the last stroke on a wall (none given: the wall being painted). Returns how many strokes went. */
   undo: (id?: string) => number;
@@ -141,7 +144,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const hudUi = makeHud(host);
 
   const scene = new THREE.Scene();
-  const cam = new THREE.PerspectiveCamera(62, 16 / 9, 0.05, 900);
+  const cam = new THREE.PerspectiveCamera(62, 16 / 9, 0.05, 900), camGame = cam.clone();
   const look = await loadLook(r, opts.base + 'tex/');
   const city = buildDistrict({ renderer: r, scene, high, look });
   const W0 = city.world, home = city.plan.places[0];
@@ -477,7 +480,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   // spot: the wall they buff (what was being painted by hand); kept: a wall with a half-blasted sketch, which stays
   let bust: { t: number; spot: string; kept: string } | null = null;
   const camPos = new THREE.Vector3(home.x + Math.sin(home.yaw) * 3.4, home.y + 2, home.z + Math.cos(home.yaw) * 3.4), camLook = new THREE.Vector3(), scr = new THREE.Vector3();
-  let landT = 0, forceAnim = '', idleT = 0, camH = 1.45;
+  let landT = 0, forceAnim = '', idleT = 0, camH = 1.45, shotView: { yaw: number; pitch: number; dist: number; bone?: string; h?: number; fov?: number } | null = null, fov0 = 0;
   const lookTo = new THREE.Vector3(), tipV = new THREE.Vector3(), focusV = new THREE.Vector3(), headV = new THREE.Vector3();
   const doorAt = () => city.plan.doors.find((d) => me.x > d.x0 - 0.3 && me.x < d.x1 + 0.3 && me.z > d.z0 - 0.3 && me.z < d.z1 + 0.3 && Math.abs(me.gy) < 0.5) || null;
   cam.position.copy(camPos);
@@ -557,7 +560,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       let dh = Math.atan2(-n.x, -n.z) - mv.offset - me.heading; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); me.heading += dh * Math.min(1, dt * 10);
       // aim: where the mouse points on this wall or the next one along. Anywhere along it paints (the writer steps after
       // the can); only height is out of reach
-      ray.setFromCamera(mouse, cam);
+      ray.setFromCamera(mouse, shotView ? camGame : cam);   // (a picture camera never moves the aim)
       let h = auto || bust ? null : spray.hit(ray, run.ids);
       // not through a vending machine or a pier: what is hidden behind something solid is out of the can's way
       if (h) { const c = cam.position, len = Math.hypot(h.point.x - c.x, h.point.z - c.z); if ((1 - sightTo(c.x, c.z, c.y, h.point.x, h.point.z, h.point.y, h.wall)) * len > 0.3) h = null; }
@@ -576,7 +579,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
         ghost.rotation.set(0, Math.atan2(h.wall.normal.x, h.wall.normal.z), 0); ghost.scale.set(armed.w * plan.scale, armed.h * plan.scale, 1);
       }
       let P: THREE.Vector3 | null = null, vol = 1, h0 = h;
-      if (down && h) { ray.setFromCamera(down, cam); const q = spray.hit(ray, [h.id]); if (q && q.point.y < top) h0 = q; }
+      if (down && h) { ray.setFromCamera(down, shotView ? camGame : cam); const q = spray.hit(ray, [h.id]); if (q && q.point.y < top) h0 = q; }
       down = null;
       if (auto) {
         preview.visible = false;
@@ -742,6 +745,12 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     lookTo.set(me.x + Math.cos(camO.yaw) * 0.55, tgtY, me.z - Math.sin(camO.yaw) * 0.55);
     camLook.lerp(lookTo, paint || bust ? 1 : 1 - Math.exp(-dt * 40));
     cam.lookAt(camLook);
+    camGame.position.copy(cam.position); camGame.quaternion.copy(cam.quaternion); camGame.aspect = cam.aspect; camGame.fov = fov0 || cam.fov; camGame.updateMatrixWorld(); camGame.updateProjectionMatrix();
+    if (shotView) {
+      const v = shotView, f = (v.bone && writer.bonePos(v.bone, focusV)) || focusV.set(me.x, me.gy + me.y + (v.h ?? 1.0), me.z), a = me.heading + v.yaw;
+      cam.position.set(f.x + Math.sin(a) * Math.cos(v.pitch) * v.dist, f.y + Math.sin(v.pitch) * v.dist, f.z + Math.cos(a) * Math.cos(v.pitch) * v.dist); cam.lookAt(f);
+      if (!fov0) fov0 = cam.fov; const fv = v.fov || fov0; if (cam.fov !== fv) { cam.fov = fv; cam.updateProjectionMatrix(); }
+    } else if (fov0 && cam.fov !== fov0) { cam.fov = fov0; cam.updateProjectionMatrix(); fov0 = 0; }
     focusV.set(me.x, me.gy + me.y, me.z); city.update(dt, t, cam, focusV);
     // a shop door: the trigger is marked on the ground (phase 3 opens the shops)
     if (!paint && !bust) { const d = doorAt(); if (d && t >= tipHold) prompt(`${d.name} · OPENS SOON`); }
@@ -788,9 +797,12 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       return c.toDataURL('image/jpeg', 0.82);
     },
     // look at the writer: camera yaw/pitch/distance, which way they face, a clip to hold (for judging the model)
-    inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string }) => {
+    // view: a fixed camera for pictures, round the writer (yaw from straight in front of them, pitch up, metres), aimed
+    // at a bone ('RightHand') or at a height on the body; at: hold the clip at this time
+    inspect: (o) => {
       if (o.yaw != null) camO.yaw = o.yaw; if (o.pitch != null) camO.pitch = o.pitch; if (o.dist != null) camO.dist = o.dist;
-      if (o.heading != null) me.heading = o.heading; forceAnim = o.anim || '';
+      if (o.heading != null) me.heading = o.heading; if (o.anim !== undefined) forceAnim = o.anim || '';
+      if (o.at !== undefined) writer.freeze(o.at); if (o.view !== undefined) shotView = o.view;
     },
     /** Paint a stroke on a wall: points (u, v) 0..1 across and up it. */
     paint: (id, pts, o = {}) => { stroke = null; spray.path(id, pts, { colour: o.colour || COLOURS[0], cap: o.cap || 2, dist: o.dist ?? 0.2, pressure: o.pressure ?? 1, buff: !!o.buff }); },
@@ -800,6 +812,8 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     undo: (id) => undo(id),
     tuneGait: (clip: string, v: number) => writer.tune(clip, v),
     head: (o) => writer.head(o),
+    arms: () => writer.arms(),
+    grip: () => writer.grip(),
     gait: (reset) => ({ ...writer.gait(reset), move: { speed: mv.speed, vx: Math.sin(me.heading) * mv.speed, vz: Math.cos(me.heading) * mv.speed, heading: me.heading, yawRate: mv.yawRate, airborne: me.airborne, crouch: me.crouch, gy: me.gy } }),
     sketches: () => book.all().map(infoOf),
     sketch: (q, kind) => { const s = findSketch(q, kind); return s ? JSON.parse(JSON.stringify(s)) : null; },
