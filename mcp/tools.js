@@ -44,6 +44,8 @@ function tools({ remote = false } = {}) {
     { name: 'music', description: 'Control the music player: list tracks, play (optionally a track number or title words), pause, next, prev.',
       inputSchema: { type: 'object', properties: { action: { type: 'string', enum: ['list', 'play', 'pause', 'next', 'prev'] }, track: { type: 'string' } }, required: ['action'] },
       run: (a, io) => io.cmd(a.action === 'list' ? 'tracks' : a.action, a.track != null ? { track: a.track } : {}) },
+    { name: 'store', description: 'The V3XV0ID merch range WE sell (vexvoid.com/store; not the MARKET, where players trade): each item\'s code, name, status (coming soon / concept), USD price once set, and its page. Read only: buying happens on vexvoid.com.',
+      inputSchema: { type: 'object', properties: {} }, run: (a, io) => io.cmd('store') },
     { name: 'tempo', description: 'Set the BPM the sketches follow, or choose what they listen to (clock, music, input).',
       inputSchema: { type: 'object', properties: { bpm: { type: 'number' }, listen: { type: 'string', enum: ['clock', 'music', 'input'] } } },
       run: async (a, io) => {
