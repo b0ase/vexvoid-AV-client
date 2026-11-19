@@ -496,6 +496,7 @@ export function makePhone(host: HTMLElement, d: PhoneDeps) {
   root.addEventListener('click', (e) => {
     const t = e.target as Element, a = (t.closest('[data-a]') as HTMLElement | null)?.dataset.a;
     if (e.target === root) { close(); return; }
+    if (t.closest('.vxg')) return;   // the gallery's own buttons (back, next, delete...) are the gallery's
     if (!a) { const row = t.closest('[data-th]') as HTMLElement | null; if (row) { thread = row.dataset.th!; rowSel = d.missions.threads().findIndex((x) => x.id === thread); refresh(); } const ob = t.closest('[data-mk]') as HTMLElement | null; if (ob) { const m = d.missions.markers()[+ob.dataset.mk!]; objSel = +ob.dataset.mk!; if (m) centreOn(m.x, m.z); renderObjs(); } d.focus(); return; }
     if (a === 'back') back(); else if (a === 'home') { if (app === 'home') close(); else { direct = false; show('home'); } }
     else if (a === 'now') { const c = d.missions.current(); openApp('messages'); if (c) { thread = d.missions.mission(c.mission)?.from || null; refresh(); } }

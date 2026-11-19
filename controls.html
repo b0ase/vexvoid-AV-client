@@ -7448,7 +7448,7 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
             const vb = document.querySelector('#gmView .vxp-ph');
             // the phone is page, not 3D: a picture of that part of the window
             let img = null; if (vb) { try { const b = vb.getBoundingClientRect(), im = await require('@electron/remote').getCurrentWebContents().capturePage({ x: Math.round(b.left), y: Math.round(b.top), width: Math.round(b.width), height: Math.round(b.height) }); if (im && !im.isEmpty()) img = im.toPNG().toString('base64'); } catch { img = null; } }
-            return [...(img ? [{ type: 'image', source: { type: 'base64', media_type: 'image/png', data: img } }] : []), { type: 'text', text: `The phone is out on ${s.app.toUpperCase()}${s.thread ? ' (thread ' + s.thread + ')' : ''}, ${s.land ? 'sideways' : 'upright'} ${s.w}x${s.h}; ${s.unread} unread. Apps: ${s.apps.join(', ')}. (A picture of the 3D view under it: look.)` }];
+            return [...(img ? [{ type: 'image', source: { type: 'base64', media_type: 'image/png', data: img } }] : []), { type: 'text', text: `The phone is out on ${s.app.toUpperCase()}${s.thread && s.app === 'messages' ? ' (thread ' + s.thread + ')' : ''}, ${s.land ? 'sideways' : 'upright'} ${s.w}x${s.h}; ${s.unread} unread. Apps: ${s.apps.join(', ')}. (A picture of the 3D view under it: look.)` }];
           }
           if (a === 'messages') {
             const M = g.messages({ contact: input.contact, read: !!input.read });
@@ -7457,7 +7457,8 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
           }
           if (a === 'missions') { const M = g.missions({ reset: !!input.reset }); return (input.reset ? 'The story starts again (messages, missions and places cleared; the paint stays). ' : '') + misS(M); }
           if (a === 'minimap') {
-            const m = g.minimap({ on: input.on }); if (!m.on) return 'The mini-map is off (the player presses K).';
+            g.minimap({ on: input.on }); await new Promise(r => setTimeout(r, 150));   // a frame or two: drawn, and shown again if the phone just went away
+            const m = g.minimap(); if (!m.on) return 'The mini-map is off (the player presses K).';
             const c = document.querySelector('#gmView [data-vx-hud=minimap] canvas'), png = c && c.width ? c.toDataURL('image/png').split(',')[1] : null;
             return [...(png ? [{ type: 'image', source: { type: 'base64', media_type: 'image/png', data: png } }] : []), { type: 'text', text: `Mini-map ${m.shown ? 'showing' : 'on, hidden for now (phone out or photo mode)'} top left, ${m.size} px, radius ${m.radius} m, turned ${m.rotation} rad (the writer faces up; N on the rim), ${m.car ? 'the patrol car is on it, ' : ''}${m.markers} mission marker(s)${m.edge ? ', ' + m.edge + ' off the edge' : ''}${m.objective ? '. Under it: ' + m.objective : ''}.` }];
           }
