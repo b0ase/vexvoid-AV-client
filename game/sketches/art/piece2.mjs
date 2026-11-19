@@ -233,7 +233,7 @@ import { layWord, STRAIGHT, SEMI } from './alpha.mjs'
 import { WILD } from './wild3.mjs'
 const VXV = ['V', 'E', 'X', 'V2', 'O', 'I', 'D']
 export const PIECES3 = [
-  { id: 'piece-vexvoid', make: () => piece3('piece-vexvoid', 'VEXVOID', layWord(VXV, WILD, { h: 1.0, slant: 0.16, kern: [0, 0.02, -0.06, -0.06, -0.04, -0.02, -0.02], lift: [-0.06, 0.03, -0.03, 0.03, 0, 0.04, -0.02], scale: [1.14, 1, 1, 1, 1, 1, 1.06] }),
+  { id: 'piece-vexvoid', make: () => piece3('piece-vexvoid', 'VEXVOID', layWord(VXV, WILD, { h: 1.0, slant: 0.16, kern: [0, 0.0, -0.1, -0.1, -0.08, -0.04, -0.04], lift: [-0.06, 0.03, -0.03, 0.03, 0, 0.04, -0.02], scale: [1.14, 1, 1, 1, 1, 1, 1.06] }),
     { capH: 1, log: true, glints: [[0, 0.18, 0.92], [4, 0.2, 0.9]], about: 'wildstyle VEXVOID: interlocked parts, arrows grown out of the letters, chrome fade, 3D, keyline, cloud' }) },
   { id: 'piece-vexvoid-semi', make: () => piece3('piece-vexvoid-semi', 'VEXVOID SEMI', layWord(VXV, SEMI, { h: 1.0, kern: [0, -0.12, -0.1, -0.08, -0.07, -0.05, -0.05], lift: [-0.08, 0.02, -0.02, 0.02, 0, 0.03, -0.01], scale: [1.14, 1, 1, 1, 1, 1, 1.06] }),
     { capH: 1, log: true, glints: [[0, 0.18, 0.92], [4, 0.2, 0.9]], about: 'semi-wild VEXVOID: straight letters with arrows, kicks and cuts grown out of them' }) },
