@@ -794,7 +794,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       }
       me.heading += step; mv.yawRate += ((dt > 0 ? step / dt : 0) - mv.yawRate) * Math.min(1, dt * 20);
       const was = mv.speed, acc = target > mv.speed ? (sprint ? GAIT.sprintAccel : GAIT.accel) : GAIT.decel + GAIT.decelPer * mv.speed;
-      mv.speed += Math.max(-acc * dt * air, Math.min(acc * dt * air, target - mv.speed));
+      if (!pk.launching() || target > mv.speed) mv.speed += Math.max(-acc * dt * air, Math.min(acc * dt * air, target - mv.speed));   // (pushed off a wall: the push carries)
       // running at something low: over it (the vault takes the body from here)
       if (mv.speed > 0.001 && !pk.tryVault()) {
         const x0 = me.x, z0 = me.z, feet = me.gy + me.y;

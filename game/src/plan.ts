@@ -59,10 +59,12 @@ export function fireLayout(b: { x0: number; x1: number; z0: number; z1: number; 
   // underside of the next; the last one, up to the roof, is always against the wall (you go over the parapet from it)
   const IN = { o0: 0.1, o1: 0.8 }, OUT = { o0: 0.88, o1: 1.58 };
   const flights = lands.map((yy, k) => ({ y0: yy, y1: k < lands.length - 1 ? yy + 3.5 : top, u0: k % 2 ? 1.6 : -1.6, ...((lands.length - 1 - k) % 2 ? OUT : IN) }));
-  const ladderO = flights.length && flights[0].o0 > 0.5 ? 0.45 : 1.22;   // the drop ladder in the lane flight 0 is not
+  // the drop ladder: in the lane flight 0 is not; out by the rail at the far end, or against the wall at flight 0's own
+  // low end (clear of the boxes that keep walkers from under the flights)
+  const out0 = flights.length > 0 && flights[0].o0 > 0.5, ladderO = out0 ? 0.45 : 1.22, ladderU = out0 ? -1.25 : 1.25;
   // world point from (u along, o out); and back
   const at = (u: number, o: number): [number, number] => (alongX ? [mid + u, out + d * o] : [out + d * o, mid + u]);
-  return { s, y, top, mid, out, d, alongX, lands, flights, at, LAND: { o0: 0.05, o1: 1.65, half: 1.8 }, FLIGHT: { half: 1.6 }, ladder: { u: 1.25, o: ladderO, y0: y + 2.2 } };
+  return { s, y, top, mid, out, d, alongX, lands, flights, at, LAND: { o0: 0.05, o1: 1.65, half: 1.8 }, FLIGHT: { half: 1.6 }, ladder: { u: ladderU, o: ladderO, y0: y + 2.2 } };
 }
 export type WallDef = { id: string; w: number; h: number; c: [number, number, number]; n: [number, number]; arch?: { x: number; y: number; r: number } };
 export type Scaffold = { id: string; bld: string; side: Side; a: number; b: number; lifts: number; base: number };
@@ -434,7 +436,7 @@ export function makePlan(): Plan {
       for (let k = 0; k < 8; k++) {
         const a = u0 + (u1 - u0) * k / 8, c = u0 + (u1 - u0) * (k + 1) / 8, fy = y0 + (y1 - y0) * k / 8;
         if (fy < y0 + 0.4) continue;
-        const q = o(Math.min(a, c), Math.max(a, c), f.o0, f.o1); solid(q.x0, q.z0, q.x1, q.z1, f.y0 - 1, fy - 0.2, 'fireunder');
+        const q = o(Math.min(a, c), Math.max(a, c), f.o0, f.o1); solid(q.x0, q.z0, q.x1, q.z1, f.y0 - 0.2, fy - 0.2, 'fireunder');
       }
     }
     const [lx, lz] = F.at(F.ladder.u, F.ladder.o), [tx, tz] = F.at(F.ladder.u, F.ladder.o), n: [number, number] = F.alongX ? [0, F.d] : [F.d, 0];

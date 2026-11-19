@@ -232,7 +232,7 @@ export function makeParkour(o: { world: World; plan: Plan; writer: Writer; me: B
     mode = 'none'; phase = ''; wr.rig(null); o.carry(true);
     const g = W.groundAt(me.x, me.z, me.gy);
     me.airborne = true; me.vy = 0; me.y = 0; fallTop = me.gy; jumped = false;
-    if (n) { me.heading = Math.atan2(n[0], n[1]); mv.speed = push; } else mv.speed = 0;
+    if (n) { me.heading = Math.atan2(n[0], n[1]); mv.speed = push; launchT = 0.7; } else mv.speed = 0;
     void g;
   };
 
@@ -444,7 +444,7 @@ export function makeParkour(o: { world: World; plan: Plan; writer: Writer; me: B
   };
 
   // ── the jump: held for a mantle mid-air, the highest point of a fall ──
-  let jumped = false, fallTop = 0;
+  let jumped = false, fallTop = 0, launchT = 0;
   const rig = (r: Rig) => wr.rig(r);
 
   const api = {
@@ -454,6 +454,8 @@ export function makeParkour(o: { world: World; plan: Plan; writer: Writer; me: B
     /** Over open water with nothing to stand on. */
     waterAt,
     inOpen,
+    /** Just pushed off a wall: the air keeps the push (no braking in the air for a moment). */
+    launching: () => launchT > 0 && me.airborne,
     /** Top speed now (winded after a hard landing). */
     speedK: () => (winded > 0 ? PK.windedK : 1),
     winded: () => winded,
@@ -591,7 +593,7 @@ export function makeParkour(o: { world: World; plan: Plan; writer: Writer; me: B
     /** The climbable routes and the heavens, for the maps and the API. */
     routes: () => routes(),
     /** Tick the "too high" note down. */
-    tickNote: (dt: number) => { if (tooHighT > 0) tooHighT -= dt; },
+    tickNote: (dt: number) => { if (tooHighT > 0) tooHighT -= dt; if (launchT > 0) launchT = me.airborne ? launchT - dt : 0; },
     route: () => C,
     climbY: () => cy,
     /** (tests) what is ahead now, and whether a vault or a mantle would go */
