@@ -7234,11 +7234,22 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         try {
           edSay('Gathering clips…');
           const shots = [], overlay = [];
-          for (const s of v1) shots.push({ ...s, file: await edLocal(s.src) });
+          // a picture becomes a still clip first (MLT's avformat producer renders a lone JPEG as white); cached per length
+          const still = async s => {
+            if (!edIsImg(s.src)) return s;
+            if (!ff) throw new Error('pictures on the timeline need ffmpeg to render (brew install ffmpeg)');
+            const secs = Math.ceil(s.dur + 1), f = path.join(recDir, 'stills', edAuKey(s.file) + '-' + secs + '.mp4');
+            if (!fs.existsSync(f)) {
+              fs.mkdirSync(path.dirname(f), { recursive: true });
+              await ffmpegRun(ff, ['-v', 'error', '-y', '-loop', '1', '-i', s.file, '-t', String(secs), '-vf', 'scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,format=yuv420p', '-r', '30', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '16', f]);
+            }
+            return { ...s, file: f, in: 0, speed: undefined };
+          };
+          for (const s of v1) shots.push(await still({ ...s, file: await edLocal(s.src) }));
           // a sped-up or backwards clip needs its file's length to loop (MLT's timewarp does not)
           const withDur = list => list.forEach(s => { if (s.speed && s.speed !== 1) s.srcDur = probeDur(s.file); });
           const trans = edTrk('v1').hidden ? [] : VXTL.transitions(edTrk('v1')).map(T => { const sh = shots.find(x => x.id === T.from.id) || {}; return { kind: T.kind, a: T.a, b: T.b, in: T.from.in + (T.a - T.from.start) * Math.abs(T.from.speed || 1), speed: T.from.speed, file: sh.file }; }).filter(T => T.kind !== 'cross' || T.file);
-          for (const s of v2) overlay.push({ ...s, file: await edLocal(s.src) });
+          for (const s of v2) overlay.push(await still({ ...s, file: await edLocal(s.src) }));
           withDur(shots); withDur(overlay); withDur(trans.filter(T => T.file));
           const tts = edTrk('t1').hidden ? [] : VXTL.sorted(edTrk('t1'));
           fs.mkdirSync(recDir, { recursive: true });
