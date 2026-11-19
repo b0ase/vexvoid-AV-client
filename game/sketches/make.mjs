@@ -16,7 +16,7 @@ import { reseed, randSeed } from './art/can.mjs'
 import { paint, onWall, png, secsOf } from './art/preview.mjs'
 import { THROWUPS } from './art/throwups.mjs'
 import { TAGS } from './art/tags.mjs'
-import { PIECES } from './art/pieces.mjs'
+import { PIECES3 as PIECES } from './art/piece2.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const args = process.argv.slice(2), pv = args.indexOf('--preview'), PREVIEW = pv >= 0 ? args[pv + 1] : ''
