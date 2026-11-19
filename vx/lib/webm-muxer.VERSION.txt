@@ -1,0 +1,2 @@
+webm-muxer 5.1.4 (npm, MIT, Vanilagy) build/webm-muxer.js, global WebMMuxer; loaded only when a web export starts
+sha256 8f072405cf7c9e23ae600948cb0ca2ff78c0277b3d78951cd4697b36d88ebd7b
