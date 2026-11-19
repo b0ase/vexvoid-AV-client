@@ -61,7 +61,7 @@ function tools({ remote = false } = {}) {
 }
 
 // Commands a remote (claude.ai) session may run in the app; the app checks this list too.
-const REMOTE_COMMANDS = ['state', 'fade', 'cut', 'sketches', 'sketch', 'cue', 'knobs', 'mutate', 'evolve', 'clips', 'images', 'load', 'layers', 'layer',
+const REMOTE_COMMANDS = ['state', 'store', 'fade', 'cut', 'sketches', 'sketch', 'cue', 'knobs', 'mutate', 'evolve', 'clips', 'images', 'load', 'layers', 'layer',
   'remove', 'clear', 'tracks', 'play', 'pause', 'next', 'prev', 'bpm', 'tap', 'audio', 'vx', 'vx-next', 'vx-clean', 'blackout', 'vx-reset', 'snapshot'];
 
 const INSTRUCTIONS = 'Controls the V3XV0ID VJ mixer live. Check mixer_state first; use mixer_snapshot to see the output. The look is strictly monochrome (white on black). Prefer cueing on the hidden deck and crossfading over changing what is on air abruptly. Locally you also have the VexVoid agent\'s own tools (editor for music videos on the EDIT timeline, text_layer, write_sketch, compose_set, record, skill and more): load the relevant skill first (skill music-video before cutting a video), as VexVoid does.';
