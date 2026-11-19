@@ -357,14 +357,14 @@ export function buildDistrict({ renderer, scene, high, look }: { renderer: THREE
     for (const f of F.flights) {
       // the flight: a stringer-and-treads slab from (u0, y0) up to (-u0, y1), hugging the wall
       const L = Math.hypot(2 * F.FLIGHT.half, f.y1 - f.y0), ang = Math.atan2(f.y1 - f.y0, 2 * F.FLIGHT.half) * (f.u0 < 0 ? 1 : -1);
-      const g = new THREE.BoxGeometry(L, 0.07, F.FLIGHT.o1 - F.FLIGHT.o0); g.rotateZ(ang);
-      const oc = (F.FLIGHT.o0 + F.FLIGHT.o1) / 2, yc = (f.y0 + f.y1) / 2 + 0.03;
+      const g = new THREE.BoxGeometry(L, 0.07, f.o1 - f.o0); g.rotateZ(ang);
+      const oc = (f.o0 + f.o1) / 2, yc = (f.y0 + f.y1) / 2 + 0.03;
       if (!F.alongX) g.rotateY(-Math.PI / 2);   // (the facade runs along z: local x onto world z)
       const [cx, cz] = F.at(0, oc); g.translate(cx, yc, cz);
       worldUV(g, 2, 2); add('iron@' + chunk(cx, cz), iron, g, false);
       // treads across it, every 0.3 m of rise
       const n = Math.max(3, Math.round((f.y1 - f.y0) / 0.3));
-      for (let k = 1; k < n; k++) { const u = f.u0 + (-2 * f.u0) * k / n, yy = f.y0 + (f.y1 - f.y0) * k / n; at(u - 0.02, u + 0.12, F.FLIGHT.o0, F.FLIGHT.o1, yy + 0.04, yy + 0.08); }
+      for (let k = 1; k < n; k++) { const u = f.u0 + (-2 * f.u0) * k / n, yy = f.y0 + (f.y1 - f.y0) * k / n; at(u - 0.02, u + 0.12, f.o0, f.o1, yy + 0.04, yy + 0.08); }
     }
     // the drop ladder: two rails and rungs, from 2.2 m up to the first landing
     const L0 = F.ladder.y0, L1 = F.lands[0];

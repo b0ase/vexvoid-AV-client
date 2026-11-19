@@ -55,10 +55,14 @@ export function fireLayout(b: { x0: number; x1: number; z0: number; z1: number; 
   const s = b.fire!, y = b.y ?? 0, alongX = s === 'n' || s === 's', top = y + b.h;
   const mid = alongX ? (b.x0 + b.x1) / 2 : (b.z0 + b.z1) / 2, out = s === 'e' ? b.x1 : s === 'w' ? b.x0 : s === 's' ? b.z1 : b.z0, d = s === 'e' || s === 's' ? 1 : -1;
   const lands: number[] = []; for (let yy = y + 3.6; yy < top - 1; yy += 3.5) lands.push(yy);
-  const flights = lands.map((yy, k) => ({ y0: yy, y1: k < lands.length - 1 ? yy + 3.5 : top, u0: k % 2 ? 1.6 : -1.6 }));
+  // the flights switch back and forth, in two lanes (against the wall, and out by the rail) so one never runs into the
+  // underside of the next; the last one, up to the roof, is always against the wall (you go over the parapet from it)
+  const IN = { o0: 0.1, o1: 0.8 }, OUT = { o0: 0.88, o1: 1.58 };
+  const flights = lands.map((yy, k) => ({ y0: yy, y1: k < lands.length - 1 ? yy + 3.5 : top, u0: k % 2 ? 1.6 : -1.6, ...((lands.length - 1 - k) % 2 ? OUT : IN) }));
+  const ladderO = flights.length && flights[0].o0 > 0.5 ? 0.45 : 1.22;   // the drop ladder in the lane flight 0 is not
   // world point from (u along, o out); and back
   const at = (u: number, o: number): [number, number] => (alongX ? [mid + u, out + d * o] : [out + d * o, mid + u]);
-  return { s, y, top, mid, out, d, alongX, lands, flights, at, LAND: { o0: 0.05, o1: 1.65, half: 1.8 }, FLIGHT: { o0: 0.1, o1: 0.8, half: 1.6 }, ladder: { u: 1.25, o: 1.2, y0: y + 2.2 } };
+  return { s, y, top, mid, out, d, alongX, lands, flights, at, LAND: { o0: 0.05, o1: 1.65, half: 1.8 }, FLIGHT: { half: 1.6 }, ladder: { u: 1.25, o: ladderO, y0: y + 2.2 } };
 }
 export type WallDef = { id: string; w: number; h: number; c: [number, number, number]; n: [number, number]; arch?: { x: number; y: number; r: number } };
 export type Scaffold = { id: string; bld: string; side: Side; a: number; b: number; lifts: number; base: number };
@@ -424,16 +428,16 @@ export function makePlan(): Plan {
       rail(o(-F.LAND.half, F.LAND.half, F.LAND.o1 - 0.05, F.LAND.o1)); rail(o(-F.LAND.half - 0.05, -F.LAND.half, F.LAND.o0, F.LAND.o1)); rail(o(F.LAND.half, F.LAND.half + 0.05, F.LAND.o0, F.LAND.o1));
     }
     for (const f of F.flights) {
-      const u0 = f.u0, u1 = -f.u0, y0 = f.y0 + 0.06, y1 = f.y1 + 0.06, r = o(Math.min(u0, u1), Math.max(u0, u1), F.FLIGHT.o0, F.FLIGHT.o1);
+      const u0 = f.u0, u1 = -f.u0, y0 = f.y0 + 0.06, y1 = f.y1 + 0.06, r = o(Math.min(u0, u1), Math.max(u0, u1), f.o0, f.o1);
       // a ramp from u0 (low) to u1 (high): surfY runs along +axis from y at the start to y1 at the end
       surfs.push({ ...r, y: y0, y1, axis: axis(u1 > u0 ? 1 : -1), steps: 0, tag: 'fire' });
       for (let k = 0; k < 8; k++) {
         const a = u0 + (u1 - u0) * k / 8, c = u0 + (u1 - u0) * (k + 1) / 8, fy = y0 + (y1 - y0) * k / 8;
         if (fy < y0 + 0.4) continue;
-        const q = o(Math.min(a, c), Math.max(a, c), F.FLIGHT.o0, F.FLIGHT.o1); solid(q.x0, q.z0, q.x1, q.z1, f.y0 - 1, fy - 0.05, 'fireunder');
+        const q = o(Math.min(a, c), Math.max(a, c), f.o0, f.o1); solid(q.x0, q.z0, q.x1, q.z1, f.y0 - 1, fy - 0.2, 'fireunder');
       }
     }
-    const [lx, lz] = F.at(F.ladder.u, F.ladder.o), [tx, tz] = F.at(F.ladder.u, 1.22), n: [number, number] = F.alongX ? [0, F.d] : [F.d, 0];
+    const [lx, lz] = F.at(F.ladder.u, F.ladder.o), [tx, tz] = F.at(F.ladder.u, F.ladder.o), n: [number, number] = F.alongX ? [0, F.d] : [F.d, 0];
     climbs.push({ kind: 'drop-ladder', id: b.id + '-fire', name: 'FIRE ESCAPE', x: lx, z: lz, n, y0: F.y, y1: F.lands[0] + 0.06, grab: F.ladder.y0, bld: b.id, top: { x: tx, z: tz, y: F.lands[0] + 0.06 } });
   }
 

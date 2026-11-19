@@ -168,7 +168,7 @@ export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?:
   /** PARKOUR: what the writer is doing (none vault mantle climb swim roll heavy hard), the route, out of the patrol's
    *  reach or not, what the prompt offers here; counts. climb: put the writer on a route (its id) at its foot or at y;
    *  swim: into the water here; reset: stop whatever it is. cam: where the camera is and whether it is inside anything. */
-  parkour: (o?: { climb?: string; y?: number; swim?: boolean; reset?: boolean }) => PkState & { cam: { x: number; y: number; z: number; inside: boolean }; x: number; z: number; gy: number; heading: number };
+  parkour: (o?: { climb?: string; y?: number; swim?: boolean; reset?: boolean }) => PkState & { cam: { x: number; y: number; z: number; inside: boolean }; x: number; z: number; gy: number; heading: number; airborne: boolean; stuck: boolean };
   /** The ways up (drainpipes, fire escapes, ladders, scaffold ladders, canal ladders) and the heavens; near: within this many metres. */
   climbables: (o?: { near?: number }) => { routes: { id: string; kind: string; name: string; x: number; z: number; y0: number; y1: number; top: { x: number; z: number; y: number } | null; bld: string; dist: number }[]; heavens: { id: string; name: string; wall: string; x: number; z: number; y: number; worth: number; painted: boolean; about: string }[] };
   /** WATER: how wet (0..1), swimming, whether the hands are dry enough to paint, the drips and marks showing, and the
@@ -1020,7 +1020,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       const g = W0.groundAt(me.x, me.z, me.gy + me.y);
       if (!Number.isNaN(g)) {
         if (!me.airborne && g < me.gy - STEP) { pk.takeoff(false); me.airborne = true; me.y = me.gy - g; me.vy = 0; me.gy = g; mv.takeoff = 0; }
-        else if (!me.airborne) me.gy += (g - me.gy) * Math.min(1, dt * 16);
+        else if (!me.airborne) { const sf = W0.surfAt(me.x, me.z, me.gy + me.y), ramp = !!sf && sf.y1 != null && !sf.steps; me.gy += (g - me.gy) * Math.min(1, dt * (ramp ? 45 : 16)); }   // (a ramp, a fire escape's flight: the feet keep up)
       }
       // down the water steps into deep water: swimming
       if (!me.airborne && pk.inOpen(me.x, me.z) && me.gy < WATER_Y - 0.85) pk.wade();
@@ -1051,7 +1051,8 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     // in a lane, a doorway, the tunnel or the studio: the camera comes in front of the wall behind it, and stays under
     // the ceiling (the boxes are grown a little so the near plane never cuts into a wall)
     let pulled = false;
-    { const k = W0.ray(me.x, tgtY, me.z, camX, camY, camZ, 0.22); if (k < 1) { const f = Math.max(0.12, k - 0.04); camX = me.x + (camX - me.x) * f; camZ = me.z + (camZ - me.z) * f; camY = tgtY + (camY - tgtY) * f; pulled = true; } }
+    // (PARKOUR: never past the wall, even hard against it: the floor was 0.12, which put the camera inside a wall the writer stood against)
+    { const k = W0.ray(me.x, tgtY, me.z, camX, camY, camZ, 0.22); if (k < 1) { const f = Math.max(0.02, k - 0.04); camX = me.x + (camX - me.x) * f; camZ = me.z + (camZ - me.z) * f; camY = tgtY + (camY - tgtY) * f; pulled = true; } }
     { const ceil = city.ceilingAt(camX, camZ, me.gy + 1); if (camY > ceil - 0.3) camY = Math.max(tgtY - 0.2, ceil - 0.3); }
     camPos.set(camX, camY, camZ);
     // pulled in by a wall: straight there if the eased camera would be behind it, else ease as usual
@@ -1211,7 +1212,9 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       if (o.climb) { if (paint) togglePaint(); if (!pk.climb(o.climb, o.y)) throw new Error('no climbable route ' + o.climb + ' (climbables lists them)'); }
       if (o.swim) { if (paint) togglePaint(); const z = Math.max(city.plan.canal.open.z0 + 1, Math.min(city.plan.canal.open.z1 - 1, me.z)); me.z = z; me.gy = WATER_Y; me.y = 0; me.airborne = false; pk.swim(); }
       const c = cam.position, inside = W0.boxes.some((b) => c.x > b.x0 && c.x < b.x1 && c.z > b.z0 && c.z < b.z1 && c.y > (b.y0 ?? -1e9) && c.y < (b.y1 ?? 1e9));
-      return { ...pk.state(), cam: { x: +c.x.toFixed(2), y: +c.y.toFixed(2), z: +c.z.toFixed(2), inside }, x: +me.x.toFixed(2), z: +me.z.toFixed(2), gy: +me.gy.toFixed(2), heading: +me.heading.toFixed(3) };
+      // stuck: on foot, not in the air, and either inside something solid or over nothing to stand on
+      const stuck = !pk.busy() && !me.airborne && (!W0.free(me.x, me.z, 0.2, me.gy) || Number.isNaN(W0.groundAt(me.x, me.z, me.gy + 0.05)));
+      return { ...pk.state(), cam: { x: +c.x.toFixed(2), y: +c.y.toFixed(2), z: +c.z.toFixed(2), inside }, x: +me.x.toFixed(2), z: +me.z.toFixed(2), gy: +me.gy.toFixed(2), heading: +me.heading.toFixed(3), airborne: me.airborne, stuck };
     },
     climbables: (o = {}) => ({
       routes: city.plan.climbs.filter((c) => CLIMBABLE.includes(c.kind) && c.n).map((c) => ({ id: c.id || '', kind: c.kind, name: c.name || c.kind, x: +c.x.toFixed(2), z: +c.z.toFixed(2), y0: +c.y0.toFixed(2), y1: +c.y1.toFixed(2), top: c.top ? { x: +c.top.x.toFixed(2), z: +c.top.z.toFixed(2), y: +c.top.y.toFixed(2) } : null, bld: c.bld || '', dist: +Math.hypot(c.x - me.x, c.z - me.z).toFixed(1) }))
@@ -1230,7 +1233,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     music: (o = {}) => { if (!music) return null; if (o.on != null) music.set(!!o.on); if (o.next) music.next(); return music.state(); },
     audio: () => { const b = sound(); return b ? { ctx: b.ctx, node: b.out } : null; },
     goto: (x, z, yaw, pitch, y) => { if (paint) togglePaint();   // painting holds the writer at the wall: put the can down first
-      pk.reset(); mv.speed = 0; mv.yawRate = 0; mv.side = 0; mv.roll = 0; mv.pitch = 0;
+      pk.reset(); mv.speed = 0; mv.yawRate = 0; mv.side = 0; mv.roll = 0; mv.pitch = 0; me.crouch = false;
       // the level: the one asked for, else the highest there is here (the bridge, not the towpath under it)
       const g = W0.groundAt(x, z, y ?? 60);
       me.x = x; me.z = z; me.gy = Number.isNaN(g) ? (y ?? 0) : g; me.y = 0; me.vy = 0; me.airborne = false; mv.takeoff = 0;

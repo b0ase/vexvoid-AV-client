@@ -87,12 +87,16 @@ export function drawGround(g: CanvasRenderingContext2D, P: Plan, o: MapOpts) {
  *  canal ladders), the heavens as an open triangle (a high spot) at their wall. */
 export function drawClimbs(g: CanvasRenderingContext2D, P: Plan, o: MapOpts) {
   const px = (n: number) => n / o.k, V = o.view, s = o.mini ? 1.15 : 1;
+  // the mini-map keeps it quiet: the ladders, fire escapes and scaffolds, and only the drainpipes close by, never out
+  // at the rim (where the N tick is)
+  const cx = (V.x0 + V.x1) / 2, cz = (V.z0 + V.z1) / 2, rad = (V.x1 - V.x0) / 2 / 1.05;
   g.lineCap = 'butt';
   for (const c of P.climbs) {
     if (!CLIMBABLE.includes(c.kind) || !c.n) continue;
     if (c.x < V.x0 - 4 || c.x > V.x1 + 4 || c.z < V.z0 - 4 || c.z > V.z1 + 4) continue;
+    if (o.mini) { const d = Math.hypot(c.x - cx, c.z - cz); if (d > rad * 0.82 || (c.kind === 'drainpipe' && d > 16)) continue; }
     const [nx, nz] = c.n, tx = -nz, tz = nx, L = px(7 * s), wd = px(2.2 * s), x = c.x + nx * px(1.5), z = c.z + nz * px(1.5);
-    g.strokeStyle = c.kind === 'canal-ladder' ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.62)'; g.lineWidth = px(0.9);
+    g.strokeStyle = c.kind === 'drainpipe' ? 'rgba(255,255,255,0.38)' : 'rgba(255,255,255,0.66)'; g.lineWidth = px(0.9);
     g.beginPath();
     for (const sd of [-1, 1]) { g.moveTo(x + tx * wd * sd, z + tz * wd * sd); g.lineTo(x + tx * wd * sd + nx * L, z + tz * wd * sd + nz * L); }
     for (let k = 1; k <= 3; k++) { const f = (k / 4) * L; g.moveTo(x - tx * wd + nx * f, z - tz * wd + nz * f); g.lineTo(x + tx * wd + nx * f, z + tz * wd + nz * f); }
@@ -102,6 +106,7 @@ export function drawClimbs(g: CanvasRenderingContext2D, P: Plan, o: MapOpts) {
     const w = P.walls.find((q) => q.id === h.wall); if (!w) continue;
     const x = w.c[0] + w.n[0] * px(6), z = w.c[2] + w.n[1] * px(6), r = px(6 * s);
     if (x < V.x0 - 6 || x > V.x1 + 6 || z < V.z0 - 6 || z > V.z1 + 6) continue;
+    if (o.mini && Math.hypot(x - cx, z - cz) > rad * 0.82) continue;
     g.strokeStyle = '#ffffff'; g.lineWidth = px(1.3); g.beginPath(); g.moveTo(x, z - r); g.lineTo(x + r * 0.9, z + r * 0.6); g.lineTo(x - r * 0.9, z + r * 0.6); g.closePath(); g.stroke();
   }
 }
