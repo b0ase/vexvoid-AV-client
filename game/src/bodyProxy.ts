@@ -103,10 +103,15 @@ export function bodyProxy(meshes: THREE.SkinnedMesh[], bones: THREE.Bone[], k: n
       out.pen = -Infinity;
       for (const t of tabs) {
         loc.copy(p).applyMatrix4(t.inv).multiplyScalar(k);
-        const yf = (loc.y - t.y0) / DY; if (yf < -0.5 || yf > t.ny - 0.5) continue;
+        // (pass 4) a point just past the table's top or bottom is that far outside it, not ignored: an arm's bone running
+        // just over the top of the trunk (beside the neck, reaching across) has its sleeve below it in the top bins
+        const yf = (loc.y - t.y0) / DY, over = Math.max(0, yf - (t.ny - 0.5), -0.5 - yf) * DY; if (over > 0.12) continue;
+        const yc = Math.max(-0.5, Math.min(t.ny - 0.5, yf));
         const x = loc.x - t.cx, z = loc.z - t.cz, rho = Math.hypot(x, z), af = ((Math.atan2(x, z) + Math.PI) / (2 * Math.PI)) * NA - 0.5;
-        const pen = look(t, yf, af) - rho;
-        if (pen > out.pen) { out.pen = pen; out.bone = short(t.bone.name) + (t.kind === 'pack' ? ' pack' : ''); out.loc = [+loc.x.toFixed(3), +loc.y.toFixed(3), +loc.z.toFixed(3)]; out.r = +look(t, yf, af).toFixed(3); out.dir.set(x, 0, z).transformDirection(t.bone.matrixWorld); if (rho < 1e-4) out.dir.set(0, 0, 1).transformDirection(t.bone.matrixWorld); }
+        const pen = over > 0 ? Math.min(look(t, yc, af) - rho, -over) : look(t, yc, af) - rho;
+        if (pen > out.pen) { out.pen = pen; out.bone = short(t.bone.name) + (t.kind === 'pack' ? ' pack' : ''); out.loc = [+loc.x.toFixed(3), +loc.y.toFixed(3), +loc.z.toFixed(3)]; out.r = +look(t, yc, af).toFixed(3);
+          if (over > 0 && look(t, yc, af) - rho > -over) out.dir.set(0, yf > 0 ? 1 : -1, 0).transformDirection(t.bone.matrixWorld);
+          else { out.dir.set(x, 0, z).transformDirection(t.bone.matrixWorld); if (rho < 1e-4) out.dir.set(0, 0, 1).transformDirection(t.bone.matrixWorld); } }
       }
       return out;
     },

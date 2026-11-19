@@ -185,6 +185,7 @@ def curve(xs, ys):
     return f
 FOLD = 0.9   # how deep the cloth's folds are cut into the mesh (pass 2: the sharp creases are in the normal map now)
 def crease(x): return 1 - 2 * np.abs(np.sin(np.asarray(x) / 2)) ** 0.75   # a fold's profile: a sharp ridge, a round valley; -1..1
+def crease_s(x): return 1 - 2 * np.abs(np.sin(np.asarray(x) / 2)) ** 0.42   # (pass 4) a shell's crease: a knife ridge, flat between
 def unit(v): v = np.asarray(v, float); return v / np.maximum(1e-12, np.linalg.norm(v, axis=-1, keepdims=True))
 def sup(c, n): return np.sign(c) * np.abs(c) ** (2.0 / n)   # a superellipse: n = 2 round, higher squarer
 def fbm(P, scale, seed=0.0):
@@ -370,15 +371,18 @@ def sleeve_folds(P):
     n = grid_normals(P, True); s = np.broadcast_to(s_s[:, None], P.shape[:2]); th = np.broadcast_to(th_s[None], P.shape[:2])
     front = np.cos(th); out_ = np.sin(th); d = np.zeros(s.shape); wob = fbm(P, 0.11, 2.0); amp = 0.75 + 0.5 * fbm(P, 0.07, 9.0)
     live = sstep(-0.02, 0.06, s) * (1 - sstep(sW - 0.075, sW - 0.06, s))          # none on the shoulder cap or the cuff
+    # (pass 4, owner: the sleeves "still read soft and clay-like": a shell's nylon is stiff, so its folds are crisp ridges
+    #  with flats between, not soft waves; on the inside, toward the body, they stay as they were)
+    crisp = 0.6 + 0.4 * sstep(-0.4, 0.4, out_)
     # long drags that spiral down from the shoulder
-    d += live * 0.002 * amp * crease(s / 0.13 * 2 * math.pi + th * 1.0 + 4.5 * wob)
+    d += live * crisp * 0.0025 * amp * crease_s(s / 0.13 * 2 * math.pi + th * 1.0 + 4.5 * wob)
     # the elbow: two or three sharp creases inside the bend, smooth and proud over the point
     e = bump(sE, 0.055, s)
-    d += live * e * sstep(0.0, 0.9, front) * 0.007 * crease((s - sE) / 0.034 * 2 * math.pi + 1.2 * out_ + 3.0 * wob)
+    d += live * e * sstep(0.0, 0.9, front) * 0.0075 * crease_s((s - sE) / 0.034 * 2 * math.pi + 1.2 * out_ + 3.0 * wob)
     d += live * e * 0.005 * sstep(0.2, 1.0, -front)
     # the sleeve is long: it breaks in slanting folds above the cuff
     g = sstep(sW - 0.19, sW - 0.09, s)
-    d += live * g * (0.004 + 0.006 * amp * crease((s - sW) / 0.06 * 2 * math.pi + th * 1.0 + 1.5 * np.sin(th + 0.7) + 4.0 * wob))
+    d += live * g * (0.004 + 0.0065 * amp * crisp * crease_s((s - sW) / 0.06 * 2 * math.pi + th * 1.0 + 1.5 * np.sin(th + 0.7) + 4.0 * wob))
     return P + n * (FOLD * d)[..., None]
 Ps = sleeve_folds(Ps)
 def sleeve_w(P):
@@ -454,6 +458,17 @@ def box_tube(mesh, pts, ra, rb, n, up, mat, W, pw=5.0, name='', mirror=False):
     P = sweep(pts, ra, rb, n, up, pw); return grid(mesh, P, mat, W if W.ndim == 2 else weights(**{BONES[int(W)]: np.ones(P.shape[0] * n)}), cap0=True, cap1=True, mirror=mirror, name=name or mat)
 def one(bone, P): return weights(**{bone: np.ones(P.shape[0] * P.shape[1])})
 
+# (pass 4) a shell's cuff: a welded edge where the sleeve meets the band, and an adjuster tab across the outside of the
+# wrist (a strap with a hook-and-loop end), so the cuff reads as a cuff and not as the sleeve stopping
+def _ring(s0, rr0, ths):
+    P_ = tube(arm_path, np.array([s0]), np.array([rr0 * 0.95]), np.array([rr0]), ths)[0][0]; return P_, unit(P_ - arm_path(np.array([s0]))[0])
+_wr, _wn = _ring(sW - 0.061, 0.0462, th_s); _wr = np.concatenate([_wr, _wr[:1]]); _wn = np.concatenate([_wn, _wn[:1]])
+box_tube(body, _wr, 0.0022, 0.0016, 6, _wn, 'Detail', weights(LeftForeArm=np.ones(len(_wr) * 6)), pw=4.0, name='cuff-weld', mirror=True)
+_tr, _tn = _ring(sW - 0.034, 0.0478, np.linspace(math.pi / 2 - 0.75, math.pi / 2 + 0.5, 14))
+box_tube(body, _tr, 0.0105, 0.0022, 6, _tn, 'Detail', weights(LeftForeArm=np.ones(len(_tr) * 6)), pw=4.0, name='cuff-tab', mirror=True)
+_ax = unit(arm_path(np.array([sW - 0.02]))[0] - arm_path(np.array([sW - 0.05]))[0]); _te, _tne = _ring(sW - 0.034, 0.0498, np.array([math.pi / 2 + 0.4]))
+box_tube(body, np.array([_te[0] - _ax * 0.0085, _te[0] + _ax * 0.0085]), 0.0085, 0.0022, 6, _tne[0], 'Trim', weights(LeftForeArm=np.ones(12)), pw=5.0, name='cuff-tab-end', mirror=True)
+
 # ───────────────────────────── jacket details ─────────────────────────────
 Wt = spine_w(Pt.reshape(-1, 3)); Nt = grid_normals(Pt, True)
 rz = lambda a, b: np.where((z_t >= a - 1e-6) & (z_t <= b + 1e-6))[0]
@@ -475,60 +490,110 @@ for sgn in (1, -1):
     kk = resample(np.concatenate([keys, np.zeros((len(keys), 1))], 1), 40); pts, nn = on_torso(sgn * kk[:, 0], kk[:, 1], 0.009)
     STRAPS.append((pts, nn))
 
-# ───────────────────────────── the hood: from the face over the head, then a cowl draped on the shoulders ─────────────────────────────
+# ───────────────────────────── the jacket's stand collar (pass 4) ─────────────────────────────
+# A shell zipped up to the chin: a stand collar round the neck, highest in front, lowest behind, a little bigger at its
+# mouth than at the neckline. The hood comes up out of it (and flops out over it behind).
+COL_B = zN - 0.013                                            # the neckline the collar is sewn to
+def collar_top(ph): return zN + 0.016 + 0.022 * ((1 + np.cos(ph)) / 2) ** 1.2   # (just under the chin: the hood frames the face above it)
+def collar_mouth(ph):
+    """The collar's radius at its top, round the trunk's middle line (polar angle ph, 0 = straight ahead)."""
+    s, c = np.abs(np.sin(ph)), np.cos(ph); n = 2.3; fb = np.where(c > 0, 0.095, 0.1)
+    return 1.0 / ((s / 0.118) ** n + (np.abs(c) / fb) ** n) ** (1 / n)
+def collar_r(z, ph, off=0.0):
+    """The collar's outside at height z and polar angle ph (NaN where there is no collar)."""
+    z = np.asarray(z, float); ph = np.asarray(ph, float); zt = collar_top(ph); v = (z - COL_B) / (zt - COL_B)
+    rb = torso_r(np.full(np.shape(z), COL_B), ph) - 0.002; rt = collar_mouth(ph)
+    r = rb + (rt - rb) * sstep(0.0, 0.6, v) + 0.0025 * np.sin(np.pi * np.clip(v, 0, 1)) + off
+    return np.where((v >= -0.05) & (v <= 1.0), r, np.nan)
+NCOL = 64; ph_c = np.arange(NCOL) / NCOL * 2 * math.pi
+v_c = np.linspace(0.0, 1.0, 9)
+_zt = collar_top(ph_c)[None]; _zc = COL_B + (_zt - COL_B) * v_c[:, None]
+_rc = np.array([collar_r(_zc[i], ph_c) for i in range(len(v_c))])
+# the mouth rolls over: a bound edge, then the lining runs back down inside
+_zr = np.concatenate([_zc, (_zc[-1] + 0.003)[None], _zc[-1][None], (_zc[-1] - 0.022)[None]]); _rr = np.concatenate([_rc, (_rc[-1] - 0.004)[None], (_rc[-1] - 0.008)[None], (_rc[-1] - 0.009)[None]])
+Pcol = np.stack([CX + np.sin(ph_c)[None] * _rr, t_y(_zr) - np.cos(ph_c)[None] * _rr, _zr], -1)
+Pcol = Pcol + grid_normals(Pcol, True) * (0.0015 * fbm(Pcol, 0.05, 91.0))[..., None]
+_vk = np.repeat(np.concatenate([v_c, [1, 1, 1]]), NCOL)
+Wcol = spine_w(Pcol.reshape(-1, 3)) * (1 - 0.25 * _vk)[:, None]; Wcol[:, BI['Neck']] += 0.25 * _vk
+# (on the hood's mesh, not the body's: like the hood it is soft cloth round the neck, so the arms' body check leaves it
+#  out, as it left out the hood that stood here before; and the police, who wear the writer's body, have no collar)
 hood = Mesh('SM_Char_Writer_Hood')
+grid(hood, Pcol[:len(v_c)], 'Hoodie', Wcol[:len(v_c) * NCOL], name='collar')
+grid(hood, Pcol[len(v_c) - 1:], 'Trim', Wcol[(len(v_c) - 1) * NCOL:], name='collar-edge')
+patch(hood, Pcol[:len(v_c)], grid_normals(Pcol[:len(v_c)], True), np.arange(0, len(v_c)), np.arange(-1, 2), 0.0025, 'Detail', Wcol[:len(v_c) * NCOL], 'collar-zip')
+
+# ───────────────────────────── the hood: from the face over the head, then out of the collar onto the back ─────────────────────────────
 HY, HZ = J['Head'][1], zN                                    # the base of the neck; the skull sits forward and above it
 # (owner, 16 Nov: the old hood closed round the face like Kenny's, under the chin and over the nose. A real hoodie:
 #  the opening runs from the brow down to the throat, leaning back at the bottom, and the hood falls to the shoulders)
 # (pass 3, owner: from behind the hood was "a periscope neck": a tall tube dropping straight into the pack. A hood that
 #  is up hangs off the head and its back falls open onto the shoulders and the upper back, gathering where it lands:
 #  below the back of the skull the rings widen out to the shoulders and are laid onto the jacket, with folds)
+# (pass 4, owner: from behind the pass 3 cowl read as "a padded neck pillow / fur collar". A hoodie's hood worn up under
+#  a shell jacket does not spread round the shoulders: it comes up out of the jacket's zipped stand collar, which
+#  cinches it at the front and the sides, and only at the back does the cloth flop out over the collar and lie on the
+#  upper back, in a short soft tongue with a couple of sagging folds at the nape. So: the cowl is no wider than the
+#  head, the jacket gets its stand collar, the hood is tucked inside that collar except behind, and it is a two-panel
+#  hood with one centre seam running from the brow over the crown to the nape.)
 HU = [0.0, 0.15, 0.4, 0.62, 0.78, 0.9, 1.0]
-h_c = curve(HU, [(HY - 0.138, HZ + 0.075), (HY - 0.106, HZ + 0.088), (HY - 0.044, HZ + 0.113), (HY - 0.006, HZ + 0.072), (HY + 0.012, HZ + 0.022), (HY + 0.016, HZ - 0.03), (HY + 0.014, HZ - 0.078)])
+h_c = curve(HU, [(HY - 0.138, HZ + 0.075), (HY - 0.106, HZ + 0.088), (HY - 0.044, HZ + 0.113), (HY - 0.006, HZ + 0.072), (HY + 0.01, HZ + 0.022), (HY + 0.012, HZ - 0.028), (HY + 0.01, HZ - 0.07)])
 h_ang = curve(HU, np.radians([-14, -4, 22, 60, 80, 88, 90]))
-h_a = curve(HU, [0.082, 0.104, 0.118, 0.13, 0.152, 0.176, 0.19])     # half width: the head, then out over the shoulders
-h_top = curve(HU, [0.097, 0.108, 0.113, 0.112, 0.118, 0.13, 0.142])    # over the head, then down onto the upper back
-h_bot = curve(HU, [0.138, 0.13, 0.104, 0.058, 0.064, 0.074, 0.082])    # down the throat (open), then onto the chest
+h_a = curve(HU, [0.082, 0.104, 0.118, 0.13, 0.134, 0.128, 0.118])    # half width: round the head, then no wider (into the collar)
+h_top = curve(HU, [0.097, 0.108, 0.113, 0.112, 0.112, 0.108, 0.104])   # over the head, then the slack behind the neck
+h_bot = curve(HU, [0.138, 0.13, 0.104, 0.058, 0.06, 0.064, 0.068])     # down the throat (open), then into the collar
+HOOD_DROP = 0.055                                                      # how far the back of the hood flops down the back
 NH = 48; psi = np.arange(NH) / NH * 2 * math.pi
 u_h = np.concatenate([np.linspace(0, 0.15, 5)[:-1], np.linspace(0.15, 0.72, 18)[:-1], np.linspace(0.72, 1.0, 12)])
 def hood_ring(u):
     c = h_c(u); a = h_ang(u); cu = np.cos(psi); top = cu > 0
     up = np.array([0, math.sin(a), math.cos(a)]); r = np.where(top, h_top(u), h_bot(u))
-    peak = 0.006 * bump(0.5, 0.1, u) * np.clip(cu, 0, 1) ** 6                                   # the soft point at the back of the crown
-    seam = -0.004 * (bump(0.55, 0.07, psi) + bump(2 * math.pi - 0.55, 0.07, psi)) * top * sstep(0.1, 0.25, u) * (1 - sstep(0.7, 0.85, u))   # the centre panel's two seams
+    peak = 0.004 * bump(0.5, 0.1, u) * np.clip(cu, 0, 1) ** 8                                   # the soft point where the centre seam crosses the crown
+    seam = 0.0016 * bump(0.0, 0.035, np.minimum(psi, 2 * math.pi - psi)) * sstep(0.04, 0.12, u)     # the centre seam: a felled ridge from the brow to the nape
     pw = 2.3 - 0.35 * bump(0.42, 0.16, u)                                                       # a round crown, not a box
     P = np.array([CX, c[0], c[1]]) + np.outer(h_a(u) * sup(np.sin(psi), pw), [1, 0, 0]) + np.outer((r + peak + seam) * sup(cu, 2.2), up)
     P[:, 2] += 0.045 * sstep(0.2, 1.0, -cu) * sstep(0.75, 1.0, u)                               # the neckline rises to the throat in front
+    P[:, 2] -= HOOD_DROP * sstep(0.66, 1.0, u) * np.clip(cu, 0, 1) ** 1.4                       # and falls at the back: the tongue on the upper back
     brim = sstep(0.25, 0.95, cu) * (1 - sstep(0.0, 0.14, u))                                    # the stiffened peak over the brow
-    P[:, 1] -= 0.045 * brim; P[:, 2] -= 0.012 * brim
+    P[:, 1] -= 0.034 * brim; P[:, 2] -= 0.01 * brim                                               # (pass 4: less of a cap's peak)
     chin = sstep(0.3, 1.0, -cu) * (1 - sstep(0.0, 0.2, u))                                      # the open bottom tucks back to the throat
     P[:, 1] += 0.012 * chin
     return P
 Ph = np.array([hood_ring(u) for u in u_h])
 uu = np.broadcast_to(u_h[:, None], Ph.shape[:2]); pp = np.broadcast_to(psi[None], Ph.shape[:2])
-# the cowl: from below the back of the skull the cloth is laid onto the jacket (and over the straps), more and more
-# toward its edge; where it lands it gathers in soft folds that run down from the neck
-def drape(P, w, off):
-    """Points P (n, 3) pulled toward the jacket's surface by w (0..1), to `off` outside it, and never inside it."""
-    z, ph, rho = polar(P); want = torso_r(z, ph) + off; r2 = rho + (want - rho) * w
-    r2 = np.where((w > 0) & (z < zN), np.maximum(r2, torso_r(z, ph) + 0.004), r2)   # (only where it lies on the body: above the collar the crown is left alone)
+# where each point lies round the trunk: behind (the tongue lies out over the collar and the jacket) or not (tucked in)
+def behind(ph): return sstep(1.5, 2.1, np.abs(ph))
+def outer_r(z, ph):
+    """The outside of the clothes the hood can lie on: the collar's outside where there is collar, else the jacket."""
+    rc = collar_r(z, ph, 0.0); return np.where(np.isnan(rc), torso_r(z, ph), np.maximum(np.nan_to_num(rc), torso_r(z, ph)))
+def fit(P, u, cu):
+    """Behind (and round to the ears): laid onto the collar and the jacket's back, more and more toward its edge, and
+    never inside them; above the collar it hangs free. In front: inside the collar (just in, so it reads as cinched),
+    easing out above the collar's top."""
+    z, ph, rho = polar(P); bw = behind(ph); top = collar_top(ph)
+    out = outer_r(z, ph); lay = sstep(0.62, 0.95, u) ** 1.4 * sstep(top + 0.035, top - 0.005, z)
+    soft = 0.005 + 0.002 * np.clip(cu, 0, 1)                                                    # a cloth's thickness off the jacket
+    r_b = rho + (out + soft - rho) * lay
+    r_b = np.where(z < top + 0.004, np.maximum(r_b, out + 0.004), r_b)
+    inner = np.where(np.isnan(collar_r(z, ph, 0.0)), torso_r(z, ph) - 0.012, np.nan_to_num(collar_r(z, ph, 0.0)) - 0.009)
+    cap = inner + 2.5 * np.maximum(0.0, z - top)                                                 # flaring straight out of the collar's mouth
+    r_f = np.where(z < top + 0.025, np.minimum(rho, cap), rho)
+    r2 = bw * r_b + (1 - bw) * r_f
     Q = P.copy(); Q[:, 0] = CX + np.sin(ph) * r2; Q[:, 1] = t_y(z) - np.cos(ph) * r2
-    for pts, nn in STRAPS:   # over a strap: lifted clear of it, eased off at its edges
-        d = Q[:, None] - pts[None]; k = np.argmin((d ** 2).sum(-1), 1); dd = Q - pts[k]; n_ = nn[k]
-        along = np.gradient(pts, axis=0)[k]; side_ = unit(np.cross(n_, unit(along))); lat = np.abs((dd * side_).sum(1)); h = (dd * n_).sum(1)
-        lift = (0.02 - h) * (1 - sstep(0.02, 0.034, lat)) * (h > -0.02); Q += n_ * np.clip(lift, 0, None)[:, None]
+    # (the pack's straps go over it: the hood lies under them, pressed flat, instead of being lifted over them, which
+    #  curled its corners up round the straps' tops in the game)
     return Q
-wd = sstep(0.66, 0.97, uu) ** 1.5                                                                       # how much each point lies on the body
-gather = bump(1.0, 0.16, uu) * (0.5 + 0.5 * np.abs(np.cos(pp)))
-off = 0.006 + 0.008 * gather * np.clip(crease(pp * 9 + 3.5 * fbm(Ph, 0.08, 57.0)) * 0.5 + 0.5, 0, 1)   # folds stand off the shoulders
-Ph = drape(Ph.reshape(-1, 3), wd.ravel(), off.ravel()).reshape(Ph.shape)
-# folds: the hood slumps behind the head, the cowl gathers, and the cloth is never drum-tight
-nh = grid_normals(Ph, True)
-dh = 0.004 * sstep(0.5, 0.7, uu) * (1 - sstep(0.85, 0.95, uu)) * np.clip(np.cos(pp), 0, 1) * crease(pp * 6 + 4 * fbm(Ph, 0.1, 51.0))
-dh += 0.004 * fbm(Ph, 0.09, 53.0) * sstep(0.05, 0.2, uu)
+Ph = fit(Ph.reshape(-1, 3), uu.ravel(), np.cos(pp).ravel()).reshape(Ph.shape)
+# folds: cotton jersey hangs in a few broad, soft folds. Behind the neck the slack sags in two or three folds that run
+# across the back of the hood and droop at the middle; the crown is smooth (the head fills it); nothing radial, no ruff
+nh = grid_normals(Ph, True); cb = np.clip(np.cos(pp), 0, 1); wob = fbm(Ph, 0.12, 51.0)
+nape = sstep(0.55, 0.68, uu) * (1 - sstep(0.9, 0.99, uu)) * cb ** 0.7
+dh = 0.0045 * nape * np.sin((uu - 0.6) / 0.105 * 2 * math.pi + 2.4 * (1 - cb) + 1.2 * wob)
+dh += 0.0025 * sstep(0.3, 0.6, uu) * (1 - sstep(0.85, 0.95, uu)) * np.sin(pp * 3 + 2 * wob) * (1 - cb) * 0.6   # the sides crease a little where the hood turns
+dh += 0.0018 * fbm(Ph, 0.1, 53.0) * sstep(0.05, 0.2, uu)
 Ph = Ph + nh * dh[..., None]
-# the edge where it lies on the jacket: the cloth turns under, so it has a thickness and no gap shows
-last = Ph[-1]; zl, pl, _ = polar(last); under = last.copy(); rr_ = torso_r(zl, pl) + 0.002
+# the edge: behind, where it lies on the jacket, the cloth turns under, so it has a thickness and no gap shows; in front
+# and at the sides it is inside the collar, out of sight
+last = Ph[-1]; zl, pl, rl = polar(last); under = last.copy(); rr_ = rl - 0.006
 under[:, 0] = CX + np.sin(pl) * rr_; under[:, 1] = t_y(zl) - np.cos(pl) * rr_; under[:, 2] -= 0.004
 roll = (last + under) / 2 + (last - Ph[-2]) * 0.2
 Ph = np.concatenate([Ph, roll[None], under[None]]); u_h2 = np.concatenate([u_h, [1.0, 1.0]])
@@ -891,7 +956,7 @@ def crinkle(Q, amp):
     return -amp * ((1 - np.abs(vnoise(Q, 0.035, 1.7))) ** 6 + 0.6 * (1 - np.abs(vnoise(Q, 0.014, 5.3))) ** 6)
 # seams (pass 3): where the panels of each garment are sewn, a flat-felled seam (a raised fold of cloth) with a double
 # row of stitches beside it: (columns round the piece as a fraction, rows along it as heights for the jacket)
-SEAMS = {'jacket': dict(u=(0.25, 0.75), z=(zS + 0.045,)), 'sleeve': dict(u=(0.75, 0.5)), 'leg': dict(u=(0.25, 0.75)), 'seat': dict(u=(0.0, 0.5))}
+SEAMS = {'jacket': dict(u=(0.25, 0.75), z=(zS + 0.045,)), 'sleeve': dict(u=(0.75, 0.5)), 'leg': dict(u=(0.25, 0.75)), 'seat': dict(u=(0.0, 0.5)), 'hood': dict(u=(0.0,))}
 def seam_marks(pc, w, h):
     """For a piece's patch of the atlas (h x w px): (darkening in the seam's crease, stitch dots, raised seam height)."""
     sd = SEAMS.get(pc['name']); U, Vv = np.meshgrid(np.linspace(0, 1, w), np.linspace(0, 1, h)); crease_ = np.zeros((h, w)); dots = np.zeros((h, w)); ridge = np.zeros((h, w))
@@ -921,12 +986,17 @@ def fold_height(pc, w, h):
         sp = np.interp(rv, np.arange(R), FOLDP[nm])[:, None]; front = np.cos(th); out_ = np.sin(th); wob = 1.6 * vnoise(Q, 0.12, 2.0) + 0.6 * vnoise(Q, 0.05, 9.0)
         patch_ = 0.25 + 0.75 * sstep(-0.35, 0.45, vnoise(Q, 0.09, 4.4))   # cloth folds in places, not in rings all the way round
         if nm == 'sleeve':
+            # (pass 4) a shell sleeve: crisp knife creases with flats between (not soft waves), an articulated elbow
+            # (two curved panel seams over the back of it), a taped seam down the back, and the nylon's fine crinkle
             live = sstep(-0.02, 0.06, sp) * (1 - sstep(sW - 0.075, sW - 0.06, sp))
-            H += live * patch_ * 0.0009 * crease(sp / 0.13 * 2 * math.pi + th + 4.5 * wob)
-            H += live * patch_ * bump(sE, 0.06, sp) * sstep(-0.1, 0.9, front) * 0.003 * crease((sp - sE) / 0.022 * 2 * math.pi + 1.4 * out_ + 3 * wob)
-            H += live * (0.4 + 0.6 * patch_) * sstep(sW - 0.2, sW - 0.09, sp) * 0.0026 * crease((sp - sW) / 0.04 * 2 * math.pi + th + 1.5 * np.sin(th + 0.7) + 4 * wob)
-            H += live * patch_ * bump(0.02, 0.04, sp) * sstep(0.55, 0.98, -out_) * 0.0013 * crease(sp / 0.03 * 2 * math.pi - 5 * front + 3 * wob)   # drag lines out of the armpit
-            H += crinkle(Q, 0.0006)
+            H += live * patch_ * 0.0013 * crease_s(sp / 0.11 * 2 * math.pi + th + 4.5 * wob)
+            H += live * (0.5 + 0.5 * patch_) * bump(sE, 0.065, sp) * sstep(-0.1, 0.9, front) * 0.0042 * crease_s((sp - sE) / 0.021 * 2 * math.pi + 1.4 * out_ + 3 * wob)
+            H += live * (0.5 + 0.5 * patch_) * sstep(sW - 0.2, sW - 0.09, sp) * 0.0034 * crease_s((sp - sW) / 0.038 * 2 * math.pi + th + 1.5 * np.sin(th + 0.7) + 4 * wob)
+            H += live * patch_ * bump(0.02, 0.04, sp) * sstep(0.55, 0.98, -out_) * 0.0016 * crease_s(sp / 0.03 * 2 * math.pi - 5 * front + 3 * wob)   # drag lines out of the armpit
+            for s0, k_ in ((sE - 0.07, 1.0), (sE + 0.075, -1.0)):   # the elbow panel's seams, bowed round the point
+                dd = sp - (s0 + k_ * 0.025 * np.clip(-front, 0, 1)); band = sstep(0.0, 0.5, -front + 0.35)
+                H += band * (0.0007 * np.exp(-((dd - 0.0025) / 0.002) ** 2) - 0.0005 * np.exp(-(dd / 0.0011) ** 2))
+            H += crinkle(Q, 0.0007)
         elif nm == 'leg':
             live = sstep(0.0, 0.08, sp) * (1 - sstep(CUFF - 0.012, CUFF, sp))
             H += live * patch_ * (1 - sstep(0.04, 0.24, sp)) * 0.0016 * crease(sp / 0.06 * 2 * math.pi - out_ * 7 + 3 * wob) * sstep(0.0, 0.8, front)   # whiskers fanning from the crotch
@@ -941,15 +1011,18 @@ def fold_height(pc, w, h):
             H += patch_ * bump(zS - 0.14, 0.1, sp) * sstep(0.3, 0.95, side) * 0.0022 * crease((sp - zS) / 0.05 * 2 * math.pi - side * 5 + 3 * wob)
             H += crinkle(Q, 0.0006)
         elif nm == 'hood':
-            # a hood hangs: soft folds fall from the crown down the back and pile where it meets the shoulders
-            H += patch_ * sstep(0.45, 0.7, sp) * (1 - sstep(0.95, 1.0, sp)) * np.clip(np.cos(th), 0, 1) * 0.0022 * crease(th * 7 + 3 * wob)
-            H += sstep(0.82, 0.95, sp) * 0.0018 * crease(th * 11 + 2 * wob)
-            H += crinkle(Q, 0.0005)
+            # (pass 4) cotton jersey, not nylon: no crinkle and no ruff of gathers. The slack behind the neck sags in a few
+            # soft folds across the back that droop at the middle; a couple of drag lines run from the crown toward them
+            cb = np.clip(np.cos(th), 0, 1)
+            H += sstep(0.55, 0.66, sp) * (1 - sstep(0.9, 0.99, sp)) * cb ** 0.7 * 0.0011 * np.sin((sp - 0.6) / 0.06 * 2 * math.pi + 2.4 * (1 - cb) + 1.5 * wob)
+            H += patch_ * sstep(0.35, 0.55, sp) * (1 - sstep(0.7, 0.8, sp)) * cb * 0.0007 * np.sin(th * 5 + 2 * wob)
+            H += 0.00012 * vnoise(Q, 0.006, 3.1)   # the knit's own grain, faint
         elif nm == 'seat':
             H += 0.0018 * bump(zH - 0.03, 0.05, sp) * crease(th * 9 + 3 * wob) + crinkle(Q, 0.0003)
     elif pc['mat'] in ('Hoodie', 'Pack', 'Trousers', 'Cotton'): H += crinkle(Q, 0.0004)
     elif pc['mat'] == 'Gloves': H += crinkle(Q, 0.00025)
-    cr_, dt_, rg_ = seam_marks(pc, w, h); H += 0.0007 * rg_ - 0.0004 * cr_ - 0.00025 * dt_
+    cr_, dt_, rg_ = seam_marks(pc, w, h); k_ = 1.7 if nm in ('sleeve', 'jacket') else 1.0   # (pass 4: the shell's seams are taped: prouder)
+    H += k_ * (0.0007 * rg_ - 0.0004 * cr_) - 0.00025 * dt_
     if not pc['closed']:   # a sewn panel: its edge stands up
         U, Vv = np.meshgrid(np.linspace(0, 1, w), np.linspace(0, 1, h)); e = np.minimum(np.minimum(U, 1 - U) * w, np.minimum(Vv, 1 - Vv) * h)
         H += 0.0009 * sstep(0.0, 3.5, e)
@@ -968,7 +1041,7 @@ for pc, x, y, w, h in RECTS:
         # a sewn-on panel: a dark edge, then a line of stitches just inside it
         e = np.minimum(px, py); A *= 0.72 + 0.28 * sstep(0.5, 3.0, e)
         if min(w, h) > 24: A *= 1 + 0.22 * ((e > 4) & (e < 6)) * ((np.floor((U * w + Vv * h) / 4) % 2) == 0)
-    elif pc['name'] in ('jacket', 'sleeve', 'leg', 'hood'):
+    elif pc['name'] in ('jacket', 'sleeve', 'leg'):
         A *= 0.8 + 0.2 * sstep(0.5, 2.5, px)                                    # the seam the tube closes on
     if pc['closed']: cr_, dt_, rg_ = seam_marks(pc, w, h); A *= (1 - 0.35 * cr_) * (1 + 0.3 * dt_)   # sewn seams: a dark crease, light stitches
     if pc['name'] == 'midsole': A *= 0.86 + 0.14 * (np.cos(Vv * h * 0.9) > 0.3)                       # the rubber's moulded ribs
@@ -989,7 +1062,7 @@ def mat(name, rgb, rough):
     M = bpy.data.materials.new(name); M.use_nodes = True; b = M.node_tree.nodes.get('Principled BSDF')
     b.inputs['Base Color'].default_value = (*rgb, 1); b.inputs['Roughness'].default_value = rough; return M
 LOOKS = {'Hoodie': (0.035, 0.6), 'Trousers': (0.07, 0.8), 'Gloves': (0.03, 0.6), 'Shoes': (0.7, 0.5), 'Sole': (0.8, 0.6), 'Void': (0.0, 1.0), 'Trim': (0.02, 0.8),
-         'Mask': (0.01, 0.9), 'Pack': (0.03, 0.5), 'Can': (0.6, 0.3), 'Cap': (0.85, 0.5), 'Reflect': (0.8, 0.3), 'Detail': (0.012, 0.45), 'Cotton': (0.16, 0.95), 'Lace': (0.75, 0.8)}
+         'Mask': (0.01, 0.9), 'Pack': (0.03, 0.5), 'Can': (0.6, 0.3), 'Cap': (0.85, 0.5), 'Reflect': (0.8, 0.3), 'Detail': (0.012, 0.45), 'Cotton': (0.075, 0.95), 'Lace': (0.75, 0.8)}
 BM = {n: mat(n, (LOOKS[n][0],) * 3, LOOKS[n][1]) for n in MATS}
 # the atlas goes out inside the .glb as each material's base colour texture, on the second UV set
 ATLAS_IMG = bpy.data.images.new('writer-atlas', ATLAS, ATLAS); _px = np.ones((ATLAS * ATLAS, 4), np.float32); _px[:, :3] = IMG.ravel()[:, None]; ATLAS_IMG.pixels.foreach_set(_px.ravel())

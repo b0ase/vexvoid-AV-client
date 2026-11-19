@@ -120,10 +120,13 @@ const LOOK: Record<string, () => THREE.Material> = {
   // own value in the black and white, so they separate: a black nylon shell with a slight sheen, the grey cotton hood of
   // the hoodie under it, charcoal cargo twill, worn white trainers on grey rubber, a black pack with webbing.
   // the jacket is a technical shell: a tight ripstop with a sheen, so the street's rim lights draw its folds and seams
-  Hoodie: () => new THREE.MeshPhysicalMaterial({ color: '#2a2b30', roughness: 0.46, metalness: 0, sheen: 0.7, sheenRoughness: 0.35, sheenColor: new THREE.Color('#8e9098'), normalScale: new THREE.Vector2(0.45, 0.45), ...weave('ripstop', 44) }),
-  // the hoodie under the shell: its hood is up and out over the jacket. Matte heather cotton, a lighter grey than the
-  // shell, so the hood reads as its own garment and the shoulders as the jacket's
-  Cotton: () => new THREE.MeshPhysicalMaterial({ color: '#7c7d82', roughness: 0.95, metalness: 0, sheen: 0.5, sheenRoughness: 0.85, sheenColor: new THREE.Color('#6c6d72'), normalScale: new THREE.Vector2(0.6, 0.6), ...weave('knit', 80) }),
+  // (pass 4, owner: the sleeves "still read soft and clay-like": a firmer, slightly glossier face, so the crisp creases
+  // in the normal map catch the light as edges instead of melting into one soft highlight)
+  Hoodie: () => new THREE.MeshPhysicalMaterial({ color: '#2a2b30', roughness: 0.4, metalness: 0, sheen: 0.55, sheenRoughness: 0.3, sheenColor: new THREE.Color('#9a9ca4'), specularIntensity: 0.6, normalScale: new THREE.Vector2(0.45, 0.45), ...weave('ripstop', 44) }),
+  // the hoodie under the shell: its hood is up, out of the jacket's collar. Matte charcoal heather cotton (pass 4: pass 3's
+  // light grey read as a fur collar against the black shell): a few steps lighter than the shell and dead matte where the
+  // shell shines, so the two still separate
+  Cotton: () => new THREE.MeshPhysicalMaterial({ color: '#4c4d52', roughness: 0.93, metalness: 0, sheen: 0.35, sheenRoughness: 0.9, sheenColor: new THREE.Color('#55565b'), normalScale: new THREE.Vector2(0.6, 0.6), ...weave('knit', 80) }),
   // cargo twill: dead matte, darker than the hood, lighter than the shell
   Trousers: () => new THREE.MeshPhysicalMaterial({ color: '#45464b', roughness: 0.88, metalness: 0, sheen: 0.4, sheenRoughness: 0.7, sheenColor: new THREE.Color('#77787e'), normalScale: new THREE.Vector2(0.5, 0.5), ...weave('twill', 30) }),
   Gloves: () => new THREE.MeshStandardMaterial({ color: '#2d2e32', roughness: 0.6, metalness: 0, normalScale: new THREE.Vector2(0.4, 0.4), ...weave('knit', 70) }),
@@ -227,7 +230,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       if (src.normalMap && std.isMeshStandardMaterial) {
         const weave = std.normalMap; std.normalMap = src.normalMap; std.normalScale.copy(src.normalScale);
         const ph = mat as THREE.MeshPhysicalMaterial;
-        if (weave && ph.isMeshPhysicalMaterial && src.name === 'Hoodie') { ph.clearcoat = 0.3; ph.clearcoatRoughness = 0.42; ph.clearcoatNormalMap = weave; ph.clearcoatNormalScale.set(0.7, 0.7); }
+        if (weave && ph.isMeshPhysicalMaterial && src.name === 'Hoodie') { ph.clearcoat = 0.35; ph.clearcoatRoughness = 0.36; ph.clearcoatNormalMap = weave; ph.clearcoatNormalScale.set(0.7, 0.7); }
         std.needsUpdate = true;
       }
       const m = new THREE.SkinnedMesh(geo, mat); m.name = sm.name; m.userData.slot = src.name;
@@ -510,9 +513,15 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
   const R_UP = 0.064, R_FORE = 0.056, R_HAND = 0.046, R_CAN = 0.036, CLEAR = 0.006;
   const kS = vx.scale || 1;
   const armPen = (a: THREE.Vector3, b: THREE.Vector3, r: number, t0: number, n: number, worst: { pen: number; p: THREE.Vector3; dir: THREE.Vector3 }) => {
-    for (let i = 0; i < n; i++) { const t = t0 + (1 - t0) * (n === 1 ? 1 : i / (n - 1)); tv2.copy(a).lerp(b, t); const d = body.depth(tv2); const pen = d.pen + r + CLEAR; if (pen > worst.pen) { worst.pen = pen; worst.p.copy(tv2); worst.dir.copy(d.dir); } }
+    for (let i = 0; i < n; i++) {
+      const t = t0 + (1 - t0) * (n === 1 ? 1 : i / (n - 1)); tv2.copy(a).lerp(b, t); const d = body.depth(tv2); const pen = d.pen + r + CLEAR + clearX; if (pen > worst.pen) { worst.pen = pen; worst.p.copy(tv2); worst.dir.copy(d.dir); }
+      // (pass 4) and the capsule's underside: over a sloping surface (the top of the shoulder, the trapezius) the part of
+      // the sleeve below the bone can be in while the bone's own height is clear
+      tv2.y -= r * 0.7; const d2 = body.depth(tv2); const pen2 = d2.pen + r * 0.3 + CLEAR + clearX; if (pen2 > worst.pen) { worst.pen = pen2; worst.p.copy(tv2); worst.dir.copy(d2.dir); }
+    }
   };
   const W1 = { pen: 0, p: new THREE.Vector3(), dir: new THREE.Vector3() };
+  let clearX = 0;   // (pass 4) extra clearance while the arm reaches for a wall: the mesh's folds and the pinky stand off the bones' capsules
   const canAxis = (out0: THREE.Vector3, out1: THREE.Vector3) => { if (!gripPos) return false; rHand.getWorldQuaternion(gQ).multiply(gripRot); out0.copy(gripPos); rHand.localToWorld(out0); out1.set(0, 1, 0).applyQuaternion(gQ); return true; };
   // a clip's arm through the trunk: the upper arm turns out about the shoulder until the elbow side clears, then the
   // forearm about the elbow until the forearm, the fist and the can clear (a few small passes)
@@ -522,9 +531,9 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
     for (let pass = 0; pass < passes; pass++) {
       root.updateMatrixWorld(true); body.prep();
       sa.arm.getWorldPosition(iA); sa.fore.getWorldPosition(iB); sa.hand.getWorldPosition(iC);
-      hTip.copy(iC).sub(iB).normalize().multiplyScalar(0.085).add(iC);
+      hTip.copy(iC).sub(iB).normalize().multiplyScalar(0.085 + 0.02 * Math.sign(clearX)).add(iC);
       const carrying = sa.s === 'Right' && carryW > 0.5 && canAxis(cA, cU);
-      W1.pen = 0; if (fixUpper) armPen(iA, iB, R_UP, 0.5, 4, W1);
+      W1.pen = 0; if (fixUpper) armPen(iA, iB, R_UP, clearX > 0 ? 0.42 : 0.5, clearX > 0 ? 5 : 4, W1);
       if (W1.pen > 0.001) { ax.subVectors(W1.p, iA); const L = ax.length(); tv3.copy(ax); ax.cross(W1.dir); if (ax.lengthSq() < 1e-8) ax.crossVectors(tv3, UP); ax.normalize(); if (ax.lengthSq() > 0.5) { spin(sa.arm, qr.setFromAxisAngle(ax, Math.atan2(W1.pen, L) * 1.12)); continue; } }
       W1.pen = 0; armPen(iB, iC, R_FORE, 0.15, 4, W1); armPen(iC, hTip, R_HAND, 0, 3, W1);
       if (carrying) { tv3.copy(cA).addScaledVector(cU, CAN.y0 * 0.9); armPen(cA, tv3, R_CAN, 0, 3, W1); }
@@ -563,7 +572,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
     qU.setFromUnitVectors(cU, UP); const a = 2 * Math.acos(Math.min(1, Math.abs(qU.w))); if (a < 1e-3) return;
     qI.identity().slerp(qU, Math.min(1, max / a) * w); spin(rHand, qI);
   };
-  let readyW = 0, foldW = 0, pass2 = false, sinceAim = 1;
+  let readyW = 0, foldW = 0, tuckW = 0, pass2 = false, sinceAim = 1;
   const fT = new THREE.Vector3(), fP = new THREE.Vector3();
   // the spray arm: the hand turns so the can is upright with its nozzle at the wall, the wrist goes where that puts the
   // nozzle at the can's distance (kept outside the trunk), and of all the elbows that reach it the one that keeps the
@@ -1025,14 +1034,31 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
           if (armsFix) { pushOut(sa, true, 3); sa.fore.getWorldPosition(iB); sa.hand.getWorldPosition(iC); turn(sa.fore, aT.subVectors(iC, iB).normalize(), fP.subVectors(fT, iB).normalize(), foldW); pushOut(sa, false, 3); }
         }
       }
-      if (!pass2 && carryW > 0.5 && aimW < 0.99) canUp((1 - aimW) * carryW, 0.5 + 0.3 * Math.max(readyW, foldW));
+      // SPRINT CARRY (pass 4, owner: the can tipped about 28 degrees at a full sprint): the clip's sprint pumps the arm
+      // through 90 degrees, more than a wrist can take back. Running, the can arm rides tucked (forearm forward and up,
+      // the fist by the ribs), keeping a third of the clip's pump, so the wrist holds the can near upright all stride
+      tuckW += ((carryOn && locoOn && !aimOn && !pass2 ? THREE.MathUtils.smoothstep(locoS, 2.4, 6.2) * (1 - crouchW) : 0) - tuckW) * Math.min(1, dt * 6);
+      const tk = tuckW * (1 - foldW) * (1 - readyW) * (1 - aimW);
+      if (tk > 0.01) {
+        rArm.getWorldPosition(fT); const lvL = chestDir(1, 0, 0, aT).setY(0).normalize(), lvF = chestDir(0, 0, 1, fP).setY(0).normalize();
+        fT.addScaledVector(lvL, -0.11).addScaledVector(UP, -0.34).addScaledVector(lvF, 0.2);
+        fP.copy(lvF).multiplyScalar(-0.8).addScaledVector(lvL, -0.6).addScaledVector(UP, -0.4).normalize();
+        armTo(sideArms[1], fT, fP, 0.68 * tk);
+        if (armsFix) pushOut(sideArms[1], true, 6);   // the elbow off the ribs, the fist and the can off the hip
+      }
+      if (!pass2 && carryW > 0.5 && aimW < 0.99) canUp((1 - aimW) * carryW, 0.5 + 0.3 * Math.max(readyW, foldW) + 0.15 * tuckW);
       if (aimW > 0.01) {
         ik(aimW, dt);
         // whatever the reach could not avoid, the arm is pushed out of the trunk like a clip's arm; then the hand turns
         // back so the can points at the spot from where it is
         if (armsFix) {
-          pushOut(sideArms[1], true, 10);
-          if (gripPos) { rHand.getWorldPosition(tv2); rHand.getWorldQuaternion(qb); tv3.copy(gripPos).multiplyScalar(kS).applyQuaternion(qb).add(tv2); lookCan(tv3); gH.copy(gQ).multiply(gripInv); rHand.parent!.getWorldQuaternion(qp); qb.copy(qp).invert().multiply(gH); rHand.quaternion.slerp(qb, aimW); rHand.updateMatrixWorld(true); }
+          // (pass 4: arm-1 still caught the spray arm 2-10 cm into the trunk for a frame or two as the reach changed its
+          //  mind between aim points: the push now keeps a wider margin round the bones while painting, and runs once
+          //  more after the hand's last turn, which can swing the fist and the can back in)
+          clearX = 0.012 * aimW;
+          const aimHandTurn = () => { if (gripPos) { rHand.getWorldPosition(tv2); rHand.getWorldQuaternion(qb); tv3.copy(gripPos).multiplyScalar(kS).applyQuaternion(qb).add(tv2); lookCan(tv3); gH.copy(gQ).multiply(gripInv); rHand.parent!.getWorldQuaternion(qp); qb.copy(qp).invert().multiply(gH); rHand.quaternion.slerp(qb, aimW); rHand.updateMatrixWorld(true); } };
+          pushOut(sideArms[1], true, 10); aimHandTurn(); pushOut(sideArms[1], true, 6); aimHandTurn();
+          clearX = 0;
         }
       } else { swivel = NaN; reachTw = 0; reachPull = 0; reachSw = 0; ikBest = null; }
       // the fingers: relaxed; the right hand closed round its can; the index finger up on the actuator while the can is
