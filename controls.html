@@ -2109,6 +2109,14 @@
     .vx-out-away { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 12px; background: #000; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em; color: rgba(255,255,255,.6); }
     .vx-out-away b { color: #fff; font-size: 12px; letter-spacing: 0.2em; }
     .vx-out-away button { margin-top: 6px; background: #fff; color: #000; border: 0; padding: 7px 12px; font: 600 10px var(--font-mono); letter-spacing: 0.15em; cursor: pointer; }
+    /* a phone held upright: the mixer needs width */
+    .vx-small { display: none; }
+    @media (max-width: 599px) and (orientation: portrait) {
+      html.vx-web:not(.vx-small-ok) .vx-small { display: flex; position: fixed; inset: 0; z-index: 100000; background: #000; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; }
+    }
+    .vx-small b { font-family: var(--font-sans); font-weight: 800; font-size: 22px; letter-spacing: 0.3em; color: #fff; }
+    .vx-small span { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.15em; line-height: 1.7; color: rgba(255,255,255,.65); max-width: 300px; }
+    .vx-small button { margin-top: 8px; background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.5); padding: 9px 14px; font: 600 10px var(--font-mono); letter-spacing: 0.2em; cursor: pointer; }
     /* STORE */
     #storeTab .store { padding: 24px 28px; max-width: 1800px; }
     .store-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
@@ -2128,6 +2136,7 @@
   <link rel="stylesheet" href="./vx/fonts/fonts.css">
 </head>
 <body>
+  <div class="vx-small" data-web><b>STUDIO</b><span>Best on a bigger screen. Turn your phone sideways, or open vexvoid.com/studio on a laptop.</span><button type="button" onclick="document.documentElement.classList.add('vx-small-ok')">CONTINUE ANYWAY</button></div>
   <!-- V3XV0ID Header -->
   <div class="v3xv0id-header">
     <div class="v3xv0id-brand">V3XV0ID</div>
@@ -2490,7 +2499,7 @@
             <button id="exportPatternBtn" class="gen-btn">EXPORT</button>
             <button id="importPatternBtn" class="gen-btn">IMPORT</button>
             <span class="gen-sep"></span>
-            <button id="genMintBtn" class="gen-btn hot" title="Inscribe this sketch (code, seed, knobs) on BSV with bWalletX">MINT</button>
+            <button id="genMintBtn" class="gen-btn hot" data-desktop title="Inscribe this sketch (code, seed, knobs) on BSV with bWalletX">MINT</button>
           </div>
         </div>
 
@@ -9266,6 +9275,9 @@ Reply with only the JSON array in one \`\`\`json code block.`;
           if (a.where === 'window') await VXP.popOutput(); else if (a.where === 'mixer') await VXP.dockOutput(); else if (a.where === 'fullscreen') await VXP.fullscreenOutput();
           return VXP.outputState();
         } };
+        const sub = document.querySelector('.v3xv0id-subtitle'); if (sub) sub.textContent = 'STUDIO';
+        const brand = document.querySelector('.v3xv0id-brand'); // back to the site
+        if (brand) { brand.title = 'vexvoid.com'; brand.style.cursor = 'pointer'; brand.addEventListener('click', () => { (window.top || window).location.href = '/'; }); }
         document.querySelector('[data-tab="layers"]').click();
       }
 
