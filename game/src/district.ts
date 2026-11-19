@@ -580,15 +580,25 @@ export function buildDistrict({ renderer, scene, high, look }: { renderer: THREE
         v.fromBufferAttribute(p, i); const h = v.y / 0.3, neck = THREE.MathUtils.smoothstep(h, 0.6, 0.97), sag = THREE.MathUtils.smoothstep(-h, -0.2, 0.9);
         const ridge = 1 - 2 * Math.abs(nz(v.x, v.y, v.z, 17));   // sharp creases in the plastic
         let r = (1 + 0.17 * nz(v.x, v.y, v.z, 6) + 0.045 * ridge + 0.012 * nz(v.x, v.y, v.z, 60)) * (1 + 0.1 * sag) * (1 - 0.86 * neck);
-        let y = v.y * (h > 0 ? 0.78 + 0.75 * neck : 0.75);
+        let y = v.y * (h > 0 ? 0.78 + 0.42 * neck : 0.75);   // (pass 4: a short gathered neck, so the knot and its ears sit on top)
         if (y < -0.18) { r *= 1 + (-0.18 - y) * 0.9; y = -0.18 - (-0.18 - y) * 0.1; }   // the bottom squashed flat on the ground
         p.setXYZ(i, v.x * r, y + 0.2, v.z * r);
       }
       g.deleteAttribute('uv'); g.computeVertexNormals();   // smooth: the creases are in the shape
-      // the knot: two flattened ears of plastic sticking up from the neck
-      const ears: THREE.BufferGeometry[] = [];
-      for (const s of [-1, 1]) { const e = new THREE.SphereGeometry(0.055, 10, 8); e.scale(0.7, 1.8, 0.3); e.rotateZ(s * (0.6 + 0.12 * Math.sin(seed))); e.translate(s * 0.04, 0.53, 0); e.deleteAttribute('uv'); ears.push(e); }
-      const knot = new THREE.SphereGeometry(0.036, 10, 8); knot.translate(0, 0.46, 0); knot.deleteAttribute('uv');
+      // the knot on top of the neck, and its two ears: the bag's tie flaps, flat, crumpled, splayed out like a rabbit's
+      // (pass 4, owner: pass 3's were too small to see; they sat down inside the neck)
+      const top = 0.3 * (0.78 + 0.42) + 0.2, ears: THREE.BufferGeometry[] = [];
+      for (const s of [-1, 1]) {
+        const tilt = s * (0.62 + 0.18 * Math.sin(seed * 1.7 + s)), len = 0.085 + 0.012 * Math.cos(seed + s), e = new THREE.SphereGeometry(0.05, 14, 10);
+        const q = e.attributes.position;
+        for (let i = 0; i < q.count; i++) {   // a flap: wide at its tip, pinched where it leaves the knot, creased
+          v.fromBufferAttribute(q, i); const t = (v.y / 0.05 + 1) / 2, w = 0.45 + 0.75 * Math.sin(Math.PI * Math.min(1, t * 0.85 + 0.12));
+          const cr = Math.sin(v.x * 140 + seed * 3 + s) * Math.sin(v.y * 90 - seed) * 0.006;
+          q.setXYZ(i, v.x * 0.9 * w, v.y * (len / 0.05), v.z * 0.22 + cr + 0.012 * Math.sin(t * 3.1) * s);
+        }
+        e.rotateY(s * 0.35 + 0.2 * Math.sin(seed)); e.rotateZ(-tilt); e.translate(Math.sin(tilt) * len * 0.92, top + 0.02 + Math.cos(tilt) * len * 0.92, 0); e.deleteAttribute('uv'); e.computeVertexNormals(); ears.push(e);
+      }
+      const knot = new THREE.SphereGeometry(0.042, 12, 9); knot.scale(1.05, 0.8, 1); knot.translate(0, top + 0.015, 0); knot.deleteAttribute('uv');
       const m = mergeGeometries([g.toNonIndexed(), ...ears.map((e) => e.toNonIndexed()), knot.toNonIndexed()])!; [g, knot, ...ears].forEach((x) => x.dispose());
       return m;
     };
