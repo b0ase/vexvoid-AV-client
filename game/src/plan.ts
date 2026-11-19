@@ -13,10 +13,16 @@
  *            South block: the square, lanes, scaffold 2 on the canal, the PAINT SHOP on the E road corner.
  *            S road (z 46). The patrol car comes out of its depot at the east end of the spur road (z 22).
  *
- * Phase 2 (climbing) will use `climbs` (drainpipes, fire stairs, scaffold ladders, ledges) and the roofs; phase 3 the
- * shops' `doors` (the interiors); phase 4 the hall of fame; phase 5 the roads.
+ * PARKOUR (phase 2): every roof is a surface you can stand on (parapets round it are walls); `climbs` are the routes up
+ * (drainpipes, fire-escape drop ladders, scaffold ladders, the warehouse ladder, ladders out of the canal) with the way
+ * the climber faces and where they step off at the top; fire escapes are walkable (landings and flights), so are the
+ * scaffold lifts and the warehouse mezzanine. `ledge` and `dock` entries mark edges you can jump at and mantle.
+ * `heavens` are high walls painted from a roof or a scaffold's top lift, seen from the street (worth more).
+ * WATER: the canal between the towpaths is open water you can fall, jump or walk (down the water steps) into; you get
+ * out at the water steps or a canal ladder. Phase 3 the shops' `doors` (the interiors); phase 4 the hall of fame;
+ * phase 5 the roads.
  */
-import { makeWorld, type Box, type Surf, type Rect, type World } from './world';
+import { makeWorld, STEP, type Box, type Surf, type Rect, type World } from './world';
 
 export type Kind = 'brick' | 'soot' | 'block' | 'shed' | 'render';
 export type Side = 'n' | 's' | 'e' | 'w';
@@ -30,15 +36,48 @@ export type Gate = { id: string; x0: number; x1: number; z0: number; z1: number;
 export type Lamp = { x: number; y: number; z: number; kind: 'street' | 'wall' | 'tube' | 'flood' | 'bulb' | 'canal' | 'warm'; k?: number; dir?: number; steady?: boolean };
 export type Place = { id: string; name: string; x: number; z: number; y: number; yaw: number; about: string };
 export type Door = { id: string; name: string; x0: number; x1: number; z0: number; z1: number; face: Side; sign: string; about: string };
-export type Climb = { kind: 'drainpipe' | 'fire-stairs' | 'scaffold-ladder' | 'ledge' | 'dock'; x: number; z: number; y0: number; y1: number; bld?: string };
+/** A way up. Climbable routes (drainpipe, drop-ladder, scaffold-ladder, ladder, canal-ladder) run up a line at (x, z)
+ *  from y0 to y1: the climber's body is out along `n` (the side they climb on, facing back along it); `top` is where they
+ *  stand after the top (null: no way over, climb back down), `stops` other heights to step off at (scaffold lifts), `grab`
+ *  the lowest a hand can take it (a drop ladder hangs out of reach: jump for it). ledge / dock / fire-stairs only mark an
+ *  edge or a stair for the maps. */
+export type ClimbKind = 'drainpipe' | 'fire-stairs' | 'scaffold-ladder' | 'ledge' | 'dock' | 'ladder' | 'drop-ladder' | 'canal-ladder';
+export type Climb = { kind: ClimbKind; x: number; z: number; y0: number; y1: number; bld?: string; id?: string; n?: [number, number];
+  top?: { x: number; z: number; y: number } | null; stops?: { y: number; x: number; z: number }[]; grab?: number; name?: string };
+export const CLIMBABLE: ClimbKind[] = ['drainpipe', 'drop-ladder', 'scaffold-ladder', 'ladder', 'canal-ladder'];
+/** A heaven: a high wall painted from a roof or a scaffold's top lift, in view of the street. worth: how much more it
+ *  counts than a wall at street level (rep, later; there are no points). */
+export type Heaven = { id: string; name: string; wall: string; x: number; z: number; y: number; worth: number; about: string };
+/** A fire escape's shape (shared by the plan's surfaces and the district's ironwork): along the facade `u` (x for n/s
+ *  sides, z for e/w), out from it `o`; landings every 3.5 m from 3.6 up, a flight from each to the next (the last to the
+ *  roof), the drop ladder hanging under the first landing. */
+export function fireLayout(b: { x0: number; x1: number; z0: number; z1: number; h: number; y?: number; fire?: Side }) {
+  const s = b.fire!, y = b.y ?? 0, alongX = s === 'n' || s === 's', top = y + b.h;
+  const mid = alongX ? (b.x0 + b.x1) / 2 : (b.z0 + b.z1) / 2, out = s === 'e' ? b.x1 : s === 'w' ? b.x0 : s === 's' ? b.z1 : b.z0, d = s === 'e' || s === 's' ? 1 : -1;
+  const lands: number[] = []; for (let yy = y + 3.6; yy < top - 1; yy += 3.5) lands.push(yy);
+  // the flights switch back and forth, in two lanes (against the wall, and out by the rail) so one never runs into the
+  // underside of the next; the last one, up to the roof, is always against the wall (you go over the parapet from it)
+  const IN = { o0: 0.1, o1: 0.8 }, OUT = { o0: 0.88, o1: 1.58 };
+  const flights = lands.map((yy, k) => ({ y0: yy, y1: k < lands.length - 1 ? yy + 3.5 : top, u0: k % 2 ? 1.6 : -1.6, ...((lands.length - 1 - k) % 2 ? OUT : IN) }));
+  // the drop ladder: in the lane flight 0 is not; out by the rail at the far end, or against the wall at flight 0's own
+  // low end (clear of the boxes that keep walkers from under the flights)
+  const out0 = flights.length > 0 && flights[0].o0 > 0.5, ladderO = out0 ? 0.45 : 1.22, ladderU = out0 ? -1.25 : 1.25;
+  // world point from (u along, o out); and back
+  const at = (u: number, o: number): [number, number] => (alongX ? [mid + u, out + d * o] : [out + d * o, mid + u]);
+  return { s, y, top, mid, out, d, alongX, lands, flights, at, LAND: { o0: 0.05, o1: 1.65, half: 1.8 }, FLIGHT: { half: 1.6 }, ladder: { u: ladderU, o: ladderO, y0: y + 2.2 } };
+}
 export type WallDef = { id: string; w: number; h: number; c: [number, number, number]; n: [number, number]; arch?: { x: number; y: number; r: number } };
 export type Scaffold = { id: string; bld: string; side: Side; a: number; b: number; lifts: number; base: number };
 export type Plan = {
   bounds: Rect; blds: Bld[]; boxes: Box[]; surfs: Surf[]; holes: Rect[]; roads: Rect[]; gates: Gate[]; lamps: Lamp[];
-  places: Place[]; doors: Door[]; climbs: Climb[]; walls: WallDef[]; scaffolds: Scaffold[];
+  places: Place[]; doors: Door[]; climbs: Climb[]; walls: WallDef[]; scaffolds: Scaffold[]; heavens: Heaven[];
+  /** Low things to vault (fences, barriers, low walls, planters, concrete blocks, pallets): their own geometry in the district. */
+  lows: { x0: number; x1: number; z0: number; z1: number; h: number; kind: 'lowwall' | 'planter' | 'blocks' | 'barrier' | 'pallets' }[];
   stairs: Surf[]; railings: { x0: number; x1: number; z0: number; z1: number; y: number }[];
   containers: { x0: number; x1: number; z0: number; z1: number; y: number; h: number; seed: number }[];
-  canal: { z0: number; z1: number; tow: number; water: number; bridges: Rect[]; foot: Rect[] };
+  canal: { z0: number; z1: number; tow: number; water: number; bridges: Rect[]; foot: Rect[];
+    /** the open water (you swim here) and the ways out of it: the water steps (stairs into the water) */
+    open: Rect; steps: Surf[] };
   viaduct: { z0: number; z1: number; deck: number; wide: Rect; tunnel: Rect; bays: { x0: number; x1: number; kind: 'open' | 'shut' | 'shop' | 'tunnel' | 'solid'; id: string }[] };
   route: [number, number][];
   deck: Rect & { y: number };
@@ -77,7 +116,9 @@ export function makePlan(): Plan {
   const CZ0 = -4, CZ1 = 6;
   holes.push({ x0: bounds.x0, x1: bounds.x1, z0: CZ0, z1: CZ1 });
   surfs.push({ x0: bounds.x0, x1: bounds.x1, z0: CZ0, z1: CZ0 + 2, y: TOW_Y, tag: 'towpath' }, { x0: bounds.x0, x1: bounds.x1, z0: CZ1 - 2, z1: CZ1, y: TOW_Y, tag: 'towpath' });
-  solid(bounds.x0, CZ0 + 2, bounds.x1, CZ1 - 2, -8, -2.3, 'water');
+  // (the water itself is no box any more: a walker on the towpath is stopped at the edge by there being nothing to stand
+  // on, and a body that falls, jumps or walks down the water steps into it swims)
+  const open: Rect = { x0: bounds.x0, x1: bounds.x1, z0: CZ0 + 2, z1: CZ1 - 2 };
   const bridges: Rect[] = [{ x0: -67, x1: -57, z0: CZ0, z1: CZ1 }, { x0: 57, x1: 67, z0: CZ0, z1: CZ1 }];
   const foot: Rect[] = [{ x0: -24, x1: -21.4, z0: CZ0, z1: CZ1 }, { x0: 24, x1: 26.6, z0: CZ0, z1: CZ1 }];
   for (const b of bridges) {
@@ -125,6 +166,21 @@ export function makePlan(): Plan {
   }
   // the footbridges' ends meet the street through the railing gap; the stair landings through the retaining wall gap:
   // under a landing gap the retaining wall still stops a street walker from dropping in (the well wall does)
+
+  // ways out of the water: iron ladders up the towpath kerb (a canal has one every so often) and two flights of water
+  // steps down into it (by the canal place on the north towpath, and by the square on the south one)
+  const steps: Surf[] = [];
+  {
+    const STEP_Y = WATER_Y - 1.2;
+    const n: Surf = { x0: 10, x1: 12.4, z0: open.z0, z1: open.z0 + 1.4, y: TOW_Y, y1: STEP_Y, axis: 'z', steps: 7, tag: 'water-steps' };
+    const so: Surf = { x0: -30.4, x1: -28, z0: open.z1 - 1.4, z1: open.z1, y: TOW_Y, y1: STEP_Y, axis: '-z', steps: 7, tag: 'water-steps' };
+    for (const st of [n, so]) { surfs.push(st); stairs.push(st); steps.push(st); }
+    let li = 0;
+    for (const [side, xs] of [[-1, [-82, -48, -10, 18, 44, 78]], [1, [-76, -40, 5, 32, 52, 84]]] as [number, number[]][]) for (const x of xs) {
+      const kz = side < 0 ? open.z0 : open.z1, nz = side < 0 ? 1 : -1;   // the climber is in the water, facing the kerb
+      climbs.push({ kind: 'canal-ladder', id: `canal-ladder-${++li}`, name: 'CANAL LADDER', x, z: kz, n: [0, nz], y0: WATER_Y - 1.15, y1: TOW_Y, top: { x, z: kz - nz * 0.75, y: TOW_Y } });
+    }
+  }
 
   // ── the rail viaduct: brick arches, a deck at 7.2 m; a wide part over the foot tunnel ──
   const VZ0 = -90, VZ1 = -80;
@@ -281,9 +337,25 @@ export function makePlan(): Plan {
   solid(pit.x0, pit.z0 - 1, pit.x1, pit.z0 + 0.4, -1, 12, 'pitwall');
 
   // ── buildings become boxes (solid) or walls (shells) ──
+  // a solid building: its box to the roof, the roof a surface to stand on, a parapet round it (a wall to the walker on
+  // the roof; none along a side that abuts a taller building: that is the neighbour's wall going on up)
+  const PARA = 0.98;
+  const tallerAt = (b: Bld, x: number, z: number) => blds.some((o) => o !== b && !o.shell && x > o.x0 && x < o.x1 && z > o.z0 && z < o.z1 && (o.y ?? 0) + o.h > (b.y ?? 0) + b.h + 0.3);
   for (const b of blds) {
     const y = b.y ?? 0;
-    if (!b.shell) { solid(b.x0, b.z0, b.x1, b.z1, y - 4, y + b.h + 0.6, 'bld:' + b.id); continue; }
+    if (!b.shell) {
+      const top = y + b.h;
+      solid(b.x0, b.z0, b.x1, b.z1, y - 4, top, 'bld:' + b.id);
+      surfs.push({ x0: b.x0, x1: b.x1, z0: b.z0, z1: b.z1, y: top, tag: 'roof:' + b.id });
+      if (b.parapet !== false) {
+        const t = 0.25, cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2;
+        if (!tallerAt(b, cx, b.z0 - 0.3)) solid(b.x0, b.z0, b.x1, b.z0 + t, top - 0.2, top + PARA, 'roofpar:' + b.id);
+        if (!tallerAt(b, cx, b.z1 + 0.3)) solid(b.x0, b.z1 - t, b.x1, b.z1, top - 0.2, top + PARA, 'roofpar:' + b.id);
+        if (!tallerAt(b, b.x0 - 0.3, cz)) solid(b.x0, b.z0, b.x0 + t, b.z1, top - 0.2, top + PARA, 'roofpar:' + b.id);
+        if (!tallerAt(b, b.x1 + 0.3, cz)) solid(b.x1 - t, b.z0, b.x1, b.z1, top - 0.2, top + PARA, 'roofpar:' + b.id);
+      }
+      continue;
+    }
     const t = b.shell.t, top = y + b.h;
     const side = (s: Side, a0: number, a1: number) => {
       // a wall along one side with door gaps (a: along x for n/s, along z for e/w); above a door the wall goes on
@@ -310,6 +382,13 @@ export function makePlan(): Plan {
   for (let x = wh.x0 + 6; x < wh.x1 - 3; x += 7) for (const z of [-54, -42.5]) solid(x - 0.2, z - 0.2, x + 0.2, z + 0.2, -1, wh.h, 'wh:column');
   solid(17, -59.5, 21, -57.5, -1, 1.3, 'wh:pallets', true); solid(40, -59.6, 44, -56.4, -1, 2.2, 'wh:crates', true);
   solid(36.5, -45.5, 39.5, -43.5, -1, 1.4, 'wh:van', true); solid(23, -48.5, 24.5, -47, -1, 1.0, 'wh:drums', true);
+  // the steel mezzanine along the warehouse's north wall: a deck at 3.62, a rail along its open edge, a ladder at its end
+  {
+    const MZ = 3.62;
+    surfs.push({ x0: wh.x0 + 0.4, x1: wh.x0 + 14, z0: wh.z0 + 0.4, z1: wh.z0 + 3.4, y: MZ, tag: 'mezz' });
+    solid(wh.x0 + 0.4, wh.z0 + 3.33, wh.x0 + 14, wh.z0 + 3.43, MZ - 0.1, MZ + 0.95, 'mezzrail');
+    climbs.push({ kind: 'ladder', id: 'warehouse-ladder', name: 'MEZZANINE LADDER', x: wh.x0 + 14.25, z: wh.z0 + 2.0, n: [1, 0], y0: 0, y1: MZ, top: { x: wh.x0 + 13.3, z: wh.z0 + 2.0, y: MZ } });
+  }
   void st;
 
   // ── scaffolds (phase 2 climbs them; for now you walk under the first lift and paint the wall behind) ──
@@ -322,13 +401,46 @@ export function makePlan(): Plan {
       const [x, z] = s.side === 'w' ? [b.x0 - off, u] : s.side === 'e' ? [b.x1 + off, u] : s.side === 'n' ? [u, b.z0 - off] : [u, b.z1 + off];
       solid(x - 0.04, z - 0.04, x + 0.04, z + 0.04, -1, s.lifts * 2 + 1, 'scaffold');
     }
-    const ux = s.side === 'w' ? b.x0 - 1.0 : s.side === 'e' ? b.x1 + 1.0 : s.a + 1.2, uz = s.side === 'n' ? b.z0 - 1.0 : s.side === 's' ? b.z1 + 1.0 : s.a + 1.2;
-    climbs.push({ kind: 'scaffold-ladder', x: ux, z: uz, y0: s.base, y1: s.base + s.lifts * 2, bld: b.id });
+    // the lifts are boards to walk on (2 m apart), a guard rail along the outside and across both ends
+    const pos = (u: number, off: number): [number, number] => s.side === 'w' ? [b.x0 - off, u] : s.side === 'e' ? [b.x1 + off, u] : s.side === 'n' ? [u, b.z0 - off] : [u, b.z1 + off];
+    const rect = (u0: number, u1: number, o0: number, o1: number) => { const [ax, az] = pos(u0, o0), [bx, bz] = pos(u1, o1); return { x0: Math.min(ax, bx), x1: Math.max(ax, bx), z0: Math.min(az, bz), z1: Math.max(az, bz) }; };
+    const stops: { y: number; x: number; z: number }[] = [];
+    const [lx, lz] = pos(s.a + 1.2, 0.78), [nx, nz] = s.side === 'w' ? [-1, 0] : s.side === 'e' ? [1, 0] : s.side === 'n' ? [0, -1] : [0, 1];
+    for (let k = 1; k <= s.lifts; k++) {
+      const by = s.base + k * 2 + 0.09;
+      surfs.push({ ...rect(s.a, s.b, 0.2, 1.35), y: by, tag: 'scaffold' });
+      const rail = (r: Rect) => solid(r.x0, r.z0, r.x1, r.z1, by - 0.1, by + 1.0, 'scafrail');
+      rail(rect(s.a, s.b, 1.33, 1.4)); rail(rect(s.a - 0.06, s.a, 0.2, 1.4)); rail(rect(s.b, s.b + 0.06, 0.2, 1.4));
+      const [sx, sz] = pos(s.a + 2.1, 0.75); stops.push({ y: by, x: sx, z: sz });
+    }
+    const topL = stops.pop()!;
+    climbs.push({ kind: 'scaffold-ladder', id: s.id + '-ladder', name: 'SCAFFOLD LADDER', x: lx, z: lz, n: [nx, nz], y0: s.base, y1: topL.y, bld: b.id, top: topL, stops });
   }
-  // drainpipes and fire stairs: what phase 2 climbs
+  // fire escapes: a drop ladder hanging out of reach (jump for it) up to the first landing; landings and flights are
+  // walkable to the roof, where you go over the parapet. Under each flight its own steps keep a walker on the landing
+  // out from under it (stepped boxes, each just under the flight above)
   for (const b of blds) {
-    if (b.shell || b.h < 6) continue;
-    if (b.fire) climbs.push({ kind: 'fire-stairs', x: b.fire === 'e' ? b.x1 + 0.6 : b.fire === 'w' ? b.x0 - 0.6 : (b.x0 + b.x1) / 2, z: b.fire === 's' ? b.z1 + 0.6 : b.fire === 'n' ? b.z0 - 0.6 : (b.z0 + b.z1) / 2, y0: 2.4, y1: b.h, bld: b.id });
+    if (b.shell || b.h < 6 || !b.fire) continue;
+    const F = fireLayout(b), o = (u0: number, u1: number, o0: number, o1: number) => { const [ax, az] = F.at(u0, o0), [bx, bz] = F.at(u1, o1); return { x0: Math.min(ax, bx), x1: Math.max(ax, bx), z0: Math.min(az, bz), z1: Math.max(az, bz) }; };
+    const axis = (sgn: number): Surf['axis'] => (F.alongX ? (sgn > 0 ? 'x' : '-x') : (sgn > 0 ? 'z' : '-z'));
+    for (const yy of F.lands) {
+      const ly = yy + 0.06;
+      surfs.push({ ...o(-F.LAND.half, F.LAND.half, F.LAND.o0, F.LAND.o1), y: ly, tag: 'fire' });
+      const rail = (r: Rect) => solid(r.x0, r.z0, r.x1, r.z1, ly - 0.1, ly + 1.0, 'firerail');
+      rail(o(-F.LAND.half, F.LAND.half, F.LAND.o1 - 0.05, F.LAND.o1)); rail(o(-F.LAND.half - 0.05, -F.LAND.half, F.LAND.o0, F.LAND.o1)); rail(o(F.LAND.half, F.LAND.half + 0.05, F.LAND.o0, F.LAND.o1));
+    }
+    for (const f of F.flights) {
+      const u0 = f.u0, u1 = -f.u0, y0 = f.y0 + 0.06, y1 = f.y1 + 0.06, r = o(Math.min(u0, u1), Math.max(u0, u1), f.o0, f.o1);
+      // a ramp from u0 (low) to u1 (high): surfY runs along +axis from y at the start to y1 at the end
+      surfs.push({ ...r, y: y0, y1, axis: axis(u1 > u0 ? 1 : -1), steps: 0, tag: 'fire' });
+      for (let k = 0; k < 8; k++) {
+        const a = u0 + (u1 - u0) * k / 8, c = u0 + (u1 - u0) * (k + 1) / 8, fy = y0 + (y1 - y0) * k / 8;
+        if (fy < y0 + 0.4) continue;
+        const q = o(Math.min(a, c), Math.max(a, c), f.o0, f.o1); solid(q.x0, q.z0, q.x1, q.z1, f.y0 - 0.2, fy - 0.2, 'fireunder');
+      }
+    }
+    const [lx, lz] = F.at(F.ladder.u, F.ladder.o), [tx, tz] = F.at(F.ladder.u, F.ladder.o), n: [number, number] = F.alongX ? [0, F.d] : [F.d, 0];
+    climbs.push({ kind: 'drop-ladder', id: b.id + '-fire', name: 'FIRE ESCAPE', x: lx, z: lz, n, y0: F.y, y1: F.lands[0] + 0.06, grab: F.ladder.y0, bld: b.id, top: { x: tx, z: tz, y: F.lands[0] + 0.06 } });
   }
 
   // ── street furniture that stops you (skips, bins, parked vans, bollards) ──
@@ -341,6 +453,16 @@ export function makePlan(): Plan {
   // parked vans and cars along the kerbs (the car's lane stays free)
   prop(-54.2, -66.5, 1.0, 2.6, 2.2, 'van'); prop(54.2, -20, 1.0, 2.6, 2.2, 'van'); prop(-20, 52.8, 2.4, 1.0, 1.45, 'car');
   prop(20, -68.4, 2.3, 0.95, 1.45, 'car'); prop(-40, 39.6, 2.3, 0.95, 1.45, 'car'); prop(-77, 45, 2.3, 0.95, 1.4, 'carpark-wreck');
+  // low things to vault at a run (under 1.2 m): a low wall with a bench in the square and two planters, concrete
+  // blocks in the goods yard, a crash barrier on the north wharf, a pallet stack against a container (a step up onto it)
+  const lows: Plan['lows'] = [];
+  const low = (x0: number, z0: number, x1: number, z1: number, h: number, kind: Plan['lows'][number]['kind']) => { lows.push({ x0, x1, z0, z1, h, kind }); solid(x0, z0, x1, z1, -1, h, kind, true); };
+  low(-22, 26.2, -15, 26.6, 0.95, 'lowwall'); low(-12.6, 24.0, -11.2, 25.4, 0.6, 'planter'); low(-8.4, 24.0, -7.0, 25.4, 0.6, 'planter');
+  low(26, -24.4, 29.2, -23.6, 0.8, 'blocks'); low(5, -9.05, 9, -8.75, 1.0, 'barrier'); low(24.6, -15.4, 25.8, -14.4, 0.9, 'pallets');
+
+  // ── tops you can stand on once you are up (PARKOUR: mantle onto a skip, a parked car, a container, a pallet stack,
+  // the concrete blocks, a planter, the low wall) ──
+  for (const b of boxes) if (['skip', 'bin', 'car', 'van', 'carpark-wreck', 'container', 'pallets', 'blocks', 'planter', 'lowwall', 'barrier'].includes(b.tag || '') && (b.y1 ?? 0) > STEP) surfs.push({ x0: b.x0, x1: b.x1, z0: b.z0, z1: b.z1, y: b.y1!, tag: 'top:' + b.tag });
 
   // ── lamps ──
   for (let x = -54; x <= 54; x += 18) { lamps.push({ x, y: 6.5, z: -70.8, kind: 'street', dir: -1 }); lamps.push({ x: x + 9, y: 6.5, z: 41.8, kind: 'street', dir: 1 }); }
@@ -358,6 +480,9 @@ export function makePlan(): Plan {
   lamps.push({ x: 34.5, y: 4.6, z: -79.4, kind: 'wall', k: 1.3 }, { x: 58.4, y: 3.4, z: 32, kind: 'wall', k: 1.3 });
   lamps.push({ x: -16, y: 4.5, z: 20.2, kind: 'wall' }, { x: -27, y: 4, z: 32.6, kind: 'wall' }, { x: 27.3, y: 4, z: 18, kind: 'wall' }, { x: -2, y: 4, z: -30, kind: 'wall' });
   lamps.push({ x: -0.5, y: 4.2, z: -55, kind: 'wall' }, { x: 13, y: 4, z: -62.6, kind: 'wall' }, { x: -66.6, y: 4, z: -44, kind: 'wall' }, { x: 74, y: 4, z: -43.6, kind: 'wall' });
+
+  // ── the phone kiosk on the S road (a new burner when the canal has killed yours) ──
+  doors.push({ id: 'phone-shop', name: 'PHONE KIOSK', x0: 0.2, x1: 2.6, z0: 41, z1: 42.6, face: 's', sign: 'PHONES', about: 'BURNERS · UNLOCKING · REPAIRS: a new burner on the spot when the canal has had yours' });
 
   // ── named places (spawn, teleports for testing; the shops' doors) ──
   const P = (id: string, name: string, x: number, z: number, y: number, yaw: number, about: string) => places.push({ id, name, x, z, y, yaw, about });
@@ -377,6 +502,15 @@ export function makePlan(): Plan {
   P('square', 'THE SQUARE', -16, 25, 0, 0, 'the little square in the south block');
   P('void-street', 'VOID STREET', 0, -30, 0, 0, 'the lane through the middle of the north block, bollards at the wharf');
   P('n-road', 'N ROAD', -20, -71, 0, -Math.PI / 2, 'the N road, the car\'s loop');
+  P('phone-shop', 'PHONE KIOSK', 1.4, 42.3, 0, 0, 'the phone kiosk on the S road: a new burner when the canal has killed yours');
+  P('n-road-heaven', 'N ROAD HEAVEN', -42.6, -66, 10, Math.PI / 2, 'up on the roof over the N road shops (nw2), under the tall side wall of the corner block: a heaven');
+  P('yard-heaven', 'YARD HEAVEN', 49.2, -20, 8.09, -Math.PI / 2, 'the top lift of scaffold 1 on the goods yard: the parapet of ne8, seen right across the yard');
+  P('canal-heaven', 'CANAL HEAVEN', -9, 9.2, 10.09, Math.PI, 'the top lift of scaffold 2, over the south wharf: the top of the block, seen across the canal');
+  const heavens: Heaven[] = [
+    { id: 'n-road-heaven', name: 'N ROAD HEAVEN', wall: 'heaven-nw1-e', x: -42.6, z: -66, y: 10, worth: 3, about: 'the corner block\'s tall side wall, over the roof of the N road shops (nw2); up a drainpipe from the back lane' },
+    { id: 'yard-heaven', name: 'YARD HEAVEN', wall: 'heaven-ne8-w', x: 49.2, z: -20, y: 8.09, worth: 3, about: 'the parapet of the block over the goods yard (ne8), from scaffold 1\'s top lift; the whole yard sees it' },
+    { id: 'canal-heaven', name: 'CANAL HEAVEN', wall: 'heaven-c3-n', x: -9, z: 9.2, y: 10.09, worth: 3, about: 'the top of the block over the south wharf, from scaffold 2\'s top lift; seen right across the canal' },
+  ];
 
   const world = makeWorld({ boxes, surfs, holes, bounds });
 
@@ -441,6 +575,10 @@ export function makePlan(): Plan {
   faceRuns('pit-w', pit.x0, pit.z0 + 0.4, pit.x0, pit.z1, [1, 0], 0, 6); faceRuns('pit-e', pit.x1, pit.z1, pit.x1, pit.z0 + 0.4, [-1, 0], 0, 6);
   faceRuns('pit-l', pit.x0, pit.z0 + 0.4, hall.x - hall.w / 2, pit.z0 + 0.4, [0, 1], 0, 6); faceRuns('pit-r', hall.x + hall.w / 2, pit.z0 + 0.4, pit.x1, pit.z0 + 0.4, [0, 1], 0, 6);
   walls.unshift({ id: 'hall-of-fame', w: hall.w, h: hall.h, c: [hall.x, hall.h / 2, pit.z0 + 0.4 + 0.03], n: [0, 1] });
+  // the heavens: the corner block's side wall above the N road shops' roof, and the top of c3 above scaffold 2's top lift
+  walls.push({ id: 'heaven-nw1-e', w: 7.6, h: 4.6, c: [-44, 10 + 2.3, -66], n: [1, 0] });
+  walls.push({ id: 'heaven-c3-n', w: 15, h: 2.85, c: [-9, 10.09 + 1.425, 10], n: [0, -1] });
+  walls.push({ id: 'heaven-ne8-w', w: 16, h: 0.98, c: [50, 9 + 0.49, -20], n: [-1, 0] });   // (the parapet band over ne8-w's own panel, which ends at 9)
   // gates take paint too (the steel ones)
   for (const g of gates) if (g.kind === 'steel') {
     // only the shut part (an open leaf is swung back out of the way)
@@ -450,7 +588,7 @@ export function makePlan(): Plan {
     else { faceRuns(`${g.id}-e`, g.x1, g.z1, g.x1, a0, [1, 0], 0, g.h); faceRuns(`${g.id}-w`, g.x0, a0, g.x0, g.z1, [-1, 0], 0, g.h); }
   }
 
-  return { bounds, blds, boxes, surfs, holes, roads, gates, lamps, places, doors, climbs, walls, scaffolds, stairs, railings, containers,
-    canal: { z0: CZ0, z1: CZ1, tow: TOW_Y, water: WATER_Y, bridges, foot }, viaduct: { z0: VZ0, z1: VZ1, deck: VIA_Y, wide, tunnel, bays },
+  return { bounds, blds, boxes, surfs, holes, roads, gates, lamps, places, doors, climbs, walls, scaffolds, stairs, railings, containers, heavens, lows,
+    canal: { z0: CZ0, z1: CZ1, tow: TOW_Y, water: WATER_Y, bridges, foot, open, steps }, viaduct: { z0: VZ0, z1: VZ1, deck: VIA_Y, wide, tunnel, bays },
     route, deck, dock, yard: { x0: 10, x1: 50, z0: -33.2, z1: -12 }, pit, hall, world };
 }

@@ -14,7 +14,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import type { Look } from './look';
-import { makePlan, ROAD_Y, SPRING, TOW_Y, WATER_Y, type Plan, type Bld, type Side } from './plan';
+import { makePlan, fireLayout, ROAD_Y, SPRING, TOW_Y, WATER_Y, type Plan, type Bld, type Side, type Climb } from './plan';
 import { makeNav, type Box } from './world';
 import { skylineTex, softGlow, ringTex } from './cityAssets';
 import { beamMaterial, glowMaterial, makeShared, mistMaterial, rainMaterial, rippleMaterial, steamMaterial } from './cityShaders';
@@ -287,6 +287,9 @@ export function buildDistrict({ renderer, scene, high, look }: { renderer: THREE
   }
 
   // ── buildings ──
+  const pipes: Climb[] = [], clutter: Box[] = [];
+  // nothing on a roof where a heaven is painted from
+  const nearHeaven = (x: number, z: number, y: number) => P.heavens.some((h) => Math.abs(h.y - y) < 1 && Math.hypot(h.x - x, h.z - z) < 4.5);
   const climbsDrain: THREE.Matrix4[] = [], tanks: THREE.Matrix4[] = [], acs: THREE.Matrix4[] = [], vents: THREE.Matrix4[] = [], stacks: THREE.Matrix4[] = [], hatches: THREE.Matrix4[] = [];
   for (const b of P.blds) {
     if (b.shell) continue;
@@ -298,51 +301,87 @@ export function buildDistrict({ renderer, scene, high, look }: { renderer: THREE
       else face(f, s, b, a0, a1, y, top, ou);
       // fascia over a shop floor; a gutter at the top
       if (sp) { if (s === 'n' || s === 's') { const z = s === 'n' ? b.z0 : b.z1, d = s === 'n' ? -1 : 1; box(dark, a0, a1, y + 3.8, y + 4.05, Math.min(z, z + d * 0.18), Math.max(z, z + d * 0.18), 'dark'); } else { const x = s === 'w' ? b.x0 : b.x1, d = s === 'w' ? -1 : 1; box(dark, Math.min(x, x + d * 0.18), Math.max(x, x + d * 0.18), y + 3.8, y + 4.05, a0, a1, 'dark'); } }
-      // drainpipes every 9-12 m (phase 2 climbs them)
-      for (let a = a0 + 1.2 + r() * 3; a < a1 - 1; a += 9 + r() * 4) {
+      // drainpipes: each one climbable to the roof (PARKOUR). The N road shops (nw2) get one on the back
+      // lane at z -65.5 too: the way up to the N road heaven
+      const nrm: [number, number] = s === 'n' ? [0, -1] : s === 's' ? [0, 1] : s === 'w' ? [-1, 0] : [1, 0];
+      const pipe = (a: number) => {
         const [px, pz] = s === 'n' ? [a, b.z0 - 0.12] : s === 's' ? [a, b.z1 + 0.12] : s === 'w' ? [b.x0 - 0.12, a] : [b.x1 + 0.12, a];
-        if (W.free(px, pz, 0.2, y)) { climbsDrain.push(M(px, y + b.h / 2, pz, 1, b.h, 1)); P.climbs.push({ kind: 'drainpipe', x: px, z: pz, y0: y, y1: top, bld: b.id }); }
-      }
+        // (the pipe's own spot clear of anything standing there, and room for a climber in front of it; until 19 Nov the
+        // test was a 0.2 m body at the pipe, which the wall itself always failed, so no drainpipe was ever drawn)
+        if (!W.free(px, pz, 0.08, y) || !W.free(px + nrm[0] * 0.5, pz + nrm[1] * 0.5, 0.32, y)) return;
+        climbsDrain.push(M(px, y + b.h / 2, pz, 1, b.h, 1));
+        const c: Climb = { kind: 'drainpipe', id: `${b.id}-${s}-pipe${pipes.filter((q) => q.bld === b.id).length + 1}`, name: 'DRAINPIPE', x: px, z: pz, n: nrm, y0: y, y1: top, bld: b.id, top: null };
+        P.climbs.push(c); pipes.push(c);
+      };
+      // (a pipe every 15-23 m on a plain side; shop fronts keep their shutters clear)
+      for (let a = a0 + 1.2 + r() * 3; a < a1 - 1; a += 15 + r() * 8) if (!sp) pipe(a);
+      if (b.id === 'nw2' && s === 'e') pipe(-65.5);
     }
     // the roof: felt, a parapet with coping, or a gutter
     flat(roof, b.x0, b.x1, b.z0, b.z1, top + 0.01, 'roof');
     if (b.parapet !== false) {
-      const t = 0.25, h = 0.9;
-      box(f, b.x0, b.x1, top, top + h, b.z0, b.z0 + t, 'par'); box(f, b.x0, b.x1, top, top + h, b.z1 - t, b.z1, 'par');
-      box(f, b.x0, b.x0 + t, top, top + h, b.z0, b.z1, 'par'); box(f, b.x1 - t, b.x1, top, top + h, b.z0, b.z1, 'par');
-      box(conc, b.x0 - 0.04, b.x1 + 0.04, top + h, top + h + 0.08, b.z0 - 0.04, b.z0 + t + 0.04, 'coping', false); box(conc, b.x0 - 0.04, b.x1 + 0.04, top + h, top + h + 0.08, b.z1 - t - 0.04, b.z1 + 0.04, 'coping', false);
-      box(conc, b.x0 - 0.04, b.x0 + t + 0.04, top + h, top + h + 0.08, b.z0, b.z1, 'coping', false); box(conc, b.x1 - t - 0.04, b.x1 + 0.04, top + h, top + h + 0.08, b.z0, b.z1, 'coping', false);
+      // the parapet the plan walls the roof with (none against a taller neighbour), and its coping
+      const h = 0.9;
+      for (const q of P.boxes) if (q.tag === 'roofpar:' + b.id) { box(f, q.x0, q.x1, top, top + h, q.z0, q.z1, 'par'); box(conc, q.x0 - 0.04, q.x1 + 0.04, top + h, top + h + 0.08, q.z0 - 0.04, q.z1 + 0.04, 'coping', false); }
     } else { box(iron, b.x0 - 0.15, b.x1 + 0.15, top - 0.15, top, b.z1, b.z1 + 0.18, 'iron', false); }
     // rooftop clutter: water tanks, AC units, vents, chimney stacks, a hatch
     const px = () => rr(b.x0 + 1.5, b.x1 - 1.5), pz = () => rr(b.z0 + 1.5, b.z1 - 1.5);
+    // (PARKOUR: each is solid now, a box round it; none where a heaven is painted from)
     if (b.x1 - b.x0 > 4 && b.z1 - b.z0 > 4) {
-      for (let i = 0; i < (b.tanks || 0); i++) tanks.push(M(px(), top, pz(), 1, 0.9 + r() * 0.3, 1, r() * 6));
-      for (let i = 0; i < 1 + Math.floor(r() * 4); i++) acs.push(M(px(), top, pz(), 0.8 + r() * 1.2, 0.7 + r() * 0.6, 0.8 + r(), r() * 3));
-      for (let i = 0; i < 2 + Math.floor(r() * 4); i++) vents.push(M(px(), top, pz(), 1, 0.5 + r() * 1.2, 1));
-      if (b.kind === 'brick' || b.kind === 'soot') for (let i = 0; i < 1 + Math.floor(r() * 2); i++) stacks.push(M(rr(b.x0 + 0.8, b.x1 - 0.8), top, r() < 0.5 ? b.z0 + 0.7 : b.z1 - 0.7, 1, 1.2 + r() * 1.6, 1));
+      const solidOn = (x: number, z: number, hx: number, hz: number, h: number, tag: string) => { if (nearHeaven(x, z, top)) return false; clutter.push({ x0: x - hx, x1: x + hx, z0: z - hz, z1: z + hz, y0: top - 0.1, y1: top + h, tag, low: h < 1.5 }); return true; };
+      for (let i = 0; i < (b.tanks || 0); i++) { const x = px(), z = pz(), k = 0.9 + r() * 0.3, ry = r() * 6; if (solidOn(x, z, 1.15, 1.15, 4.1, 'tank')) tanks.push(M(x, top, z, 1, k, 1, ry)); }
+      for (let i = 0; i < 1 + Math.floor(r() * 4); i++) {
+        const x = px(), z = pz(), sx = 0.8 + r() * 1.2, sy = 0.7 + r() * 0.6, sz = 0.8 + r(), ry = r() * 3, c = Math.abs(Math.cos(ry)), sn = Math.abs(Math.sin(ry));
+        if (solidOn(x, z, (c * sx + sn * sz) / 2, (sn * sx + c * sz) / 2, sy, 'ac')) acs.push(M(x, top, z, sx, sy, sz, ry));
+      }
+      for (let i = 0; i < 2 + Math.floor(r() * 4); i++) { const x = px(), z = pz(), h = 0.5 + r() * 1.2; if (solidOn(x, z, 0.2, 0.2, h, 'vent')) vents.push(M(x, top, z, 1, h, 1)); }
+      if (b.kind === 'brick' || b.kind === 'soot') for (let i = 0; i < 1 + Math.floor(r() * 2); i++) { const x = rr(b.x0 + 0.8, b.x1 - 0.8), z = r() < 0.5 ? b.z0 + 0.7 : b.z1 - 0.7, h = 1.2 + r() * 1.6; if (solidOn(x, z, 0.35, 0.35, h, 'stack')) stacks.push(M(x, top, z, 1, h, 1)); }
       hatches.push(M(px(), top, pz()));
     }
     // fire stairs zig-zagging up one side (landings every floor, a drop ladder at the bottom)
     if (b.fire) fireStairs(b);
   }
+  // fire stairs zig-zagging up one side: landings, flights (switchbacks, the last one to the roof), rails, and the drop
+  // ladder hanging out of reach under the first landing (the plan's fireLayout: what you walk on is what you see)
   function fireStairs(b: Bld) {
-    const s = b.fire!, y = b.y ?? 0, alongX = s === 'n' || s === 's';
-    const mid = alongX ? (b.x0 + b.x1) / 2 : (b.z0 + b.z1) / 2, out = s === 'e' ? b.x1 : s === 'w' ? b.x0 : s === 's' ? b.z1 : b.z0, d = s === 'e' || s === 's' ? 1 : -1;
-    const at = (u: number, o: number, yy0: number, yy1: number, l: number, depth: number) => { if (alongX) box(iron, mid + u - l, mid + u + l, yy0, yy1, Math.min(out + d * o, out + d * (o + depth)), Math.max(out + d * o, out + d * (o + depth)), 'iron', false); else box(iron, Math.min(out + d * o, out + d * (o + depth)), Math.max(out + d * o, out + d * (o + depth)), yy0, yy1, mid + u - l, mid + u + l, 'iron', false); };
-    for (let yy = y + 3.6, k = 0; yy < y + b.h - 1; yy += 3.5, k++) {
-      at(0, 0.05, yy, yy + 0.06, 1.8, 1.2);                  // landing
-      at(0, 1.2, yy, yy + 1.0, 1.8, 0.04);                   // its rail
-      at(0, 1.2, yy + 0.95, yy + 1.0, 1.8, 0.06);
-      // the flight up to the next landing
-      const g = new THREE.BoxGeometry(alongX ? 3.4 : 0.75, 0.06, alongX ? 0.75 : 3.4);
-      const ang = Math.atan2(3.5, 3.2) * (k % 2 ? 1 : -1);
-      if (alongX) g.rotateZ(ang); else g.rotateX(-ang);
-      if (alongX) g.translate(mid, yy + 1.8, out + d * 0.5); else g.translate(out + d * 0.5, yy + 1.8, mid);
-      worldUV(g, 2, 2); add('iron@' + chunk(alongX ? mid : out, alongX ? out : mid), iron, g, false);
+    const F = fireLayout(b);
+    // a box from (u0, o0) to (u1, o1), y0 to y1
+    const at = (u0: number, u1: number, o0: number, o1: number, yy0: number, yy1: number) => { const [ax, az] = F.at(u0, o0), [bx, bz] = F.at(u1, o1); box(iron, Math.min(ax, bx), Math.max(ax, bx), yy0, yy1, Math.min(az, bz), Math.max(az, bz), 'iron', false); };
+    for (const yy of F.lands) {
+      at(-F.LAND.half, F.LAND.half, F.LAND.o0, F.LAND.o1, yy, yy + 0.06);                              // the grating
+      at(-F.LAND.half, F.LAND.half, F.LAND.o1 - 0.05, F.LAND.o1, yy + 0.95, yy + 1.0);                  // its top rail
+      at(-F.LAND.half, F.LAND.half, F.LAND.o1 - 0.04, F.LAND.o1, yy + 0.45, yy + 0.5);
+      for (const u of [-F.LAND.half, -0.6, 0.6, F.LAND.half]) at(u - 0.025, u + 0.025, F.LAND.o1 - 0.05, F.LAND.o1, yy, yy + 1.0);   // posts
+      for (const u of [-F.LAND.half - 0.05, F.LAND.half]) at(u, u + 0.05, F.LAND.o0, F.LAND.o1, yy + 0.95, yy + 1.0);
     }
-    at(1.4, 0.4, y + 2.2, y + 3.6, 0.03, 0.03); at(1.8, 0.4, y + 2.2, y + 3.6, 0.03, 0.03); // the drop ladder's rails
+    for (const f of F.flights) {
+      // the flight: a stringer-and-treads slab from (u0, y0) up to (-u0, y1), hugging the wall
+      const L = Math.hypot(2 * F.FLIGHT.half, f.y1 - f.y0), ang = Math.atan2(f.y1 - f.y0, 2 * F.FLIGHT.half) * (f.u0 < 0 ? 1 : -1);
+      const g = new THREE.BoxGeometry(L, 0.07, f.o1 - f.o0); g.rotateZ(ang);
+      const oc = (f.o0 + f.o1) / 2, yc = (f.y0 + f.y1) / 2 + 0.03;
+      if (!F.alongX) g.rotateY(-Math.PI / 2);   // (the facade runs along z: local x onto world z)
+      const [cx, cz] = F.at(0, oc); g.translate(cx, yc, cz);
+      worldUV(g, 2, 2); add('iron@' + chunk(cx, cz), iron, g, false);
+      // treads across it, every 0.3 m of rise
+      const n = Math.max(3, Math.round((f.y1 - f.y0) / 0.3));
+      for (let k = 1; k < n; k++) { const u = f.u0 + (-2 * f.u0) * k / n, yy = f.y0 + (f.y1 - f.y0) * k / n; at(u - 0.02, u + 0.12, f.o0, f.o1, yy + 0.04, yy + 0.08); }
+    }
+    // the drop ladder: two rails and rungs, from 2.2 m up to the first landing
+    const L0 = F.ladder.y0, L1 = F.lands[0];
+    for (const du of [-0.2, 0.2]) at(F.ladder.u + du - 0.02, F.ladder.u + du + 0.02, F.ladder.o - 0.02, F.ladder.o + 0.02, L0, L1 + 1.0);
+    for (let yy = L0 + 0.15; yy < L1; yy += 0.3) at(F.ladder.u - 0.2, F.ladder.u + 0.2, F.ladder.o - 0.015, F.ladder.o + 0.015, yy, yy + 0.03);
   }
   instanced(new THREE.CylinderGeometry(0.06, 0.06, 1, 8), steel, climbsDrain);
+  // the roofs' clutter is solid; then where each drainpipe lets you off at the top: on the roof just inside the parapet,
+  // beside the pipe (or along a little, past a vent); nowhere free: no way over (climb back down)
+  W.addAll(clutter);
+  for (const c of pipes) {
+    const [nx, nz] = c.n!, tx = -nz, tz = nx;
+    for (const along of [0, 0.5, -0.5, 1, -1, 1.6, -1.6]) {
+      const x = c.x - nx * 0.9 + tx * along, z = c.z - nz * 0.9 + tz * along, g = W.groundAt(x, z, c.y1 + 0.2);
+      if (!Number.isNaN(g) && Math.abs(g - c.y1) < 0.05 && W.free(x, z, 0.36, g)) { c.top = { x, z, y: g }; break; }
+    }
+  }
   const tankGeo = (() => { const a = new THREE.CylinderGeometry(1.1, 1.1, 2.2, 14); a.translate(0, 2.5, 0); const c = new THREE.ConeGeometry(1.2, 0.6, 14); c.translate(0, 3.9, 0); const ps: THREE.BufferGeometry[] = [a, c]; for (const [lx, lz] of [[-0.7, -0.7], [0.7, -0.7], [-0.7, 0.7], [0.7, 0.7]]) { const l = new THREE.BoxGeometry(0.1, 1.4, 0.1); l.translate(lx, 0.7, lz); ps.push(l); } const m = mergeGeometries(ps.map((g) => (g.index ? g.toNonIndexed() : g)))!; ps.forEach((g) => g.dispose()); return m; })();
   instanced(tankGeo, grime(std({ color: '#3c3c3c', roughness: 0.8, metalness: 0.3 }), { rust: 1, floor: 1.5 }), tanks, true);
   instanced(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), grime(std({ color: '#6a6c70', roughness: 0.6, metalness: 0.5 }), { rust: 0.7, floor: 1 }), acs, true);
@@ -501,6 +540,28 @@ export function buildDistrict({ renderer, scene, high, look }: { renderer: THREE
     instanced(new THREE.CylinderGeometry(0.024, 0.024, 1, 6), steel, tubes);
   }
 
+  // ── PARKOUR: ladders (the warehouse mezzanine's, out of the canal), the low things to vault ──
+  {
+    const rungs = (c: Climb, from: number, to: number) => {
+      const [nx, nz] = c.n!, tx = -nz, tz = nx, off = c.kind === 'canal-ladder' ? 0.07 : 0;   // the canal ladders sit on the kerb's face
+      const x = c.x + nx * off, z = c.z + nz * off;
+      for (const s of [-0.21, 0.21]) { const cx = x + tx * s, cz = z + tz * s; box(iron, cx - 0.022, cx + 0.022, from, to, cz - 0.022, cz + 0.022, 'iron', false); }
+      for (let y = from + 0.15; y < to - 0.6; y += 0.28) box(iron, Math.min(x - tx * 0.21, x + tx * 0.21) - 0.012, Math.max(x - tx * 0.21, x + tx * 0.21) + 0.012, y, y + 0.03, Math.min(z - tz * 0.21, z + tz * 0.21) - 0.012, Math.max(z - tz * 0.21, z + tz * 0.21) + 0.012, 'iron', false);
+    };
+    for (const c of P.climbs) {
+      if (c.kind === 'ladder') rungs(c, 0, c.y1 + 1.0);
+      if (c.kind === 'canal-ladder') rungs(c, WATER_Y - 1.4, TOW_Y + 0.85);
+    }
+    const lowM = { lowwall: brick, planter: conc, blocks: conc, barrier: { mat: steel, tw: 2, th: 2 }, pallets: { mat: wood, tw: 2, th: 2 } } as const;
+    for (const l of P.lows) {
+      if (l.kind === 'pallets') { for (let y = 0; y < l.h - 0.05; y += 0.15) box(wood, l.x0, l.x1, y + 0.02, y + 0.14, l.z0, l.z1, 'wood'); continue; }
+      if (l.kind === 'barrier') { box(steel, l.x0, l.x1, 0.55, l.h, l.z0, l.z1, 'iron'); for (let x = l.x0 + 0.1; x < l.x1; x += 1.3) box(steel, x, x + 0.08, 0, 0.55, l.z0, l.z1, 'iron'); continue; }
+      box(lowM[l.kind], l.x0, l.x1, 0, l.h, l.z0, l.z1, l.kind === 'lowwall' ? 'brick' : 'conc');
+      if (l.kind === 'lowwall') box(conc, l.x0 - 0.03, l.x1 + 0.03, l.h, l.h + 0.06, l.z0 - 0.04, l.z1 + 0.04, 'coping', false);
+      if (l.kind === 'planter') box(dark, l.x0 + 0.08, l.x1 - 0.08, l.h, l.h + 0.02, l.z0 + 0.08, l.z1 - 0.08, 'dark', false);
+    }
+  }
+
   // ── containers ──
   for (const c of P.containers) {
     const g = boxG(c.x0, c.x1, c.y, c.y + c.h, c.z0, c.z1); worldUV(g, cont.tw, cont.th, (c.seed % 7) / 7); add('cont@' + chunk(c.x0, c.z0), cont.mat, g);
@@ -617,6 +678,7 @@ export function buildDistrict({ renderer, scene, high, look }: { renderer: THREE
   const recDoor = P.doors.find((d) => d.id === 'record-shop')!, paintDoor = P.doors.find((d) => d.id === 'paint-shop')!;
   signs.push({ tex: signTex('RECORDS', 'VOID RECORDS · NEW · USED · VEXVOID', { dark: true }), w: 4.4, h: 1.1, x: (recDoor.x0 + recDoor.x1) / 2, y: 4.35, z: P.viaduct.z1 - 0.55, ry: 0, lit: 1.6 });
   signs.push({ tex: signTex('PAINT', 'DEAD STOCK · CANS · CAPS · MARKERS'), w: 4.4, h: 1.1, x: 57.06, y: 4.5, z: 32, ry: Math.PI / 2, lit: 1.4 });
+  signs.push({ tex: signTex('PHONES', 'BURNERS · UNLOCKING · REPAIRS'), w: 3.6, h: 0.9, x: 1.4, y: 4.55, z: 41.06, ry: 0, lit: 1.3 });
   for (const [t, x, y, z, ry] of [['ARCHES ROAD', -40, 2.8, -69.9, 0], ['ARCHES ROAD', 30, 2.8, -69.9, 0], ['CANAL STREET', -56.9, 2.8, -40, Math.PI / 2], ['WHARF LANE', -30, 2.8, -8.1, Math.PI], ['VOID STREET', -3.1, 2.6, -38, Math.PI / 2], ['BACK LANE', -33.5, 2.6, -66, -Math.PI / 2], ['DEPOT ROAD', 66.9, 2.8, 17.1, Math.PI], ['SOUTH ROAD', -20, 2.8, 41.1, 0]] as [string, number, number, number, number][])
     signs.push({ tex: plateTex(t), w: 1.4, h: 0.35, x, y, z, ry, lit: 0 });
   for (const s of signs) {
@@ -633,6 +695,10 @@ export function buildDistrict({ renderer, scene, high, look }: { renderer: THREE
     const win = (t: THREE.Texture, w: number, h: number, x: number, y: number, z: number, ry: number) => { const m = new THREE.Mesh(track(new THREE.PlaneGeometry(w, h)), track(new THREE.MeshBasicMaterial({ map: t, color: new THREE.Color('#ffffff').multiplyScalar(0.62) }))); m.position.set(x, y, z); m.rotation.y = ry; group.add(m); };
     win(recT, 5.6, 2.8, (recDoor.x0 + recDoor.x1) / 2, 1.6, P.viaduct.z1 - 0.58, 0);
     win(paintT, 5.2, 2.6, 57.03, 1.5, 32, Math.PI / 2);
+    // the phone kiosk: a wall of handsets on hooks behind the glass, a counter, a hand-written card
+    const phoneT = front((g, Wd, H) => { g.fillStyle = '#d6d6d6'; g.fillRect(0, 0, Wd, H); for (let row = 0; row < 3; row++) for (let i = 0; i < 9; i++) { const x = 18 + i * 54, y = 16 + row * 66; g.fillStyle = '#1c1c1e'; g.fillRect(x, y, 30, 54); g.fillStyle = (i + row) % 3 ? '#4a4a4e' : '#8a8a90'; g.fillRect(x + 3, y + 5, 24, 40); g.fillStyle = '#fff'; g.fillRect(x + 8, y + 58, 14, 5); } g.fillStyle = '#111'; g.font = '900 26px Impact, sans-serif'; g.fillText('BURNERS · UNLOCKING · NO QUESTIONS', 14, H - 12); });
+    win(phoneT, 2.7, 1.9, 4.3, 1.55, 41.03, 0);
+    srcs.push({ p: new THREE.Vector3(1.4, 2.4, 43.2), k: 16, d: 8, flick: 0 }); addPool(1.4, 0.01, 42.4, 5, 0.75);
     srcs.push({ p: new THREE.Vector3((recDoor.x0 + recDoor.x1) / 2, 2.4, P.viaduct.z1 + 2.4), k: 22, d: 9, flick: 0 }, { p: new THREE.Vector3(59.6, 2.4, 32), k: 22, d: 9, flick: 0 });
     addPool((recDoor.x0 + recDoor.x1) / 2, 0.01, P.viaduct.z1 + 2, 6, 0.9); addPool(59, ROAD_Y + 0.02, 32, 6, 0.8);
     // the entry: a doormat outlined in white (phase 3 opens the door)
@@ -839,6 +905,25 @@ export function buildDistrict({ renderer, scene, high, look }: { renderer: THREE
     refl = new Reflector(new THREE.PlaneGeometry(2, 2), { textureWidth: Math.max(64, Math.round(buf.x * 0.42)), textureHeight: Math.max(64, Math.round(buf.y * 0.42)), clipBias: 0.003, multisample: 0 });
     refl.rotation.x = -Math.PI / 2; refl.updateMatrixWorld(true); reflInv.copy(refl.matrixWorld).invert();
     wu.tReflect.value = refl.getRenderTarget().texture; wu.uReflOn.value = 1;
+  }
+  // ── the heavens: a security light over each, washing down the wall, so a piece up there reads from the street. Not a
+  // real light (three more lights in every shader cost ~15% fps): the fixture glows and an additive wash lies on the wall ──
+  {
+    const c = document.createElement('canvas'); c.width = 128; c.height = 128; const g = c.getContext('2d')!;
+    const gr = g.createRadialGradient(64, 8, 4, 64, 30, 120); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,0.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+    const washT = track(texOf(c, true, false));
+    const washM = track(new THREE.MeshBasicMaterial({ map: washT, transparent: true, opacity: 0.32, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    for (const h of P.heavens) {
+      const w = P.walls.find((q) => q.id === h.wall); if (!w) continue;
+      const top = w.c[1] + w.h / 2, nx = w.n[0], nz = w.n[1];
+      const lx = w.c[0] + nx * 0.45, ly = top + 0.55, lz = w.c[2] + nz * 0.45;
+      const fx = new THREE.Mesh(track(boxG(lx - 0.18, lx + 0.18, ly - 0.05, ly + 0.12, lz - 0.18, lz + 0.18)), dark); group.add(fx);   // (the buckets are merged already: its own mesh)
+      const face = new THREE.Mesh(track(new THREE.PlaneGeometry(0.28, 0.06)), glowM(1.6)); face.rotation.x = -Math.PI / 2; face.position.set(lx, ly - 0.06, lz); group.add(face);
+      const ww = Math.min(w.w, 9), wh = Math.min(top + 0.6 - (w.c[1] - w.h / 2 - 1.2), 5.5);
+      const wash = new THREE.Mesh(track(new THREE.PlaneGeometry(ww, wh)), washM); wash.userData.noAO = true;
+      wash.position.set(w.c[0] + nx * 0.04, top + 0.6 - wh / 2, w.c[2] + nz * 0.04); wash.rotation.y = Math.atan2(nx, nz); group.add(wash);
+    }
   }
   scene.add(group);
 

@@ -64,11 +64,20 @@ export type Writer = {
   bonePos: (name: string, out: THREE.Vector3) => THREE.Vector3 | null;
   /** The can in the hand (a scene-level object: add it to the scene once). */
   can: THREE.Object3D;
+  /** PARKOUR: hold a library clip at a time as the base pose and reach the hands and feet to points in the world
+   *  (two-bone IK, elbows and knees bent toward the poles given): a vault's planted hand, a hang's hands on the edge,
+   *  rungs on a ladder, strokes in the water. free: the feet are not fitted to the ground. null lets go. */
+  rig: (o: Rig | null) => void;
+  /** Soaked (0 dry .. 1 just out of the canal): the cloth goes darker and takes a wet sheen. */
+  wet: (k: number) => void;
   update: (dt: number) => void;
   dispose: () => void;
 };
 
 const HEIGHT = 1.78;
+export type Rig = { clip: string; at: number; fade?: number; free?: boolean;
+  hands?: (THREE.Vector3 | null)[]; handW?: number[]; elbows?: (THREE.Vector3 | null)[];
+  feet?: (THREE.Vector3 | null)[]; footW?: number[]; knees?: (THREE.Vector3 | null)[] };
 /** The figure as seen from behind (pass 3): per 2 cm band of height above the soles, the widest the body reaches either
  *  side of the hips' middle (half width, m) and how far back it reaches behind it (m); and from those the head's width
  *  (the hood round the skull), the shoulders' width, the neck (the narrowest band between them) and the column (how far
@@ -408,7 +417,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
     if (name === curName) return;
     const clip = clips.get(name); if (!clip) return;
     const a = mixer.clipAction(clip);
-    a.reset(); a.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, Infinity); a.clampWhenFinished = once; a.enabled = true; a.setEffectiveWeight(1);
+    a.reset(); a.timeScale = 1; a.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, Infinity); a.clampWhenFinished = once; a.enabled = true; a.setEffectiveWeight(1);
     if (cur) a.crossFadeFrom(cur, fade, true);
     a.play(); cur = a; curName = name;
   };
@@ -835,6 +844,34 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
     // the foot keeps the way it was pointing
     lg.foot.parent!.getWorldQuaternion(qp); lg.foot.quaternion.copy(qp.invert().multiply(qF)); lg.foot.updateMatrixWorld(true);
   };
+  // PARKOUR RIG: a held clip as the base pose, the hands and feet reached to points in the world (vault, hang, climb,
+  // swim). A two-bone leg to a world point, the knee toward `pole`, the foot keeping the way it points.
+  let rigO: Rig | null = null; const rigW = { hands: [0, 0], feet: [0, 0] };
+  const rP = new THREE.Vector3(), rT = new THREE.Vector3();
+  const legTo = (lg: { up: THREE.Bone; knee: THREE.Bone; foot: THREE.Bone }, target: THREE.Vector3, pole: THREE.Vector3, w: number) => {
+    root.updateMatrixWorld(true);
+    lg.foot.getWorldQuaternion(qF);
+    lg.up.getWorldPosition(iA); lg.knee.getWorldPosition(iB); lg.foot.getWorldPosition(iC);
+    const l1 = iA.distanceTo(iB), l2 = iB.distanceTo(iC);
+    iU.copy(target).sub(iA); const d = Math.max(0.05, Math.min(iU.length(), (l1 + l2) * 0.999)); iU.normalize();
+    const cosA = Math.max(-1, Math.min(1, (l1 * l1 + d * d - l2 * l2) / (2 * l1 * d))), sinA = Math.sqrt(1 - cosA * cosA);
+    iP.copy(pole).addScaledVector(iU, -pole.dot(iU)); if (iP.lengthSq() < 1e-8) iP.set(0, 0, 1).applyQuaternion(root.quaternion); iP.normalize();
+    iE.copy(iA).addScaledVector(iU, l1 * cosA).addScaledVector(iP, l1 * sinA);
+    turn(lg.up, rT.subVectors(iB, iA).normalize(), iE.sub(iA).normalize(), w);
+    lg.knee.getWorldPosition(iB); lg.foot.getWorldPosition(iC);
+    iE.copy(iA).addScaledVector(iU, d);
+    turn(lg.knee, rT.subVectors(iC, iB).normalize(), iE.sub(iB).normalize(), w);
+    lg.foot.parent!.getWorldQuaternion(qp); lg.foot.quaternion.slerp(qp.invert().multiply(qF), w); lg.foot.updateMatrixWorld(true);
+  };
+  const rigLimbs = () => {
+    const o = rigO; if (!o) return;
+    for (const i of [0, 1]) {
+      const h = o.hands?.[i], w = h ? (o.handW?.[i] ?? 1) : 0; rigW.hands[i] = w;
+      if (h && w > 0.001) armTo(sideArms[i], h, o.elbows?.[i] || rP.set(0, -1, 0), w);
+      const f = o.feet?.[i], fw = f ? (o.footW?.[i] ?? 1) : 0; rigW.feet[i] = fw;
+      if (f && fw > 0.001) legTo(legs[i], f, o.knees?.[i] || rP.set(0, 0, 1).applyQuaternion(root.quaternion), fw);
+    }
+  };
   // FOOT LOCK (pass 3: the planted foot slid 1.4-1.7 m/s at a sprint). A sole point that touches the ground is pinned
   // there; while any pinned point is still down, the leg reaches (IK) so they stay where they landed. Points that lift
   // (the heel as the foot rolls) let go and points that come down (the ball, the toe) pin where they land, so the lock
@@ -910,14 +947,17 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
   const pct = (a: number[], k: number) => { if (!a.length) return 0; const b = [...a].sort((x, y) => x - y); return b[Math.min(b.length - 1, Math.floor(b.length * k))]; };
   const r3 = (n: number) => Math.round(n * 1000) / 1000;
 
-  return {
-    root, height: HEIGHT, play: (name: string, fade = 0.2, once = false) => {
-      if (locoOn) { locoOn = false; const clip = clips.get(name); if (!clip) return; const a = mixer.clipAction(clip); a.reset(); a.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, Infinity); a.clampWhenFinished = once; a.enabled = true; a.setEffectiveWeight(1); a.fadeIn(fade); a.play(); cur = a; curName = name; return; }
+  let wetK = 0; const dryOf = new Map<THREE.MeshStandardMaterial, { c: THREE.Color; r: number; e: number }>();
+  const playAny = (name: string, fade = 0.2, once = false) => {
+      if (locoOn) { locoOn = false; const clip = clips.get(name); if (!clip) return; const a = mixer.clipAction(clip); a.reset(); a.timeScale = 1; a.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, Infinity); a.clampWhenFinished = once; a.enabled = true; a.setEffectiveWeight(1); a.fadeIn(fade); a.play(); cur = a; curName = name; return; }
       play(name, fade, once);
-    },
+  };
+  return {
+    root, height: HEIGHT, play: (name: string, fade = 0.2, once = false) => { if (rigO) { rigO = null; if (cur && !locoOn) cur.timeScale = 1; } playAny(name, fade, once); },
     playing: () => (locoOn ? mixName : curName), can,
     tip: (out) => (can.visible ? can.localToWorld(out.copy(nozLocal)) : null),
     loco: (speed, crouch) => {
+      if (rigO) { rigO = null; if (cur && !locoOn) cur.timeScale = 1; }
       locoStart(); locoS = speed; crouchT = crouch;
       if (!locoOn) { locoOn = true; if (cur) cur.fadeOut(0.18); cur = null; curName = ''; }
     },
@@ -980,6 +1020,21 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       aimOn = !!nozzle; pressOn = !!pressing; if (nozzle) { aimHand.copy(nozzle); aimAt.copy(at || nozzle); aimTo = weight; }
     },
     carry: (on) => { carryOn = on; },
+    rig: (o) => {
+      if (!o) { if (rigO) { rigO = null; if (cur && !locoOn) cur.timeScale = 1; } return; }
+      const was = rigO; rigO = o;
+      if (locoOn || curName !== o.clip || !was) playAny(o.clip, o.fade ?? 0.12);
+    },
+    wet: (k) => {
+      k = Math.max(0, Math.min(1, k)); if (Math.abs(k - wetK) < 0.004) return; wetK = k;
+      for (const m of meshes) for (const mt of (Array.isArray(m.material) ? m.material : [m.material]) as THREE.MeshStandardMaterial[]) {
+        if (!mt.isMeshStandardMaterial) continue;
+        let b = dryOf.get(mt); if (!b) dryOf.set(mt, (b = { c: mt.color.clone(), r: mt.roughness, e: mt.envMapIntensity }));
+        // soaked cloth: darker (the water fills the weave), smoother and shinier; white trainers grey down less
+        const white = b.c.r > 0.7;
+        mt.color.copy(b.c).multiplyScalar(1 - (white ? 0.3 : 0.5) * k); mt.roughness = b.r * (1 - 0.22 * k); mt.envMapIntensity = b.e * (1 + 0.25 * k);   // (soaked cotton: dark, a dull sheen, not plastic)
+      }
+    },
     fixArms: (on) => { armsFix = on; },
     update: (dt) => {
       locoTick(dt);
@@ -987,12 +1042,13 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       // pose: put the pose the mixer made last frame back first (the mixer writes a bone only when its value changed),
       // so nothing can pile up from frame to frame
       if (poseOk) for (let i = 0; i < bones.length; i++) bones[i].quaternion.copy(poseQ[i]);
+      if (rigO && !locoOn && cur && curName === rigO.clip) { cur.timeScale = 0; cur.time = Math.max(0, Math.min(rigO.at, cur.getClip().duration - 1e-3)); }
       if (frozen != null && cur && !locoOn) { cur.time = Math.min(frozen, cur.getClip().duration); cur.setEffectiveWeight(1); mixer.update(0); } else mixer.update(dt);
       for (let i = 0; i < bones.length; i++) poseQ[i].copy(bones[i].quaternion); poseOk = true;
       twistS += (Math.max(-1.3, Math.min(1.3, twistA)) - twistS) * Math.min(1, dt * 12);   // eased: no snap of the neck
       if (Math.abs(twistS) > 1e-3) { const ch: [THREE.Bone, number][] = [[spine0, 0.3], [spine1, 0.3], [spine2, 0.25], [neckB, 0.15]]; for (const [b, k] of ch) b.rotateY(twistS * k); }
       char.rotation.set(leanP, 0, leanR);
-      lt += dt; life += ((/Idle/.test(locoOn ? mixName : curName) && !aimOn ? 1 : 0) - life) * Math.min(1, dt * 2);
+      lt += dt; life += ((/Idle/.test(locoOn ? mixName : curName) && !aimOn && !rigO ? 1 : 0) - life) * Math.min(1, dt * 2);
       if (life > 0.01) {
         spine1.rotateX(Math.sin(lt * 1.6) * 0.018 * life);
         const look = Math.sin(lt * 0.23) * 0.5 + Math.sin(lt * 0.61 + 1.3) * 0.2;
@@ -1000,17 +1056,19 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       }
       steadyHead(dt);
       squareShoulders();
-      if (ground) { if (feetOn) { fitFeet(dt); footLock(dt); } else soleNow(); measure(dt); }
+      if (rigO && rigO.free) { bodyOff *= Math.exp(-dt * 14); dip *= Math.exp(-dt * 7); char.position.y = baseY + bodyOff + dip; soleNow(); }
+      else if (ground) { if (feetOn) { fitFeet(dt); footLock(dt); } else soleNow(); measure(dt); }
       aimW += ((aimOn ? aimTo : 0) - aimW) * Math.min(1, dt * 9);
       carryW += ((carryOn ? 1 : 0) - carryW) * Math.min(1, dt * 10);
       // the arms out of the trunk as the clip has them (both), then the spray arm reaches for the wall over that
-      if (armsFix) { if (!(aimW > 0.99)) pushOut(sideArms[1]); pushOut(sideArms[0]); }
+      if (armsFix) { if (!(aimW > 0.99) && !(rigO && rigW.hands[1] > 0.5)) pushOut(sideArms[1]); if (!(rigO && rigW.hands[0] > 0.5)) pushOut(sideArms[0]); }
+      if (rigO) rigLimbs(); else rigW.hands[0] = rigW.hands[1] = rigW.feet[0] = rigW.feet[1] = 0;
       // CARRYING THE CAN LIKE A WRITER (pass 3, owner: "upright in the palm, index finger on the actuator", not a baton).
       // The can lies across the fist (pinky to index), so with the arm hanging as the clips have it, it pointed forward
       // flat. Standing, the forearm comes up and forward (the can at the ready, the index finger resting on its top);
       // moving, the wrist turns the can toward upright as far as a wrist goes.
       sinceAim = aimOn || steadyOn ? 0 : sinceAim + dt;   // (the can just off a wall is not yet carried: the reach blends out first)
-      const idleNow = !pass2 && sinceAim > 0.6 && (locoOn ? locoS < 0.7 : /^(Idle_Loop|Crouch_Idle_Loop)$/.test(curName));
+      const idleNow = !pass2 && !rigO && sinceAim > 0.6 && (locoOn ? locoS < 0.7 : /^(Idle_Loop|Crouch_Idle_Loop)$/.test(curName));
       readyW += ((carryOn && idleNow ? 1 : 0) - readyW) * Math.min(1, dt * 5);
       // FOLDED ARMS (pass 3, owner: they hovered in front of the chest; the longer arms reach past where the clip folds
       // them): each forearm laid across the chest, the right one tucked under the left, the elbows by the sides

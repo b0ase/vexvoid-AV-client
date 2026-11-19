@@ -125,7 +125,29 @@ export function makeWorld(o: { boxes: Box[]; surfs: Surf[]; holes: Rect[]; bound
   };
   const clear = (ax: number, ay: number, az: number, bx: number, by: number, bz: number) => ray(ax, ay, az, bx, by, bz) >= 1;
   const add = (b: Box) => { boxes.push(b); bIdx = index(boxes, PAD); };
-  return { boxes, surfs, holes, bounds, base, levels, groundAt, stops, pushOut, free, near, ray, clear, add, inHole };
+  /** Several boxes at once (one re-index). */
+  const addAll = (list: Box[]) => { if (!list.length) return; boxes.push(...list); bIdx = index(boxes, PAD); };
+  /** The surface groundAt stands on here (null: the street level, or nothing). */
+  const surfAt = (x: number, z: number, feet: number): Surf | null => {
+    let best = !inHole(x, z) && base <= feet + STEP ? base : NaN, out: Surf | null = null;
+    for (const s of sIdx[cellOf(x, z)]) {
+      if (!inR(s, x, z)) continue;
+      const y = surfY(s, x, z);
+      if (y <= feet + STEP && !(y <= best)) { best = y; out = s; }
+    }
+    return out;
+  };
+  /** The top of what is solid in a column here, starting from y and stepping up through boxes that sit on each other. */
+  const topAt = (x: number, z: number, y: number) => {
+    let t = y;
+    for (let k = 0; k < 6; k++) {
+      let up = t;
+      for (const b of bIdx[cellOf(x, z)]) if (x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1 && yb0(b) <= t + 0.05 && yb1(b) > up) up = yb1(b);
+      if (up <= t) break; t = up;
+    }
+    return t;
+  };
+  return { boxes, surfs, holes, bounds, base, levels, groundAt, stops, pushOut, free, near, ray, clear, add, addAll, inHole, surfAt, topAt };
 }
 
 /**
