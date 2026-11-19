@@ -123,8 +123,10 @@ export function piece3(id, name, parts, o = {}) {
       if (v > 0.55 || at(F, Uf, x, y) > -(r + 0.035 * k) || placed.some(([a, b, rr]) => Math.hypot(a - x, b - y) < r + rr + 0.03 * k)) continue
       const i = topAt(x, y); if (i < 0 || at(F, parts[i].f, x, y) > -(r + 0.03 * k)) continue
       placed.push([x, y, r]); n++
-      out.fx.push(dot(x, y, r > 0.034 ? { cap: 3, dist: 0.05, colour: C.mid } : { cap: 2, dist: Math.max(0.05, Math.min(0.2, r * 2.4)), colour: C.mid }, 0.3))
-      out.fx.push(dot(x - r * 0.35, y + r * 0.35, { cap: 1, dist: 0.05, colour: C.light }, 0.04))
+      // painted as a quick small spiral, not a held press (a held press pools and runs in the game)
+      const sp = []; for (let q = 0; q <= 40; q++) { const t = q / 40, a = t * Math.PI * 4.5, rr = Math.max(0, r - 0.011) * (1 - t * 0.85); sp.push([x + Math.cos(a) * rr, y + Math.sin(a) * rr]) }
+      out.fx.push(stroke(sp, { cap: 1, dist: 0.07, colour: C.mid }, { speed: 0.6, corner: 0, step: 0.004 }))
+      out.fx.push(stroke([[x - r * 0.4, y + r * 0.3], [x - r * 0.3, y + r * 0.42]], { cap: 1, dist: 0.05, colour: C.light }, { speed: 0.5 }))
     }
   }
 
