@@ -974,7 +974,9 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     // mini-map turns with the writer, out of the way while the phone is out or in photo mode
     phone.tick(t, canvas);
     missions.tick(dt);
-    minimap.hide(photoMode || phone.isOpen());
+    // (and out of the way of the help card, and of the sketchbook panel where the view is too narrow for both)
+    { const hs = hudScale(w, h), mapB = 16 + Math.round(150 * hs) + 8;
+      minimap.hide(photoMode || phone.isOpen() || (!!paint && (help || h - (16 + 124 * hs) - 40 < mapB)) || (book.state.open && w - 290 < mapB)); }
     minimap.update(rdt, t);
     { const b = minimap.box(); camera.toastAt(b.size ? b.x + b.size + 10 : 16, 16); }
     hud();

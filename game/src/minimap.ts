@@ -92,7 +92,8 @@ export function makeMinimap(host: HTMLElement, o: { plan: Plan; walls: Wall[]; p
       const op = me.painting ? 0.32 : 1; if (Math.abs(op - opacity) > 0.01) { opacity = op; el.style.opacity = String(op); }
       if (t - lastDraw >= 1 / 30 || lastDraw < 0) { lastDraw = t; draw(t); }
       // the objective in play, and how far
-      const ob = o.objective(); let s = '';
+      // (painting: the map fades back and the objective line goes; the dock and its tip line need the room)
+      const ob = me.painting ? null : o.objective(); let s = '';
       if (ob) { const mk = ob.marker, d = mk ? Math.hypot(mk.x - me.x, mk.z - me.z) : -1; s = `${ob.text}${d >= 0 ? ` · ${d < 1000 ? Math.round(d) + ' M' : (d / 1000).toFixed(1) + ' KM'}` : ''}`; }
       if (s !== lastLine) { lastLine = s; line.style.display = s ? 'flex' : 'none'; line.innerHTML = s ? '<span style="flex:none;width:7px;height:7px;transform:rotate(45deg);background:#fff;border:1px solid #000;margin-right:2px"></span><span></span>' : ''; if (s) (line.lastChild as HTMLElement).textContent = s; }
     },

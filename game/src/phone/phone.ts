@@ -199,12 +199,14 @@ const CSS = `
 .vxp .vxg-p>.vxg-grid{padding-bottom:28px!important}
 .vxp .vxg-v .vxg-acts{padding-bottom:22px}
 /* sideways (a short view) */
-.vxp-ph.land .vxp-sb{left:auto;right:0;top:0;bottom:0;width:30px;height:auto;flex-direction:column;padding:14px 0;justify-content:space-between}
-.vxp-ph.land .vxp-sb .isl{left:auto;right:4px;top:50%;width:22px;height:70px;margin:-35px 0 0}
-.vxp-ph.land .vxp-sb .isl::after{right:7px;top:auto;bottom:10px}
-.vxp-ph.land .vxp-sb .ic{flex-direction:column}
-.vxp-ph.land .vxp-app{top:0;right:30px}
-.vxp-ph.land .vxp-hi{left:auto;right:12px;bottom:auto;top:50%;width:5px;height:96px;margin:-48px 0 0}
+.vxp-ph.land .vxp-sb{height:24px;padding:0 18px 0 22px;font-size:11px}
+.vxp-ph.land .vxp-sb .isl{display:none}
+.vxp-ph.land .vxp-app{top:24px}
+.vxp-ph.land .vxp-hi{bottom:5px;width:96px;margin-left:-48px;height:4px}
+.vxp-ph.land .vxp-hd{height:36px}
+.vxp-ph.land .vxp-who{display:none}
+.vxp-ph.land .vxp-card{margin:4px 8px 14px;padding:7px 10px;gap:4px}
+.vxp-ph.land .vxp-cam{margin-top:-24px}
 .vxp-ph.land .vxp-home{flex-direction:row;align-items:stretch;padding:16px 20px 16px 22px;gap:18px}
 .vxp-ph.land .vxp-hl{flex:0 0 38%;display:flex;flex-direction:column;justify-content:center;gap:14px;min-width:0}
 .vxp-ph.land .vxp-clk{align-items:flex-start;padding:0}
@@ -222,6 +224,8 @@ const CSS = `
 .vxp-ph.land .vxp-art{width:auto;height:min(100%,230px)}
 .vxp-ph.land .vxp-mr{display:flex;flex-direction:column;align-items:center;gap:16px;min-width:0;flex:1}
 .vxp-ph.land .vxp-aim{top:14px}
+.vxp-ph.land.short .vxp-ft{display:none}
+.vxp-ph.land .vxp-mus{padding:10px 26px 16px}
 .vxp-ph.land .vxp-cb{left:auto;top:0;width:96px;height:auto;flex-direction:column;padding:16px 0;background:linear-gradient(270deg,rgba(0,0,0,.85),rgba(0,0,0,.55))}
 .vxp-ph.land .vxp-wal{flex-direction:row;gap:26px;text-align:left}
 .vxp-ph.land .vxp-wal .wt{display:flex;flex-direction:column;gap:10px}
@@ -306,7 +310,7 @@ export function makePhone(host: HTMLElement, d: PhoneDeps) {
     if (land) { PH = Math.max(240, h - 20); PW = Math.min(w - 24, Math.round(PH * 2.06)); }
     else { PH = Math.min(h - 32, 820); PW = Math.round(PH * 0.485); if (PW > w - 24) { PW = w - 24; PH = Math.min(h - 32, Math.round(PW / 0.485)); } }
     const R = Math.min(54, Math.round(Math.min(PW, PH) * 0.13)), bz = Math.max(7, Math.round(Math.min(PW, PH) * 0.024));
-    ph.className = 'vxp-ph ' + (land ? 'land' : 'port');
+    ph.className = 'vxp-ph ' + (land ? 'land' : 'port') + (PH < 330 ? ' short' : '');
     ph.style.width = PW + 'px'; ph.style.height = PH + 'px'; ph.style.borderRadius = R + 'px';
     scr.style.inset = bz + 'px'; scr.style.borderRadius = (R - bz) + 'px';
     // the wear: a crack from the top corner, a chip in the frame, scuffs; faint, never over what you read
