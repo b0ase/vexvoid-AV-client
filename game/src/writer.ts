@@ -526,6 +526,39 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       break;
     }
   };
+  // ---- pass 3: arms placed against the chest (carrying the can at the ready; folded arms that rest on the chest) ----
+  // a point in the chest's frame, given in metres from the Spine2 joint as the model was built: left, up, forward
+  const bS2 = vx.bind?.[spine2.name] ? new THREE.Matrix4().fromArray(vx.bind[spine2.name]) : null, bS2i = bS2 ? bS2.clone().invert() : null;
+  const cP0 = new THREE.Vector3();
+  const chestPt = (left: number, up: number, fwd: number, out: THREE.Vector3) => {
+    if (!bS2 || !bS2i) return spine2.getWorldPosition(out);
+    out.setFromMatrixPosition(bS2).add(cP0.set(left, up, fwd).divideScalar(kS)).applyMatrix4(bS2i); return spine2.localToWorld(out);
+  };
+  const chestDir = (left: number, up: number, fwd: number, out: THREE.Vector3) => { const o = chestPt(0, 0, 0, new THREE.Vector3()); return chestPt(left, up, fwd, out).sub(o).normalize(); };
+  const aD = new THREE.Vector3(), aT = new THREE.Vector3();
+  /** Two-bone IK for an arm: the wrist toward `target`, the elbow bent toward `pole` (a direction), by weight w. */
+  const armTo = (sa: (typeof sideArms)[number], target: THREE.Vector3, pole: THREE.Vector3, w: number) => {
+    root.updateMatrixWorld(true);
+    sa.arm.getWorldPosition(iA); sa.fore.getWorldPosition(iB); sa.hand.getWorldPosition(iC);
+    const l1 = iA.distanceTo(iB), l2 = iB.distanceTo(iC);
+    aD.copy(target).sub(iA); const d = Math.max(0.05, Math.min(aD.length(), (l1 + l2) * 0.995)); aD.normalize();
+    const cosA = Math.max(-1, Math.min(1, (l1 * l1 + d * d - l2 * l2) / (2 * l1 * d))), sinA = Math.sqrt(1 - cosA * cosA);
+    iP.copy(pole).addScaledVector(aD, -pole.dot(aD)).normalize();
+    iE.copy(iA).addScaledVector(aD, l1 * cosA).addScaledVector(iP, l1 * sinA);
+    turn(sa.arm, aT.subVectors(iB, iA).normalize(), iE.sub(iA).normalize(), w);
+    sa.fore.getWorldPosition(iB); sa.hand.getWorldPosition(iC);
+    iE.copy(iA).addScaledVector(aD, d);
+    turn(sa.fore, aT.subVectors(iC, iB).normalize(), iE.sub(iB).normalize(), w);
+  };
+  // the can upright: the hand turns so the can's axis comes to the world's up, at most `max` (a wrist's range), by w
+  const qU = new THREE.Quaternion(), qI = new THREE.Quaternion();
+  const canUp = (w: number, max: number) => {
+    root.updateMatrixWorld(true); if (w < 1e-3 || !canAxis(cA, cU)) return;
+    qU.setFromUnitVectors(cU, UP); const a = 2 * Math.acos(Math.min(1, Math.abs(qU.w))); if (a < 1e-3) return;
+    qI.identity().slerp(qU, Math.min(1, max / a) * w); spin(rHand, qI);
+  };
+  let readyW = 0, foldW = 0;
+  const fT = new THREE.Vector3(), fP = new THREE.Vector3();
   // the spray arm: the hand turns so the can is upright with its nozzle at the wall, the wrist goes where that puts the
   // nozzle at the can's distance (kept outside the trunk), and of all the elbows that reach it the one that keeps the
   // arm out of the body and the wrist straightest (eased, so it never jumps)
@@ -881,7 +914,12 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
         gap = Math.min(gap, inY ? Math.max(0, rho - CAN.r) : Math.hypot(Math.max(0, rho - CAN.r), v.y < CAN.y0 ? CAN.y0 - v.y : v.y - CAN.y1));
         if (inY && Math.abs(rho - CAN.r) < 0.008) bins.add(Math.floor(((Math.atan2(v.x, v.z) + Math.PI) / (2 * Math.PI)) * 24) % 24);
       }
-      o.gap = gap === Infinity ? 0 : gap; o.wrap = bins.size / 24; return o;
+      o.gap = gap === Infinity ? 0 : gap; o.wrap = bins.size / 24;
+      // (pass 3) how upright the can stands: its axis from the world's up (degrees), and from the forearm (a spray grip
+      // holds it across the forearm, about 90)
+      const ax = new THREE.Vector3(0, 1, 0).applyQuaternion(can.quaternion), fa = rHand.getWorldPosition(new THREE.Vector3()).sub(rFore.getWorldPosition(new THREE.Vector3())).normalize();
+      o.tilt = Math.round(THREE.MathUtils.radToDeg(ax.angleTo(UP)) * 10) / 10; o.fore = Math.round(THREE.MathUtils.radToDeg(ax.angleTo(fa)) * 10) / 10;
+      return o;
     },
     aim: (nozzle, at, weight = 1, pressing = false) => {
       aimOn = !!nozzle; pressOn = !!pressing; if (nozzle) { aimHand.copy(nozzle); aimAt.copy(at || nozzle); aimTo = weight; }
@@ -912,6 +950,32 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       carryW += ((carryOn ? 1 : 0) - carryW) * Math.min(1, dt * 10);
       // the arms out of the trunk as the clip has them (both), then the spray arm reaches for the wall over that
       if (armsFix) { if (!(aimW > 0.99)) pushOut(sideArms[1]); pushOut(sideArms[0]); }
+      // CARRYING THE CAN LIKE A WRITER (pass 3, owner: "upright in the palm, index finger on the actuator", not a baton).
+      // The can lies across the fist (pinky to index), so with the arm hanging as the clips have it, it pointed forward
+      // flat. Standing, the forearm comes up and forward (the can at the ready, the index finger resting on its top);
+      // moving, the wrist turns the can toward upright as far as a wrist goes.
+      const idleNow = !aimOn && !steadyOn && (locoOn ? locoS < 0.7 : /^(Idle_Loop|Crouch_Idle_Loop)$/.test(curName));
+      readyW += ((carryOn && idleNow ? 1 : 0) - readyW) * Math.min(1, dt * 5);
+      // FOLDED ARMS (pass 3, owner: they hovered in front of the chest; the longer arms reach past where the clip folds
+      // them): each forearm laid across the chest, the right one tucked under the left, the elbows by the sides
+      foldW += ((!aimOn && !locoOn && curName === 'Idle_FoldArms_Loop' ? 1 : 0) - foldW) * Math.min(1, dt * 4);
+      if (readyW * (1 - foldW) > 0.01) {   // the wrist below the shoulder and in front of it: the elbow bent about 100 degrees, by the side
+        const ck = locoOn ? crouchW : /Crouch/.test(curName) ? 1 : 0;   // crouched, the can comes forward of the knee
+        rArm.getWorldPosition(fT); fT.addScaledVector(chestDir(1, 0, 0, fP), -0.1 - 0.03 * ck).addScaledVector(chestDir(0, 1, 0, fP), -0.37 + 0.05 * ck).addScaledVector(chestDir(0, 0, 1, fP), 0.28 + 0.1 * ck);
+        armTo(sideArms[1], fT, chestDir(-0.45, -0.35, -0.8, fP), readyW * (1 - foldW) * (1 - aimW));
+        if (armsFix) pushOut(sideArms[1], false, 4);   // the fist and the can clear of the hip
+      }
+      if (foldW > 0.01) {
+        // (left, up, forward from the chest joint, metres): the elbow by the ribs, the wrist across at the other side
+        for (const [sa, e, w] of [[sideArms[0], [0.285, -0.05, 0.18], [-0.06, 0.0, 0.29]], [sideArms[1], [-0.285, -0.08, 0.15], [0.0, -0.04, 0.215]]] as const) {
+          chestPt(e[0], e[1], e[2], fP); chestPt(w[0], w[1], w[2], fT); sa.arm.getWorldPosition(aT);
+          armTo(sa, fT, fP.sub(aT.add(fT).multiplyScalar(0.5)).normalize(), foldW);
+          // the upper arm out of the ribs, then the forearm laid back across to its wrist (pushing the whole arm out
+          // would unfold it), then the forearm out of the chest
+          if (armsFix) { pushOut(sa, true, 3); sa.fore.getWorldPosition(iB); sa.hand.getWorldPosition(iC); turn(sa.fore, aT.subVectors(iC, iB).normalize(), fP.subVectors(fT, iB).normalize(), foldW); pushOut(sa, false, 3); }
+        }
+      }
+      if (carryW > 0.5 && aimW < 0.99) canUp((1 - aimW) * carryW, 0.5 + 0.2 * Math.max(readyW, foldW));
       if (aimW > 0.01) {
         ik(aimW, dt);
         // whatever the reach could not avoid, the arm is pushed out of the trunk like a clip's arm; then the hand turns
@@ -923,7 +987,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       } else { swivel = NaN; reachTw = 0; reachPull = 0; reachSw = 0; ikBest = null; }
       // the fingers: relaxed; the right hand closed round its can; the index finger up on the actuator while the can is
       // up at a wall, pressing while it sprays
-      pressW += ((aimW > 0.3 && carryW > 0.5 ? (pressOn ? 1 : 0.88) : 0) - pressW) * Math.min(1, dt * 14);
+      pressW += ((aimW > 0.3 && carryW > 0.5 ? (pressOn ? 1 : 0.88) : carryW > 0.5 ? 0.82 * readyW : 0) - pressW) * Math.min(1, dt * 14);
       for (const f of fingers) { f.b.quaternion.copy(f.relax); if (f.right) { f.b.quaternion.slerp(f.grip, carryW); if (f.index && pressW > 0.001) f.b.quaternion.slerp(f.press, pressW); } }
       // the can rides the hand's grip socket: wherever the hand goes, it goes
       can.visible = carryOn ? carryW > 0.5 : aimW > 0.3;

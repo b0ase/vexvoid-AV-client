@@ -307,7 +307,7 @@ HEM = zP - 0.02    # the jacket's hem: a waist-length shell, short enough that a
 # (pass 3: square shoulders. Pass 2's jacket narrowed in a dome from the armpits to the neck, so the shoulders sloped
 #  away under the hood. Now the shoulder line runs out level to the deltoids and the trapezius slopes in to the neck.)
 TZ = [HEM, HEM + 0.05, HEM + 0.11, zP + 0.26, zS - 0.13, zS - 0.02, zS + 0.03, zS + 0.055, zS + 0.075, zN + 0.0]
-t_a = curve(TZ, [0.166, 0.167, 0.172, 0.168, 0.184, 0.2, 0.197, 0.17, 0.124, 0.074])     # half width (pass 2: lean, not puffy)
+t_a = curve(TZ, [0.166, 0.167, 0.172, 0.168, 0.178, 0.188, 0.19, 0.167, 0.124, 0.074])     # half width (pass 2: lean, not puffy)
 t_f = curve(TZ, [0.104, 0.105, 0.11, 0.106, 0.116, 0.112, 0.1, 0.09, 0.08, 0.068])     # depth to the front
 t_b = curve(TZ, [0.096, 0.098, 0.104, 0.102, 0.11, 0.11, 0.104, 0.096, 0.086, 0.074])     # depth to the back
 t_y = curve(TZ, [J['Hips'][1] - 0.005, J['Hips'][1] - 0.005, J['Hips'][1] - 0.01, J['Spine1'][1], J['Spine2'][1] + 0.02, J['Spine2'][1] + 0.035, J['LeftArm'][1] - 0.02, J['LeftArm'][1] - 0.021, J['Head'][1] - 0.015, J['Head'][1] - 0.012])
@@ -790,7 +790,11 @@ for sgn in (1, -1):
     grid(pack, Pq[-3:], 'Trim', Wpk.repeat(3 * 24, 0), name='can-pocket-band')
 # straps: over each shoulder from the top of the pack, down the chest, and back under the arm, lying on the jacket
 for (pts, nn), sgn in zip(STRAPS, (1, -1)):
-    box_tube(pack, pts, 0.021 * (1 - 0.35 * sstep(26, 34, np.arange(40))), 0.005, 8, nn, 'Pack', spine_w(pts.repeat(8, 0)), name='strap')
+    # (pass 3: over the top of the shoulder the strap rides the collar bone, as a real strap does: it moves with the
+    #  shoulder, and the sleeve's cap under it is not taken for the trunk)
+    Ws_ = spine_w(pts.repeat(8, 0)); top_ = 0.85 * sstep(zS + 0.0, zS + 0.04, pts[:, 2]).repeat(8)
+    Ws_ = Ws_ * (1 - top_)[:, None]; Ws_[:, BI[('Left' if sgn > 0 else 'Right') + 'Shoulder']] += top_
+    box_tube(pack, pts, 0.021 * (1 - 0.35 * sstep(26, 34, np.arange(40))), 0.005, 8, nn, 'Pack', Ws_, name='strap')
     pb, nb_ = on_torso(np.array([sgn * 0.54]), np.array([zS - 0.21]), 0.016); box_tube(pack, np.array([pb[0] + [0, 0, 0.02], pb[0] - [0, 0, 0.02]]), 0.016, 0.006, 8, nb_[0], 'Detail', spine_w(np.repeat(pb, 16, 0)), name='buckle')
 ths = np.linspace(-0.5, 0.5, 9); pts, nn = on_torso(ths, np.full(9, zS - 0.1), 0.012)
 box_tube(pack, pts, 0.011, 0.004, 8, nn, 'Pack', spine_w(pts.repeat(8, 0)), name='chest-strap')
