@@ -348,6 +348,9 @@ export function makeSpray(scene: THREE.Scene, walls: Wall[], store: WallStore = 
         if (!start(o.wall || s.wall, s, { seed: s.seed, group })) throw new Error('no wall ' + (o.wall || s.wall));
         for (const [x, y, t] of s.pts) feed(ax + x * k, ay + y * k, t);
         finish();
+        // the wet clock runs on as if the piece were painted: each stroke takes its own time, then the 0.18 s a writer
+        // takes between strokes, so paint laid at once dries between strokes as it does at 1x (pass 4, the drying bug)
+        now += (s.pts.length ? s.pts[s.pts.length - 1][2] : 0) + 0.18;
       }
     },
     /** A wall's strokes, oldest first (those of this session, and earlier ones where the store keeps the log). */
@@ -393,9 +396,10 @@ export function makeSpray(scene: THREE.Scene, walls: Wall[], store: WallStore = 
     loaded,
     /** Save every wall with paint not yet saved (also done by itself, a moment after the paint settles). */
     async flush() { await Promise.all([...layers.values()].filter((L) => L.unsaved > 0).map((L) => { L.unsaved = 0; return save(L); })); },
-    /** Drips run down and the changed tiles go to the GPU. at: where the writer is, so far walls can rest. */
-    update(dt: number, at?: { x: number; z: number }) {
-      now += dt;
+    /** Drips run down and the changed tiles go to the GPU. at: where the writer is, so far walls can rest. rate: how
+     *  fast the wet clock runs (a blast played at 2x dries twice as fast, so its paint sets between strokes as at 1x). */
+    update(dt: number, at?: { x: number; z: number }, rate = 1) {
+      now += dt * rate;
       for (let i = drips.length - 1; i >= 0; i--) { const d = drips[i], to = Math.min(d.n, d.i + dt * 60); runDrip(d, d.i, to); d.i = to; if (to >= d.n) drips.splice(i, 1); }
       for (const L of layers.values()) {
         for (const T of L.tiles.values()) if (T.dirty) { T.tex.needsUpdate = true; T.dirty = false; }

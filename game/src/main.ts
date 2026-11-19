@@ -747,7 +747,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     // the line under the picture sits above the dock, and in the middle of what the sketchbook panel leaves free
     tip.style.bottom = paint ? `${Math.round(16 + 124 * hudScale(w, h))}px` : '9%';
     tip.style.left = book.state.open ? 'calc((100% - 296px) / 2)' : '50%'; tip.style.maxWidth = book.state.open ? 'calc(100% - 330px)' : 'calc(100% - 32px)';
-    spray.update(dt, me);
+    spray.update(dt, me, auto ? auto.speed : 1);   // a blast at 2x/4x runs the paint's wet clock at its own speed
     law.pushOut(me, 0.35);
     const ev = photoMode ? '' : law.update(dt, t, { x: me.x, z: me.z, y: me.y, gy: me.gy, crouch: me.crouch, painting: !!paint, spraying: sprayingNow, torch: torch.on, vx: paint ? 0 : Math.sin(me.heading) * mv.speed, vz: paint ? 0 : Math.cos(me.heading) * mv.speed });
     if (ev && opts.onEvent) try { opts.onEvent(ev); } catch { /* the host's business */ }
