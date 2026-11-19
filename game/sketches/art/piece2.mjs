@@ -99,8 +99,8 @@ export function piece3(id, name, parts, o = {}) {
   // ---- the fill: two coats, each part's edge cut in ----
   out.fill = [
     // light coats (a fill that pools runs: the paint must stay under the drip point even when it has no time to set)
-    ...solid(F, Uf, { cap: 3, dist: o.fillDist ?? 0.13, colour: C.fill, pressure: 0.8 }, { inset: 0.05, ang: 0.08, speed: 2.0, k: 0.9 }),
-    ...fillPass(F, Uf, { cap: 3, dist: 0.14, colour: C.fill, pressure: 0.4 }, { gap: 0.07, inset: 0.05, ang: 1.3, speed: 2.4 }),
+    ...solid(F, Uf, { cap: 3, dist: o.fillDist ?? 0.16, colour: C.fill }, { inset: 0.06, ang: 0.08, speed: 2.0, k: 0.85 }),
+    ...fillPass(F, Uf, { cap: 3, dist: 0.18, colour: C.fill, pressure: 0.6 }, { gap: 0.07, inset: 0.06, ang: 1.3, speed: 2.4 }),
     // each part's edge cut in, only where that part shows (a ring under a part in front would show through it)
     ...parts.flatMap((p, i) => contours(F, p.f, -0.022, 0.002).flatMap((lp) => runsWhere(resample(lp.concat([lp[0]]), 0.008), (x, y) => topAt(x, y) === i, 0.05))
       .map((r) => stroke(r, { cap: 2, dist: 0.08, colour: C.fill, pressure: 0.5 }, { speed: 1.5, corner: 0.7, step: 0.01 }))),

@@ -3,7 +3,9 @@
 // the one cutting angle; every arrow the one arrow shape (AR), grown out of a terminal or a connection and pointing
 // with the word's sweep (up and out at the top, out to the right at the middle, down and out at the bottom); a couple
 // of bits broken off; calm open areas left between the knots. Cap height 1, y up; z: depth within the letter.
-import { W, WH, AR, part, inset } from './alpha.mjs'
+import { W as W0, WH as WH0, AR, part, inset } from './alpha.mjs'
+// wildstyle bars run heavier than the straights: the letters pack into one dense knot
+const W = W0 * 1.16, WH = WH0 * 1.16
 import { bar, curveBar, clipHalf, unit } from './skel.mjs'
 
 const S = (d) => ({ cut: d })              // a slice along d
