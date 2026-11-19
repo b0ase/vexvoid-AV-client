@@ -563,7 +563,7 @@ export function buildDistrict({ renderer, scene, high, look }: { renderer: THREE
       const k = R(), y = g + 0.01;
       if (k < 0.4) papers.push(M(x, y, z, 0.2 + R() * 0.2, 1, 0.15 + R() * 0.2, R() * 6));
       else if (k < 0.6) tins.push(M(x, y + 0.033, z, 1, 1, 1, R() * 6, 0, Math.PI / 2));
-      else if (k < 0.78) bags.push(M(x, y + 0.25, z, 0.8 + R() * 0.5, 0.6 + R() * 0.4, 0.8 + R() * 0.5, R() * 6));
+      else if (k < 0.78) bags.push(M(x, y, z, 0.8 + R() * 0.5, 0.6 + R() * 0.4, 0.8 + R() * 0.5, R() * 6));   // (pass 3: the bag's own base is at 0)
       else if (k < 0.9) cards.push(M(x, y + 0.2, z, 0.6 + R() * 0.6, 0.4 + R() * 0.3, 0.5 + R() * 0.4, R() * 6, (R() - 0.5) * 0.3));
       else if (k < 0.95) pallets.push(R() < 0.5 ? M(x, y + 0.07, z, 1, 1, 1, R() * 6) : M(x, y + 0.6, z, 1, 1, 1, R() * 0.4, Math.PI / 2 - 0.25));
       else if (k < 0.985) tyres.push(M(x, y + 0.11, z, 1, 1, 1, 0, Math.PI / 2));
@@ -571,7 +571,31 @@ export function buildDistrict({ renderer, scene, high, look }: { renderer: THREE
     }
     instanced(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), std({ color: '#cfcfcf', roughness: 0.9, side: THREE.DoubleSide }), papers);
     instanced(new THREE.CylinderGeometry(0.033, 0.033, 0.12, 8), std({ color: '#9c9ea2', roughness: 0.3, metalness: 0.9 }), tins);
-    instanced(new THREE.IcosahedronGeometry(0.33, 1), std({ color: '#141414', roughness: 0.25, metalness: 0.1, envMapIntensity: 1.6 }), bags);
+    // bin bags (pass 3, owner: they read as glossy black balls): a full bag slumps on its flat bottom, lumpy with what
+    // is inside and creased all over, gathered at the neck and tied off in two ears; matte black plastic. Three shapes.
+    const bagGeo = (seed: number) => {
+      const g = new THREE.SphereGeometry(0.3, 30, 22), p = g.attributes.position, v = new THREE.Vector3();
+      const nz = (x: number, y: number, z: number, f: number) => Math.sin(x * f + seed * 1.3) * Math.sin(y * f * 0.9 + seed * 2.1) * Math.sin(z * f * 1.1 + seed * 0.7) + 0.5 * Math.sin((x + z) * f * 2.3 + seed) * Math.sin(y * f * 1.9 - seed);
+      for (let i = 0; i < p.count; i++) {
+        v.fromBufferAttribute(p, i); const h = v.y / 0.3, neck = THREE.MathUtils.smoothstep(h, 0.6, 0.97), sag = THREE.MathUtils.smoothstep(-h, -0.2, 0.9);
+        const ridge = 1 - 2 * Math.abs(nz(v.x, v.y, v.z, 17));   // sharp creases in the plastic
+        let r = (1 + 0.17 * nz(v.x, v.y, v.z, 6) + 0.045 * ridge + 0.012 * nz(v.x, v.y, v.z, 60)) * (1 + 0.1 * sag) * (1 - 0.86 * neck);
+        let y = v.y * (h > 0 ? 0.78 + 0.75 * neck : 0.75);
+        if (y < -0.18) { r *= 1 + (-0.18 - y) * 0.9; y = -0.18 - (-0.18 - y) * 0.1; }   // the bottom squashed flat on the ground
+        p.setXYZ(i, v.x * r, y + 0.2, v.z * r);
+      }
+      g.deleteAttribute('uv'); g.computeVertexNormals();   // smooth: the creases are in the shape
+      // the knot: two flattened ears of plastic sticking up from the neck
+      const ears: THREE.BufferGeometry[] = [];
+      for (const s of [-1, 1]) { const e = new THREE.SphereGeometry(0.055, 10, 8); e.scale(0.7, 1.8, 0.3); e.rotateZ(s * (0.6 + 0.12 * Math.sin(seed))); e.translate(s * 0.04, 0.53, 0); e.deleteAttribute('uv'); ears.push(e); }
+      const knot = new THREE.SphereGeometry(0.036, 10, 8); knot.translate(0, 0.46, 0); knot.deleteAttribute('uv');
+      const m = mergeGeometries([g.toNonIndexed(), ...ears.map((e) => e.toNonIndexed()), knot.toNonIndexed()])!; [g, knot, ...ears].forEach((x) => x.dispose());
+      return m;
+    };
+    const bagMat = std({ color: '#19191b', roughness: 0.62, metalness: 0.02, envMapIntensity: 0.45 });
+    for (let k = 0; k < 3; k++) instanced(bagGeo(k * 2.7 + 1), bagMat, bags.filter((_, i) => i % 3 === k));
+    // (for tests and pictures: where the bags lie)
+    (globalThis as { __vxBags?: number[][] }).__vxBags = bags.map((m) => { const e = m.elements; return [+e[12].toFixed(2), +e[13].toFixed(2), +e[14].toFixed(2)]; });
     instanced(new THREE.BoxGeometry(1, 1, 1), std({ color: '#7a756e', roughness: 0.95 }), cards);
     instanced(new THREE.BoxGeometry(1.2, 0.14, 1.0), wood, pallets);
     instanced(new THREE.TorusGeometry(0.3, 0.11, 8, 16), rubber, tyres);

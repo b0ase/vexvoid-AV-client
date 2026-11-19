@@ -30,7 +30,7 @@ export type Writer = {
   twist: (a: number) => void;
   /** The head on the body, for tests: drift (m) of the head bone from its rest place in the chest's frame, the neck's
    *  and head's turn from rest (rad), and how much the head-to-neck distance has changed (m). */
-  head: (o?: { steady?: boolean }) => { drift: number; neck: number; head: number; gap: number; hood: number; worst: string; pts: number; wob: number };
+  head: (o?: { steady?: boolean; silhouette?: boolean; square?: boolean; pass2?: boolean }) => { drift: number; neck: number; head: number; gap: number; hood: number; worst: string; pts: number; wob: number; sil?: Silhouette };
   /** A landing: the body gives a little (k 0..1, how hard). */
   land: (k: number) => void;
   /** Hold still (painting): the standing clips stop breathing and swaying, so a raised can stays where it is aimed. */
@@ -69,7 +69,12 @@ export type Writer = {
 };
 
 const HEIGHT = 1.78;
-export type GripReport = { shown: boolean; pen: number; gap: number; wrap: number; n: number };
+/** The figure as seen from behind (pass 3): per 2 cm band of height above the soles, the widest the body reaches either
+ *  side of the hips' middle (half width, m) and how far back it reaches behind it (m); and from those the head's width
+ *  (the hood round the skull), the shoulders' width, the neck (the narrowest band between them) and the column (how far
+ *  down from the crown the figure stays no wider than 1.2 x the head: a "periscope" neck is a long column). Arms out. */
+export type Silhouette = { bands: [number, number, number][]; top: number; headW: number; shoulderW: number; neckW: number; ratio: number; column: number; shoulderDrop: number[] };
+export type GripReport = { shown: boolean; pen: number; gap: number; wrap: number; n: number; tilt?: number; fore?: number; palm?: number };
 // the spray can's body in its own frame (metres): radius and where the cylinder runs along its axis
 const CAN = { r: 0.033, y0: -0.165, y1: 0.025 };
 export type GaitInfo = { on: boolean; rest: number[]; clips: Record<string, { v: number; stride: number; lift?: number[]; zr?: number[] }>; speed: number; mix: string; bodyOff: number;
@@ -111,23 +116,32 @@ function weave(kind: Weave, per: number) {
 
 // the game's own materials for the model's named slots
 const LOOK: Record<string, () => THREE.Material> = {
-  // cotton and canvas: a soft sheen at grazing angles, the thing that makes cloth read as cloth
-  // the jacket is a technical shell: a tight ripstop with a sheen, so the street's rim lights draw its folds
-  Hoodie: () => new THREE.MeshPhysicalMaterial({ color: '#4a4b51', roughness: 0.6, metalness: 0, sheen: 0.9, sheenRoughness: 0.45, sheenColor: new THREE.Color('#a4a5ad'), normalScale: new THREE.Vector2(0.45, 0.45), ...weave('ripstop', 44) }),
-  Trousers: () => new THREE.MeshPhysicalMaterial({ color: '#5d5e64', roughness: 0.84, metalness: 0, sheen: 0.5, sheenRoughness: 0.65, sheenColor: new THREE.Color('#84848a'), normalScale: new THREE.Vector2(0.5, 0.5), ...weave('twill', 30) }),
-  Gloves: () => new THREE.MeshStandardMaterial({ color: '#34353a', roughness: 0.55, metalness: 0, normalScale: new THREE.Vector2(0.4, 0.4), ...weave('knit', 70) }),
-  Trim: () => new THREE.MeshStandardMaterial({ color: '#2a2b30', roughness: 0.9, metalness: 0, normalScale: new THREE.Vector2(0.8, 0.8), ...weave('knit', 60) }),
-  Shoes: () => new THREE.MeshStandardMaterial({ color: '#dcdcdf', roughness: 0.5, metalness: 0, emissive: '#141414' }),
-  Sole: () => new THREE.MeshStandardMaterial({ color: '#f1f1f1', roughness: 0.55, metalness: 0, emissive: '#1c1c1c' }),
+  // (pass 3, owner: "a real modern-AAA graffiti writer, not a grey clay figure"): each garment its own fabric and its
+  // own value in the black and white, so they separate: a black nylon shell with a slight sheen, the grey cotton hood of
+  // the hoodie under it, charcoal cargo twill, worn white trainers on grey rubber, a black pack with webbing.
+  // the jacket is a technical shell: a tight ripstop with a sheen, so the street's rim lights draw its folds and seams
+  Hoodie: () => new THREE.MeshPhysicalMaterial({ color: '#2a2b30', roughness: 0.46, metalness: 0, sheen: 0.7, sheenRoughness: 0.35, sheenColor: new THREE.Color('#8e9098'), normalScale: new THREE.Vector2(0.45, 0.45), ...weave('ripstop', 44) }),
+  // the hoodie under the shell: its hood is up and out over the jacket. Matte heather cotton, a lighter grey than the
+  // shell, so the hood reads as its own garment and the shoulders as the jacket's
+  Cotton: () => new THREE.MeshPhysicalMaterial({ color: '#7c7d82', roughness: 0.95, metalness: 0, sheen: 0.5, sheenRoughness: 0.85, sheenColor: new THREE.Color('#6c6d72'), normalScale: new THREE.Vector2(0.6, 0.6), ...weave('knit', 80) }),
+  // cargo twill: dead matte, darker than the hood, lighter than the shell
+  Trousers: () => new THREE.MeshPhysicalMaterial({ color: '#45464b', roughness: 0.88, metalness: 0, sheen: 0.4, sheenRoughness: 0.7, sheenColor: new THREE.Color('#77787e'), normalScale: new THREE.Vector2(0.5, 0.5), ...weave('twill', 30) }),
+  Gloves: () => new THREE.MeshStandardMaterial({ color: '#2d2e32', roughness: 0.6, metalness: 0, normalScale: new THREE.Vector2(0.4, 0.4), ...weave('knit', 70) }),
+  Trim: () => new THREE.MeshStandardMaterial({ color: '#202125', roughness: 0.92, metalness: 0, normalScale: new THREE.Vector2(0.8, 0.8), ...weave('knit', 60) }),
+  // worn trainers: an off-white upper gone matte with wear, grey rubber under it, white laces
+  Shoes: () => new THREE.MeshStandardMaterial({ color: '#cfcfd1', roughness: 0.66, metalness: 0, emissive: '#0d0d0d', normalScale: new THREE.Vector2(0.5, 0.5) }),
+  Sole: () => new THREE.MeshStandardMaterial({ color: '#b9b9bb', roughness: 0.82, metalness: 0, emissive: '#101010' }),
+  Lace: () => new THREE.MeshStandardMaterial({ color: '#e6e6e6', roughness: 0.85, metalness: 0, ...weave('twill', 400) }),
   Void: () => new THREE.MeshBasicMaterial({ color: '#000000' }),
   // the bandana is near-black: inside the hood there is only darkness (no faces, not even the suggestion of one)
   Mask: () => new THREE.MeshPhysicalMaterial({ color: '#0b0b0d', roughness: 0.95, metalness: 0, sheen: 0.25, sheenRoughness: 0.8, sheenColor: new THREE.Color('#2a2a2e') }),
-  Pack: () => new THREE.MeshStandardMaterial({ color: '#36373c', roughness: 0.5, metalness: 0.05, normalScale: new THREE.Vector2(0.45, 0.45), ...weave('ripstop', 24) }), // nylon, a little sheen
+  Pack: () => new THREE.MeshStandardMaterial({ color: '#1d1e22', roughness: 0.55, metalness: 0.05, normalScale: new THREE.Vector2(0.45, 0.45), ...weave('ripstop', 24) }), // nylon, a little sheen
   Can: () => new THREE.MeshStandardMaterial({ color: '#b8b8bc', roughness: 0.35, metalness: 0.8 }),
   Cap: () => new THREE.MeshStandardMaterial({ color: '#f2f2f2', roughness: 0.5, metalness: 0 }),
-  // reflective tape (the pack, the heels): it throws back whatever light finds it; and the dark hardware: zips, buckles, rubber
+  // reflective tape (the pack, the heels): it throws back whatever light finds it; and the dark hardware: zips, buckles,
+  // webbing, rubber
   Reflect: () => new THREE.MeshStandardMaterial({ color: '#e6e7ea', roughness: 0.32, metalness: 0.35, emissive: '#2c2c2e' }),
-  Detail: () => new THREE.MeshStandardMaterial({ color: '#17181b', roughness: 0.42, metalness: 0.15 }),
+  Detail: () => new THREE.MeshStandardMaterial({ color: '#141518', roughness: 0.5, metalness: 0.12 }),
 };
 
 // each file is fetched and parsed once (the cops are the same model on the same skeleton)
@@ -213,7 +227,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       if (src.normalMap && std.isMeshStandardMaterial) {
         const weave = std.normalMap; std.normalMap = src.normalMap; std.normalScale.copy(src.normalScale);
         const ph = mat as THREE.MeshPhysicalMaterial;
-        if (weave && ph.isMeshPhysicalMaterial && src.name === 'Hoodie') { ph.clearcoat = 0.16; ph.clearcoatRoughness = 0.5; ph.clearcoatNormalMap = weave; ph.clearcoatNormalScale.set(0.7, 0.7); }
+        if (weave && ph.isMeshPhysicalMaterial && src.name === 'Hoodie') { ph.clearcoat = 0.3; ph.clearcoatRoughness = 0.42; ph.clearcoatNormalMap = weave; ph.clearcoatNormalScale.set(0.7, 0.7); }
         std.needsUpdate = true;
       }
       const m = new THREE.SkinnedMesh(geo, mat); m.name = sm.name; m.userData.slot = src.name;
@@ -418,6 +432,28 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       }
     }
   }
+  // the silhouette from behind (for tests: see Silhouette). Every skinned vertex but the forearms, hands and fingers.
+  const armIdx = new Set(bones.map((b, i) => (/(ForeArm|Hand)/.test(b.name) ? i : -1)).filter((i) => i >= 0));
+  const silhouette = (): Silhouette => {
+    root.updateMatrixWorld(true); for (const m of meshes) m.skeleton?.update();
+    const inv = root.matrixWorld.clone().invert(), v = new THREE.Vector3(), hipsW = hips.getWorldPosition(new THREE.Vector3()).applyMatrix4(inv);
+    const N = 100, half = new Array(N).fill(0), back = new Array(N).fill(0); let top = 0;
+    for (const m of meshes) {
+      const si = m.geometry.attributes.skinIndex, sw = m.geometry.attributes.skinWeight, n = m.geometry.attributes.position.count;
+      for (let i = 0; i < n; i++) {
+        let bi = si.getX(i), bw = sw.getX(i); for (let c = 1; c < 4; c++) if (sw.getComponent(i, c) > bw) { bw = sw.getComponent(i, c); bi = si.getComponent(i, c); }
+        if (armIdx.has(bi)) continue;
+        m.getVertexPosition(i, v); v.applyMatrix4(m.matrixWorld).applyMatrix4(inv);
+        const k = Math.floor(v.y / 0.02); if (k < 0 || k >= N) continue; top = Math.max(top, v.y);
+        half[k] = Math.max(half[k], Math.abs(v.x - hipsW.x)); back[k] = Math.max(back[k], -(v.z - hipsW.z));
+      }
+    }
+    const at = (z0: number, z1: number, f: (a: number[]) => number) => f(half.slice(Math.max(0, Math.floor(z0 / 0.02)), Math.floor(z1 / 0.02) + 1).filter((x) => x > 0));
+    const headW = at(top - 0.16, top - 0.04, (a) => Math.max(...a)), shoulderW = at(top - 0.42, top - 0.28, (a) => Math.max(...a)), neckW = at(top - 0.28, top - 0.16, (a) => Math.min(...a));
+    let column = 0; for (let k = Math.floor(top / 0.02); k >= 0; k--) { if (half[k] > headW * 1.2) { column = top - (k + 1) * 0.02; break; } }
+    const r = (x: number) => Math.round(x * 1000) / 1000;
+    return { bands: half.map((h, k) => [r(k * 0.02), r(h), r(back[k])] as [number, number, number]).filter((b) => b[0] > top - 0.6 && b[1] > 0), top: r(top), headW: r(headW), shoulderW: r(shoulderW), neckW: r(neckW), ratio: r(shoulderW / headW), column: r(column), shoulderDrop: shoulderDrop.map(r) };
+  };
   let life = 0, lt = 0, frozen: number | null = null;
   // spraying: the right arm reaches for the wall (two-bone IK over whatever clip plays) with a can in the hand
   const rArm = B('RightArm'), rFore = B('RightForeArm'), rHand = B('RightHand'), spine2 = B('Spine2');
@@ -496,6 +532,39 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       break;
     }
   };
+  // ---- pass 3: arms placed against the chest (carrying the can at the ready; folded arms that rest on the chest) ----
+  // a point in the chest's frame, given in metres from the Spine2 joint as the model was built: left, up, forward
+  const bS2 = vx.bind?.[spine2.name] ? new THREE.Matrix4().fromArray(vx.bind[spine2.name]) : null, bS2i = bS2 ? bS2.clone().invert() : null;
+  const cP0 = new THREE.Vector3();
+  const chestPt = (left: number, up: number, fwd: number, out: THREE.Vector3) => {
+    if (!bS2 || !bS2i) return spine2.getWorldPosition(out);
+    out.setFromMatrixPosition(bS2).add(cP0.set(left, up, fwd).divideScalar(kS)).applyMatrix4(bS2i); return spine2.localToWorld(out);
+  };
+  const chestDir = (left: number, up: number, fwd: number, out: THREE.Vector3) => { const o = chestPt(0, 0, 0, new THREE.Vector3()); return chestPt(left, up, fwd, out).sub(o).normalize(); };
+  const aD = new THREE.Vector3(), aT = new THREE.Vector3();
+  /** Two-bone IK for an arm: the wrist toward `target`, the elbow bent toward `pole` (a direction), by weight w. */
+  const armTo = (sa: (typeof sideArms)[number], target: THREE.Vector3, pole: THREE.Vector3, w: number) => {
+    root.updateMatrixWorld(true);
+    sa.arm.getWorldPosition(iA); sa.fore.getWorldPosition(iB); sa.hand.getWorldPosition(iC);
+    const l1 = iA.distanceTo(iB), l2 = iB.distanceTo(iC);
+    aD.copy(target).sub(iA); const d = Math.max(0.05, Math.min(aD.length(), (l1 + l2) * 0.995)); aD.normalize();
+    const cosA = Math.max(-1, Math.min(1, (l1 * l1 + d * d - l2 * l2) / (2 * l1 * d))), sinA = Math.sqrt(1 - cosA * cosA);
+    iP.copy(pole).addScaledVector(aD, -pole.dot(aD)).normalize();
+    iE.copy(iA).addScaledVector(aD, l1 * cosA).addScaledVector(iP, l1 * sinA);
+    turn(sa.arm, aT.subVectors(iB, iA).normalize(), iE.sub(iA).normalize(), w);
+    sa.fore.getWorldPosition(iB); sa.hand.getWorldPosition(iC);
+    iE.copy(iA).addScaledVector(aD, d);
+    turn(sa.fore, aT.subVectors(iC, iB).normalize(), iE.sub(iB).normalize(), w);
+  };
+  // the can upright: the hand turns so the can's axis comes to the world's up, at most `max` (a wrist's range), by w
+  const qU = new THREE.Quaternion(), qI = new THREE.Quaternion();
+  const canUp = (w: number, max: number) => {
+    root.updateMatrixWorld(true); if (w < 1e-3 || !canAxis(cA, cU)) return;
+    qU.setFromUnitVectors(cU, UP); const a = 2 * Math.acos(Math.min(1, Math.abs(qU.w))); if (a < 1e-3) return;
+    qI.identity().slerp(qU, Math.min(1, max / a) * w); spin(rHand, qI);
+  };
+  let readyW = 0, foldW = 0, pass2 = false, sinceAim = 1;
+  const fT = new THREE.Vector3(), fP = new THREE.Vector3();
   // the spray arm: the hand turns so the can is upright with its nozzle at the wall, the wrist goes where that puts the
   // nozzle at the can's distance (kept outside the trunk), and of all the elbows that reach it the one that keeps the
   // arm out of the body and the wrist straightest (eased, so it never jumps)
@@ -529,8 +598,17 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
   // nozzle at the can's distance (kept outside the trunk), and of all the elbows that reach it the one that keeps the
   // arm out of the body and the wrist straightest (eased, so it never jumps)
   // where the wrist goes for a nozzle at N pointing at the wall point: the hand upright, the can its distance off
+  // the can upright while it points at the spot (pass 3, owner: held upright like a writer holds it): out of reach the
+  // nozzle sits back from the wall and pointing straight at the spot tipped the can 25-50 degrees; it tips at most
+  // MAX_PITCH (the paint goes where the reticle is either way)
+  const MAX_PITCH = 0.31, lkT = new THREE.Vector3();
+  const lookCan = (from: THREE.Vector3) => {
+    lkT.subVectors(aimAt, from); const hz = Math.hypot(lkT.x, lkT.z), lim = Math.tan(MAX_PITCH) * hz;
+    if (Math.abs(lkT.y) > lim) lkT.y = Math.sign(lkT.y) * lim;
+    return gQ.setFromRotationMatrix(gM.lookAt(lkT.add(from), from, UP));
+  };
   const wristFor = (N: THREE.Vector3) => {
-    gQ.setFromRotationMatrix(gM.lookAt(aimAt, N, UP)); gH.copy(gQ).multiply(gripInv);
+    gQ.setFromRotationMatrix(gM.lookAt(aimAt, N, UP));   // (the reach is planned with the can pointing right at the spot, as in pass 2; the hand's last turn tips it less) gH.copy(gQ).multiply(gripInv);
     wristT.copy(N).sub(tv2.copy(nozLocal).applyQuaternion(gQ));
     if (gripPos) wristT.sub(tv2.copy(gripPos).multiplyScalar(kS).applyQuaternion(gH));
     for (let i = 0; i < 2; i++) { const d = body.depth(wristT); const pen = d.pen + R_HAND + CLEAR; if (pen > 0) wristT.addScaledVector(d.dir, pen); }   // the fist never in the trunk
@@ -703,12 +781,39 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
     const a = shR.angleTo(shQ); if (a > STEADY.cap) { shR.slerp(shQ, STEADY.cap / a); shQ.copy(shR); }
     headB.quaternion.copy(shP.invert().multiply(shQ)); headB.updateMatrixWorld(true);
   };
+  // SQUARE SHOULDERS (pass 3, owner: from behind the neck looked "kinda... not right"): the library's clips shrug both
+  // collar bones, the arm joints riding 3-4 cm higher against the chest than the model was built, so the jacket's
+  // shoulders pushed up round the hood and sloped away. Each frame the collar bone turns back down until its arm joint
+  // is where the model has it (lowered only, never raised; the clip's own forward/back roll is kept).
+  const shoulderFix = (['Left', 'Right'] as const).map((s) => {
+    const sh = B(s + 'Shoulder'), armB = B(s + 'Arm'), b = vx.bind;
+    if (!b?.[spine2.name] || !b[armB.name] || !b[neckB.name]) return null;
+    const inv = new THREE.Matrix4().fromArray(b[spine2.name]).invert();
+    const arm = new THREE.Vector3().setFromMatrixPosition(new THREE.Matrix4().fromArray(b[armB.name])).applyMatrix4(inv);
+    const up = new THREE.Vector3().setFromMatrixPosition(new THREE.Matrix4().fromArray(b[neckB.name])).applyMatrix4(inv).normalize();
+    return { sh, armB, arm, up, h: arm.dot(up) };
+  });
+  const sqA = new THREE.Vector3(), sqS = new THREE.Vector3(), sqU = new THREE.Vector3(), sqT = new THREE.Vector3();
+  let shoulderDrop = [0, 0], squareOn = true;
+  const squareShoulders = () => {
+    if (!squareOn) return;
+    root.updateMatrixWorld(true);
+    shoulderFix.forEach((f, i) => {
+      if (!f) return;
+      f.armB.getWorldPosition(sqA); const loc = spine2.worldToLocal(sqT.copy(sqA)); const ex = loc.dot(f.up) - f.h;
+      shoulderDrop[i] = ex; if (ex < 0.002) return;
+      // the chest's up in the world, and the arm joint lowered along it by the excess (skeleton units to world: kS)
+      spine2.getWorldQuaternion(qb); sqU.copy(f.up).applyQuaternion(qb);
+      f.sh.getWorldPosition(sqS); sqT.copy(sqA).addScaledVector(sqU, -ex * kS * 0.75 * (1 - aimW));   // (not while the arm reaches for a wall: painting keeps pass 2's reach)
+      turn(f.sh, sqA.sub(sqS).normalize(), sqT.sub(sqS).normalize(), 1);
+    });
+  };
   let baseY = char.position.y;
   const iU = new THREE.Vector3(), qF = new THREE.Quaternion();
-  const legIK = (lg: { up: THREE.Bone; knee: THREE.Bone; foot: THREE.Bone }, lift: number) => {
+  const legIK = (lg: { up: THREE.Bone; knee: THREE.Bone; foot: THREE.Bone }, lift: number, dx = 0, dz = 0) => {
     lg.foot.getWorldQuaternion(qF);
     lg.up.getWorldPosition(iA); lg.knee.getWorldPosition(iB); lg.foot.getWorldPosition(iC);
-    iT.copy(iC); iT.y += lift;
+    iT.copy(iC); iT.y += lift; iT.x += dx; iT.z += dz;
     const l1 = iA.distanceTo(iB), l2 = iB.distanceTo(iC);
     iU.copy(iT).sub(iA); const d = Math.max(0.05, Math.min(iU.length(), (l1 + l2) * 0.999)); iU.normalize();
     const cosA = Math.max(-1, Math.min(1, (l1 * l1 + d * d - l2 * l2) / (2 * l1 * d))), sinA = Math.sqrt(1 - cosA * cosA);
@@ -721,6 +826,36 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
     // the foot keeps the way it was pointing
     lg.foot.parent!.getWorldQuaternion(qp); lg.foot.quaternion.copy(qp.invert().multiply(qF)); lg.foot.updateMatrixWorld(true);
   };
+  // FOOT LOCK (pass 3: the planted foot slid 1.4-1.7 m/s at a sprint). A sole point that touches the ground is pinned
+  // there; while any pinned point is still down, the leg reaches (IK) so they stay where they landed. Points that lift
+  // (the heel as the foot rolls) let go and points that come down (the ball, the toe) pin where they land, so the lock
+  // follows the heel-to-toe roll. Off the ground the correction eases away through the swing.
+  const LOCK = { on: true, max: 0.22, down: 0.03 };   // (down: a point is pinned from 3 cm above the ground, so it comes straight down onto its spot)
+  const locks = [0, 1].map(() => ({ on: false, anc: [] as (THREE.Vector3 | null)[], off: new THREE.Vector3(), d: new THREE.Vector3() }));
+  const footLock = (dt: number) => {
+    const live = LOCK.on && !!ground && onGround && locoOn && locoS > 0.25;
+    for (const side of [0, 1]) {
+      const L = locks[side], S = soles[side]; let n = 0, down = 0; L.d.set(0, 0, 0);
+      const isDown = (q: SP) => q.w.y - ground!(q.w.x, q.w.z) <= LOCK.down;
+      // first the correction that keeps the points already pinned where they are, then the points just come down are
+      // pinned where that correction puts them (pinning them with last frame's correction dragged the foot next frame)
+      if (live) for (let i = 0; i < S.length; i++) {
+        const q = S[i]; if (!isDown(q)) { L.anc[i] = null; continue; }
+        down++; if (!L.on || !L.anc[i]) continue;
+        L.d.x += L.anc[i]!.x - q.w.x; L.d.z += L.anc[i]!.z - q.w.z; n++;
+      }
+      if (!live || !down) { L.on = false; L.anc.length = 0; L.off.multiplyScalar(Math.exp(-dt * 18)); }
+      else {
+        if (n) L.off.set(L.d.x / n, 0, L.d.z / n);
+        for (let i = 0; i < S.length; i++) if (isDown(S[i]) && (!L.on || !L.anc[i])) { L.anc[i] = S[i].w.clone().add(L.off); L.anc[i]!.y = 0; }
+        L.on = true;
+        if (L.off.length() > LOCK.max) { L.on = false; L.anc.length = 0; L.off.setLength(LOCK.max); }   // too far to hold: let go
+      }
+      if (L.off.lengthSq() > 1e-8) { legIK(legs[side], 0, L.off.x, L.off.z); soleNow(); }
+      lockInfo[side] = [L.on ? 1 : 0, +L.off.length().toFixed(3), down, n];
+    }
+  };
+  const lockInfo: number[][] = [[], []];
   const lowest = (side: number) => { let lo = Infinity, x = 0, z = 0; for (const q of soles[side]) if (q.w.y < lo) { lo = q.w.y; x = q.w.x; z = q.w.z; } return { y: lo, x, z }; };
   const fitFeet = (dt: number) => {
     char.position.y = baseY;   // measured from the pose as animated, so the offset is absolute
@@ -782,6 +917,8 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
     twist: (a) => { twistA = a; },
     head: (o) => {
       if (o && o.steady != null) STEADY.on = !!o.steady;
+      if (o && o.square != null) squareOn = !!o.square;   // (tests: the clips' shrug as it was, for a before/after)
+      if (o && o.pass2 != null) { pass2 = !!o.pass2; squareOn = !pass2; LOCK.on = !pass2; }   // (tests: every pass 3 layer off: shrug, carry, upright can, folded arms, foot lock)
       root.updateMatrixWorld(true);
       const hp = headB.getWorldPosition(hdV[0]), np = neckB.getWorldPosition(hdV[1]), rest = spine2.localToWorld(hdV[2].copy(headRest.inChest));
       const ang = (q: THREE.Quaternion) => 2 * Math.acos(Math.min(1, Math.abs(q.w)));
@@ -792,7 +929,9 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       // the head's turn against the body since the last call (a wobble shows as big changes, frame to frame)
       const hr = root.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(headB.getWorldQuaternion(new THREE.Quaternion()));
       const wob = lastHR ? lastHR.angleTo(hr) : 0; lastHR = hr;
-      return { drift, neck: ang(neckB.quaternion), head: ang(headB.quaternion), gap, hood, worst, pts: hoodPts.length, wob };
+      const out: ReturnType<Writer['head']> = { drift, neck: ang(neckB.quaternion), head: ang(headB.quaternion), gap, hood, worst, pts: hoodPts.length, wob };
+      if (o?.silhouette) out.sil = silhouette();
+      return out;
     },
     land: (k) => { dip = Math.min(dip, -0.09 * Math.max(0, Math.min(1, k))); },
     grounded: (on) => { onGround = on; },
@@ -806,7 +945,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       return out;
     },
     arms: () => { root.updateMatrixWorld(true); return body.measure(); },
-    ik: () => ikInfo,
+    ik: () => ({ ...ikInfo, lock: lockInfo as unknown as number }),
     far: (side) => { root.updateMatrixWorld(true); const r = body.far(side); r.info += ` | bind hits ${bones.filter((b) => vx.bind?.[b.name]).length}/${bones.length} e.g. ${bones[9]?.name} keys ${Object.keys(vx.bind || {}).slice(8, 10)}`; return r; },
     freeze: (t) => { frozen = t; },
     bonePos: (name, out) => { const b = bones.find((x) => x.name.replace(/^mixamorig:?/, '') === name); return b ? b.getWorldPosition(out) : null; },
@@ -821,7 +960,12 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
         gap = Math.min(gap, inY ? Math.max(0, rho - CAN.r) : Math.hypot(Math.max(0, rho - CAN.r), v.y < CAN.y0 ? CAN.y0 - v.y : v.y - CAN.y1));
         if (inY && Math.abs(rho - CAN.r) < 0.008) bins.add(Math.floor(((Math.atan2(v.x, v.z) + Math.PI) / (2 * Math.PI)) * 24) % 24);
       }
-      o.gap = gap === Infinity ? 0 : gap; o.wrap = bins.size / 24; return o;
+      o.gap = gap === Infinity ? 0 : gap; o.wrap = bins.size / 24;
+      // (pass 3) how upright the can stands: its axis from the world's up (degrees), and from the forearm (a spray grip
+      // holds it across the forearm, about 90)
+      const ax = new THREE.Vector3(0, 1, 0).applyQuaternion(can.quaternion), fa = rHand.getWorldPosition(new THREE.Vector3()).sub(rFore.getWorldPosition(new THREE.Vector3())).normalize();
+      o.tilt = Math.round(THREE.MathUtils.radToDeg(ax.angleTo(UP)) * 10) / 10; o.fore = Math.round(THREE.MathUtils.radToDeg(ax.angleTo(fa)) * 10) / 10;
+      return o;
     },
     aim: (nozzle, at, weight = 1, pressing = false) => {
       aimOn = !!nozzle; pressOn = !!pressing; if (nozzle) { aimHand.copy(nozzle); aimAt.copy(at || nozzle); aimTo = weight; }
@@ -846,23 +990,54 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
         neckB.rotateY(look * 0.18 * life); headB.rotateY(look * 0.22 * life); headB.rotateX((Math.sin(lt * 0.37) * 0.06 + 0.03) * life);
       }
       steadyHead(dt);
-      if (ground) { if (feetOn) fitFeet(dt); else soleNow(); measure(dt); }
+      squareShoulders();
+      if (ground) { if (feetOn) { fitFeet(dt); footLock(dt); } else soleNow(); measure(dt); }
       aimW += ((aimOn ? aimTo : 0) - aimW) * Math.min(1, dt * 9);
       carryW += ((carryOn ? 1 : 0) - carryW) * Math.min(1, dt * 10);
       // the arms out of the trunk as the clip has them (both), then the spray arm reaches for the wall over that
       if (armsFix) { if (!(aimW > 0.99)) pushOut(sideArms[1]); pushOut(sideArms[0]); }
+      // CARRYING THE CAN LIKE A WRITER (pass 3, owner: "upright in the palm, index finger on the actuator", not a baton).
+      // The can lies across the fist (pinky to index), so with the arm hanging as the clips have it, it pointed forward
+      // flat. Standing, the forearm comes up and forward (the can at the ready, the index finger resting on its top);
+      // moving, the wrist turns the can toward upright as far as a wrist goes.
+      sinceAim = aimOn || steadyOn ? 0 : sinceAim + dt;   // (the can just off a wall is not yet carried: the reach blends out first)
+      const idleNow = !pass2 && sinceAim > 0.6 && (locoOn ? locoS < 0.7 : /^(Idle_Loop|Crouch_Idle_Loop)$/.test(curName));
+      readyW += ((carryOn && idleNow ? 1 : 0) - readyW) * Math.min(1, dt * 5);
+      // FOLDED ARMS (pass 3, owner: they hovered in front of the chest; the longer arms reach past where the clip folds
+      // them): each forearm laid across the chest, the right one tucked under the left, the elbows by the sides
+      foldW += ((!pass2 && !aimOn && !locoOn && curName === 'Idle_FoldArms_Loop' ? 1 : 0) - foldW) * Math.min(1, dt * 4);
+      if (readyW * (1 - foldW) > 0.01) {   // the wrist below the shoulder and in front of it: the elbow bent about 100 degrees, by the side
+        const ck = locoOn ? crouchW : /Crouch/.test(curName) ? 1 : 0;   // crouched, the can comes forward of the knee
+        // (in a level frame: the chest's heading and the world's up, so a crouch's forward lean doesn't point the forearm down)
+        rArm.getWorldPosition(fT); fT.addScaledVector(chestDir(1, 0, 0, fP).setY(0).normalize(), -0.14 - 0.02 * ck).addScaledVector(UP, -0.37 + 0.09 * ck).addScaledVector(chestDir(0, 0, 1, fP).setY(0).normalize(), 0.31 + 0.08 * ck);
+        const lvL = chestDir(1, 0, 0, aT).setY(0).normalize(), lvF = chestDir(0, 0, 1, fP).setY(0).normalize();   // (the elbow back, down and out, level too)
+        fP.multiplyScalar(-0.8).addScaledVector(lvL, -0.45).addScaledVector(UP, -0.35).normalize();
+        armTo(sideArms[1], fT, fP, readyW * (1 - foldW) * (1 - aimW));
+        if (armsFix) pushOut(sideArms[1], false, 4);   // the fist and the can clear of the hip
+      }
+      if (foldW > 0.01) {
+        // (left, up, forward from the chest joint, metres): the elbow by the ribs, the wrist across at the other side
+        for (const [sa, e, w] of [[sideArms[0], [0.285, -0.05, 0.18], [-0.06, 0.0, 0.29]], [sideArms[1], [-0.285, -0.08, 0.16], [0.0, -0.04, 0.24]]] as const) {
+          chestPt(e[0], e[1], e[2], fP); chestPt(w[0], w[1], w[2], fT); sa.arm.getWorldPosition(aT);
+          armTo(sa, fT, fP.sub(aT.add(fT).multiplyScalar(0.5)).normalize(), foldW);
+          // the upper arm out of the ribs, then the forearm laid back across to its wrist (pushing the whole arm out
+          // would unfold it), then the forearm out of the chest
+          if (armsFix) { pushOut(sa, true, 3); sa.fore.getWorldPosition(iB); sa.hand.getWorldPosition(iC); turn(sa.fore, aT.subVectors(iC, iB).normalize(), fP.subVectors(fT, iB).normalize(), foldW); pushOut(sa, false, 3); }
+        }
+      }
+      if (!pass2 && carryW > 0.5 && aimW < 0.99) canUp((1 - aimW) * carryW, 0.5 + 0.3 * Math.max(readyW, foldW));
       if (aimW > 0.01) {
         ik(aimW, dt);
         // whatever the reach could not avoid, the arm is pushed out of the trunk like a clip's arm; then the hand turns
         // back so the can points at the spot from where it is
         if (armsFix) {
           pushOut(sideArms[1], true, 10);
-          if (gripPos) { rHand.getWorldPosition(tv2); rHand.getWorldQuaternion(qb); tv3.copy(gripPos).multiplyScalar(kS).applyQuaternion(qb).add(tv2); gQ.setFromRotationMatrix(gM.lookAt(aimAt, tv3, UP)); gH.copy(gQ).multiply(gripInv); rHand.parent!.getWorldQuaternion(qp); qb.copy(qp).invert().multiply(gH); rHand.quaternion.slerp(qb, aimW); rHand.updateMatrixWorld(true); }
+          if (gripPos) { rHand.getWorldPosition(tv2); rHand.getWorldQuaternion(qb); tv3.copy(gripPos).multiplyScalar(kS).applyQuaternion(qb).add(tv2); lookCan(tv3); gH.copy(gQ).multiply(gripInv); rHand.parent!.getWorldQuaternion(qp); qb.copy(qp).invert().multiply(gH); rHand.quaternion.slerp(qb, aimW); rHand.updateMatrixWorld(true); }
         }
       } else { swivel = NaN; reachTw = 0; reachPull = 0; reachSw = 0; ikBest = null; }
       // the fingers: relaxed; the right hand closed round its can; the index finger up on the actuator while the can is
       // up at a wall, pressing while it sprays
-      pressW += ((aimW > 0.3 && carryW > 0.5 ? (pressOn ? 1 : 0.88) : 0) - pressW) * Math.min(1, dt * 14);
+      pressW += ((aimW > 0.3 && carryW > 0.5 ? (pressOn ? 1 : 0.88) : carryW > 0.5 ? 0.82 * readyW : 0) - pressW) * Math.min(1, dt * 14);
       for (const f of fingers) { f.b.quaternion.copy(f.relax); if (f.right) { f.b.quaternion.slerp(f.grip, carryW); if (f.index && pressW > 0.001) f.b.quaternion.slerp(f.press, pressW); } }
       // the can rides the hand's grip socket: wherever the hand goes, it goes
       can.visible = carryOn ? carryW > 0.5 : aimW > 0.3;
