@@ -28,6 +28,8 @@
   var P5 = root.p5 || (typeof require === 'function' ? (function () {
     try { return require(require('path').join(__dirname, 'vx', 'lib', 'p5.min.js')); } catch (e) { return null; }
   })() : null);
+  // the web studio loads p5 with a <script> after this file (vx/platform.js), so look again when it is needed
+  function lib() { return P5 || (P5 = root.p5 || null); }
 
   var signals = { bpm: 120, level: 0, bass: 0, mid: 0, high: 0, kick: false, kickAt: 0, beat0: performance.now(), external: false };
 
@@ -46,7 +48,7 @@
 
   function mount(host, code, opts) {
     opts = opts || {};
-    if (!P5) throw new Error('p5 is not loaded');
+    if (!lib()) throw new Error('p5 is not loaded');
     var factory = compile(code);
     var scale = opts.scale || 1;
     var seed = opts.seed != null ? opts.seed : Math.floor(Math.random() * 1e9);
@@ -214,5 +216,5 @@
     tap: function () { var now = performance.now(), t = root.VXGEN._taps = (root.VXGEN._taps || []).filter(function (x) { return now - x < 3000; }); t.push(now);
       if (t.length > 1) { var dt = (t[t.length - 1] - t[0]) / (t.length - 1); signals.bpm = Math.round(60000 / dt); } signals.beat0 = now; return signals.bpm; },
     analyser: function () { return audio.an; },
-    ready: !!P5 };
+    get ready() { return !!lib(); } };
 })(typeof window !== 'undefined' ? window : this);

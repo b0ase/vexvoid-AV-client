@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="./vx/platform.js" data-role="controls"></script>
   <title>V3XV0ID Image Animator - Controls</title>
   <style>
     /* ========== V3XV0ID DESIGN SYSTEM ========== */
@@ -2098,6 +2099,32 @@
     .gen-targets{max-height:140px;overflow:auto;font-size:11px}
     .gen-targets .target-layer-item{display:flex;gap:6px;align-items:center;padding:3px 0}
 </style>
+  <style>
+    /* ===== web studio (vexvoid.com/studio): Studio 1 tools only; the rest is in the desktop app (vx/platform.js) ===== */
+    html.vx-web [data-desktop] { display: none !important; }
+    html:not(.vx-web) [data-web] { display: none !important; }
+    #outputLive.vx-out-frame { display: block; position: relative; overflow: hidden; pointer-events: auto; z-index: 2; }
+    #vxOutputFrame { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; border: 0; transform-origin: 0 0; background: #000; pointer-events: none; }
+    #vxOutputFrame:fullscreen { transform: none !important; width: 100vw !important; height: 100vh !important; }
+    .vx-out-away { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 12px; background: #000; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em; color: rgba(255,255,255,.6); }
+    .vx-out-away b { color: #fff; font-size: 12px; letter-spacing: 0.2em; }
+    .vx-out-away button { margin-top: 6px; background: #fff; color: #000; border: 0; padding: 7px 12px; font: 600 10px var(--font-mono); letter-spacing: 0.15em; cursor: pointer; }
+    /* STORE */
+    #storeTab .store { padding: 24px 28px; max-width: 1800px; }
+    .store-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+    .store-title { font-family: var(--font-sans); font-weight: 800; font-size: 28px; letter-spacing: 0.3em; color: #fff; }
+    .store-sub { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.2em; color: rgba(255,255,255,.55); margin-top: 6px; }
+    .store-head .gen-btn { text-decoration: none; }
+    .store-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+    .store-card { border: 1px solid rgba(255,255,255,.18); background: #050505; display: flex; flex-direction: column; }
+    .store-card img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; background: #111; display: block; filter: grayscale(1); }
+    .store-card .store-meta { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 6px; }
+    .store-card .store-name { font-family: var(--font-sans); font-weight: 700; font-size: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: #fff; }
+    .store-card .store-code { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.15em; color: rgba(255,255,255,.55); display: flex; justify-content: space-between; gap: 8px; }
+    .store-card .store-state { border: 1px solid rgba(255,255,255,.5); padding: 1px 6px; color: #fff; }
+    .store-card .gen-btn { text-decoration: none; text-align: center; margin-top: 4px; }
+    .store-note { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; color: rgba(255,255,255,.5); margin-top: 18px; line-height: 1.6; }
+  </style>
   <link rel="stylesheet" href="./vx/fonts/fonts.css">
 </head>
 <body>
@@ -2105,10 +2132,12 @@
   <div class="v3xv0id-header">
     <div class="v3xv0id-brand">V3XV0ID</div>
     <div class="v3xv0id-subtitle">AV MIXER</div>
-    <button id="recChip" class="midi-chip" title="Record the output and the music to a video file">REC</button>
-    <button id="liveChip" class="midi-chip" title="Stream the output, pay per view">GO LIVE</button>
-    <button id="bwxChip" class="midi-chip bwx-chip">CONNECT bWALLETX</button>
-    <button id="claudeChip" class="midi-chip" title="Control this mixer from claude.ai">CLAUDE.AI</button>
+    <button id="recChip" class="midi-chip" data-desktop title="Record the output and the music to a video file">REC</button>
+    <button id="liveChip" class="midi-chip" data-desktop title="Stream the output, pay per view">GO LIVE</button>
+    <button id="bwxChip" class="midi-chip bwx-chip" data-desktop>CONNECT bWALLETX</button>
+    <button id="claudeChip" class="midi-chip" data-desktop title="Control this mixer from claude.ai">CLAUDE.AI</button>
+    <button id="outFullChip" class="midi-chip" data-web title="Put the output on the whole screen (Esc leaves)">FULLSCREEN</button>
+    <button id="outPopChip" class="midi-chip" data-web title="Move the output to its own window, for a second screen or a projector">OUTPUT WINDOW</button>
     <button id="midiChip" class="midi-chip" title="MIDI controller mapping">MIDI · …</button>
   </div>
   <div id="livePanel" class="midi-panel" style="display:none">
@@ -2144,20 +2173,21 @@
 
   <!-- Tab Navigation -->
   <div class="tab-navigation">
-    <button class="tab-button active" data-tab="ai">AI</button>
-    <button class="tab-button" data-tab="jobs">JOBS</button>
+    <button class="tab-button active" data-tab="ai" data-desktop>AI</button>
+    <button class="tab-button" data-tab="jobs" data-desktop>JOBS</button>
     <button class="tab-button" data-tab="layers">MIXING DESK</button>
     <button class="tab-button" data-tab="patterns">PATTERNS</button>
     <button class="tab-button" data-tab="music">MUSIC</button>
     <button class="tab-button" data-tab="videos">VIDEOS</button>
     <button class="tab-button" data-tab="images">IMAGES</button>
-    <button class="tab-button" data-tab="composer">COMPOSER</button>
-    <button class="tab-button" data-tab="edit">EDIT</button>
+    <button class="tab-button" data-tab="composer" data-desktop>COMPOSER</button>
+    <button class="tab-button" data-tab="edit" data-desktop>EDIT</button>
     <button class="tab-button" data-tab="titles">TITLES</button>
-    <button class="tab-button" data-tab="game">GAME</button>
-    <button class="tab-button" data-tab="wallet">WALLET</button>
-    <button class="tab-button" data-tab="market">MARKET</button>
-    <button class="tab-button" data-tab="code">CODE</button>
+    <button class="tab-button" data-tab="game" data-desktop>GAME</button>
+    <button class="tab-button" data-tab="wallet" data-desktop>WALLET</button>
+    <button class="tab-button" data-tab="market" data-desktop>MARKET</button>
+    <button class="tab-button" data-tab="store">STORE</button>
+    <button class="tab-button" data-tab="code" data-desktop>CODE</button>
     <button class="tab-button vexvoid-tab" data-tab="vexvoid">VEXVOID</button>
   </div>
   
@@ -2414,7 +2444,7 @@
       <div class="global-controls">
         <button class="global-btn resume" id="playPauseBtn">PAUSE ALL</button>
         <button class="global-btn" id="setBackgroundBtn">SET BACKGROUND</button>
-        <button class="global-btn" id="recordBtn" style="border-color: var(--white-30);">● REC</button>
+        <button class="global-btn" id="recordBtn" data-desktop style="border-color: var(--white-30);">● REC</button>
         <div id="recordStatus" style="font-size:9px;color:var(--white-30);text-align:center;margin-top:2px;letter-spacing:0.1em;display:none;"></div>
       </div>
     </div>
@@ -2468,10 +2498,10 @@
           <div class="gen-col">
             <div class="gen-h">LIBRARY <span class="dim" id="genLibCount"></span></div>
             <div id="patternPresets" class="gen-lib"></div>
-            <div class="gen-h">PROMPT → SKETCH <span class="dim">CLAUDE</span></div>
-            <textarea id="genPrompt" class="gen-prompt" rows="3" placeholder="e.g. a slow monochrome lattice that folds on every kick, thin lines, lots of black"></textarea>
-            <div class="gen-row"><button id="genAskBtn" class="gen-btn wide">WRITE SKETCH</button></div>
-            <div id="genAskNote" class="gen-note"></div>
+            <div class="gen-h" data-desktop>PROMPT → SKETCH <span class="dim">CLAUDE</span></div>
+            <textarea id="genPrompt" class="gen-prompt" data-desktop rows="3" placeholder="e.g. a slow monochrome lattice that folds on every kick, thin lines, lots of black"></textarea>
+            <div class="gen-row" data-desktop><button id="genAskBtn" class="gen-btn wide">WRITE SKETCH</button></div>
+            <div id="genAskNote" class="gen-note" data-desktop></div>
           </div>
 
           <div class="gen-col mid">
@@ -2617,7 +2647,7 @@
 
     <!-- Images Tab Content -->
     <div class="tab-content" id="imagesTab">
-      <div class="grok">
+      <div class="grok" data-desktop>
         <div class="gen-h">GROK IMAGINE <span class="dim" id="grokSpend">xAI · paid per generation</span></div>
         <div class="grok-row">
           <textarea id="grokPrompt" class="gen-prompt" rows="2" placeholder="e.g. a brutalist stairwell, one hard shaft of light, rain on the window"></textarea>
@@ -2805,7 +2835,7 @@
         <div class="ti-right">
           <div class="ti-view" id="tiView"></div>
           <div class="ti-knobs" id="tiKnobs"></div>
-          <div class="ti-acts"><button class="gen-btn hot" id="tiA">ADD TO A</button><button class="gen-btn hot" id="tiB">ADD TO B</button><button class="gen-btn" id="tiCode" title="Open the layer as code in PATTERNS, to change it by hand">OPEN IN PATTERNS</button><button class="gen-btn" id="tiEdit" title="Put this title on the EDIT timeline (T1) at the playhead, two bars long; it goes into the exported video">TO EDIT</button></div>
+          <div class="ti-acts"><button class="gen-btn hot" id="tiA">ADD TO A</button><button class="gen-btn hot" id="tiB">ADD TO B</button><button class="gen-btn" id="tiCode" title="Open the layer as code in PATTERNS, to change it by hand">OPEN IN PATTERNS</button><button class="gen-btn" id="tiEdit" data-desktop title="Put this title on the EDIT timeline (T1) at the playhead, two bars long; it goes into the exported video">TO EDIT</button></div>
           <div class="ti-note" id="tiNote">A text layer sits over the deck's other layers. Its knobs stay live on the deck.</div>
         </div>
       </div>
@@ -2859,6 +2889,18 @@
     </div>
 
     <!-- VEXVOID: the preset gallery. Every animation, live on hover, onto a deck in one click; or ask VexVoid. -->
+    <!-- STORE: V3XV0ID merch WE sell (vexvoid.com/store). Not the MARKET, where players trade. No checkout in the mixer. -->
+    <div class="tab-content" id="storeTab">
+      <div class="store">
+        <div class="store-head">
+          <div><div class="store-title">STORE</div><div class="store-sub" id="storeSub">V3XV0ID MERCH · FROM THE RECORD ART</div></div>
+          <a class="gen-btn" id="storeSite" href="https://www.vexvoid.com/store" target="_blank" rel="noopener">VEXVOID.COM/STORE</a>
+        </div>
+        <div class="store-grid" id="storeGrid"></div>
+        <div class="store-note" id="storeNote">Loading the range…</div>
+      </div>
+    </div>
+
     <div class="tab-content" id="vexvoidTab">
       <div class="pg">
         <div class="pg-hero" id="pgHero" title="VEXVOID"><div class="pg-hero-bg" id="pgHeroBg"></div><div class="pg-hero-fg" id="pgHeroFg"></div><div class="pg-hero-sub">URBAN VISUAL ENGINE</div></div>
@@ -2874,10 +2916,11 @@
 
   <script>
     window.addEventListener('DOMContentLoaded', function() {
-      const { ipcRenderer } = require('electron');
-      const { dialog } = require('@electron/remote');
-      const fs = require('fs');
-      const path = require('path');
+      // Electron and Node go through the platform layer (vx/platform.js): the real modules in the app, stand-ins on the web
+      const ipcRenderer = VXP.ipc;
+      const { dialog } = VXP;
+      const fs = VXP.fs;
+      const path = VXP.path;
       
       // State variables
       let layersA = []; // Palette A layers
@@ -3097,7 +3140,7 @@
       function seqThumb(file) {
         let el = seqThumbs.get(file);
         if (el) return el;
-        const src = 'file://' + encodeURI(file);
+        const src = VXP.fileUrl(file);
         if (/\.(mp4|mov|avi|webm|mkv|m4v)$/i.test(file)) {
           el = document.createElement('video'); el.muted = true; el.preload = 'metadata'; el.src = src + '#t=0.5';
           el.addEventListener('mouseenter', () => { el.loop = true; el.play().catch(() => {}); });
@@ -3423,7 +3466,7 @@
             : `${items.length} ${tab.toLowerCase()}. Click one to load it.`;
           items.slice(0, 400).forEach(i => {
             const card = document.createElement('div'); card.className = 'video-item';
-            const local = i.source === 'local', src = local ? 'file://' + encodeURI(i.url) : i.url;
+            const local = i.source === 'local', src = local ? VXP.fileUrl(i.url) : i.url;
             let t;
             if (i.video) { t = document.createElement('video'); t.className = 'media-thumb'; t.muted = true; t.playsInline = true; t.loop = true;
               // ORDFS sends whole files, so wallet videos load on hover; storage clips can fetch just the first frame
@@ -3474,7 +3517,7 @@
 
       async function loadCompositionToLayer(layerId, compFilePath) {
         try {
-          const fs = require('fs');
+          const fs = VXP.fs;
           const compData = JSON.parse(fs.readFileSync(compFilePath, 'utf8'));
           
           if (compData.type === 'v3xv0id-composition' && compData.metadata?.patternType === 'p5js') {
@@ -4063,8 +4106,8 @@
 
             if (!result.canceled && result.filePath) {
               const buffer = Buffer.from(await blob.arrayBuffer());
-              require('fs').writeFileSync(result.filePath, buffer);
-              recordStatus.textContent = `SAVED: ${require('path').basename(result.filePath)}`;
+              VXP.fs.writeFileSync(result.filePath, buffer);
+              recordStatus.textContent = `SAVED: ${VXP.path.basename(result.filePath)}`;
               setTimeout(() => { recordStatus.style.display = 'none'; }, 4000);
             } else {
               recordStatus.textContent = 'CANCELLED';
@@ -4358,10 +4401,11 @@
 
       // ===== Videos + Images tabs: the V3XV0ID catalogue (vx/catalogue.json) plus local files =====
       // Remote media is copied into a local cache before it goes to the output, so a set keeps running offline.
-      const mediaCacheDir = require('path').join(require('@electron/remote').app.getPath('userData'), 'media-cache');
+      const mediaCacheDir = VXP.path.join(VXP.dir('userData'), 'media-cache');
       async function cacheMedia(item) {
         if (item.source === 'local') return item.url;
-        const fs = require('fs'), path = require('path');
+        if (VXP.web) return item.url; // the web streams it from its address (the browser caches it)
+        const fs = VXP.fs, path = VXP.path;
         const slug = String(item.name || 'media').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'media';
         const base = path.join(mediaCacheDir, slug + '-' + require('crypto').createHash('sha1').update(item.url).digest('hex').slice(0, 8));
         let ext = (item.url.split('?')[0].match(/\/[^/]*(\.[a-z0-9]{2,5})$/i) || [])[1];
@@ -4380,7 +4424,7 @@
         return file;
       }
       function catalogue() {
-        try { return JSON.parse(require('fs').readFileSync(require('path').join(__dirname, 'vx', 'catalogue.json'), 'utf8')); }
+        try { return JSON.parse(VXP.fs.readFileSync(VXP.path.join(VXP.appDir, 'vx', 'catalogue.json'), 'utf8')); }
         catch (e) { return { clips: [], images: [] }; }
       }
       // Load into a new layer on the given deck (the deck showing now if none is given)
@@ -4409,7 +4453,8 @@
       async function initializeVideosTab() {
         const local = videoLibrary.filter(v => v.source === 'local' && !/^GROK · /.test(v.name));
         const mine = walletMedia('clip').map(i => ({ name: 'WALLET · ' + i.name, url: i.url, format: (i.contentType.split('/')[1] || 'VIDEO').toUpperCase(), source: 'wallet', origin: i.origin }));
-        videoLibrary = mine.concat(typeof recordedFiles === 'function' ? recordedFiles() : [], grokFiles('video'), catalogue().clips.map(c => ({ name: c.name, url: c.url, format: 'MP4', source: c.set || 'smooth' })), local);
+        const kept = VXP.uploads('videos').filter(u => !local.some(v => v.url === u.url));
+        videoLibrary = mine.concat(typeof recordedFiles === 'function' ? recordedFiles() : [], grokFiles('video'), kept, catalogue().clips.map(c => ({ name: c.name, url: c.url, format: 'MP4', source: c.set || 'smooth' })), local);
         videoLibrary.forEach((v, i) => { v.id = i; });
         document.getElementById('videoCloudStatus').textContent = `● V3XV0ID CLIPS · ${videoLibrary.length - mine.length}` + (mine.length ? ` · YOUR WALLET · ${mine.length}` : '');
         renderVideoLibrary();
@@ -4422,7 +4467,7 @@
           item.className = 'video-item';
           const thumb = document.createElement('video');
           thumb.className = 'media-thumb'; thumb.muted = true; thumb.preload = 'metadata'; thumb.playsInline = true;
-          thumb.src = (video.source === 'local' ? 'file://' + encodeURI(video.url) : video.url) + '#t=1';
+          thumb.src = (video.source === 'local' ? VXP.fileUrl(video.url) : video.url) + '#t=1';
           item.addEventListener('mouseenter', () => thumb.play().catch(() => {}));
           item.addEventListener('mouseleave', () => thumb.pause());
           const name = document.createElement('div');
@@ -4436,7 +4481,7 @@
         selectedVideo = video;
         document.getElementById('videoPreviewTitle').textContent = video.name;
         document.getElementById('videoPreviewDetails').textContent = `${video.format} · ${String(video.source).toUpperCase()}`;
-        videoPreviewSource.src = video.source === 'local' ? 'file://' + encodeURI(video.url) : video.url;
+        videoPreviewSource.src = video.source === 'local' ? VXP.fileUrl(video.url) : video.url;
         videoPreviewPlayer.load();
         videoPreviewPlayer.play().catch(() => {});
         videoPreviewPanel.style.display = 'block';
@@ -4452,7 +4497,7 @@
           const file = await cacheMedia(item);
           const ext = (file.match(/\.[a-z0-9]+$/i) || [''])[0].toLowerCase(), type = MEDIA_TYPES[ext];
           if (!type) throw new Error('unsupported file type ' + ext);
-          const data = new Uint8Array(require('fs').readFileSync(file));
+          const data = new Uint8Array(VXP.fs.readFileSync(file));
           if (data.length > VXMINT.MAX_MEDIA_BYTES) throw new Error(`${(data.length / 1048576).toFixed(1)} MB is over the 2 MB a paired wallet can take in one request: export a smaller version (480p, a few seconds) and mint that`);
           const wallet = await mintWallet(t => { statusEl.textContent = t; });
           statusEl.textContent = `APPROVE IN bWALLETX · ${(data.length / 1024).toFixed(0)} KB`;
@@ -4462,7 +4507,7 @@
         } catch (e) { statusEl.textContent = 'Mint failed: ' + e.message; }
         finally { btn.disabled = false; }
       }
-      const mintClipBtn = document.createElement('button'); mintClipBtn.className = 'action-btn'; mintClipBtn.textContent = 'MINT';
+      const mintClipBtn = document.createElement('button'); mintClipBtn.className = 'action-btn'; mintClipBtn.textContent = 'MINT'; mintClipBtn.dataset.desktop = '';
       loadToBackgroundBtn.parentNode.appendChild(mintClipBtn);
       mintClipBtn.addEventListener('click', () => selectedVideo && mintMedia(selectedVideo, 'clip', document.getElementById('videoPreviewDetails'), mintClipBtn));
       loadToLayerBtn.textContent = 'LOAD → DECK A';
@@ -4473,15 +4518,15 @@
 
       // PHOTOS from the game (Q, or the dock's PHOTO tile): PNGs in this app's own "VexVoid Photos" folder, named by when they
       // were taken; thumbnails and a note of where the writer was in .thumbs beside them. The gallery (L) and IMAGES list them.
-      const gmPhotoDir = require('path').join(require('@electron/remote').app.getPath('userData'), 'VexVoid Photos');
+      const gmPhotoDir = VXP.path.join(VXP.dir('userData'), 'VexVoid Photos');
       const gmPhotoOk = id => /^VEXVOID-PHOTO-[0-9-]+$/.test(String(id));
-      const gmPhotoFile = (id, thumb) => { if (!gmPhotoOk(id)) throw new Error('no photo ' + id); const path = require('path'); return thumb ? path.join(gmPhotoDir, '.thumbs', id + '.png') : path.join(gmPhotoDir, id + '.png'); };
-      function gmPhotoFiles() { const fs = require('fs'); return fs.existsSync(gmPhotoDir) ? fs.readdirSync(gmPhotoDir).filter(f => /^VEXVOID-PHOTO-[0-9-]+\.png$/.test(f)).sort().reverse() : []; }
-      const gmPhotoUrl = f => 'file://' + encodeURI(f).replace(/#/g, '%23').replace(/\?/g, '%3F');
+      const gmPhotoFile = (id, thumb) => { if (!gmPhotoOk(id)) throw new Error('no photo ' + id); const path = VXP.path; return thumb ? path.join(gmPhotoDir, '.thumbs', id + '.png') : path.join(gmPhotoDir, id + '.png'); };
+      function gmPhotoFiles() { const fs = VXP.fs; return fs.existsSync(gmPhotoDir) ? fs.readdirSync(gmPhotoDir).filter(f => /^VEXVOID-PHOTO-[0-9-]+\.png$/.test(f)).sort().reverse() : []; }
+      const gmPhotoUrl = f => VXP.fileUrl(f).replace(/#/g, '%23').replace(/\?/g, '%3F');
       const gmPhotos = {
         label: 'VEXVOID PHOTOS FOLDER',
         async save(m, png, thumb) {
-          const fs = require('fs'), path = require('path'), d = new Date(m.t), p = (n, k = 2) => String(n).padStart(k, '0');
+          const fs = VXP.fs, path = VXP.path, d = new Date(m.t), p = (n, k = 2) => String(n).padStart(k, '0');
           fs.mkdirSync(path.join(gmPhotoDir, '.thumbs'), { recursive: true });
           const stem = `VEXVOID-PHOTO-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}-${p(d.getMilliseconds(), 3)}`;
           let id = stem; for (let k = 2; fs.existsSync(gmPhotoFile(id)); k++) id = stem + '-' + k;
@@ -4493,7 +4538,7 @@
           return { id, where: ['disk'], path: file };
         },
         async list() {
-          const fs = require('fs'), path = require('path');
+          const fs = VXP.fs, path = VXP.path;
           return gmPhotoFiles().map(f => {
             const id = f.slice(0, -4), file = path.join(gmPhotoDir, f);
             let m = {}; try { m = JSON.parse(fs.readFileSync(path.join(gmPhotoDir, '.thumbs', id + '.json'), 'utf8')); } catch (e) {}
@@ -4502,17 +4547,17 @@
             return { id, t: m.t || st.mtimeMs, w: w || 0, h: h || 0, bytes: st.size, place: m.place || '', where: ['disk'], path: file };
           }).filter(Boolean).sort((a, b) => b.t - a.t);
         },
-        async src(id, big) { const fs = require('fs'), f = gmPhotoFile(id, !big); return fs.existsSync(f) ? gmPhotoUrl(f) : (!big && fs.existsSync(gmPhotoFile(id)) ? gmPhotoUrl(gmPhotoFile(id)) : null); },
-        async blob(id, thumb) { const fs = require('fs'), f = gmPhotoFile(id, !!thumb); return fs.existsSync(f) ? new Blob([fs.readFileSync(f)], { type: 'image/png' }) : null; },
+        async src(id, big) { const fs = VXP.fs, f = gmPhotoFile(id, !big); return fs.existsSync(f) ? gmPhotoUrl(f) : (!big && fs.existsSync(gmPhotoFile(id)) ? gmPhotoUrl(gmPhotoFile(id)) : null); },
+        async blob(id, thumb) { const fs = VXP.fs, f = gmPhotoFile(id, !!thumb); return fs.existsSync(f) ? new Blob([fs.readFileSync(f)], { type: 'image/png' }) : null; },
         async remove(id) {
-          if (!gmPhotoOk(id)) return false; const fs = require('fs'), path = require('path'), f = gmPhotoFile(id); if (!fs.existsSync(f)) return false;
+          if (!gmPhotoOk(id)) return false; const fs = VXP.fs, path = VXP.path, f = gmPhotoFile(id); if (!fs.existsSync(f)) return false;
           fs.unlinkSync(f); for (const x of [gmPhotoFile(id, true), path.join(gmPhotoDir, '.thumbs', id + '.json')]) try { fs.unlinkSync(x); } catch (e) {}
           try { if (imageLibrary.length) initializeImagesTab(); } catch (e) {}
           return true;
         },
         // DOWNLOAD in the gallery: a copy in the Downloads folder (no save dialog; tests point __vxDownloadsDir elsewhere)
         async download(id) {
-          const fs = require('fs'), path = require('path'), dir = window.__vxDownloadsDir || require('@electron/remote').app.getPath('downloads');
+          const fs = VXP.fs, path = VXP.path, dir = window.__vxDownloadsDir || VXP.dir('downloads');
           fs.mkdirSync(dir, { recursive: true });
           let out = path.join(dir, id + '.png'); for (let k = 2; fs.existsSync(out); k++) out = path.join(dir, `${id} (${k}).png`);
           await fs.promises.copyFile(gmPhotoFile(id), out); return out;
@@ -4533,12 +4578,21 @@
       const loadImageToLayerBtn = document.getElementById('loadImageToLayerBtn');
       const loadImageToBackgroundBtn = document.getElementById('loadImageToBackgroundBtn');
 
+      const studioCloud = { files: null, busy: false };
+      async function studioCloudFiles() {
+        if (!VXP.web || !VXP.cloud || studioCloud.files || studioCloud.busy) return;
+        studioCloud.busy = true; studioCloud.files = await VXP.cloud.list(); studioCloud.busy = false;
+        if (studioCloud.files.length) initializeImagesTab();
+      }
       async function initializeImagesTab() {
+        studioCloudFiles();
         const local = imageLibrary.filter(v => v.source === 'local' && !/^(GROK|GAME PHOTO) · /.test(v.name));
         const MON = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-        const shots = gmPhotoFiles().map(f => { const m = f.match(/^VEXVOID-PHOTO-(\d{4})(\d\d)(\d\d)-(\d\d)(\d\d)(\d\d)/); return { name: 'GAME PHOTO · ' + (m ? `${+m[3]} ${MON[+m[2] - 1]} ${m[1]} ${m[4]}:${m[5]}:${m[6]}` : f), url: require('path').join(gmPhotoDir, f), format: 'PNG', source: 'local' }; });
+        const shots = gmPhotoFiles().map(f => { const m = f.match(/^VEXVOID-PHOTO-(\d{4})(\d\d)(\d\d)-(\d\d)(\d\d)(\d\d)/); return { name: 'GAME PHOTO · ' + (m ? `${+m[3]} ${MON[+m[2] - 1]} ${m[1]} ${m[4]}:${m[5]}:${m[6]}` : f), url: VXP.path.join(gmPhotoDir, f), format: 'PNG', source: 'local' }; });
         const mine = walletMedia('image').map(i => ({ name: 'WALLET · ' + i.name, url: i.url, format: (i.contentType.split('/')[1] || 'IMG').toUpperCase(), source: 'wallet', origin: i.origin }));
-        imageLibrary = mine.concat(shots, grokFiles('image'), catalogue().images.map(im => ({ name: im.name, url: im.url, format: (im.url.match(/\.([a-z]+)$/i) || [, 'IMG'])[1].toUpperCase(), source: im.set })), local);
+        const kept = VXP.uploads('images').filter(u => !local.some(v => v.url === u.url));
+        const cloud = (studioCloud.files || []).filter(c => !kept.some(k => VXP.cloud.idOf(k.url) === c.id)).map(c => ({ name: 'CLOUD · ' + c.id.toUpperCase(), url: c.url, format: 'PNG', source: 'cloud' }));
+        imageLibrary = mine.concat(shots, grokFiles('image'), kept, cloud, catalogue().images.map(im => ({ name: im.name, url: im.url, format: (im.url.match(/\.([a-z]+)$/i) || [, 'IMG'])[1].toUpperCase(), source: im.set })), local);
         imageLibrary.forEach((v, i) => { v.id = i; });
         document.getElementById('imageCloudStatus').textContent = `● V3XV0ID IMAGES · ${imageLibrary.length - mine.length}` + (mine.length ? ` · YOUR WALLET · ${mine.length}` : '');
         renderImageLibrary();
@@ -4551,7 +4605,7 @@
           item.className = 'image-item';
           const img = document.createElement('img');
           img.className = 'media-thumb'; img.loading = 'lazy';
-          img.src = image.source === 'local' ? 'file://' + encodeURI(image.url) : image.url;
+          img.src = image.source === 'local' ? VXP.fileUrl(image.url) : image.url;
           const name = document.createElement('div');
           name.className = 'image-name'; name.textContent = image.name;
           item.append(img, name);
@@ -4563,7 +4617,7 @@
         selectedImage = image;
         document.getElementById('imagePreviewTitle').textContent = image.name;
         document.getElementById('imagePreviewDetails').textContent = `${image.format} · ${String(image.source).toUpperCase()}`;
-        imagePreviewImg.src = image.source === 'local' ? 'file://' + encodeURI(image.url) : image.url;
+        imagePreviewImg.src = image.source === 'local' ? VXP.fileUrl(image.url) : image.url;
         imagePreviewPanel.style.display = 'block';
       }
       loadImageToLayerBtn.textContent = 'LOAD TO NEW LAYER';
@@ -4576,7 +4630,7 @@
         catch (e) { st.textContent = 'FAILED: ' + e.message; }
       });
       refreshImagesBtn.addEventListener('click', initializeImagesTab);
-      const mintImageBtn = document.createElement('button'); mintImageBtn.className = 'action-btn'; mintImageBtn.textContent = 'MINT';
+      const mintImageBtn = document.createElement('button'); mintImageBtn.className = 'action-btn'; mintImageBtn.textContent = 'MINT'; mintImageBtn.dataset.desktop = '';
       loadImageToBackgroundBtn.parentNode.appendChild(mintImageBtn);
       mintImageBtn.addEventListener('click', () => selectedImage && mintMedia(selectedImage, 'image', document.getElementById('imagePreviewDetails'), mintImageBtn));
 
@@ -4594,11 +4648,11 @@
         nobody: { still: 'No people.', motion: 'No one appears.' },
         figure: { still: 'The person is seen from behind with a black hoodie hood up, face never visible. Plain streetwear.', motion: 'The person keeps their back to the camera; they never turn toward the camera or the light.' }
       };
-      const grokDir = require('path').join(require('@electron/remote').app.getPath('userData'), 'generated');
+      const grokDir = VXP.path.join(VXP.dir('userData'), 'generated');
       let grokSpent = 0;
-      function xaiKey() { return process.env.XAI_API_KEY || genSettings().xaiKey || ''; }
+      function xaiKey() { return VXP.env('XAI_API_KEY') || genSettings().xaiKey || ''; }
       function grokFiles(kind) {
-        const fs = require('fs'), path = require('path');
+        const fs = VXP.fs, path = VXP.path;
         if (!fs.existsSync(grokDir)) return [];
         return fs.readdirSync(grokDir).filter(f => kind === 'video' ? /\.mp4$/i.test(f) : /\.(jpe?g|png|webp)$/i.test(f)).sort().reverse().map(f => {
           let meta = {}; try { meta = JSON.parse(fs.readFileSync(path.join(grokDir, f + '.json'), 'utf8')); } catch (e) {}
@@ -4621,7 +4675,7 @@
         }
       }
       async function grokSave(url, ext, meta) {
-        const fs = require('fs'), path = require('path');
+        const fs = VXP.fs, path = VXP.path;
         const res = await fetch(url); if (!res.ok) throw new Error('download failed (' + res.status + ')');
         fs.mkdirSync(grokDir, { recursive: true });
         const slug = meta.prompt.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 32).replace(/-$/, '');
@@ -4652,7 +4706,7 @@
             if (mode === 'i2v') {
               const src = await cacheMedia(image);
               const ext = (src.match(/\.(\w+)$/) || [, 'jpeg'])[1].toLowerCase().replace('jpg', 'jpeg');
-              body.image = { url: `data:image/${ext};base64,${require('fs').readFileSync(src).toString('base64')}` };
+              body.image = { url: `data:image/${ext};base64,${VXP.fs.readFileSync(src).toString('base64')}` };
             } else body.aspect_ratio = '16:9';
             const sub = await xai('/v1/videos/generations', body);
             const id = sub.request_id || sub.id; if (!id) throw new Error('no request id came back');
@@ -4676,7 +4730,7 @@
       }
       // what recent generations cost, from the saved metadata (to quote a price before asking)
       function grokRecentCost(video) {
-        const fs = require('fs'), path = require('path');
+        const fs = VXP.fs, path = VXP.path;
         if (!fs.existsSync(grokDir)) return null;
         const costs = fs.readdirSync(grokDir).filter(f => f.endsWith('.json') && (video ? /\.mp4\.json$/ : /\.(jpe?g|png|webp)\.json$/).test(f))
           .map(f => { try { return JSON.parse(fs.readFileSync(path.join(grokDir, f), 'utf8')).cost; } catch (e) { return null; } }).filter(c => c > 0).slice(-10);
@@ -4933,18 +4987,18 @@
       importPatternBtn.addEventListener('click', async () => {
         const res = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'V3XV0ID composition', extensions: ['comp', 'json', 'js'] }] });
         if (res.canceled || !res.filePaths[0]) return;
-        const raw = require('fs').readFileSync(res.filePaths[0], 'utf8');
+        const raw = VXP.fs.readFileSync(res.filePaths[0], 'utf8');
         let item;
         try { const d = JSON.parse(raw); item = { name: d.name || 'IMPORTED', code: d.code, knobs: d.knobs }; if (d.params) Object.assign(gen.params, d.params); if (d.seed) gen.seed = d.seed; }
-        catch (e) { item = { name: require('path').basename(res.filePaths[0]).toUpperCase(), code: raw }; }
+        catch (e) { item = { name: VXP.path.basename(res.filePaths[0]).toUpperCase(), code: raw }; }
         if (item.code) loadSketch(item);
       });
 
       // Prompt → sketch, written by Claude. Key: ANTHROPIC_API_KEY in the environment, or one saved in this app's settings.
-      const genSettingsPath = require('path').join(require('@electron/remote').app.getPath('userData'), 'vx-settings.json');
-      function genSettings() { try { return JSON.parse(require('fs').readFileSync(genSettingsPath, 'utf8')); } catch (e) { return {}; } }
-      function genSaveSettings(q) { require('fs').writeFileSync(genSettingsPath, JSON.stringify({ ...genSettings(), ...q }, null, 2), { mode: 0o600 }); }
-      function anthropicKey() { return process.env.ANTHROPIC_API_KEY || genSettings().anthropicKey || ''; }
+      const genSettingsPath = VXP.path.join(VXP.dir('userData'), 'vx-settings.json');
+      function genSettings() { try { return JSON.parse(VXP.fs.readFileSync(genSettingsPath, 'utf8')); } catch (e) { return {}; } }
+      function genSaveSettings(q) { VXP.fs.writeFileSync(genSettingsPath, JSON.stringify({ ...genSettings(), ...q }, null, 2), { mode: 0o600 }); }
+      function anthropicKey() { return VXP.env('ANTHROPIC_API_KEY') || genSettings().anthropicKey || ''; }
 
       const GEN_SYSTEM = `You write generative p5.js sketches for V3XV0ID, a live VJ tool. The sketch runs on a projector behind music.
 
@@ -5043,7 +5097,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       async function initializeMusicTab() {
         if (musicLibraryTracks.some(t => t.source !== 'wallet')) { mergeWalletTracks(); renderMusicLibrary(); return; }
         try {
-          const cat = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, 'vx', 'catalogue.json'), 'utf8'));
+          const cat = JSON.parse(VXP.fs.readFileSync(VXP.path.join(VXP.appDir, 'vx', 'catalogue.json'), 'utf8'));
           musicLibraryTracks = cat.tracks.map((t, i) => ({
             id: i, name: t.take && t.take !== 'A' ? `${t.title} · ${t.take}` : t.title, artist: 'V3XV0ID',
             format: 'MP3', duration: mmss(t.seconds), url: t.url, source: 'catalogue', album: 'rel:' + t.release, albumTitle: t.title
@@ -5052,6 +5106,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         } catch (e) {
           musicEl('musicCloudStatus').textContent = 'CATALOGUE MISSING · LOAD LOCAL FILES';
         }
+        VXP.uploads('music').forEach(u => { if (!musicLibraryTracks.some(t => t.url === u.url)) musicLibraryTracks.push({ id: musicLibraryTracks.length, name: u.name.replace(/^\d{14}-/, '').replace(/\.[^.]+$/, ''), artist: 'YOUR FILES', format: u.format, duration: '--:--', url: u.url, source: 'local' }); });
         mergeWalletTracks();
         renderMusicLibrary();
         initializeAudioVisualizer();
@@ -5068,7 +5123,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         const seen = new Map();
         musicLibraryTracks.forEach(t => { const k = t.album || (t.source === 'local' ? 'local:FILES' : 'other'); if (!seen.has(k)) seen.set(k, { id: k, title: t.albumTitle || (t.source === 'local' ? 'YOUR FILES' : 'OTHER'), n: 0, src: t.source }); seen.get(k).n++; });
         const list = [...seen.values()];
-        return [{ id: 'all', title: 'EVERYTHING', n: musicLibraryTracks.length }, ...list.filter(a => a.src === 'local'), ...list.filter(a => a.id === 'wallet'), { id: 'market', title: 'MARKET', n: mc.market ? mc.market.length : null },
+        return [{ id: 'all', title: 'EVERYTHING', n: musicLibraryTracks.length }, ...list.filter(a => a.src === 'local'), ...list.filter(a => a.id === 'wallet'), ...(VXP.web ? [] : [{ id: 'market', title: 'MARKET', n: mc.market ? mc.market.length : null }]),
           ...list.filter(a => a.src !== 'local' && a.id !== 'wallet')];
       }
       function renderCarousel() {
@@ -5108,7 +5163,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       musicEl('mcNext').addEventListener('click', () => { const s = musicEl('mcStrip'); s.scrollLeft += s.clientWidth * 0.8; });
       musicEl('loadFolderMusicBtn').addEventListener('click', async () => {
         const r = await dialog.showOpenDialog({ properties: ['openDirectory'] }); if (r.canceled || !r.filePaths.length) return;
-        const fs = require('fs'), path = require('path'), dir = r.filePaths[0], album = 'local:' + dir;
+        const fs = VXP.fs, path = VXP.path, dir = r.filePaths[0], album = 'local:' + dir;
         const files = fs.readdirSync(dir).filter(f => /\.(mp3|wav|m4a|aif|aiff|flac|ogg|aac)$/i.test(f)).sort();
         if (!files.length) { musicEl('playerStatus').textContent = 'NO AUDIO FILES IN THAT FOLDER'; return; }
         files.forEach(f => { const fp = path.join(dir, f); if (!musicLibraryTracks.some(t => t.url === fp)) musicLibraryTracks.push({ id: musicLibraryTracks.length, name: f.replace(/\.[^.]+$/, ''), artist: path.basename(dir).toUpperCase(), format: f.split('.').pop().toUpperCase(), duration: '--:--', url: fp, source: 'local', album, albumTitle: path.basename(dir).toUpperCase() }); });
@@ -5135,7 +5190,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         if (!track) return;
         const a = musicAudio();
         currentTrackIndex = id;
-        a.src = track.source === 'local' ? 'file://' + encodeURI(track.url) : track.url;
+        a.src = track.source === 'local' ? VXP.fileUrl(track.url) : track.url;
         a.play().catch(err => { musicEl('playerStatus').textContent = 'PLAY FAILED: ' + err.message; });
         musicEl('currentTrackTitle').textContent = track.name.toUpperCase();
         musicEl('currentTrackArtist').textContent = track.artist;
@@ -5172,7 +5227,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         const res = await dialog.showOpenDialog({ properties: ['openFile', 'multiSelections'], filters: [{ name: 'Audio', extensions: ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aiff'] }] });
         if (res.canceled) return;
         res.filePaths.forEach(fp => {
-          const f = require('path').basename(fp);
+          const f = VXP.path.basename(fp);
           musicLibraryTracks.push({ id: musicLibraryTracks.length, name: f.replace(/\.[^/.]+$/, ''), artist: 'LOCAL', format: f.split('.').pop().toUpperCase(), duration: '--:--', url: fp, source: 'local' });
         });
         renderMusicLibrary();
@@ -5275,7 +5330,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           const cat = catalogue(); let item;
           if (a.clip) item = cat.clips.find(c => c.name.toLowerCase() === String(a.clip).toLowerCase());
           else if (a.image) item = cat.images.find(c => (c.set + '/' + c.name).toLowerCase().endsWith(String(a.image).toLowerCase()));
-          else if (a.path) item = { name: require('path').basename(String(a.path)), url: String(a.path), source: 'local' };
+          else if (a.path) item = { name: VXP.path.basename(String(a.path)), url: String(a.path), source: 'local' };
           else if (a.url) item = { name: String(a.url).split('/').pop(), url: String(a.url) };
           if (!item) throw new Error('nothing to load (give clip, image, path or url)');
           const note = { textContent: '' };
@@ -5338,10 +5393,12 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       }
       setInterval(pushApiState, 250);
 
-      VXWALLET.init();
+      if (VXP.desktop) VXWALLET.init();
 
       // OUTPUT monitor shows the real output (all layers, decks, blend and the VX engine), ~10 fps while visible
       (function liveOutputMonitor() {
+        // web: the output itself runs in the OUTPUT cell (an iframe at 1920x1080, scaled), so the monitor is live
+        if (VXP.web) { const d = document.createElement('div'); d.id = 'outputLive'; d.className = 'vx-out-frame'; document.getElementById('previewScreen').appendChild(d); VXP.mountOutput(d); return; }
         // its own grid item over the OUTPUT cell: the preview updater rewrites #outputPreview's contents
         const box = document.getElementById('outputPreview');
         const img = document.createElement('img');
@@ -5404,13 +5461,12 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         document.getElementById('claudePair').textContent = '······';
         claudeStatus();
       });
-      claudeStatus();
-      setInterval(claudeStatus, 8000);
+      if (VXP.desktop) { claudeStatus(); setInterval(claudeStatus, 8000); }
 
 
       // ===== YOUR WALLET: the performer's own clips, images, audio, sets, sketches and MIDI, read from bWalletX =====
       // (vx/wallet-library.js). Media joins the VIDEOS / IMAGES / MUSIC tabs; programs are listed here to open or play.
-      function walletKey() { return VXWALLET.identityKey() || (() => { try { return localStorage.getItem('bwx:connected'); } catch (e) { return null; } })(); }
+      function walletKey() { if (VXP.web) return null; return VXWALLET.identityKey() || (() => { try { return localStorage.getItem('bwx:connected'); } catch (e) { return null; } })(); }
       function walletMedia(kind) { const k = walletKey(); return k ? VXLIB.items(kind, k) : []; }
       let walletScan = null, midiPlayback = null;
       function walletSummary() {
@@ -5516,7 +5572,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         box.querySelector('.key').textContent = key.slice(0, 12) + '…' + key.slice(-8);
         box.querySelector('.key').addEventListener('click', () => { navigator.clipboard.writeText(key); box.querySelector('.key').textContent = 'IDENTITY KEY COPIED'; });
         box.querySelector('.via').textContent = via;
-        wbEl('wbOpenWallet').addEventListener('click', () => require('electron').shell.openExternal('https://web.bwalletx.com'));
+        wbEl('wbOpenWallet').addEventListener('click', () => VXP.openExternal('https://web.bwalletx.com'));
         if (earnedSats) usdRate().then(r => { const e = wbEl('wbEarned'); if (!e) return; const usd = r ? earnedSats / 1e8 * r : null; e.textContent = usd == null ? (earnedSats / 1e8).toFixed(6) + ' BSV' : '$' + usd.toFixed(usd >= 0.01 ? 2 : 4); });
         const feed = wbEl('wbFeed');
         feed.innerHTML = acts.length ? '' : '<div style="cursor:default"><span></span><span></span><i>No mixer activity in this wallet yet.</i><span></span></div>';
@@ -5526,7 +5582,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           row.innerHTML = `<span>${a.txid.slice(0, 8)}</span><span>${kind}</span><i></i><span>${a.status === 'completed' ? '' : String(a.status || '').toUpperCase()}</span>`;
           row.querySelector('i').textContent = a.description;
           row.title = 'Open the transaction on WhatsOnChain';
-          row.addEventListener('click', () => require('electron').shell.openExternal('https://whatsonchain.com/tx/' + a.txid));
+          row.addEventListener('click', () => VXP.openExternal('https://whatsonchain.com/tx/' + a.txid));
           feed.appendChild(row);
         });
       }
@@ -5600,9 +5656,9 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           if (t) { playTrack(t.id); note.textContent = 'Playing in MUSIC; the sketches follow it.'; } });
         else if (it.kind === 'midi') btn(midiPlayback && midiPlayback.origin === it.origin ? 'STOP' : 'PLAY', async () => { await toggleMidiFile(it); note.textContent = setEl('setNote').textContent; renderWalletTab(); }, 'Plays the file through your MIDI LEARN mappings');
         else if (it.kind !== 'other') btn(it.kind === 'sketch' ? 'OPEN IN PATTERNS' : 'OPEN IN COMPOSER', () => { setEl('chainOrigin').value = it.origin; setEl('chainOpenBtn').click(); if (it.kind !== 'sketch') document.querySelector('[data-tab="composer"]').click(); });
-        if (/^(set|setlog|sketch)$/.test(it.kind)) btn('WEB REPLAY', () => require('electron').shell.openExternal('https://mixer.vexvoid.com/replay/' + it.origin), 'Plays it in any browser from the chain: a link you can share');
+        if (/^(set|setlog|sketch)$/.test(it.kind)) btn('WEB REPLAY', () => VXP.openExternal('https://mixer.vexvoid.com/replay/' + it.origin), 'Plays it in any browser from the chain: a link you can share');
         btn('COPY ID', () => { navigator.clipboard.writeText(it.origin); note.textContent = 'Inscription id copied.'; });
-        btn('OPEN ON ORDFS', () => require('electron').shell.openExternal(it.url));
+        btn('OPEN ON ORDFS', () => VXP.openExternal(it.url));
         box.appendChild(acts);
         if (it.kind === 'other') note.textContent = 'The mixer can\'t use this kind of file.';
         box.appendChild(note);
@@ -5682,8 +5738,8 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         const buy = btn('BUY IN bWALLETX', () => showBuy(l, buyBox), 'Opens the purchase in bWalletX: it checks the listing and shows you the price to approve');
         buy.disabled = !BUY_LINK_LIVE;
         btn('COPY LISTING', () => navigator.clipboard.writeText(l.outpoint));
-        btn('OPEN ON ORDFS', () => require('electron').shell.openExternal(l.url));
-        btn('SELLER ON WOC', () => require('electron').shell.openExternal('https://whatsonchain.com/address/' + l.seller));
+        btn('OPEN ON ORDFS', () => VXP.openExternal(l.url));
+        btn('SELLER ON WOC', () => VXP.openExternal('https://whatsonchain.com/address/' + l.seller));
         box.appendChild(acts);
         box.appendChild(buyBox);
         const note = document.createElement('div'); note.className = 'wb-note';
@@ -5696,7 +5752,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         const link = VXMARKET.buyLink(l, VXWALLET.ORIGIN);
         box.innerHTML = '<div class="bwx-qr" style="max-width:260px;margin:4px auto"></div><div class="wb-acts"><button class="gen-btn">OPEN ON THIS COMPUTER</button><button class="gen-btn">COPY LINK</button></div><div class="wb-note"></div>';
         box.querySelector('.bwx-qr').innerHTML = bWalletXConnect.qrSvg(link);
-        box.querySelectorAll('button')[0].addEventListener('click', () => require('electron').shell.openExternal(link));
+        box.querySelectorAll('button')[0].addEventListener('click', () => VXP.openExternal(link));
         box.querySelectorAll('button')[1].addEventListener('click', () => navigator.clipboard.writeText(link));
         const say = box.querySelector('.wb-note'); say.textContent = 'Scan with bWalletX on your phone and approve there. Waiting for the purchase…';
         const t0 = Date.now(), timer = setInterval(async () => {
@@ -5785,10 +5841,10 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       // ===== RECORD: the output plus the playing music, saved as a video file (a music video rendered live) =====
       // Same capture as GO LIVE (the output window; macOS asks for Screen Recording the first time). WebM from the
       // recorder, then an MP4 for sharing when ffmpeg is on this computer.
-      const recDir = require('path').join(require('@electron/remote').app.getPath('userData'), 'videos');
+      const recDir = VXP.path.join(VXP.dir('userData'), 'videos');
       const rec = { mr: null, chunks: [], title: '', t0: 0, tracks: [], done: null };
       function recordedFiles() {
-        const fs = require('fs'), path = require('path');
+        const fs = VXP.fs, path = VXP.path;
         if (!fs.existsSync(recDir)) return [];
         const all = fs.readdirSync(recDir).filter(f => /\.(mp4|webm)$/i.test(f));
         return all.filter(f => !(f.endsWith('.webm') && all.includes(f.replace(/\.webm$/, '.mp4')))).sort().reverse()
@@ -5813,7 +5869,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       }
       async function stopRecording() {
         if (!rec.mr) throw new Error('not recording');
-        const fs = require('fs'), path = require('path');
+        const fs = VXP.fs, path = VXP.path;
         rec.mr.stop(); await rec.done; rec.tracks.forEach(t => t.stop());
         const seconds = Math.round((Date.now() - rec.t0) / 1000);
         const buf = Buffer.from(await new Blob(rec.chunks).arrayBuffer());
@@ -5824,7 +5880,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       }
       // a finished take: the webm as recorded into the videos folder, an MP4 beside it when ffmpeg is here, then VIDEOS and the EDIT bin pick it up
       async function recSave(name, buf, vf) {
-        const fs = require('fs'), base = require('path').join(recDir, name);
+        const fs = VXP.fs, base = VXP.path.join(recDir, name);
         fs.mkdirSync(recDir, { recursive: true });
         fs.writeFileSync(base + '.webm', buf);
         let file = base + '.webm';
@@ -5885,7 +5941,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       let clipNotesCache = null;
       function clipNotes() {
         if (clipNotesCache) return clipNotesCache;
-        try { clipNotesCache = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, 'vx', 'clip-notes.json'), 'utf8')); } catch (e) { clipNotesCache = {}; }
+        try { clipNotesCache = JSON.parse(VXP.fs.readFileSync(VXP.path.join(VXP.appDir, 'vx', 'clip-notes.json'), 'utf8')); } catch (e) { clipNotesCache = {}; }
         return clipNotesCache;
       }
       // what the cutter knows about a clip: its notes, or failing those the catalogue set (rough/smooth look, fast/slow motion)
@@ -5911,17 +5967,17 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       async function edDurations(pool) { // how long each clip is (a hidden video element per clip, a few at a time); sets p.dur
         const out = [], q = pool.slice(0, 80);
         await Promise.all(Array.from({ length: 6 }, async () => { while (q.length) { const p = q.shift();
-          const v = document.createElement('video'); v.preload = 'metadata'; v.muted = true; v.src = /^\//.test(p.src) ? 'file://' + encodeURI(p.src) : p.src;
+          const v = document.createElement('video'); v.preload = 'metadata'; v.muted = true; v.src = /^\//.test(p.src) ? VXP.fileUrl(p.src) : p.src;
           p.dur = await new Promise(r => { v.onloadedmetadata = () => r(v.duration || 0); v.onerror = () => r(0); setTimeout(() => r(0), 8000); }); v.removeAttribute('src'); out.push(p); } }));
         return out;
       }
       // ----- the music. Each audio source is read once (waveform peaks, loudness, tempo) and kept in memory and on disk.
-      const edAuDir = () => require('path').join(require('@electron/remote').app.getPath('userData'), 'audio-analysis');
+      const edAuDir = () => VXP.path.join(VXP.dir('userData'), 'audio-analysis');
       const edAuKey = src => require('crypto').createHash('sha1').update(String(src)).digest('hex').slice(0, 16);
       let edAuQ = Promise.resolve();
       function edAnalyse(src) {
         if (ed.au.has(src)) return ed.au.get(src);
-        const fs = require('fs'), path = require('path');
+        const fs = VXP.fs, path = VXP.path;
         const job = edAuQ = edAuQ.catch(() => {}).then(async () => {
           const file = path.join(edAuDir(), edAuKey(src) + '.json');
           let st = null; try { st = /^(\/|file:)/.test(src) ? fs.statSync(src.replace(/^file:\/\//, '')) : null; } catch (e) {}
@@ -6007,7 +6063,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         let v = edVids.get(src);
         if (v) { edVids.delete(src); edVids.set(src, v); return v; } // most recently used goes last
         v = document.createElement('video'); v.muted = true; v.playsInline = true; v.preload = 'auto';
-        edLocal(src).then(f => { v.addEventListener('loadedmetadata', () => edShowAt(ed.t, ed.playing && ed.rate > 0), { once: true }); v.src = 'file://' + encodeURI(f); }).catch(() => {});
+        edLocal(src).then(f => { v.addEventListener('loadedmetadata', () => edShowAt(ed.t, ed.playing && ed.rate > 0), { once: true }); v.src = VXP.fileUrl(f); }).catch(() => {});
         edVids.set(src, v);
         if (edVids.size > 10) for (const [k, old] of edVids) { if (edVids.size <= 10) break; if (!old.isConnected) { old.removeAttribute('src'); old.load(); edVids.delete(k); } }
         return v;
@@ -6127,7 +6183,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       // Gains and fades set the element's volume (capped at 0 dB here; the export applies the full gain). A stretch plays
       // at playbackRate with the pitch kept by the player: close to, not the same as, the export's ffmpeg atempo.
       const edAuEls = new Map();
-      const edAuUrl = src => /^\//.test(src) ? 'file://' + encodeURI(src) : src;
+      const edAuUrl = src => /^\//.test(src) ? VXP.fileUrl(src) : src;
       function edAudioSync(t, playing) {
         const full = VXTL.audioPlan(ed.proj), plan = playing && ed.rate > 0 ? full : [], live = new Set(), ids = new Set(full.map(x => x.id));
         plan.forEach(sg => {
@@ -6342,7 +6398,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
               v.removeAttribute('src'); v.load(); res(u);
             };
             v.onerror = () => res(null); setTimeout(() => res(null), 12000);
-            v.src = 'file://' + encodeURI(f);
+            v.src = VXP.fileUrl(f);
           });
           edThumbs.set(src, url);
           if (url) document.querySelectorAll('#edContent .ed-it').forEach(el => { if (el.dataset.src === src) el.style.backgroundImage = `url(${url})`; });
@@ -6584,7 +6640,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       // audio files in: one file on a track; several (or a stems .zip, as Suno gives) as one stem group on parallel tracks
       const ED_AUDIO = /\.(wav|mp3|m4a|aac|aif|aiff|flac|ogg|opus)$/i;
       function edUnzip(zip) {
-        const path = require('path'), fs = require('fs'), dir = path.join(require('@electron/remote').app.getPath('userData'), 'imports', path.basename(zip).replace(/\.zip$/i, '').replace(/[^\w .()-]+/g, '_').slice(0, 60) + '-' + edAuKey(zip).slice(0, 6));
+        const path = VXP.path, fs = VXP.fs, dir = path.join(VXP.dir('userData'), 'imports', path.basename(zip).replace(/\.zip$/i, '').replace(/[^\w .()-]+/g, '_').slice(0, 60) + '-' + edAuKey(zip).slice(0, 6));
         fs.mkdirSync(dir, { recursive: true });
         require('child_process').execFileSync('/usr/bin/unzip', ['-o', '-q', zip, '-d', dir]);
         const walk = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.name.startsWith('.') || e.name === '__MACOSX' ? [] : e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
@@ -6594,9 +6650,9 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         let files = [];
         paths.forEach(p => { if (/\.zip$/i.test(p)) files = files.concat(edUnzip(p)); else if (ED_AUDIO.test(p)) files.push(p); });
         if (!files.length) throw new Error('no audio files there (wav, mp3, m4a, aif, flac, ogg, or a .zip of them)');
-        edSay(`Reading ${files.length === 1 ? require('path').basename(files[0]) : files.length + ' files'}…`);
+        edSay(`Reading ${files.length === 1 ? VXP.path.basename(files[0]) : files.length + ' files'}…`);
         const list = [];
-        for (const f of files) { const A = await edAnalyse(f); list.push({ src: f, name: require('path').basename(f).replace(/\.[^.]+$/, '').toUpperCase(), dur: A.seconds, bpm: A.bpm, bar0: A.bar0 }); }
+        for (const f of files) { const A = await edAnalyse(f); list.push({ src: f, name: VXP.path.basename(f).replace(/\.[^.]+$/, '').toUpperCase(), dur: A.seconds, bpm: A.bpm, bar0: A.bar0 }); }
         let made; edDo(() => { made = VXTL.importAudio(ed.proj, list, at, tid); });
         ed.sel = made.map(m => m.id); ed.selSec = null; if (!edLength()) ed.pps = 0; edRender();
         edSay(list.length > 1 ? `${list.length} stems on ${made.map(m => edTrk(m.track).name).join(', ')}, lined up at ${VXTL.timecode(at)}.` : `${list[0].name} on ${edTrk(made[0].track).name} at ${VXTL.timecode(at)} · ${list[0].bpm} BPM.`);
@@ -6605,7 +6661,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       // stems with a local demucs (open source, runs on this Mac); if it is not installed, say how and do nothing else
       const ED_DEMUCS_INSTALL = 'python3 -m pip install -U demucs';
       function edDemucs() {
-        const fs = require('fs'), path = require('path'), os = require('os'), cp = require('child_process');
+        const fs = VXP.fs, path = VXP.path, os = require('os'), cp = require('child_process');
         const dirs = String(process.env.PATH || '').split(':').concat(['/opt/homebrew/bin', '/usr/local/bin', path.join(os.homedir(), '.local/bin')],
           (() => { try { return fs.readdirSync(path.join(os.homedir(), 'Library/Python')).map(v => path.join(os.homedir(), 'Library/Python', v, 'bin')); } catch (e) { return []; } })());
         const bin = dirs.map(d => path.join(d, 'demucs')).find(f => { try { return fs.statSync(f).isFile(); } catch (e) { return false; } });
@@ -6620,7 +6676,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         const f = VXTL.find(ed.proj, iid); if (!f || f.track.kind !== 'audio') throw new Error('pick a music item');
         const dm = edDemucs();
         if (!dm) { const m = `Stem split needs demucs (free, open source, runs on this Mac). Install it in Terminal with <code>${ED_DEMUCS_INSTALL}</code> then press SPLIT STEMS again.`; edSay('Stem split needs demucs: ' + ED_DEMUCS_INSTALL); return m; }
-        const path = require('path'), fs = require('fs'), file = await edLocal(f.item.src), out = path.join(require('@electron/remote').app.getPath('userData'), 'stems', edAuKey(file));
+        const path = VXP.path, fs = VXP.fs, file = await edLocal(f.item.src), out = path.join(VXP.dir('userData'), 'stems', edAuKey(file));
         const dir = path.join(out, 'htdemucs', path.basename(file).replace(/\.[^.]+$/, '')), names = ['drums', 'bass', 'vocals', 'other'];
         if (!names.every(n => fs.existsSync(path.join(dir, n + '.wav')))) {
           edSay('Splitting stems with demucs (a minute or two)…');
@@ -6654,14 +6710,14 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         const ff = edFfmpeg(); if (!ff) throw new Error('ffmpeg is not on this computer (brew install ffmpeg)');
         const plan = VXTL.audioPlan(ed.proj); if (!plan.length) return null;
         for (const sg of plan) sg.file = await edLocal(sg.src);
-        require('fs').mkdirSync(require('path').dirname(out), { recursive: true });
+        VXP.fs.mkdirSync(VXP.path.dirname(out), { recursive: true });
         const len = total || VXTL.audioLength(ed.proj);
         await ffmpegRun(ff, VXTL.mixArgs({ segs: plan, total: len, out }), len, 'Mixing the music');
         return out;
       }
       async function edExportMix(title) {
         if (!VXTL.audioPlan(ed.proj).length) throw new Error('no music on the timeline (or every audio track is muted)');
-        const path = require('path'), slug = String(title || ed.title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'mix';
+        const path = VXP.path, slug = String(title || ed.title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'mix';
         const out = path.join(recDir, 'mix', `${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}-${slug}.wav`);
         await edRenderMix(out); ed.lastMix = out; edSay('Mix saved: ' + out); return out;
       }
@@ -6904,7 +6960,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         bin.dataset.key = key; bin.innerHTML = '';
         list.slice(0, 400).forEach(p => {
           const c = document.createElement('div'); c.className = 'ed-clip'; c.draggable = true; c.title = `${p.name}${p.desc ? '\n' + p.desc : ''}\nDrag onto the timeline, or double-click to drop it at the playhead on V1.`;
-          const v = document.createElement('video'); v.muted = true; v.preload = 'metadata'; v.loop = true; v.dataset.src = (/^\//.test(p.src) ? 'file://' + encodeURI(p.src) : p.src) + '#t=1';
+          const v = document.createElement('video'); v.muted = true; v.preload = 'metadata'; v.loop = true; v.dataset.src = (/^\//.test(p.src) ? VXP.fileUrl(p.src) : p.src) + '#t=1';
           const n = document.createElement('span'); n.textContent = p.name.replace(/^(GROK|RECORDED|WALLET) · /, '');
           c.append(v, n); edBinSeen.observe(v);
           c.onmouseenter = () => v.src && v.play().catch(() => {}); c.onmouseleave = () => v.pause();
@@ -6982,8 +7038,8 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           p.on('close', c => c === 0 ? res() : rej(new Error('ffmpeg stopped: ' + err.split('\n').filter(Boolean).slice(-2).join(' '))));
         });
       }
-      const edFfmpeg = () => ['/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/usr/bin/ffmpeg'].find(p => require('fs').existsSync(p));
-      const edMelt = () => ['/opt/homebrew/bin/melt', '/usr/local/bin/melt'].find(p => require('fs').existsSync(p));
+      const edFfmpeg = () => ['/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/usr/bin/ffmpeg'].find(p => VXP.fs.existsSync(p));
+      const edMelt = () => ['/opt/homebrew/bin/melt', '/usr/local/bin/melt'].find(p => VXP.fs.existsSync(p));
       // looks for an MLT render: grade, letterbox and where flash frames go
       const ED_LOOKS = {
         house: { grade: { saturation: 0, contrast: 1.12 }, letterbox: 0, flashes: 'off' },
@@ -7018,7 +7074,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         if (ed.rendering) throw new Error('already rendering');
         const vis = id => edTrk(id).hidden ? [] : VXTL.sorted(edTrk(id)), v1 = vis('v1'), v2 = vis('v2');
         if (!v1.length && !v2.length && !VXTL.sorted(edTrk('t1')).length) throw new Error('the timeline is empty');
-        const fs = require('fs'), path = require('path');
+        const fs = VXP.fs, path = VXP.path;
         const ff = edFfmpeg(), melt = edMelt();
         if (!ff && !melt) throw new Error('ffmpeg is not on this computer: play the edit and use REC instead');
         ed.rendering = true; edEl('edExport').disabled = true;
@@ -7050,7 +7106,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           }
           if (melt) {
             // MLT: one render with every layer on its own track; the project stays beside the MP4 for Shotcut
-            const kit = path.join(__dirname, 'vx', 'assets', 'finish'), look = edLookNow();
+            const kit = path.join(VXP.appDir, 'vx', 'assets', 'finish'), look = edLookNow();
             const plan = finish ? VXEDIT.finishPlan({ shots: v1, env: fenv, seconds: total }) : { idents: [], mattes: [] };
             const idents = plan.idents.map(d => { const file = path.join(kit, `V3X-ident-${d.name}.mp4`); return { t: d.t, corner: d.corner, file, dur: probeDur(file) }; });
             const mltFile = out.replace(/\.mp4$/, '.mlt');
@@ -7065,7 +7121,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           const base = finish ? out.replace(/\.mp4$/, '-base.mp4') : out;
           await ffmpegRun(ff, VXEDIT.ffmpegArgs({ shots: flat, track, out: base }), seconds0, 'Rendering');
           if (finish) {
-            const kit = path.join(__dirname, 'vx', 'assets', 'finish'), seconds = Math.min(seconds0, VXTL.audioLength(ed.proj) || seconds0);
+            const kit = path.join(VXP.appDir, 'vx', 'assets', 'finish'), seconds = Math.min(seconds0, VXTL.audioLength(ed.proj) || seconds0);
             const plan = VXEDIT.finishPlan({ shots: flat, env: fenv, seconds });
             const mattes = [];
             for (let i = 0; i < plan.mattes.length; i++) {
@@ -7096,7 +7152,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       edEl('edExport').addEventListener('click', () => edExport().catch(e => edSay(e.message)));
       edEl('edLook').value = ed.look || 'house';
       edEl('edLook').addEventListener('change', e => { ed.look = e.target.value; ed.lookOver = null; edSave(); edRender(); });
-      edEl('edShotcut').addEventListener('click', () => { if (ed.lastProject && require('fs').existsSync('/Applications/Shotcut.app')) require('child_process').execFile('open', ['-a', 'Shotcut', ed.lastProject]); else edSay('Shotcut is not installed (brew install --cask shotcut).'); });
+      edEl('edShotcut').addEventListener('click', () => { if (ed.lastProject && VXP.fs.existsSync('/Applications/Shotcut.app')) require('child_process').execFile('open', ['-a', 'Shotcut', ed.lastProject]); else edSay('Shotcut is not installed (brew install --cask shotcut).'); });
       edEl('edClear').addEventListener('click', () => { if (!edLength() && !ed.proj.markers.length) return; ed.sel = []; edDo(() => { ed.proj.tracks.forEach(tr => { if (tr.kind !== 'audio') tr.items = []; }); ed.proj.markers = []; }); edSay('Cleared the pictures, titles and markers (the music stays). ⌘Z brings them back.'); });
       edEl('edExportMix').addEventListener('click', () => edExportMix().catch(e => edSay(e.message)));
       edEl('edTitle').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
@@ -7107,7 +7163,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       const gm = { g: null, loading: null };
       function gmLoad() {
         if (window.VXGAME) return Promise.resolve();
-        if (!require('fs').existsSync(require('path').join(__dirname, 'vx', 'game', 'vexvoid-game.js'))) return Promise.reject(new Error('The game engine is not installed yet (scripts/build-game.sh builds it).'));
+        if (!VXP.fs.existsSync(VXP.path.join(VXP.appDir, 'vx', 'game', 'vexvoid-game.js'))) return Promise.reject(new Error('The game engine is not installed yet (scripts/build-game.sh builds it).'));
         return gm.loading || (gm.loading = new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = './vx/game/vexvoid-game.js'; sc.onload = res; sc.onerror = () => { gm.loading = null; rej(new Error('The game engine did not load.')); }; document.body.appendChild(sc); }));
       }
       async function gmStart() {
@@ -7163,7 +7219,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           gmRecNote('Saving the take…');
           const file = await recSave(`VEXVOID-GAME-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`, buf, 'scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1');
           gmRecNote(`Saved ${seconds}s to VIDEOS: ${file.split('/').pop()}`);
-          return { file, seconds, mb: +(require('fs').statSync(file).size / 1e6).toFixed(1) };
+          return { file, seconds, mb: +(VXP.fs.statSync(file).size / 1e6).toFixed(1) };
         })().finally(() => { gmRec.saving = null; });
       }
       function gmRecToggle() { try { if (gmRec.mr) gmRecStop().catch(e => gmRecNote('REC: ' + e.message)); else gmRecStart(); } catch (e) { gmRecNote('REC: ' + e.message); } }
@@ -7478,7 +7534,7 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
           return `Set "${input.title}" loaded: ${set.steps.length} steps${input.play !== false ? ', playing from bar 1' : ''}. It is in COMPOSER too.`;
         }
         if (name === 'load_track') {
-          const fs = require('fs'), path = require('path'), p = String(input.path || '').replace(/^~(?=\/)/, require('os').homedir());
+          const fs = VXP.fs, path = VXP.path, p = String(input.path || '').replace(/^~(?=\/)/, require('os').homedir());
           if (!/\.(mp3|wav|m4a|aif|aiff|flac|ogg|aac)$/i.test(p)) throw new Error('not an audio file: ' + p);
           if (!fs.existsSync(p)) throw new Error('no such file: ' + p);
           if (!musicLibraryTracks.length) await initializeMusicTab();
@@ -7582,14 +7638,14 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
             edDo(() => { it.src = p.src; it.name = p.name; it.in = 0; }); return st();
           }
           if (a === 'frames') {
-            const file = String(input.path || ed.lastExport || ''), fs = require('fs'), ff = edFfmpeg();
+            const file = String(input.path || ed.lastExport || ''), fs = VXP.fs, ff = edFfmpeg();
             if (!file || !fs.existsSync(file)) throw new Error('nothing exported yet');
             if (!ff) throw new Error('ffmpeg is not on this computer');
-            const secs = await new Promise(r => { const v = document.createElement('video'); v.preload = 'metadata'; v.src = 'file://' + encodeURI(file); v.onloadedmetadata = () => r(v.duration || 60); v.onerror = () => r(60); });
-            const sheet = require('path').join(require('os').tmpdir(), 'vx-frames.jpg');
+            const secs = await new Promise(r => { const v = document.createElement('video'); v.preload = 'metadata'; v.src = VXP.fileUrl(file); v.onloadedmetadata = () => r(v.duration || 60); v.onerror = () => r(60); });
+            const sheet = VXP.path.join(require('os').tmpdir(), 'vx-frames.jpg');
             await ffmpegRun(ff, ['-v', 'error', '-y', '-i', file, '-vf', `fps=20/${secs.toFixed(1)},scale=384:-2,tile=5x4:padding=4`, '-frames:v', '1', '-q:v', '4', sheet]);
             return [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: fs.readFileSync(sheet).toString('base64') } },
-              { type: 'text', text: `${require('path').basename(file)}: 20 frames, one every ${(secs / 20).toFixed(1)} s, left to right, top to bottom.` }];
+              { type: 'text', text: `${VXP.path.basename(file)}: 20 frames, one every ${(secs / 20).toFixed(1)} s, left to right, top to bottom.` }];
           }
           if (a === 'export') { const f = await edExport(input.title, input.finish !== false); if (gig) { (gig.assets = gig.assets || []).push(f); gigSave(); } return `Exported ${f}. It is in VIDEOS.` + (ed.lastProject ? ` The Shotcut project is ${ed.lastProject} (the person can open it with OPEN IN SHOTCUT to finish by hand).` : ''); }
           throw new Error('unknown editor action ' + a);
@@ -7867,7 +7923,7 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
       function jobChanges(j, note, send) { VXJOBS.act(j, 'changes', jobSet, { note }); jobSave(); jobRender(); return jobHandOff(j, VXJOBS.changesBrief(j, note), send); }
       // videos made in the job's conversation, newest first, plus the EDIT tab's last export: what can be attached
       function jobExports(j) {
-        const g = j.gigId && gigs.find(x => x.id === j.gigId), fs = require('fs');
+        const g = j.gigId && gigs.find(x => x.id === j.gigId), fs = VXP.fs;
         const all = ((g && g.assets) || []).filter(f => /\.(mp4|mov|webm|m4v)$/i.test(f)).reverse();
         if (ed.lastExport && !all.includes(ed.lastExport)) all.push(ed.lastExport);
         return all.filter(f => { try { return fs.existsSync(f); } catch (e) { return false; } });
@@ -7875,7 +7931,7 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
       function jobAttach(j, file) {
         const f = String(file || '').trim().replace(/^~(?=\/)/, require('os').homedir());
         if (!f) throw new Error('give the path of the exported video');
-        if (!require('fs').existsSync(f)) throw new Error('no such file: ' + f);
+        if (!VXP.fs.existsSync(f)) throw new Error('no such file: ' + f);
         if (!j.deliverables.includes(f)) j.deliverables.push(f);
         jobSave(); return f;
       }
@@ -8210,7 +8266,7 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
           const video = await navigator.mediaDevices.getUserMedia({ audio: false, video: { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: sourceId, maxWidth: 1280, maxHeight: 720, maxFrameRate: 30 } } });
           stream.tracks = video.getTracks();
           if (currentAudio && currentAudio.captureStream) stream.tracks.push(...currentAudio.captureStream().getAudioTracks());
-          const LK = window.LivekitClient || require(require('path').join(__dirname, 'vx', 'lib', 'livekit-client.umd.js'));
+          const LK = window.LivekitClient || require(VXP.path.join(VXP.appDir, 'vx', 'lib', 'livekit-client.umd.js'));
           stream.room = new LK.Room();
           say('Connecting to the stream server…');
           await stream.room.connect(show.livekitUrl, show.token);
@@ -8597,14 +8653,14 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
       setEl('saveSequenceBtn').addEventListener('click', async () => {
         const res = await dialog.showSaveDialog({ defaultPath: 'v3xv0id-set.json', filters: [{ name: 'V3XV0ID set', extensions: ['json'] }] });
         if (res.canceled || !res.filePath) return;
-        require('fs').writeFileSync(res.filePath, JSON.stringify(setAsDoc(), null, 2));
+        VXP.fs.writeFileSync(res.filePath, JSON.stringify(setAsDoc(), null, 2));
         setEl('composerStatus').textContent = 'SAVED';
       });
       setEl('setLoadBtn').addEventListener('click', async () => {
         const res = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'V3XV0ID set', extensions: ['json'] }] });
         if (res.canceled || !res.filePaths[0]) return;
         try {
-          setFromDoc(await VXCHAIN.resolveSet(JSON.parse(require('fs').readFileSync(res.filePaths[0], 'utf8'))));
+          setFromDoc(await VXCHAIN.resolveSet(JSON.parse(VXP.fs.readFileSync(res.filePaths[0], 'utf8'))));
           setEl('composerStatus').textContent = 'LOADED ' + set.steps.length + ' STEPS';
         } catch (e) { setEl('setNote').textContent = 'Could not read that file: ' + e.message; }
       });
@@ -9152,6 +9208,67 @@ Reply with only the JSON array in one \`\`\`json code block.`;
         document.getElementById('chaosStatus').textContent = status;
       }
 
+      // ===== STORE: V3XV0ID merch WE sell, from the one catalogue at vexvoid.com/store/catalogue.json (the site renders the same
+      // file). Not the MARKET (players trading). No checkout here: each item opens its page on vexvoid.com.
+      const store = { cat: null, busy: null, error: null };
+      function storeLoad() {
+        if (store.cat) return Promise.resolve(store.cat);
+        if (!store.busy) store.busy = VXP.getJSON(VXP.site + '/store/catalogue.json')
+          .then(c => { store.cat = c; store.error = null; return c; })
+          .catch(e => { store.error = e.message; throw e; })
+          .finally(() => { store.busy = null; });
+        return store.busy;
+      }
+      const storeAbs = u => /^https?:/.test(u || '') ? u : VXP.site + (u || '');
+      const storePage = p => VXP.site + '/store/' + encodeURIComponent(p.slug || String(p.code || '').toLowerCase());
+      const storeState = st => ({ 'coming-soon': 'COMING SOON', concept: 'CONCEPT', 'on-sale': 'ON SALE', 'sold-out': 'SOLD OUT' })[st] || String(st || 'COMING SOON').toUpperCase();
+      // links open in the browser: a normal link on the web, the system browser in the app
+      const storeLink = a => { if (VXP.desktop) a.addEventListener('click', e => { e.preventDefault(); VXP.openExternal(a.href); }); return a; };
+      storeLink(document.getElementById('storeSite'));
+      async function renderStore() {
+        const grid = document.getElementById('storeGrid'), note = document.getElementById('storeNote');
+        let cat;
+        try { cat = await storeLoad(); } catch (e) { note.textContent = 'The store could not be reached (' + e.message + '). It is at vexvoid.com/store.'; return; }
+        document.getElementById('storeSite').href = VXP.site + '/store';
+        grid.innerHTML = '';
+        (cat.products || []).forEach(p => {
+          const card = document.createElement('div'); card.className = 'store-card'; card.dataset.code = p.code;
+          const img = document.createElement('img'); img.alt = p.name + ' (' + p.code + ')'; img.loading = 'lazy'; img.src = storeAbs(p.mockup || (p.art && p.art.source));
+          const meta = document.createElement('div'); meta.className = 'store-meta';
+          const name = document.createElement('div'); name.className = 'store-name'; name.textContent = p.name;
+          const code = document.createElement('div'); code.className = 'store-code';
+          const c1 = document.createElement('span'); c1.textContent = p.code;
+          const c2 = document.createElement('span'); c2.className = 'store-state'; c2.textContent = storeState(p.status);
+          code.append(c1, c2);
+          const a = storeLink(Object.assign(document.createElement('a'), { className: 'gen-btn', href: storePage(p), target: '_blank', rel: 'noopener', textContent: 'VIEW ON VEXVOID.COM' }));
+          meta.append(name, code, a); card.append(img, meta); grid.appendChild(card);
+        });
+        const n = (cat.products || []).length;
+        document.getElementById('storeSub').textContent = `V3XV0ID MERCH · ${n} ITEM${n === 1 ? '' : 'S'} · ${storeState(cat.status)}`;
+        note.textContent = cat.status === 'coming-soon' ? 'Coming soon: the range is shown here, buying opens on vexvoid.com. Prices in USD. Trading between players is in MARKET.'
+          : 'Buy on vexvoid.com: each item opens its page there. Prices in USD.';
+      }
+      document.querySelector('[data-tab="store"]').addEventListener('click', () => { renderStore(); });
+      VXCMD.store = { doc: 'The V3XV0ID merch range from vexvoid.com/store (what we sell; not the MARKET): code, name, status, page', run: async () => {
+        const cat = await storeLoad();
+        return { status: cat.status, products: (cat.products || []).map(p => ({ code: p.code, name: p.name, status: p.status, priceUsd: p.priceUsd == null ? null : p.priceUsd, page: storePage(p), mockup: storeAbs(p.mockup) })) };
+      } };
+
+      // ===== web studio: the output's place (mixer monitor, fullscreen, its own window) and the tab to start on =====
+      if (VXP.web) {
+        const full = document.getElementById('outFullChip'), popc = document.getElementById('outPopChip');
+        full.addEventListener('click', () => VXP.fullscreenOutput().catch(e => alert(e.message)));
+        popc.addEventListener('click', () => {
+          if (VXP.outputState().where === 'window') VXP.dockOutput(); else VXP.popOutput().catch(e => alert(e.message));
+        });
+        VXP.onOutput = st => { popc.textContent = st.where === 'window' ? 'OUTPUT TO MIXER' : 'OUTPUT WINDOW'; popc.classList.toggle('on', st.where === 'window'); };
+        VXCMD.output = { args: '{where? mixer|window|fullscreen}', doc: 'Web studio: where the output shows', run: async a => {
+          if (a.where === 'window') await VXP.popOutput(); else if (a.where === 'mixer') await VXP.dockOutput(); else if (a.where === 'fullscreen') await VXP.fullscreenOutput();
+          return VXP.outputState();
+        } };
+        document.querySelector('[data-tab="layers"]').click();
+      }
+
       console.log('🎛️ All V3XV0ID Tab Content Systems initialized');
     });
   </script>
@@ -9177,7 +9294,7 @@ Reply with only the JSON array in one \`\`\`json code block.`;
   <script>
     // ===== VX engine panel: mirrors the output window's engine state and forwards changes over IPC =====
     window.addEventListener('DOMContentLoaded', function () {
-      const { ipcRenderer } = require('electron');
+      const ipcRenderer = VXP.ipc;
       const panel = document.getElementById('vxPanel');
       if (!panel) return;
       let st = {};

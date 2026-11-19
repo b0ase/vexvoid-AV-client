@@ -5,6 +5,7 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=800, initial-scale=1.0">
   <title>V3XV0ID AV Client - Output</title>
+  <script src="./vx/platform.js" data-role="output"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap');
     
@@ -276,7 +277,7 @@
   <script>
     // ===== VX engine: mounted once, driven from the controls window over IPC ('vx' command) =====
     window.addEventListener('DOMContentLoaded', function() {
-      const { ipcRenderer } = require('electron');
+      const ipcRenderer = VXP.ipc;
       let saved = null;
       try { saved = JSON.parse(localStorage.getItem('vx-state') || 'null'); } catch (e) { saved = null; }
       if (saved) saved.blackout = false;
@@ -307,9 +308,9 @@
   <script src="./vx/vx-keys.js"></script>
   <script>
     window.addEventListener('DOMContentLoaded', function() {
-      const { ipcRenderer } = require('electron');
-      const fs = require('fs');
-      const path = require('path');
+      const ipcRenderer = VXP.ipc;
+      const fs = VXP.fs;
+      const path = VXP.path;
       const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif'];
       const videoExtensions = ['.mp4', '.mov', '.avi', '.webm', '.mkv'];
       
@@ -459,7 +460,7 @@
             if (!l || !l.imageFiles || !l.imageFiles.length) break;
             const i = Math.max(0, Math.min(l.imageFiles.length - 1, Number(data.index) || 0));
             if (l.isVideo) loadVideoAtIndex(l, l.imageFiles, i);
-            else { l.imageIndex = i; if (l.imageElement) l.imageElement.src = 'file://' + encodeURI(l.imageFiles[i]); }
+            else { l.imageIndex = i; if (l.imageElement) l.imageElement.src = VXP.fileUrl(l.imageFiles[i]); }
             sendLayersUpdate();
             break;
           }
@@ -522,8 +523,57 @@
           case 'update-video-property':
             updateVideoProperty(data.layerId, data.property, data.value);
             break;
+          case 'export-layers': // the output is moving (web: mixer <-> its own window): everything needed to rebuild it
+            sendToControl('layers-snapshot', exportLayers());
+            break;
+          case 'import-layers':
+            importLayers(data);
+            break;
         }
       });
+
+      // ===== Moving the output: the layers as data, and back (web studio: the output window and the mixer's monitor) =====
+      let lastBackgroundPath = null;
+      function exportLayers() {
+        return {
+          crossfader: currentCrossfader, globalPaused, background: lastBackgroundPath,
+          layers: layers.map(l => ({
+            palette: l.palette || 'A', visible: l.visible !== false, files: (l.imageFiles || []).slice(), imageIndex: l.imageIndex || 0,
+            gen: l.gen && l.genSpec ? Object.assign({}, l.genSpec, { key: l.genKey, blend: l.blendMode }) : null,
+            props: { speed: l.speed, size: l.size, jitterAmount: l.jitterAmount, opacity: l.opacity, blendMode: l.blendMode || 'normal', strobe: l.strobe, impact: l.impact, fillFrame: l.fillFrame !== false },
+            inverse: !!l.inverse, fx: l.fx || 0, fy: l.fy || 0,
+            video: l.isVideo && l.imageElement ? { time: l.imageElement.currentTime || 0, paused: !!l.videoPaused, loopIn: l.videoLoopIn || 0, loopOut: l.videoLoopOut || 0 } : null
+          }))
+        };
+      }
+      function importLayers(snap) {
+        if (!snap || !Array.isArray(snap.layers)) return;
+        const DEF = { speed: 20, size: 100, jitterAmount: 0, opacity: 100, blendMode: 'normal', strobe: 0, impact: 0, fillFrame: true };
+        snap.layers.forEach(s => {
+          createLayer(s.palette || 'A');
+          const l = layers[layers.length - 1];
+          if (s.gen) applyGen(l, s.gen);
+          else if (s.files && s.files.length) {
+            loadImagesFromPaths(l.id, s.files);
+            if (s.imageIndex && !l.isVideo && l.imageFiles && l.imageFiles[s.imageIndex]) { l.imageIndex = s.imageIndex; if (l.imageElement) l.imageElement.src = VXP.fileUrl(l.imageFiles[s.imageIndex]); }
+          }
+          Object.keys(DEF).forEach(k => { if (s.props && s.props[k] != null && s.props[k] !== DEF[k]) updateLayerProperty(l.id, k, s.props[k]); });
+          if (s.inverse) toggleLayerInverse(l.id);
+          if (s.fx || s.fy) { const sc = (l.size || 100) / 100; l.fx = s.fx; l.fy = s.fy; l.x = l.fx * window.innerWidth / sc; l.y = l.fy * window.innerHeight / sc; if (!l.jitterEnabled) l.element.style.transform = `scale(${sc}) translate(${l.x}px, ${l.y}px)`; }
+          if (s.video && l.isVideo && l.imageElement) {
+            l.videoLoopIn = s.video.loopIn; l.videoLoopOut = s.video.loopOut;
+            const v = l.imageElement, at = s.video.time;
+            v.addEventListener('loadedmetadata', () => { try { v.currentTime = at; } catch (e) {} if (s.video.paused) { l.videoPaused = true; v.pause(); } }, { once: true });
+          }
+          if (!s.visible) toggleLayerVisibility(l.id);
+        });
+        if (snap.background) setDefaultBackground(snap.background);
+        if (snap.crossfader) handleCrossfaderUpdate(snap.crossfader);
+        if (snap.globalPaused && !globalPaused) toggleGlobalPause();
+        applyCrossfaderOpacities();
+        sendLayersUpdate();
+      }
+      VXP.beforeBye = () => sendToControl('layers-snapshot', exportLayers());
       
       function sendInitialState() {
         const layerData = layers.map(layer => ({
@@ -650,7 +700,7 @@
                   mediaElement.parentNode.replaceChild(imageElement, mediaElement);
                   layer.imageElement = imageElement;
                 }
-                layer.imageElement.src = 'file://' + encodeURI(firstFile);
+                layer.imageElement.src = VXP.fileUrl(firstFile);
                 layer.isVideo = false;
                 if (layer.inverse) layer.imageElement.style.filter = 'invert(1)';
                 layer.imageElement.classList.toggle('fit-contain', !layer.fillFrame);
@@ -1019,7 +1069,7 @@
         thumbnailsDiv.innerHTML = '';
         imageFiles.forEach((file, idx) => {
           const thumb = document.createElement('img');
-          thumb.src = 'file://' + encodeURI(file);
+          thumb.src = VXP.fileUrl(file);
           thumb.className = 'thumbnail';
           thumb.title = `Frame ${idx+1}`;
           thumb.style.border = idx === current ? '2px solid #fff' : '2px solid transparent';
@@ -1050,7 +1100,7 @@
         if (current < loopStart || current > loopEnd) current = loopStart;
         if (current >= imageFiles.length) current = Math.min(loopEnd, imageFiles.length - 1);
         
-        img.src = 'file://' + encodeURI(imageFiles[current]);
+        img.src = VXP.fileUrl(imageFiles[current]);
         if (mainLayer) {
           mainLayer.imageIndex = current;
           // Apply inverse filter if main layer has inverse enabled
@@ -1183,7 +1233,7 @@
         
         const imageElement = document.createElement('img');
         if (imageFiles.length > 0) {
-          imageElement.src = 'file://' + encodeURI(imageFiles[layer.imageIndex]);
+          imageElement.src = VXP.fileUrl(imageFiles[layer.imageIndex]);
         }
         // an empty layer shows nothing: this window is the audience's screen
         imageElement.className = 'layer-image';
@@ -1390,7 +1440,7 @@
                 mediaElement.parentNode.replaceChild(videoElement, mediaElement);
                 layer.imageElement = videoElement;
               }
-              layer.imageElement.src = 'file://' + encodeURI(currentFile);
+              layer.imageElement.src = VXP.fileUrl(currentFile);
               layer.imageElement.play();
             } else {
               if (mediaElement.tagName === 'VIDEO') {
@@ -1400,7 +1450,7 @@
                 mediaElement.parentNode.replaceChild(imageElement, mediaElement);
                 layer.imageElement = imageElement;
               }
-              layer.imageElement.src = 'file://' + encodeURI(currentFile);
+              layer.imageElement.src = VXP.fileUrl(currentFile);
             }
             if (layer.inverse) layer.imageElement.style.filter = 'invert(1)';
             layer.imageElement.classList.toggle('fit-contain', !layer.fillFrame);
@@ -1433,7 +1483,7 @@
 
         const video = layer.imageElement;
         video.loop = false; // Don't loop individual videos — advance to next
-        video.src = 'file://' + encodeURI(filePath);
+        video.src = VXP.fileUrl(filePath);
         video.playbackRate = layer.playbackRate || 1.0;
         if (layer.inverse) video.style.filter = 'invert(1)';
         video.classList.toggle('fit-contain', !layer.fillFrame);
@@ -1653,7 +1703,7 @@
           const minIndex = Math.min(loopStart, imageFiles.length - 1);
           const maxIndex = Math.min(loopEnd, imageFiles.length - 1);
           if (current < minIndex) current = maxIndex;
-          img.src = 'file://' + encodeURI(imageFiles[current]);
+          img.src = VXP.fileUrl(imageFiles[current]);
           if (mainLayer) {
             mainLayer.imageIndex = current;
           }
@@ -1669,7 +1719,7 @@
             if (layer.imageIndex < minIndex) layer.imageIndex = maxIndex;
             const imageElement = layer.imageElement || layer.element.querySelector('.layer-image');
             if (imageElement) {
-              imageElement.src = 'file://' + encodeURI(layer.imageFiles[layer.imageIndex]);
+              imageElement.src = VXP.fileUrl(layer.imageFiles[layer.imageIndex]);
             }
           }
         });
@@ -1686,7 +1736,7 @@
           const minIndex = Math.min(loopStart, imageFiles.length - 1);
           const maxIndex = Math.min(loopEnd, imageFiles.length - 1);
           if (current > maxIndex) current = minIndex;
-          img.src = 'file://' + encodeURI(imageFiles[current]);
+          img.src = VXP.fileUrl(imageFiles[current]);
           if (mainLayer) {
             mainLayer.imageIndex = current;
           }
@@ -1702,7 +1752,7 @@
             if (layer.imageIndex > maxIndex) layer.imageIndex = minIndex;
             const imageElement = layer.imageElement || layer.element.querySelector('.layer-image');
             if (imageElement) {
-              imageElement.src = 'file://' + encodeURI(layer.imageFiles[layer.imageIndex]);
+              imageElement.src = VXP.fileUrl(layer.imageFiles[layer.imageIndex]);
             }
           }
         });
@@ -1849,7 +1899,7 @@
 
       // Function to load images into a specific layer
       async function loadImagesIntoLayer(layer) {
-        const { dialog } = require('@electron/remote');
+        const { dialog } = VXP;
         const result = await dialog.showOpenDialog({
           properties: ['openFile', 'openDirectory', 'multiSelections'],
           filters: [
@@ -1862,8 +1912,6 @@
           let layerImages = [];
           
           for (const filePath of result.filePaths) {
-            const fs = require('fs');
-            const path = require('path');
             const stat = fs.statSync(filePath);
             
             if (stat.isDirectory()) {
@@ -1887,7 +1935,7 @@
             // Update the layer's image
             const imageElement = layer.imageElement || layer.element.querySelector('.layer-image');
             if (imageElement) {
-              imageElement.src = 'file://' + encodeURI(layerImages[0]);
+              imageElement.src = VXP.fileUrl(layerImages[0]);
             }
             
             // Start animation for this layer
@@ -2039,7 +2087,8 @@
       
       function setDefaultBackground(imagePath) {
         if (imagePath) {
-          defaultBackgroundImage.src = 'file://' + encodeURI(imagePath);
+          lastBackgroundPath = imagePath;
+          defaultBackgroundImage.src = VXP.fileUrl(imagePath);
         }
         updatePlaceholderVisibility();
         sendPreviewUpdate();
