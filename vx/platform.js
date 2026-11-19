@@ -10,8 +10,11 @@
  *           client's read-only files (vx/catalogue.json); writes under /downloads become browser downloads
  *   dialog  file pickers (the picked files are copied into /userData/uploads/...) and "save" = a download
  *   cloud   signed-in copies of PNG uploads in the player's private folder (vexvoid.com /api/studio/files)
- *   Studio 2/3 features need Node (ffmpeg, demucs, recording the output window, the local API, the claude.ai relay):
- *   elements marked data-desktop are hidden on the web and VXP.desktopOnly() explains why.
+ *   Studio 2 (EDIT, the music editor, REC, EXPORT) runs in the browser: keepFiles/unzip bring dropped files in, userTag
+ *   keeps each signed-in wallet's edits apart, outputWindow() is what REC composites, and vx/webmix.js + vx/render.js
+ *   + vx/capture.js stand in for ffmpeg/melt and the window recorder.
+ *   Studio 3 needs Node or paid servers (demucs stems, Grok, the AI agent, big renders, the local API, the claude.ai
+ *   relay): elements marked data-desktop are hidden on the web and VXP.desktopOnly() explains why.
  */
 (function (root) {
   'use strict';
@@ -36,6 +39,11 @@
     VXP.env = function (k) { return root.process.env[k] || ''; };
     VXP.uploads = function () { return []; };
     VXP.cloud = null;
+    VXP.userTag = 'local';
+    // files dropped or picked in the page: their paths on this computer
+    VXP.keepFiles = function (files) { return Promise.resolve([].slice.call(files || []).map(function (f) { return (electron.webUtils && electron.webUtils.getPathForFile(f)) || f.path; }).filter(Boolean)); };
+    VXP.download = null;
+    VXP.outputWindow = function () { return null; };
     VXP.ready = Promise.resolve();
     VXP.desktopOnly = function () { return null; };
     return;
@@ -120,6 +128,8 @@
   var mem = new Map(), dirs = new Set(['/', '/app', '/userData', '/downloads', '/tmp']), urls = new Map();
   var enc = new TextEncoder(), dec = new TextDecoder();
   var persisted = function (p) { return p.indexOf('/userData/') === 0; };
+  // the output window reads uploads and recordings, never the edits or the music analysis: those stay out of the mirror
+  var mirrored = function (p) { return !/^\/userData\/(edit|audio-analysis)\//.test(p); };
   function fsErr(code, p, what) { var e = new Error(code + ': ' + (what || 'no such file or directory') + ', ' + p); e.code = code; e.path = p; return e; }
   function addDirs(p) { for (var d = path.dirname(p); d && !dirs.has(d); d = path.dirname(d)) { dirs.add(d); if (d === '/') break; } }
   function toData(x) {
@@ -135,12 +145,12 @@
     p = norm(p); addDirs(p); dropUrl(p);
     var ent = { data: data, mtime: mtime || Date.now() };
     mem.set(p, ent);
-    if (!quiet && persisted(p)) { idb('put', { path: p, data: data, mtime: ent.mtime }); post({ t: 'vfs', op: 'put', path: p, data: data, mtime: ent.mtime }); }
+    if (!quiet && persisted(p)) { idb('put', { path: p, data: data, mtime: ent.mtime }); if (mirrored(p)) post({ t: 'vfs', op: 'put', path: p, data: data, mtime: ent.mtime }); }
   }
   function del(p, quiet) {
     p = norm(p); dropUrl(p);
     var had = mem.delete(p);
-    if (had && !quiet && persisted(p)) { idb('delete', p); post({ t: 'vfs', op: 'del', path: p }); }
+    if (had && !quiet && persisted(p)) { idb('delete', p); if (mirrored(p)) post({ t: 'vfs', op: 'del', path: p }); }
     return had;
   }
   function applyRemote(m) { if (m.op === 'put') put(m.path, m.data, m.mtime, true); else if (m.op === 'del') del(m.path, true); }
@@ -151,6 +161,7 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 60000);
     VXP.lastDownload = { name: name, bytes: blob.size, at: Date.now() };
   }
+  VXP.download = download;
   function entry(p) { var e = mem.get(norm(p)); if (!e) throw fsErr('ENOENT', p); return e; }
   function stat(p) {
     if (isUrl(p)) return { size: 0, mtimeMs: 0, isDirectory: function () { return false; }, isFile: function () { return true; } };
@@ -282,6 +293,33 @@
       .map(function (p) { var n = path.basename(p); return { name: n, url: p, source: 'local', format: (path.extname(n).slice(1) || 'FILE').toUpperCase() }; });
   };
   VXP.removeUpload = function (p) { p = norm(p); if (p.indexOf('/userData/uploads/') !== 0) return false; var ok = del(p); if (VXP.cloud) VXP.cloud.remove(p).catch(function () {}); return ok; };
+  // files dropped on the page (or from an <input>): kept in this browser like picked ones; resolves to their paths
+  VXP.keepFiles = function (files) {
+    return Promise.all([].slice.call(files || []).map(function (f) { return keep(f, '/userData/uploads/' + KIND(f)); }));
+  };
+  // a .zip (Suno stems): its files kept under /userData/imports/<zip name>/ (stored and deflated entries; no zip64)
+  VXP.unzip = function (p) {
+    return VXP.readBlob(p).then(function (blob) {
+      return blob.arrayBuffer().then(function (ab) {
+        var dv = new DataView(ab), u8 = new Uint8Array(ab), e = -1;
+        for (var i = ab.byteLength - 22; i >= Math.max(0, ab.byteLength - 65557); i--) if (dv.getUint32(i, true) === 0x06054b50) { e = i; break; }
+        if (e < 0) throw new Error('not a zip file');
+        var n = dv.getUint16(e + 10, true), off = dv.getUint32(e + 16, true), list = [];
+        var dir = '/userData/imports/' + safe(path.basename(p).replace(/\.zip$/i, '')).slice(0, 60) + '-' + Date.now().toString(36);
+        for (var k = 0; k < n && dv.getUint32(off, true) === 0x02014b50; k++) {
+          var method = dv.getUint16(off + 10, true), csize = dv.getUint32(off + 20, true), nlen = dv.getUint16(off + 28, true), xlen = dv.getUint16(off + 30, true), clen = dv.getUint16(off + 32, true), loc = dv.getUint32(off + 42, true);
+          var name = dec.decode(u8.subarray(off + 46, off + 46 + nlen)); off += 46 + nlen + xlen + clen;
+          if (/\/$/.test(name) || /(^|\/)(__MACOSX|\.)/.test(name)) continue;
+          var start = loc + 30 + dv.getUint16(loc + 26, true) + dv.getUint16(loc + 28, true), raw = blob.slice(start, start + csize);
+          list.push({ name: name, method: method, raw: raw });
+        }
+        return Promise.all(list.map(function (x) {
+          var data = x.method === 0 ? Promise.resolve(x.raw) : x.method === 8 ? new Response(x.raw.stream().pipeThrough(new DecompressionStream('deflate-raw'))).blob() : Promise.reject(new Error('zip method ' + x.method));
+          return data.then(function (b) { var q = path.join(dir, safe(x.name.split('/').pop())); put(q, new Blob([b], { type: mimeOf(q) })); return q; });
+        }));
+      });
+    });
+  };
 
   // ---------------------------------------------------------------- cloud copies (signed in on vexvoid.com) -----------
   // PNG uploads up to 16 MB also go to the player's private folder (<identity key>/studio/...), so they follow the wallet
@@ -355,6 +393,8 @@
     root.addEventListener('beforeunload', function () { if (pop && !pop.closed) pop.close(); });
   };
   VXP.outputState = function () { return { where: pop ? 'window' : 'mixer', live: out.live, id: out.id }; };
+  // the output's own window (in the mixer's frame, or its own window): what REC composites and records
+  VXP.outputWindow = function () { return pop && !pop.closed ? pop : frame ? frame.contentWindow : null; };
   VXP.outputFrame = function () { return frame; };
   VXP.fullscreenOutput = function () {
     if (pop && !pop.closed) { pop.focus(); return Promise.resolve('window'); }
@@ -386,14 +426,32 @@
   // The page's DOMContentLoaded handlers wait until the files are loaded (they read them synchronously) and p5 is in.
   function loadScript(src) { return new Promise(function (res) { var s = document.createElement('script'); s.src = src; s.onload = s.onerror = function () { res(); }; document.head.appendChild(s); }); }
   var here = script ? script.src.replace(/vx\/platform\.js.*$/, '') : './';
-  var catalogue = role === 'controls' ? fetch(here + 'vx/catalogue.json').then(function (r) { return r.ok ? r.arrayBuffer() : null; }).then(function (b) { if (b) put('/app/vx/catalogue.json', new Uint8Array(b), Date.now(), true); }).catch(function () {}) : null;
-  VXP.ready = Promise.all([loadAll(), catalogue, root.p5 ? null : loadScript(here + 'vx/lib/p5.min.js')]);
+  // the client's read-only data: the catalogue, and the clip notes (EDIT's cutter reads them; they keep clips with faces
+  // or colour out of the edit pool)
+  var appFile = function (f) { return fetch(here + 'vx/' + f).then(function (r) { return r.ok ? r.arrayBuffer() : null; }).then(function (b) { if (b) put('/app/vx/' + f, new Uint8Array(b), Date.now(), true); }).catch(function () {}); };
+  var catalogue = role === 'controls' ? Promise.all([appFile('catalogue.json'), appFile('clip-notes.json')]) : null;
+  // whose studio this is: the signed-in wallet (vexvoid.com) keeps its own edits; 'local' when there is no session
+  VXP.userTag = 'local';
+  var who = role !== 'controls' ? null : Promise.race([new Promise(function (r) { setTimeout(r, 3000); }),
+    fetch('/api/bwalletx/session', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var k = j && j.identityKey; if (typeof k === 'string' && /^0[23][0-9a-f]{64}$/i.test(k)) VXP.userTag = k.slice(0, 16).toLowerCase();
+    }).catch(function () {})]);
+  VXP.ready = Promise.all([loadAll(), catalogue, who, root.p5 ? null : loadScript(here + 'vx/lib/p5.min.js')]);
   var addEL = root.addEventListener.bind(root), queue = Promise.resolve();
   root.addEventListener = function (type, fn, opts) {
     if (type !== 'DOMContentLoaded' || typeof fn !== 'function') return addEL(type, fn, opts);
     return addEL(type, function (ev) { queue = queue.then(function () { return VXP.ready; }).then(function () { fn.call(root, ev); }).catch(function (e) { console.error(e); }); }, opts);
   };
   if (role === 'output') {
+    // web media from other hosts load with CORS (every host we use sends the headers), so REC can composite the output
+    // onto one canvas without it going "tainted" (vx/capture.js); the app plays files from disk and is left as it is
+    [root.HTMLImageElement, root.HTMLMediaElement].forEach(function (C) {
+      var d = C && Object.getOwnPropertyDescriptor(C.prototype, 'src'); if (!d || !d.set) return;
+      Object.defineProperty(C.prototype, 'src', { configurable: true, enumerable: d.enumerable, get: d.get, set: function (v) {
+        try { if (/^https?:/i.test(v) && this.getAttribute('crossorigin') == null && new URL(v, location.href).origin !== location.origin) this.crossOrigin = 'anonymous'; } catch (e) {}
+        d.set.call(this, v);
+      } });
+    });
     // hello once the page's own handlers are listening (they run after VXP.ready, in order)
     addEL('DOMContentLoaded', function () { setTimeout(function () { queue = queue.then(function () { post({ t: 'hello', from: me }); }); }, 0); });
     addEL('pagehide', function () { try { if (VXP.beforeBye) VXP.beforeBye(); } catch (e) {} post({ t: 'bye', from: me }); });

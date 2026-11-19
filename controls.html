@@ -1839,7 +1839,40 @@
     .ed-stage{flex:1;min-height:0;container-type:size;display:grid;place-items:center;background:#030303}
     .ed-frame{position:relative;width:min(100cqw,calc(100cqh * 16 / 9));aspect-ratio:16/9;background:#000;overflow:hidden}
     .ed-frame[data-look="house"] .ed-layer,.ed-frame[data-look="scope"] .ed-layer{filter:grayscale(1) contrast(1.12)}
-    .ed-layer{position:absolute;inset:0;transform-origin:50% 50%}.ed-layer video{width:100%;height:100%;object-fit:cover;display:block}
+    .ed-layer{position:absolute;inset:0;transform-origin:50% 50%}.ed-layer video,.ed-layer img{width:100%;height:100%;object-fit:cover;display:block}
+    .ed-clip img{width:100%;aspect-ratio:16/9;object-fit:cover;background:#111;display:block;filter:grayscale(1);pointer-events:none}.ed-clip:hover img{filter:none}
+    .ed-add{padding:3px 8px;font-size:12px;line-height:1}
+    .ed-pj{position:relative}
+    #edTrack{max-width:260px}
+    .ed-pjm{position:absolute;top:calc(100% + 4px);left:0;z-index:50;width:340px;max-height:60vh;overflow:auto;background:#000;border:1px solid #fff;padding:8px;display:flex;flex-direction:column;gap:6px;font-size:10px}
+    .ed-pjm[hidden]{display:none}
+    .ed-pjm .ed-pjr{display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;padding:6px;border:1px solid #222;cursor:pointer}
+    .ed-pjm .ed-pjr:hover{border-color:#888}.ed-pjm .ed-pjr.on{border-color:#fff;background:#111}
+    .ed-pjm .ed-pjr b{font-size:10px;letter-spacing:.08em;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .ed-pjm .ed-pjr small{font-size:8px;letter-spacing:.12em;color:#777;white-space:nowrap}
+    .ed-pjm .ed-pjr button{background:none;border:1px solid #333;color:#888;cursor:pointer;font:inherit;font-size:9px;padding:1px 6px}.ed-pjm .ed-pjr button:hover{color:#fff;border-color:#fff}
+    .ed-pjm .ed-pja{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+    .ed-pjm .ed-pja button{font:inherit;font-size:9px;letter-spacing:.14em;background:none;color:#ddd;border:1px solid #333;padding:7px 4px;cursor:pointer}.ed-pjm .ed-pja button:hover{border-color:#fff;color:#fff}
+    .ed-pjm .ed-pjn{font-size:8px;letter-spacing:.1em;line-height:1.6;color:#666}
+    /* a phone on its side (844x390) and other short screens: one-line toolbar that scrolls sideways, a smaller preview,
+       slimmer timeline rows (ED_H follows in the script) */
+    @media (max-height: 560px) {
+      .ed{gap:4px}
+      .ed-top{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;gap:4px;scrollbar-width:none;min-height:28px}
+      .ed-top::-webkit-scrollbar{display:none}
+      .ed-top > *{flex:none}
+      .ed-title{flex:none;min-width:0;max-width:140px;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .ed-top .gen-btn,.ed-top .gen-select{padding:3px 6px;font-size:9px}
+      .ed-ic{height:22px;width:24px;font-size:11px}
+      .ed-main{grid-template-columns:30px 132px minmax(0,1fr) 170px;gap:4px}
+      .ed-rail{overflow-y:auto;padding:2px 0;gap:2px}.ed-rail button{width:24px;height:24px}.ed-rail svg{width:13px;height:13px}
+      .ed-mhead{padding:3px;gap:3px}.ed-bin{gap:4px;padding:3px}.ed-hint{display:none}
+      .ed-transport{padding:2px 6px;gap:4px}.ed-tc{font-size:9px;min-width:0}.ed-tc small{display:none}.ed-tbtns button{width:24px;height:20px}
+      .ed-insp{padding:6px;gap:5px}
+      .ed-tlbar{padding:2px 6px;gap:8px;font-size:8px}.ed-tlbar #edLen{display:none}.ed-zoom input{width:70px}
+      .ed-tlgrid{grid-template-columns:64px minmax(0,1fr)}.ed-hd{font-size:7px;padding:0 3px}.ed-hd svg{width:10px;height:10px}
+    }
+    .ed-big{border:1px solid #fff;padding:8px;font-size:9px;line-height:1.6;letter-spacing:.06em;color:#ddd}.ed-big b{display:block;font-size:10px;letter-spacing:.2em;margin-bottom:4px}
     .ed-lbox{position:absolute;inset:0;pointer-events:none}
     .ed-lbox::before,.ed-lbox::after{content:'';position:absolute;left:0;right:0;height:var(--lb,0%);background:#000}.ed-lbox::before{top:0}.ed-lbox::after{bottom:0}
     .ed-transport{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-top:1px solid #1d1d1d;gap:10px}
@@ -2141,7 +2174,7 @@
   <div class="v3xv0id-header">
     <div class="v3xv0id-brand">V3XV0ID</div>
     <div class="v3xv0id-subtitle">AV MIXER</div>
-    <button id="recChip" class="midi-chip" data-desktop title="Record the output and the music to a video file">REC</button>
+    <button id="recChip" class="midi-chip" title="Record the output and the music to a video file (it lands in VIDEOS and the EDIT bin)">REC</button>
     <button id="liveChip" class="midi-chip" data-desktop title="Stream the output, pay per view">GO LIVE</button>
     <button id="bwxChip" class="midi-chip bwx-chip" data-desktop>CONNECT bWALLETX</button>
     <button id="claudeChip" class="midi-chip" data-desktop title="Control this mixer from claude.ai">CLAUDE.AI</button>
@@ -2190,7 +2223,7 @@
     <button class="tab-button" data-tab="videos">VIDEOS</button>
     <button class="tab-button" data-tab="images">IMAGES</button>
     <button class="tab-button" data-tab="composer" data-desktop>COMPOSER</button>
-    <button class="tab-button" data-tab="edit" data-desktop>EDIT</button>
+    <button class="tab-button" data-tab="edit">EDIT</button>
     <button class="tab-button" data-tab="titles">TITLES</button>
     <button class="tab-button" data-tab="game" data-desktop>GAME</button>
     <button class="tab-button" data-tab="wallet" data-desktop>WALLET</button>
@@ -2453,7 +2486,7 @@
       <div class="global-controls">
         <button class="global-btn resume" id="playPauseBtn">PAUSE ALL</button>
         <button class="global-btn" id="setBackgroundBtn">SET BACKGROUND</button>
-        <button class="global-btn" id="recordBtn" data-desktop style="border-color: var(--white-30);">● REC</button>
+        <button class="global-btn" id="recordBtn" style="border-color: var(--white-30);">● REC</button>
         <div id="recordStatus" style="font-size:9px;color:var(--white-30);text-align:center;margin-top:2px;letter-spacing:0.1em;display:none;"></div>
       </div>
     </div>
@@ -2720,10 +2753,11 @@
       <div class="ed">
         <div class="ed-top">
           <div class="ed-title" id="edTitle" contenteditable="true" spellcheck="false">UNTITLED VIDEO</div>
+          <div class="ed-pj"><button id="edProjBtn" class="gen-btn" title="Your edits: open one, start a new one, duplicate or delete, or save and open a project file">PROJECTS ▾</button><div class="ed-pjm" id="edProj" hidden></div></div>
           <button class="ed-ic" id="edUndo" title="Undo (⌘Z)">↶</button><button class="ed-ic" id="edRedo" title="Redo (⇧⌘Z)">↷</button>
           <select id="edTrack" class="gen-select"></select>
           <select id="edPace" class="gen-select"><option value="fast">FAST CUTS</option><option value="medium" selected>MEDIUM</option><option value="slow">SLOW</option></select>
-          <button id="edAuto" class="gen-btn hot" title="Cut the whole track from your clips on V1 (undo with ⌘Z)">AUTO-CUT</button><button id="edClear" class="gen-btn">CLEAR</button><label class="ed-finish" title="Faint V3X idents in the corners every ~19 s and matte flashes on the two biggest hits, as on the finished VexVoid videos"><input type="checkbox" id="edFinish" checked> FINISH</label><select id="edLook" class="gen-select" title="The look of the export: grade, letterbox and flash frames (rendered with MLT); the preview shows the grade and letterbox"><option value="house">HOUSE · MONO</option><option value="scope">SCOPE · 2.39 + FLASHES</option><option value="raw">RAW · AS SHOT</option></select><button id="edExport" class="gen-btn">EXPORT MP4</button><button id="edExportMix" class="gen-btn" title="The edited music alone, as a WAV (cuts, loops, fades, gains, stretches, stems)">EXPORT MIX</button><button id="edShotcut" class="gen-btn" title="Open the last export as a Shotcut project, to finish it by hand" disabled>OPEN IN SHOTCUT</button>
+          <button id="edAuto" class="gen-btn hot" title="Cut the whole track from your clips on V1 (undo with ⌘Z)">AUTO-CUT</button><button id="edClear" class="gen-btn">CLEAR</button><label class="ed-finish" data-desktop title="Faint V3X idents in the corners every ~19 s and matte flashes on the two biggest hits, as on the finished VexVoid videos"><input type="checkbox" id="edFinish" checked> FINISH</label><select id="edLook" class="gen-select" title="The look of the export: grade, letterbox and flash frames; the preview shows the grade and letterbox"><option value="house">HOUSE · MONO</option><option value="scope">SCOPE · 2.39 + FLASHES</option><option value="raw">RAW · AS SHOT</option></select><select id="edFormat" class="gen-select" data-web title="WebM (VP9 + Opus) or MP4 (H.264 + AAC), made in this browser"><option value="webm">WEBM</option><option value="mp4">MP4</option></select><select id="edSize" class="gen-select" data-web title="Picture size of the export"><option value="1080">1080p</option><option value="720">720p</option></select><button id="edExport" class="gen-btn">EXPORT MP4</button><button id="edExportMix" class="gen-btn" title="The edited music alone, as a WAV (cuts, loops, fades, gains, stretches, stems)">EXPORT MIX</button><button id="edShotcut" class="gen-btn" data-desktop title="Open the last export as a Shotcut project, to finish it by hand" disabled>OPEN IN SHOTCUT</button>
         </div>
         <div class="ed-main">
           <div class="ed-rail" id="edRail">
@@ -2741,9 +2775,9 @@
             <button data-act="section" title="Mark a section of 8 bars at the playhead (E)"><svg viewBox="0 0 16 16"><path d="M2 4h12v8H2zM6 4v8"/></svg></button>
           </div>
           <div class="ed-media">
-            <div class="ed-mhead"><input id="edFind" placeholder="SEARCH CLIPS" spellcheck="false"><select id="edSrc" class="gen-select"><option value="all">ALL</option><option value="catalogue">CATALOGUE</option><option value="generated">GROK</option><option value="recorded">RECORDED</option><option value="wallet">WALLET</option></select></div>
+            <div class="ed-mhead"><input id="edFind" placeholder="SEARCH CLIPS" spellcheck="false"><select id="edSrc" class="gen-select"><option value="all">ALL</option><option value="clips">CLIPS</option><option value="images">PICTURES</option><option value="mine" data-web>MY FILES</option><option value="catalogue">CATALOGUE</option><option value="generated">GROK</option><option value="recorded">RECORDED</option><option value="wallet">WALLET</option></select><button id="edAddFiles" class="gen-btn ed-add" title="Add your own clips, pictures or music (on the web they stay in this browser)">+</button><input type="file" id="edAnyFile" multiple accept="video/*,image/*,audio/*,.zip,.mp4,.mov,.m4v,.webm,.png,.jpg,.jpeg,.webp,.gif,.wav,.mp3,.m4a,.aif,.aiff,.flac,.ogg" style="display:none"></div>
             <div class="ed-bin" id="edBin"></div>
-            <div class="ed-hint">DRAG CLIPS ONTO THE TIMELINE · DOUBLE-CLICK DROPS ONE AT THE PLAYHEAD · FILES FROM FINDER WORK TOO</div>
+            <div class="ed-hint">DRAG CLIPS AND PICTURES ONTO THE TIMELINE · DOUBLE-CLICK DROPS ONE AT THE PLAYHEAD · DROP FILES FROM YOUR COMPUTER TOO</div>
           </div>
           <div class="ed-view">
             <div class="ed-stage"><div class="ed-frame" id="edStage"><div class="ed-layer" data-track="v1"></div><div class="ed-layer" data-track="tx"></div><div class="ed-layer" data-track="v2"></div><div class="ed-layer" data-track="dp"><div class="ed-dip"></div></div><div class="ed-layer ed-tlay" data-track="t1"></div><div class="ed-lbox"></div></div></div>
@@ -2844,7 +2878,7 @@
         <div class="ti-right">
           <div class="ti-view" id="tiView"></div>
           <div class="ti-knobs" id="tiKnobs"></div>
-          <div class="ti-acts"><button class="gen-btn hot" id="tiA">ADD TO A</button><button class="gen-btn hot" id="tiB">ADD TO B</button><button class="gen-btn" id="tiCode" title="Open the layer as code in PATTERNS, to change it by hand">OPEN IN PATTERNS</button><button class="gen-btn" id="tiEdit" data-desktop title="Put this title on the EDIT timeline (T1) at the playhead, two bars long; it goes into the exported video">TO EDIT</button></div>
+          <div class="ti-acts"><button class="gen-btn hot" id="tiA">ADD TO A</button><button class="gen-btn hot" id="tiB">ADD TO B</button><button class="gen-btn" id="tiCode" title="Open the layer as code in PATTERNS, to change it by hand">OPEN IN PATTERNS</button><button class="gen-btn" id="tiEdit" title="Put this title on the EDIT timeline (T1) at the playhead, two bars long; it goes into the exported video">TO EDIT</button></div>
           <div class="ti-note" id="tiNote">A text layer sits over the deck's other layers. Its knobs stay live on the deck.</div>
         </div>
       </div>
@@ -4049,6 +4083,7 @@
       }
 
       recordBtn.addEventListener('click', async () => {
+        if (VXP.web) { document.getElementById('recChip').click(); return; }
         if (mediaRecorder && mediaRecorder.state === 'recording') {
           // Stop recording
           mediaRecorder.stop();
@@ -5860,9 +5895,20 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           .map(f => ({ name: 'RECORDED · ' + f.replace(/^\d{4}-\d\d-\d\dT[\d-]+-/, '').replace(/\.(mp4|webm)$/, '').replace(/-/g, ' ').toUpperCase(), url: path.join(recDir, f), format: f.split('.').pop().toUpperCase(), source: 'local' }));
       }
       function recChip() { const c = document.getElementById('recChip'); if (!c) return; c.classList.toggle('on', !!rec.mr); c.textContent = rec.mr ? '● REC ' + mmss((Date.now() - rec.t0) / 1000) : 'REC'; }
+      // the mixing desk's ● REC is the same recorder on the web (on the desktop it keeps its own save-as flow)
+      function recBtnSync() { if (!VXP.web) return; const b = document.getElementById('recordBtn'); b.textContent = rec.mr ? '■ STOP REC' : '● REC'; b.style.color = rec.mr ? '#fff' : ''; b.style.borderColor = rec.mr ? '#fff' : 'var(--white-30)'; }
       setInterval(() => { if (rec.mr) recChip(); }, 500);
       async function startRecording(title) {
         if (rec.mr) throw new Error('already recording');
+        if (VXP.web) {
+          // the web: the output window composited onto one canvas (vx/capture.js) plus the music, no screen-share prompt
+          const win = VXP.outputWindow(); if (!win || !win.document || !win.document.body) throw new Error('the output is not open');
+          const a = musicAudio(), audio = a.captureStream ? a.captureStream().getAudioTracks() : [];
+          const cap = VXCAP.start(win, { width: 1920, height: 1080, fps: 30, audio, bitrate: 8e6 });
+          rec.mr = { web: cap }; rec.chunks = []; rec.title = String(title || 'V3XV0ID').slice(0, 60); rec.t0 = Date.now(); rec.tracks = audio;
+          recChip(); recBtnSync();
+          return { recording: true, audio: audio.length > 0, how: 'composited in the browser' };
+        }
         const sourceId = await ipcRenderer.invoke('get-output-source-id');
         if (!sourceId) throw new Error('output window not found');
         const video = await navigator.mediaDevices.getUserMedia({ audio: false, video: { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: sourceId, maxWidth: 1920, maxHeight: 1080, maxFrameRate: 30 } } });
@@ -5879,6 +5925,14 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       async function stopRecording() {
         if (!rec.mr) throw new Error('not recording');
         const fs = VXP.fs, path = VXP.path;
+        if (rec.mr.web) {
+          const r = await rec.mr.web.stop(); rec.tracks.forEach(t => t.stop());
+          rec.mr = null; recChip(); recBtnSync();
+          const slug = rec.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'v3xv0id';
+          const file = await recSave(`${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}-${slug}`, r.blob);
+          rec.last = { file, seconds: r.seconds, frames: r.frames, bytes: r.blob.size };
+          return { file, seconds: Math.round(r.seconds), mb: Math.round(r.blob.size / 1e5) / 10, frames: r.frames };
+        }
         rec.mr.stop(); await rec.done; rec.tracks.forEach(t => t.stop());
         const seconds = Math.round((Date.now() - rec.t0) / 1000);
         const buf = Buffer.from(await new Blob(rec.chunks).arrayBuffer());
@@ -5893,7 +5947,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         fs.mkdirSync(recDir, { recursive: true });
         fs.writeFileSync(base + '.webm', buf);
         let file = base + '.webm';
-        const ff = ['/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/usr/bin/ffmpeg'].find(p => fs.existsSync(p));
+        const ff = VXP.web ? null : ['/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/usr/bin/ffmpeg'].find(p => fs.existsSync(p));
         if (ff) {
           try {
             await new Promise((res, rej) => require('child_process').execFile(ff, ['-y', '-i', base + '.webm', '-vf', vf, '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '18', '-preset', 'medium',
@@ -5905,43 +5959,68 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         return file;
       }
       document.getElementById('recChip').addEventListener('click', async () => {
-        try { if (rec.mr) { const r = await stopRecording(); alertNote(`Saved ${r.seconds}s to VIDEOS: ${r.file.split('/').pop()}`); } else await startRecording('V3XV0ID ' + new Date().toISOString().slice(0, 10)); }
-        catch (e) { alertNote('REC: ' + e.message); }
+        const say = t => { alertNote(t); if (VXP.web) { const st = document.getElementById('recordStatus'); st.style.display = 'block'; st.textContent = t.toUpperCase(); } };
+        try { if (rec.mr) { const r = await stopRecording(); say(`Saved ${r.seconds}s to VIDEOS: ${r.file.split('/').pop()}`); } else { await startRecording('V3XV0ID ' + new Date().toISOString().slice(0, 10)); if (VXP.web) say('Recording the output and the music…'); } }
+        catch (e) { say('REC: ' + e.message); }
       });
       function alertNote(t) { const c = document.getElementById('recChip'); c.title = t; if (typeof aiLine === 'function' && document.getElementById('aiTab').classList.contains('active')) aiLine('tool', t); }
 
       // ===== EDIT: a timeline editor for music videos. vx/timeline.js holds the project and every edit; vx/editor.js cuts to the
       // music; vx/mlt.js renders. The mouse, the keyboard and VexVoid (the editor tool) all make the same edits, and all can be undone.
-      const ED_STORE = 'vx.edit.v2';
-      const ed = { title: 'UNTITLED VIDEO', track: null, proj: VXTL.newProject(), sel: [], t: 0, pps: 0, tool: 'select', snap: true, look: 'house', lookOver: null,
+      const ED_STORE = 'vx.edit.v2'; // the one edit kept before projects (Studio 2): it becomes the first project
+      const ED_KEYS = ['title', 'track', 'proj', 'pps', 'snap', 'look', 'lookOver', 't', 'grid'];
+      const ed = { id: null, title: 'UNTITLED VIDEO', track: null, proj: VXTL.newProject(), sel: [], t: 0, pps: 0, tool: 'select', snap: true, look: 'house', lookOver: null,
         env: null, playing: false, rate: 1, clk: null, raf: 0, rendering: false, lastExport: null, lastProject: null, snapAt: null, grid: 'beat', selSec: null, au: new Map() };
       const edHist = new VXTL.History();
+      // projects: one file each under <userData>/edit/<who>/ (vx/edit-store.js); in the browser that is IndexedDB, kept
+      // per signed-in wallet. As many as you like, as long as you like.
+      const edStore = VXEDSTORE.open({ fs: VXP.fs, path: VXP.path, dir: VXP.path.join(VXP.dir('userData'), 'edit', VXP.userTag) });
+      const ED_CUR = 'vx.edit.current.' + VXP.userTag;
+      // a saved edit into the tab (older shapes brought up to date)
+      function edApply(s) {
+        Object.assign(ed, { id: null, title: 'UNTITLED VIDEO', track: null, proj: VXTL.newProject(), pps: 0, snap: true, look: 'house', lookOver: null, t: 0, grid: 'beat' });
+        if (s) { ED_KEYS.forEach(k => { if (s[k] != null) ed[k] = s[k]; }); ed.id = s.id || null; }
+        if (!VXTL.track(ed.proj, 't1')) ed.proj.tracks.unshift(VXTL.newProject().tracks[0]); // edits saved before titles had a track
+        if (!ed.proj.sections) ed.proj.sections = [];
+        if (!ed.proj.markers) ed.proj.markers = [];
+        // edits saved before the music could be edited: A1 was a locked picture of the track; now the track is an item on it
+        const a1 = VXTL.track(ed.proj, 'a1');
+        if (a1 && !VXTL.audioLength(ed.proj)) { a1.locked = false; if (ed.track && ed.track.seconds) a1.items = [VXTL.item(edTrackItem(ed.track))]; }
+      }
       (function edLoad() {
+        let s = null;
         try {
-          const s = JSON.parse(localStorage.getItem(ED_STORE) || 'null');
-          if (s) { ['title', 'track', 'proj', 'pps', 'snap', 'look', 'lookOver', 't', 'grid'].forEach(k => { if (s[k] != null) ed[k] = s[k]; }); }
-          if (!VXTL.track(ed.proj, 't1')) ed.proj.tracks.unshift(VXTL.newProject().tracks[0]); // edits saved before titles had a track
-          // edits saved before the music could be edited: A1 was a locked picture of the track; now the track is an item on it
-          if (!ed.proj.sections) ed.proj.sections = [];
-          const a1 = VXTL.track(ed.proj, 'a1');
-          if (a1 && !VXTL.audioLength(ed.proj)) { a1.locked = false; if (ed.track && ed.track.seconds) a1.items = [VXTL.item(edTrackItem(ed.track))]; }
-          if (s) return;
-          const old = JSON.parse(localStorage.getItem('vx.edit.v1') || '{}'); // the first EDIT kept a plain list of shots
-          ['title', 'track', 'look', 'lookOver'].forEach(k => { if (old[k] != null) ed[k] = old[k]; });
-          if (old.shots) VXTL.track(ed.proj, 'v1').items = VXTL.fromShots(old.shots);
-        } catch (e) {}
+          const cur = localStorage.getItem(ED_CUR);
+          if (cur) s = edStore.load(cur);
+          if (!s) { const L = edStore.list(); if (L.length) s = edStore.load(L[0].id); }
+          if (!s && VXP.userTag === 'local') {
+            s = JSON.parse(localStorage.getItem(ED_STORE) || 'null');
+            const old = s ? null : JSON.parse(localStorage.getItem('vx.edit.v1') || 'null'); // the first EDIT kept a plain list of shots
+            if (old) { s = { title: old.title, track: old.track, look: old.look, lookOver: old.lookOver, proj: VXTL.newProject() }; if (old.shots) VXTL.track(s.proj, 'v1').items = VXTL.fromShots(old.shots); }
+          }
+        } catch (e) { s = null; }
+        edApply(s);
       })();
-      const edEl = id => document.getElementById(id);
-      const edTrk = id => VXTL.track(ed.proj, id);
-      const edShots = () => VXTL.sorted(edTrk('v1'));
-      const edLength = () => VXTL.length(ed.proj);
-      const edEnd = () => Math.max(edLength(), VXTL.audioLength(ed.proj)) || (ed.track && ed.track.seconds) || 0;
-      function edSave() { try { localStorage.setItem(ED_STORE, JSON.stringify({ title: ed.title, track: ed.track, proj: ed.proj, pps: ed.pps, snap: ed.snap, look: ed.look, lookOver: ed.lookOver, t: ed.t, grid: ed.grid })); } catch (e) {} }
+      function edState() { const s = { id: ed.id }; ED_KEYS.forEach(k => { s[k] = ed[k]; }); return s; }
+      let edSaveTimer = 0;
+      function edSaveNow() {
+        clearTimeout(edSaveTimer); edSaveTimer = 0;
+        try { ed.id = edStore.save(edState()); localStorage.setItem(ED_CUR, ed.id); } catch (e) { console.warn('EDIT: could not save', e); }
+        return ed.id;
+      }
+      // every change is saved a moment later (one write for a burst of edits); leaving the page saves at once
+      function edSave() { if (!edSaveTimer) edSaveTimer = setTimeout(edSaveNow, 300); }
+      window.addEventListener('pagehide', () => { if (edSaveTimer) edSaveNow(); });
       function edSay(t) { edEl('edStatus').textContent = t; }
       // every change to the edit goes through edDo, so it can be undone
       function edDo(fn) { edHist.push(ed.proj); const r = fn(); edSave(); edRender(); return r; }
       function edRestore(p) { if (!p) return; ed.proj = p; ed.sel = ed.sel.filter(i => VXTL.find(p, i)); edSave(); edRender(); }
       const edUndo = () => edRestore(edHist.undo(ed.proj)), edRedo = () => edRestore(edHist.redo(ed.proj));
+      const edEl = id => document.getElementById(id);
+      const edTrk = id => VXTL.track(ed.proj, id);
+      const edShots = () => VXTL.sorted(edTrk('v1'));
+      const edLength = () => VXTL.length(ed.proj);
+      const edEnd = () => Math.max(edLength(), VXTL.audioLength(ed.proj)) || (ed.track && ed.track.seconds) || 0;
       // the edit's tempo: one set by hand, else the music's (the earliest audio item's detected tempo through its trim and
       // stretch, VXTL.grid), else the track's, else the mixer's
       function edBpm() { const g = VXTL.grid(ed.proj); return (ed.track && ed.track.tempo) || (g && g.bpm) || (ed.track && ed.track.bpm) || (VXGEN.signals && VXGEN.signals.bpm) || 120; }
@@ -5960,15 +6039,25 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           phase: n.phase || (set === 'rough' || set === 'smooth' ? set : null), caution: !!n.caution, face: !!n.face, colour: !!n.colour, desc: n.desc || '', subject: n.subject || null,
           favourite: !!n.favourite, peak: !!n.peak, filler: !!n.filler };
       }
-      // every clip the mixer knows: recordings, Grok, the catalogue, the wallet
+      // every clip and picture the mixer knows: recordings, Grok, your own files, the catalogue, the wallet. Pictures go on
+      // V1/V2 like clips (a still for as long as the item runs); AUTO-CUT uses moving clips only.
+      const ED_IMG = /\.(png|jpe?g|webp|gif|bmp)([?#]|$)/i;
+      const edIsImg = src => ED_IMG.test(String(src || ''));
       function edPool(source, filter) {
+        const mine = k => VXP.uploads(k).map(f => ({ src: f.url, name: 'MY FILES · ' + f.name.replace(/\.[^.]+$/, '').toUpperCase(), kind: 'mine', image: k === 'images' }));
         const all = [].concat(
           recordedFiles().map(f => ({ src: f.url, name: f.name, kind: 'recorded' })),
           grokFiles('video').map(f => ({ src: f.url, name: f.name, kind: 'generated' })),
+          mine('videos'),
           catalogue().clips.map(c => ({ src: c.url, name: c.name, kind: 'catalogue', set: c.set, ...clipTraits(c.url, c.set) })).filter(c => !c.face && !c.colour),
-          walletMedia('clip').map(i => ({ src: i.url, name: i.name, kind: 'wallet' })));
+          walletMedia('clip').map(i => ({ src: i.url, name: i.name, kind: 'wallet' })),
+          mine('images'),
+          grokFiles('image').map(f => ({ src: f.url, name: f.name, kind: 'generated', image: true })),
+          (catalogue().images || []).map(c => ({ src: c.url, name: 'IMAGE · ' + String(c.name).toUpperCase(), kind: 'catalogue', set: c.set, image: true })),
+          walletMedia('image').map(i => ({ src: i.url, name: 'WALLET · ' + i.name, kind: 'wallet', image: true })));
         const q = String(filter || '').toLowerCase();
-        return all.filter(p => (!source || source === 'all' || p.kind === source) && (!q || (p.name + ' ' + (p.set || '') + ' ' + (p.phase || '') + ' ' + (p.desc || '')).toLowerCase().includes(q)));
+        const want = p => !source || source === 'all' || (source === 'images' ? p.image : source === 'clips' ? !p.image : p.kind === source);
+        return all.filter(p => want(p) && (!q || (p.name + ' ' + (p.set || '') + ' ' + (p.phase || '') + ' ' + (p.desc || '')).toLowerCase().includes(q)));
       }
       // logos, glyphs and ident cards belong in titles and the finish, never in the shot pool (studio rule)
       const isIdent = p => /\bIDENT\b|\bLOGO\b|\bGLYPH\b/i.test(p.name) || p.subject === 'glyph';
@@ -5976,13 +6065,27 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       async function edDurations(pool) { // how long each clip is (a hidden video element per clip, a few at a time); sets p.dur
         const out = [], q = pool.slice(0, 80);
         await Promise.all(Array.from({ length: 6 }, async () => { while (q.length) { const p = q.shift();
+          if (edIsImg(p.src)) { p.dur = 0; out.push(p); continue; } // a picture has no length of its own
           const v = document.createElement('video'); v.preload = 'metadata'; v.muted = true; v.src = /^\//.test(p.src) ? VXP.fileUrl(p.src) : p.src;
           p.dur = await new Promise(r => { v.onloadedmetadata = () => r(v.duration || 0); v.onerror = () => r(0); setTimeout(() => r(0), 8000); }); v.removeAttribute('src'); out.push(p); } }));
         return out;
       }
       // ----- the music. Each audio source is read once (waveform peaks, loudness, tempo) and kept in memory and on disk.
       const edAuDir = () => VXP.path.join(VXP.dir('userData'), 'audio-analysis');
-      const edAuKey = src => require('crypto').createHash('sha1').update(String(src)).digest('hex').slice(0, 16);
+      // a short name for a source: sha1 in the app (the cache files it already has), FNV-1a in the browser
+      const edAuKey = src => {
+        if (VXP.desktop) return require('crypto').createHash('sha1').update(String(src)).digest('hex').slice(0, 16);
+        let h1 = 0x811c9dc5, h2 = 0x01000193; const t = String(src);
+        for (let i = 0; i < t.length; i++) { const c = t.charCodeAt(i); h1 = Math.imul(h1 ^ c, 16777619) >>> 0; h2 = Math.imul(h2 ^ c, 2246822519) >>> 0; }
+        return (h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0')).slice(0, 16);
+      };
+      const edB64 = u8 => { if (VXP.desktop) return Buffer.from(u8).toString('base64'); let s = ''; for (let i = 0; i < u8.length; i += 32768) s += String.fromCharCode.apply(null, u8.subarray(i, i + 32768)); return btoa(s); };
+      const edUnB64 = b => VXP.desktop ? Uint8Array.from(Buffer.from(b, 'base64')) : Uint8Array.from(atob(b), c => c.charCodeAt(0));
+      // the bytes of a source: a file on this computer, a file kept in this browser, or a web address
+      async function edBytes(src) {
+        if (/^(\/|file:)/.test(src)) { const f = src.replace(/^file:\/\//, ''); return VXP.desktop ? new Uint8Array(VXP.fs.readFileSync(f)) : new Uint8Array(await (await VXP.readBlob(f)).arrayBuffer()); }
+        const r = await fetch(src); if (!r.ok) throw new Error('could not fetch the music (' + r.status + ')'); return new Uint8Array(await r.arrayBuffer());
+      }
       let edAuQ = Promise.resolve();
       function edAnalyse(src) {
         if (ed.au.has(src)) return ed.au.get(src);
@@ -5992,12 +6095,11 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           let st = null; try { st = /^(\/|file:)/.test(src) ? fs.statSync(src.replace(/^file:\/\//, '')) : null; } catch (e) {}
           try {
             const c = JSON.parse(fs.readFileSync(file, 'utf8'));
-            if (!st || c.mtime === st.mtimeMs) return Object.assign(c, { peaks: Uint8Array.from(Buffer.from(c.peaks, 'base64')), rms: Float32Array.from(c.rms, v => v / 1000) });
+            if (!st || c.mtime === st.mtimeMs) return Object.assign(c, { peaks: edUnB64(c.peaks), rms: Float32Array.from(c.rms, v => v / 1000) });
           } catch (e) {}
-          const bytes = /^(\/|file:)/.test(src) ? new Uint8Array(fs.readFileSync(src.replace(/^file:\/\//, ''))) : new Uint8Array(await (await fetch(src)).arrayBuffer());
-          const env = await VXEDIT.envelope(bytes);
+          const env = await VXEDIT.envelope(await edBytes(src));
           const A = { peaks: env.peaks, perSec: env.perSec, rms: env.rms, step: env.step, seconds: env.seconds, bpm: env.bpm, bar0: env.bar0, tempoConf: env.tempoConf, drums: env.drums, mtime: st ? st.mtimeMs : null };
-          try { fs.mkdirSync(edAuDir(), { recursive: true }); fs.writeFileSync(file, JSON.stringify(Object.assign({}, A, { peaks: Buffer.from(A.peaks).toString('base64'), rms: Array.from(A.rms, v => Math.round(v * 1000)) }))); } catch (e) {}
+          try { fs.mkdirSync(edAuDir(), { recursive: true }); fs.writeFileSync(file, JSON.stringify(Object.assign({}, A, { peaks: edB64(A.peaks), rms: Array.from(A.rms, v => Math.round(v * 1000)) }))); } catch (e) {}
           return A;
         });
         ed.au.set(src, job);
@@ -6049,7 +6151,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         edSay('Measuring the clips…');
         const wantsIdents = /ident|logo|glyph/i.test(filter);
         // recordings and earlier exports are whole videos: never cut them in unless asked for by name or source
-        let cands = edPool(source, filter).filter(p => (wantsIdents || !isIdent(p)) && (source === 'recorded' || /record/i.test(filter) || p.kind !== 'recorded'));
+        let cands = edPool(source, filter).filter(p => !p.image && (wantsIdents || !isIdent(p)) && (source === 'recorded' || /record/i.test(filter) || p.kind !== 'recorded'));
         // studio rule: a video uses its own world's clips plus the shared ones, never another track's world
         if (!filter) {
           const worlds = [...new Set(catalogue().tracks.map(t => t.title.toUpperCase()))], mine = String((ed.track && ed.track.name) || (VXTL.audioTracks(ed.proj).flatMap(t => t.items)[0] || {}).name || '').toUpperCase();
@@ -6071,10 +6173,13 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       function edVid(src) {
         let v = edVids.get(src);
         if (v) { edVids.delete(src); edVids.set(src, v); return v; } // most recently used goes last
-        v = document.createElement('video'); v.muted = true; v.playsInline = true; v.preload = 'auto';
-        edLocal(src).then(f => { v.addEventListener('loadedmetadata', () => edShowAt(ed.t, ed.playing && ed.rate > 0), { once: true }); v.src = VXP.fileUrl(f); }).catch(() => {});
+        if (edIsImg(src)) { v = new Image(); v.decoding = 'async'; edLocal(src).then(f => { v.onload = () => edShowAt(ed.t, false); v.src = VXP.fileUrl(f); }).catch(() => {}); }
+        else {
+          v = document.createElement('video'); v.muted = true; v.playsInline = true; v.preload = 'auto';
+          edLocal(src).then(f => { v.addEventListener('loadedmetadata', () => edShowAt(ed.t, ed.playing && ed.rate > 0), { once: true }); v.src = VXP.fileUrl(f); }).catch(() => {});
+        }
         edVids.set(src, v);
-        if (edVids.size > 10) for (const [k, old] of edVids) { if (edVids.size <= 10) break; if (!old.isConnected) { old.removeAttribute('src'); old.load(); edVids.delete(k); } }
+        if (edVids.size > 10) for (const [k, old] of edVids) { if (edVids.size <= 10) break; if (!old.isConnected) { old.removeAttribute('src'); if (old.load) old.load(); edVids.delete(k); } }
         return v;
       }
       // where in its file a clip is at time t (speed, backwards, and looping as the export does), and whether it can simply
@@ -6124,7 +6229,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           const v = edVid(nx.src); if (used.has(v) || !v.duration) return;
           const p0 = edSrcPos(nx, nx.start, v.duration); if (Math.abs(v.currentTime - p0) > 0.1) v.currentTime = p0;
         });
-        edVids.forEach(v => { if (!used.has(v) && !v.paused) v.pause(); });
+        edVids.forEach(v => { if (!used.has(v) && v.pause && !v.paused) v.pause(); });
         edTitleAt(t);
       }
 
@@ -6238,6 +6343,10 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
 
       // ----- timeline
       const ED_H = { ruler: 26, sec: 18, text: 34, video: 50, audio: 44 };
+      // short screens (a phone on its side) get slimmer rows, as the compact layout in the CSS
+      const ED_H_FULL = Object.assign({}, ED_H), ED_H_SHORT = { ruler: 18, sec: 12, text: 20, video: 26, audio: 24 };
+      function edRowSizes() { Object.assign(ED_H, innerHeight <= 560 ? ED_H_SHORT : ED_H_FULL); }
+      edRowSizes(); window.addEventListener('resize', () => { const h = ED_H.video; edRowSizes(); if (h !== ED_H.video && edEl('editTab').classList.contains('active')) edRender(); });
       const ED_IC = {
         eye: '<svg viewBox="0 0 16 16"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/></svg>',
         eyeOff: '<svg viewBox="0 0 16 16"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5zM2 2l12 12"/></svg>',
@@ -6248,7 +6357,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         play: '<svg viewBox="0 0 16 16"><path d="M4 2l10 6-10 6z"/></svg>', pause: '<svg viewBox="0 0 16 16"><path d="M4 2h3v12H4zM9 2h3v12H9z"/></svg>'
       };
       // rows under the ruler and the sections lane; audio rows get slimmer as stems add more of them
-      function edRows() { const na = VXTL.audioTracks(ed.proj).length; let y = ED_H.ruler + ED_H.sec; return ed.proj.tracks.map(tr => { const r = { tr, y, h: tr.kind === 'audio' ? (na > 2 ? 32 : ED_H.audio) : ED_H[tr.kind] }; y += r.h; return r; }); }
+      function edRows() { const na = VXTL.audioTracks(ed.proj).length; let y = ED_H.ruler + ED_H.sec; return ed.proj.tracks.map(tr => { const r = { tr, y, h: tr.kind === 'audio' ? (na > 2 ? Math.min(32, ED_H.audio) : ED_H.audio) : ED_H[tr.kind] }; y += r.h; return r; }); }
       const edFitPps = () => Math.max(1, Math.min(400, ((edEl('edScroll').clientWidth || 900) - 24) / Math.max(edEnd(), 10)));
       function edRender() {
         const content = edEl('edContent'); if (!content) return;
@@ -6397,8 +6506,12 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         edThumbBusy++; const src = edThumbQ.shift();
         try {
           const f = await edLocal(src);
-          const url = await new Promise(res => {
-            const v = document.createElement('video'); v.muted = true; v.preload = 'auto';
+          const url = edIsImg(src) ? await new Promise(res => {
+            const im = new Image(); if (/^https?:/.test(f)) im.crossOrigin = 'anonymous';
+            im.onload = () => { const c = document.createElement('canvas'); c.width = 96; c.height = 54; const x = c.getContext('2d'), sc = Math.max(96 / im.naturalWidth, 54 / im.naturalHeight); x.filter = 'grayscale(1)'; x.drawImage(im, (96 - im.naturalWidth * sc) / 2, (54 - im.naturalHeight * sc) / 2, im.naturalWidth * sc, im.naturalHeight * sc); let u = null; try { u = c.toDataURL('image/jpeg', 0.7); } catch (e) {} res(u); };
+            im.onerror = () => res(null); setTimeout(() => res(null), 12000); im.src = VXP.fileUrl(f);
+          }) : await new Promise(res => {
+            const v = document.createElement('video'); v.muted = true; v.preload = 'auto'; if (VXP.web && /^https?:/.test(f)) v.crossOrigin = 'anonymous';
             v.onloadedmetadata = () => { v.currentTime = Math.min(1, (v.duration || 2) / 2); };
             v.onseeked = () => {
               const c = document.createElement('canvas'); c.width = 96; c.height = 54; const x = c.getContext('2d'), s = Math.max(96 / v.videoWidth, 54 / v.videoHeight);
@@ -6515,9 +6628,9 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           <div class="ed-ih">CROSSFADE FROM THE ITEM BEFORE (EQUAL POWER)</div>${row('xf', it.tr && it.tr.dur)}
           <div class="ed-ih">TEMPO · STRETCH, PITCH KEPT</div>
           <div class="ed-bpm"><input type="number" min="40" max="240" step="0.1" value="${g ? g.bpm : ''}" ${it.bpm ? '' : 'disabled'}><button data-s="set">SET</button><button data-s="edit" title="Stretch to the edit's tempo (${edBpm()} BPM)">${edBpm()}</button><button data-s="reset">1×</button></div>
-          <div class="ed-note">Preview: approximate (playback rate, the player keeps the pitch). Export: ffmpeg atempo.</div>
+          <div class="ed-note">${ED_STRETCH_NOTE}</div>
           <div class="ed-ih">LOOP · PLAYS IT N TIMES, THE REST MOVES LATER</div><div class="ed-trs"><button data-l="2">×2</button><button data-l="4">×4</button><button data-l="8">×8</button><button data-l="16">×16</button></div>
-          <div class="ed-btns"><button data-a="split">SPLIT · S</button><button data-a="dup">DUPLICATE · ⌘D</button><button data-a="del">DELETE · ⌫</button><button data-a="ripple">RIPPLE · ⇧⌫</button><button data-a="section">MARK AS SECTION</button><button data-a="stems">SPLIT STEMS</button></div>
+          <div class="ed-btns"><button data-a="split">SPLIT · S</button><button data-a="dup">DUPLICATE · ⌘D</button><button data-a="del">DELETE · ⌫</button><button data-a="ripple">RIPPLE · ⇧⌫</button><button data-a="section">MARK AS SECTION</button><button data-a="stems" data-desktop>SPLIT STEMS</button></div>
           <div class="ed-note" id="edStemNote" style="display:none"></div>`;
         box.querySelector('b').textContent = it.name;
         const lock = () => { if (tr.locked) { edSay(`${tr.name} is locked.`); return true; } return false; };
@@ -6640,15 +6753,20 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       function edTool(t) { ed.tool = t; edTools(); edEl('edContent').classList.toggle('razor', t === 'razor'); }
 
       // ----- music edits from the panel, the keys and the agent (the edits themselves are in vx/timeline.js)
+      // how a stretch sounds, said as it is: the preview is the player's own rate change; the export is a real time-stretch
+      const ED_STRETCH_NOTE = VXP.web
+        ? 'Preview: the browser\'s playback rate with the pitch kept (close, not exact). Export here: WSOLA time-stretch in the browser, pitch kept; beyond about 0.8-1.25× drums smear a little. The desktop app uses ffmpeg atempo.'
+        : 'Preview: approximate (playback rate, the player keeps the pitch). Export: ffmpeg atempo.';
       function edStretch(iid, bpm) {
         const f = VXTL.find(ed.proj, iid); if (!f || !f.item.bpm) return null;
         let it; edDo(() => { it = VXTL.stretch(ed.proj, iid, bpm); });
-        if (it) { ed.sel = [it.id]; edMarkSel(); edSay(`${it.name}: ${VXTL.itemGrid(it).bpm} BPM (${(it.speed || 1).toFixed(3)}×, pitch kept). The preview is approximate; the export uses ffmpeg atempo.`); }
+        if (it) { ed.sel = [it.id]; edMarkSel(); edSay(`${it.name}: ${VXTL.itemGrid(it).bpm} BPM (${(it.speed || 1).toFixed(3)}×, pitch kept). The preview is approximate; the export uses ${VXP.web ? 'WSOLA in the browser' : 'ffmpeg atempo'}.`); }
         return it;
       }
       // audio files in: one file on a track; several (or a stems .zip, as Suno gives) as one stem group on parallel tracks
       const ED_AUDIO = /\.(wav|mp3|m4a|aac|aif|aiff|flac|ogg|opus)$/i;
       function edUnzip(zip) {
+        if (VXP.web) return VXP.unzip(zip).then(ps => ps.filter(f => ED_AUDIO.test(f)).sort());
         const path = VXP.path, fs = VXP.fs, dir = path.join(VXP.dir('userData'), 'imports', path.basename(zip).replace(/\.zip$/i, '').replace(/[^\w .()-]+/g, '_').slice(0, 60) + '-' + edAuKey(zip).slice(0, 6));
         fs.mkdirSync(dir, { recursive: true });
         require('child_process').execFileSync('/usr/bin/unzip', ['-o', '-q', zip, '-d', dir]);
@@ -6657,7 +6775,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       }
       async function edImportAudio(paths, at = 0, tid = null) {
         let files = [];
-        paths.forEach(p => { if (/\.zip$/i.test(p)) files = files.concat(edUnzip(p)); else if (ED_AUDIO.test(p)) files.push(p); });
+        for (const p of paths) { if (/\.zip$/i.test(p)) files = files.concat(await edUnzip(p)); else if (ED_AUDIO.test(p)) files.push(p); }
         if (!files.length) throw new Error('no audio files there (wav, mp3, m4a, aif, flac, ogg, or a .zip of them)');
         edSay(`Reading ${files.length === 1 ? VXP.path.basename(files[0]) : files.length + ' files'}…`);
         const list = [];
@@ -6683,6 +6801,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       }
       async function edStems(iid) {
         const f = VXTL.find(ed.proj, iid); if (!f || f.track.kind !== 'audio') throw new Error('pick a music item');
+        if (VXP.web) throw VXP.desktopOnly('Splitting stems');
         const dm = edDemucs();
         if (!dm) { const m = `Stem split needs demucs (free, open source, runs on this Mac). Install it in Terminal with <code>${ED_DEMUCS_INSTALL}</code> then press SPLIT STEMS again.`; edSay('Stem split needs demucs: ' + ED_DEMUCS_INSTALL); return m; }
         const path = VXP.path, fs = VXP.fs, file = await edLocal(f.item.src), out = path.join(VXP.dir('userData'), 'stems', edAuKey(file));
@@ -6724,8 +6843,24 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         await ffmpegRun(ff, VXTL.mixArgs({ segs: plan, total: len, out }), len, 'Mixing the music');
         return out;
       }
+      // the same music mixed in the browser (vx/webmix.js): the web studio's EXPORT MIX and the sound under its video export
+      async function edMixWeb(total) {
+        const plan = VXTL.audioPlan(ed.proj); if (!plan.length) return null;
+        const r = await VXMIX.mix(plan, src => edBytes(src), { rate: 48000, total: total || VXTL.audioLength(ed.proj),
+          progress: (k, src) => edSay(k === 'mix' ? 'Mixing the music…' : 'Reading ' + VXP.path.basename(String(src)).replace(/%20/g, ' ').slice(0, 48) + '…') });
+        if (r.missing.length) throw new Error('could not read ' + r.missing.map(x => VXP.path.basename(x)).join(', '));
+        return r;
+      }
+      const edSlug = (t, d) => String(t || ed.title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || d;
       async function edExportMix(title) {
         if (!VXTL.audioPlan(ed.proj).length) throw new Error('no music on the timeline (or every audio track is muted)');
+        if (VXP.web) {
+          const r = await edMixWeb(), wav = VXMIX.wav(r.chans, r.rate), name = `${edSlug(title, 'mix')}-mix.wav`;
+          VXP.download(name, new Blob([wav], { type: 'audio/wav' }));
+          ed.lastMix = { name, seconds: r.seconds, bytes: wav.length, ms: r.ms };
+          edSay(`Mix downloaded: ${name} · ${mmss(r.seconds)} · ${(wav.length / 1048576).toFixed(1)} MB · mixed in ${(r.ms / 1000).toFixed(1)} s`);
+          return name;
+        }
         const path = VXP.path, slug = String(title || ed.title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'mix';
         const out = path.join(recDir, 'mix', `${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}-${slug}.wav`);
         await edRenderMix(out); ed.lastMix = out; edSay('Mix saved: ' + out); return out;
@@ -6943,14 +7078,19 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         if (!row) return;
         if (ed.snap) t = VXTL.snap(t, edPts([]), edTol()).t;
         const raw = e.dataTransfer.getData('text/vx-clip');
-        // audio files (or a stems .zip) go to the music, whatever row they land on
-        const fpath = f => require('electron').webUtils ? require('electron').webUtils.getPathForFile(f) : f.path;
-        const sounds = raw ? [] : [...e.dataTransfer.files].filter(f => /^audio\//.test(f.type) || ED_AUDIO.test(f.name) || /\.zip$/i.test(f.name)).map(fpath);
-        if (sounds.length) { edImportAudio(sounds, t, row.tr.kind === 'audio' ? row.tr.id : null).catch(er => edSay(er.message)); return; }
-        if (row.tr.kind !== 'video') return;
-        const clips = raw ? [JSON.parse(raw)] : [...e.dataTransfer.files].filter(f => /^video\//.test(f.type) || /\.(mp4|mov|m4v|webm)$/i.test(f.name)).map(f => ({ src: (require('electron').webUtils ? require('electron').webUtils.getPathForFile(f) : f.path), name: f.name.replace(/\.[^.]+$/, '').toUpperCase() }));
-        if (clips.length) edDropClips(clips, row.tr.id, t);
+        if (raw) { if (row.tr.kind === 'video') edDropClips([JSON.parse(raw)], row.tr.id, t); return; }
+        edDropFiles([...e.dataTransfer.files], t, row.tr).catch(er => edSay(er.message));
       });
+      // files from the computer (dropped, or picked with + FILES): music (or a stems .zip) goes to the music whatever row it
+      // lands on; clips and pictures go on the video row (V1 when there is none). On the web they are kept in this browser.
+      const ED_VIS = /\.(mp4|mov|m4v|webm|png|jpe?g|webp|gif)$/i;
+      async function edDropFiles(files, t, row) {
+        const sounds = files.filter(f => /^audio\//.test(f.type) || ED_AUDIO.test(f.name) || /\.zip$/i.test(f.name));
+        const vis = files.filter(f => !sounds.includes(f) && (/^(video|image)\//.test(f.type) || ED_VIS.test(f.name)));
+        if (sounds.length) await edImportAudio(await VXP.keepFiles(sounds), t, row && row.kind === 'audio' ? row.id : null);
+        if (vis.length) { const ps = await VXP.keepFiles(vis); await edDropClips(ps.map((p, i) => ({ src: p, name: vis[i].name.replace(/\.[^.]+$/, '').toUpperCase() })), row && row.kind === 'video' ? row.id : 'v1', t); }
+        if (!sounds.length && !vis.length) edSay('Those files are not clips, pictures or music.');
+      }
       async function edDropClips(clips, tid, t) {
         edSay('Reading the clip…');
         const list = clips.map(c => ({ src: c.src, name: c.name })); await edDurations(list);
@@ -6963,16 +7103,17 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       function edBin(force) {
         const bin = edEl('edBin'); if (!bin) return;
         // shots first; idents (for titles and the finish), old recordings and exports at the end
-        const rank = p => p.kind === 'recorded' ? 3 : isIdent(p) ? 2 : p.kind === 'wallet' ? 1 : 0;
+        const rank = p => p.kind === 'recorded' ? 4 : isIdent(p) ? 3 : p.image ? 2 : p.kind === 'wallet' ? 1 : 0;
         const src = edEl('edSrc').value, q = edEl('edFind').value, list = edPool(src, q).map((p, i) => [p, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(x => x[0]), key = `${src}|${q}|${list.length}`;
         if (!force && bin.dataset.key === key) return;
         bin.dataset.key = key; bin.innerHTML = '';
         list.slice(0, 400).forEach(p => {
           const c = document.createElement('div'); c.className = 'ed-clip'; c.draggable = true; c.title = `${p.name}${p.desc ? '\n' + p.desc : ''}\nDrag onto the timeline, or double-click to drop it at the playhead on V1.`;
-          const v = document.createElement('video'); v.muted = true; v.preload = 'metadata'; v.loop = true; v.dataset.src = (/^\//.test(p.src) ? VXP.fileUrl(p.src) : p.src) + '#t=1';
+          const v = document.createElement(p.image ? 'img' : 'video'); if (!p.image) { v.muted = true; v.preload = 'metadata'; v.loop = true; } else v.alt = '';
+          v.dataset.src = (/^\//.test(p.src) ? VXP.fileUrl(p.src) : p.src) + (p.image ? '' : '#t=1');
           const n = document.createElement('span'); n.textContent = p.name.replace(/^(GROK|RECORDED|WALLET) · /, '');
           c.append(v, n); edBinSeen.observe(v);
-          c.onmouseenter = () => v.src && v.play().catch(() => {}); c.onmouseleave = () => v.pause();
+          if (!p.image) { c.onmouseenter = () => v.src && v.play().catch(() => {}); c.onmouseleave = () => v.pause(); }
           c.addEventListener('dragstart', e => { e.dataTransfer.setData('text/vx-clip', JSON.stringify({ src: p.src, name: p.name })); e.dataTransfer.effectAllowed = 'copy'; });
           c.addEventListener('dblclick', () => edDropClips([{ src: p.src, name: p.name }], 'v1', ed.t));
           bin.appendChild(c);
@@ -7035,7 +7176,9 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       }));
       edEl('edZoom').addEventListener('input', e => edZoom(Math.pow(400, +e.target.value)));
       edEl('edGrid').value = ed.grid; edEl('edGrid').addEventListener('change', e => { ed.grid = e.target.value; edSave(); edLabels(); edInspector(); });
-      edEl('edAudioFile').addEventListener('change', e => { const ps = [...e.target.files].map(f => require('electron').webUtils ? require('electron').webUtils.getPathForFile(f) : f.path); if (ps.length) edImportAudio(ps, 0).catch(er => edSay(er.message)); });
+      edEl('edAudioFile').addEventListener('change', e => { const fl = [...e.target.files]; if (fl.length) VXP.keepFiles(fl).then(ps => edImportAudio(ps, 0)).catch(er => edSay(er.message)); });
+      edEl('edAddFiles').addEventListener('click', () => { const i = edEl('edAnyFile'); i.value = ''; i.click(); });
+      edEl('edAnyFile').addEventListener('change', e => { const fl = [...e.target.files]; if (fl.length) edDropFiles(fl, ed.t, null).then(() => edBin(true)).catch(er => edSay(er.message)); });
       edEl('edUndo').addEventListener('click', edUndo); edEl('edRedo').addEventListener('click', edRedo);
 
       // ----- export
@@ -7080,6 +7223,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       }
       // what the export sees: the visible video tracks and, unless A1 is muted, the music
       async function edExport(title, finish = edEl('edFinish').checked) {
+        if (VXP.web) return edExportWeb(title);
         if (ed.rendering) throw new Error('already rendering');
         const vis = id => edTrk(id).hidden ? [] : VXTL.sorted(edTrk(id)), v1 = vis('v1'), v2 = vis('v2');
         if (!v1.length && !v2.length && !VXTL.sorted(edTrk('t1')).length) throw new Error('the timeline is empty');
@@ -7150,6 +7294,167 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           return out;
         } finally { ed.rendering = false; edEl('edExport').disabled = false; }
       }
+      // ----- projects: open, new, duplicate, delete; a project file to keep or move (PROJECTS ▾)
+      function edSwitch(s, msg) {
+        if (ed.playing) edStop();
+        if (edSaveTimer) edSaveNow();
+        edApply(s); edHist.past = []; edHist.future = []; ed.sel = []; ed.selSec = null; ed.env = null; ed.lastExport = null;
+        edEl('edLook').value = ed.look || 'house'; edEl('edGrid').value = ed.grid;
+        edSaveNow(); initializeEditTab(); edProjMenu(false);
+        if (msg) edSay(msg);
+      }
+      const edAgo = ms => { const m = Math.round((Date.now() - ms) / 60000); return m < 1 ? 'NOW' : m < 60 ? m + ' MIN' : m < 1440 ? Math.round(m / 60) + ' H' : Math.round(m / 1440) + ' D'; };
+      function edProjMenu(open) {
+        const box = edEl('edProj'); if (open === undefined) open = box.hidden; box.hidden = !open; if (!open) return;
+        if (edSaveTimer) edSaveNow();
+        const L = edStore.list();
+        box.innerHTML = `<div class="ed-ih">YOUR EDITS · ${L.length}</div><div class="ed-pjl"></div>
+          <div class="ed-pja"><button data-p="new">NEW EDIT</button><button data-p="dup">DUPLICATE THIS</button><button data-p="save">SAVE PROJECT FILE</button><button data-p="open">OPEN PROJECT FILE</button></div>
+          <div class="ed-pjn">${VXP.web ? 'Kept in this browser for your wallet, as many and as long as you like. A project file names its clips and music; the catalogue plays anywhere, your own files stay in the browser they were added in.' : 'Kept on this computer, as many and as long as you like. A project file names its clips and music by where they are.'}</div>`;
+        const list = box.querySelector('.ed-pjl');
+        if (!L.length) list.innerHTML = '<div class="ed-isub">Nothing saved yet: your first edit saves itself.</div>';
+        L.forEach(x => {
+          const r = document.createElement('div'); r.className = 'ed-pjr' + (x.id === ed.id ? ' on' : ''); r.dataset.id = x.id;
+          r.innerHTML = `<b></b><small>${mmss(x.seconds || 0)} · ${edAgo(x.saved || 0)}</small><button title="Delete this edit">✕</button>`;
+          r.querySelector('b').textContent = x.title || 'UNTITLED VIDEO';
+          r.onclick = e => { if (e.target.tagName === 'BUTTON') return; if (x.id !== ed.id) edSwitch(edStore.load(x.id), `Opened ${x.title}.`); else edProjMenu(false); };
+          r.querySelector('button').onclick = () => edProjDelete(x.id, x.title);
+          list.appendChild(r);
+        });
+        box.querySelectorAll('[data-p]').forEach(b => b.onclick = () => ({ new: edProjNew, dup: edProjDup, save: edProjSave, open: edProjOpenFile })[b.dataset.p]());
+      }
+      function edProjNew() { edSwitch({ title: 'UNTITLED VIDEO' }, 'A new edit. Your others are under PROJECTS.'); }
+      function edProjDup() { const s = JSON.parse(JSON.stringify(edState())); s.id = null; s.title = (String(ed.title) + ' COPY').slice(0, 60); edSwitch(s, 'Duplicated: you are working on the copy.'); }
+      function edProjDelete(id, title) {
+        if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
+        edStore.remove(id);
+        if (id === ed.id) { const L = edStore.list(); edSwitch(L.length ? edStore.load(L[0].id) : { title: 'UNTITLED VIDEO' }, `Deleted ${title}.`); }
+        else edProjMenu(true);
+      }
+      async function edProjSave() {
+        const name = edSlug(ed.title, 'edit') + '.vxedit.json', r = await VXP.dialog.showSaveDialog({ defaultPath: name, filters: [{ name: 'V3XV0ID edit', extensions: ['json'] }] });
+        if (r.canceled || !r.filePath) return;
+        VXP.fs.writeFileSync(r.filePath, VXEDSTORE.toFile(edState()));
+        edSay(VXP.web ? `Project file downloaded: ${name}` : `Project file saved: ${r.filePath}`); edProjMenu(false);
+      }
+      async function edProjOpenFile() {
+        const r = await VXP.dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'V3XV0ID edit', extensions: ['json', 'vxedit'] }] });
+        const f = r && !r.canceled && r.filePaths[0]; if (!f) return;
+        try {
+          const text = VXP.web ? await (await VXP.readBlob(f)).text() : VXP.fs.readFileSync(f, 'utf8');
+          if (VXP.web) VXP.removeUpload(f); // the file itself is not kept: the edit is
+          const s = VXEDSTORE.fromFile(text);
+          edSwitch(s, `Opened the project file as a new edit: ${s.title}.`);
+        } catch (e) { edSay(e.message); }
+      }
+      edEl('edProjBtn').addEventListener('click', e => { e.stopPropagation(); edProjMenu(); });
+      document.addEventListener('pointerdown', e => { const b = edEl('edProj'); if (!b.hidden && !e.target.closest('.ed-pj')) b.hidden = true; });
+
+      // ----- EXPORT in the browser (Studio 2): each frame composited on one canvas as the preview shows it (V1 with its
+      // transitions, pictures, V2 placed, the dips, the titles, the look's grade and letterbox, flash frames), encoded with
+      // WebCodecs (vx/render.js), the edited music mixed under it (vx/webmix.js). Frame by frame, not tied to the clock.
+      // FINISH (idents, matte flashes) and Shotcut projects stay in the desktop app.
+      const ED_WEB_MAX = 15 * 60;
+      function edBigNote(total) {
+        const m = `This edit runs ${mmss(total)}. The browser renders edits up to ${ED_WEB_MAX / 60} minutes; longer ones render in the desktop app, or are coming to the web as a paid render on our servers.`;
+        edSay(m); const box = edEl('edShot'); if (box) box.insertAdjacentHTML('afterbegin', `<div class="ed-big"><b>LONG RENDER</b>${m}</div>`);
+        return m;
+      }
+      // one element per source and role (V1, its crossfade, V2), so the same clip can show twice at once
+      function edExpMedia(src) {
+        return edLocal(src).then(f => new Promise((res, rej) => {
+          const url = VXP.fileUrl(f), cors = /^https?:/.test(url), bad = () => rej(new Error(`the browser cannot read ${VXP.path.basename(String(src)).replace(/%20/g, ' ')}${cors ? ' (its host does not allow it)' : ''}`));
+          if (edIsImg(src)) { const im = new Image(); if (cors) im.crossOrigin = 'anonymous'; im.onload = () => res(im); im.onerror = bad; im.src = url; return; }
+          const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.preload = 'auto'; if (cors) v.crossOrigin = 'anonymous';
+          v.addEventListener('loadeddata', () => res(v), { once: true }); v.addEventListener('error', bad, { once: true }); setTimeout(bad, 30000); v.src = url;
+        }));
+      }
+      function edSeekTo(v, pos) {
+        if (v.tagName !== 'VIDEO') return null;
+        if (Math.abs(v.currentTime - pos) < 1e-3 && v.readyState >= 2) return null;
+        return new Promise(res => { let done = false; const fin = () => { if (done) return; done = true; v.removeEventListener('seeked', fin); res(); }; v.addEventListener('seeked', fin); v.currentTime = pos; setTimeout(fin, 5000); });
+      }
+      function edCover(ctx, m, x, y, w, h) {
+        const iw = m.videoWidth || m.naturalWidth, ih = m.videoHeight || m.naturalHeight; if (!iw || !ih) return;
+        const s = Math.max(w / iw, h / ih), dw = iw * s, dh = ih * s;
+        ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip(); ctx.drawImage(m, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh); ctx.restore();
+      }
+      async function edExportWeb(title, o = {}) {
+        if (ed.rendering) { if (ed.abort) ed.abort.abort(); return null; } // pressing EXPORT again stops a render
+        const fmt = o.format || edEl('edFormat').value || 'webm', H = +(o.height || edEl('edSize').value || 1080), W = Math.round(H * 16 / 9 / 2) * 2, fps = 30;
+        const total = edLength();
+        if (!total) throw new Error('the timeline is empty: put clips, pictures or titles on it');
+        if (total > ED_WEB_MAX) return { note: edBigNote(total) };
+        const cap = await VXRENDER.check(fmt, W, H); if (!cap.ok) throw new Error(cap.why);
+        ed.rendering = true; ed.abort = new AbortController(); edEl('edExport').textContent = 'STOP RENDER'; if (ed.playing) edStop();
+        const media = new Map(), titles = new Map(), host = document.createElement('div');
+        host.style.cssText = 'position:fixed;left:-5000px;top:0;width:1920px;height:1080px;pointer-events:none'; document.body.appendChild(host);
+        try {
+          const vis = id => edTrk(id).hidden ? [] : VXTL.sorted(edTrk(id)), v1 = vis('v1'), v2 = vis('v2'), tts = vis('t1');
+          const trans = edTrk('v1').hidden ? [] : VXTL.transitions(edTrk('v1')), look = edLookNow(), g = look.grade;
+          edSay('Loading the clips…');
+          const need = [...v1.map(i => 'v1|' + i.src), ...trans.filter(T => T.kind === 'cross').map(T => 'tx|' + T.from.src), ...v2.map(i => 'v2|' + i.src)];
+          for (const k of new Set(need)) media.set(k, await edExpMedia(k.slice(3)));
+          const mixed = VXTL.audioPlan(ed.proj).length ? await edMixWeb(total) : null;
+          const flashF = new Set(edFlashTimes(look.flashes).map(x => Math.round(x * fps)));
+          const grade = g ? [g.saturation === 0 ? 'grayscale(1)' : g.saturation != null ? `saturate(${g.saturation})` : '', g.contrast != null ? `contrast(${g.contrast})` : '', g.brightness ? `brightness(${1 + g.brightness})` : ''].filter(Boolean).join(' ') || 'none' : 'none';
+          const lb = look.letterbox > W / H ? Math.round((H - W / look.letterbox) / 2) : 0;
+          // a title: its generator on a 1920x1080 stage off screen, ready before its first frame
+          async function titleAt(it, t) {
+            let tg = titles.get(it.id);
+            if (!tg) {
+              const f = VXTEXT.FONTS.find(x => x.id === it.font); if (f && document.fonts) await document.fonts.load(`${f.italic ? 'italic ' : ''}${f.weight} 64px "${f.family}"`);
+              const h = document.createElement('div'); h.style.cssText = 'position:absolute;inset:0'; host.appendChild(h);
+              tg = { h, g: VXGEN.mount(h, edTitleCode(it), { manual: true, scale: 1, seed: it.seed, params: { a: it.a, b: it.b, c: it.c, d: it.d } }) }; titles.set(it.id, tg);
+              const w0 = performance.now();
+              while (!tg.g.renderAt(it.in + t - it.start, edBeatAt(t)) || (it.mode === '3d' && VXTEXT3D.busy())) { if (performance.now() - w0 > 15000) throw new Error('a title did not load'); await new Promise(r => setTimeout(r, 50)); }
+            }
+            tg.g.renderAt(it.in + t - it.start, edBeatAt(t));
+            return tg.g.canvas();
+          }
+          const at = (list, t) => list.find(i => t >= i.start - 1e-6 && t < i.start + i.dur - 1e-6) || null;
+          let lastF = -1;
+          const draw = async (k, t, ctx) => {
+            const a = at(v1, t), b = at(v2, t), T = trans.length ? VXTL.transitionAt(trans, t) : null, cross = T && T.T.kind === 'cross' && media.get('tx|' + T.T.from.src);
+            // every clip on its frame first (they seek in parallel)
+            const seeks = [];
+            const pos = (m, it) => m.tagName === 'VIDEO' ? edSrcPos(it, t, m.duration || 1) : 0;
+            if (a) seeks.push(edSeekTo(media.get('v1|' + a.src), pos(media.get('v1|' + a.src), a)));
+            if (cross) seeks.push(edSeekTo(cross, pos(cross, T.T.from)));
+            if (b) seeks.push(edSeekTo(media.get('v2|' + b.src), pos(media.get('v2|' + b.src), b)));
+            await Promise.all(seeks.filter(Boolean));
+            ctx.globalAlpha = 1; ctx.filter = 'none'; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+            ctx.filter = grade;
+            const sf = a ? Math.round(a.start * fps) : -9, flash = a && flashF.has(sf) && k - sf < 2; // two white frames where a flash cut lands (as MLT)
+            if (flash) { ctx.filter = 'none'; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H); ctx.filter = grade; }
+            else if (a) edCover(ctx, media.get('v1|' + a.src), 0, 0, W, H);
+            if (cross) { ctx.globalAlpha = T.alpha; edCover(ctx, cross, 0, 0, W, H); ctx.globalAlpha = 1; }
+            if (b) {
+              const sc = b.scale != null ? b.scale : 1, w = W * sc, h = H * sc;
+              ctx.globalAlpha = b.opacity != null ? b.opacity : 1; edCover(ctx, media.get('v2|' + b.src), W / 2 + (b.x || 0) * W - w / 2, H / 2 + (b.y || 0) * H - h / 2, w, h); ctx.globalAlpha = 1;
+            }
+            ctx.filter = 'none';
+            if (T && T.T.kind !== 'cross') { ctx.globalAlpha = T.alpha; ctx.fillStyle = T.T.kind === 'white' ? '#fff' : '#000'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+            for (const it of tts) if (t >= it.start - 1e-6 && t < it.start + it.dur - 1e-6) ctx.drawImage(await titleAt(it, t), 0, 0, W, H);
+            // titles that are over free their stage
+            titles.forEach((tg, id) => { const it = tts.find(x => x.id === id); if (it && t >= it.start + it.dur) { tg.g.stop(); tg.h.remove(); titles.delete(id); } });
+            if (lb) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, lb); ctx.fillRect(0, H - lb, W, lb); }
+            lastF = k;
+          };
+          const r = await VXRENDER.encode({ format: fmt, width: W, height: H, fps, frames: Math.round(total * fps), draw, signal: ed.abort.signal,
+            audio: mixed ? { chans: mixed.chans, rate: mixed.rate } : null,
+            onProgress: (k, n, sec) => edSay(`Rendering ${Math.round(k / n * 100)}% · ${(k / fps / Math.max(sec, 0.01)).toFixed(2)}× real time · press STOP RENDER to stop`) });
+          const name = `${edSlug(title, 'video')}.${fmt}`;
+          VXP.download(name, r.blob);
+          ed.lastExport = { name, bytes: r.blob.size, seconds: r.seconds, ms: r.ms, speed: r.speed, video: r.video, audio: r.audio, width: W, height: H, fmt };
+          edSay(`Downloaded ${name} · ${mmss(r.seconds)} · ${W}x${H} ${r.video}${r.audio ? ' + ' + r.audio : ''} · ${(r.blob.size / 1048576).toFixed(1)} MB · rendered in ${(r.ms / 1000).toFixed(1)} s (${r.speed}× real time)`);
+          return ed.lastExport;
+        } finally {
+          titles.forEach(tg => { try { tg.g.stop(); } catch (e) {} }); host.remove();
+          media.forEach(m => { m.removeAttribute('src'); if (m.load) m.load(); });
+          ed.rendering = false; ed.abort = null; edEl('edExport').textContent = VXP.web ? 'EXPORT VIDEO' : 'EXPORT MP4';
+        }
+      }
       function initializeEditTab() {
         const sel = edEl('edTrack');
         const fill = () => { sel.innerHTML = '<option value="">PICK A TRACK…</option>' + musicLibraryTracks.map(t => `<option value="${t.id}">${t.name.replace(/</g, '')}</option>`).join(''); if (ed.track) { const t = musicLibraryTracks.find(x => x.url === ed.track.url); if (t) sel.value = t.id; } };
@@ -7159,6 +7464,10 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       edEl('edTrack').addEventListener('change', e => { const t = musicLibraryTracks[Number(e.target.value)]; if (t) edSetTrack(t); });
       edEl('edAuto').addEventListener('click', () => edAutoCut({ pace: edEl('edPace').value }).catch(e => edSay(e.message)));
       edEl('edExport').addEventListener('click', () => edExport().catch(e => edSay(e.message)));
+      if (VXP.web) { edEl('edExport').textContent = 'EXPORT VIDEO'; edEl('edExport').title = 'Render the edit in this browser (WebM or MP4, 1080p or 720p) and download it'; edEl('edExportMix').title = 'The edited music alone, as a WAV, mixed in this browser and downloaded'; }
+      // for tests and the agent: the edit as it is, and saving it now
+      window.vxEd = { state: () => JSON.parse(JSON.stringify(edState())), save: () => { edSaveNow(); return VXP.flush ? VXP.flush().then(() => ed.id) : ed.id; }, projects: () => edStore.list(), last: () => ed.lastExport, mix: () => ed.lastMix,
+        exportVideo: o => edExportWeb(o && o.title, o || {}), exportMix: t => edExportMix(t), seek: t => edSeek(t), play: () => edPlay(1), stop: () => edStop() };
       edEl('edLook').value = ed.look || 'house';
       edEl('edLook').addEventListener('change', e => { ed.look = e.target.value; ed.lookOver = null; edSave(); edRender(); });
       edEl('edShotcut').addEventListener('click', () => { if (ed.lastProject && VXP.fs.existsSync('/Applications/Shotcut.app')) require('child_process').execFile('open', ['-a', 'Shotcut', ed.lastProject]); else edSay('Shotcut is not installed (brew install --cask shotcut).'); });
@@ -9296,6 +9605,10 @@ Reply with only the JSON array in one \`\`\`json code block.`;
   <script src="./vx/editor.js"></script>
   <script src="./vx/timeline.js"></script>
   <script src="./vx/mlt.js"></script>
+  <script src="./vx/webmix.js"></script>
+  <script src="./vx/edit-store.js"></script>
+  <script src="./vx/render.js"></script>
+  <script src="./vx/capture.js"></script>
   <script src="./vx/text.js"></script>
   <script src="./vx/lib/three.global.js"></script>
   <script src="./vx/text3d.js"></script>

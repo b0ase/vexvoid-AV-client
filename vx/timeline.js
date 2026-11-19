@@ -348,7 +348,8 @@
       f.push(ch.join(',') + '[s' + i + ']'); labels.push('[s' + i + ']');
     });
     if (!labels.length) { args.push('-f', 'lavfi', '-i', 'anullsrc=r=' + rate + ':cl=stereo'); labels.push('[0:a]'); }
-    f.push(labels.join('') + (labels.length > 1 ? 'amix=inputs=' + labels.length + ':normalize=0:dropout_transition=0,' : 'anull,') + 'apad,atrim=0:' + total + '[out]');
+    // apad pads to the exact length (whole_dur): a bare apad (endless) behind aresample + a gap never ends in ffmpeg 9
+    f.push(labels.join('') + (labels.length > 1 ? 'amix=inputs=' + labels.length + ':normalize=0:dropout_transition=0,' : 'anull,') + 'apad=whole_dur=' + total + ',atrim=0:' + total + '[out]');
     return args.concat(['-filter_complex', f.join(';'), '-map', '[out]', '-ac', '2', '-ar', String(rate), '-c:a', 'pcm_s16le', o.out]);
   }
 

@@ -1,0 +1,2 @@
+mp4-muxer 5.2.2 (npm, MIT, Vanilagy) build/mp4-muxer.js, global Mp4Muxer; loaded only when a web export starts
+sha256 cc4d30bd20b9ffe0b15f59cf0de3e1930626ccd46a5146e36e4d619d7fecf63d
