@@ -906,6 +906,17 @@ export function buildDistrict({ renderer, scene, high, look }: { renderer: THREE
     refl.rotation.x = -Math.PI / 2; refl.updateMatrixWorld(true); reflInv.copy(refl.matrixWorld).invert();
     wu.tReflect.value = refl.getRenderTarget().texture; wu.uReflOn.value = 1;
   }
+  // ── the heavens: a security light over each, washing down the wall, so a piece up there reads from the street ──
+  for (const h of P.heavens) {
+    const w = P.walls.find((q) => q.id === h.wall); if (!w) continue;
+    const top = w.c[1] + w.h / 2, nx = w.n[0], nz = w.n[1];
+    const lx = w.c[0] + nx * 0.45, ly = top + 0.55, lz = w.c[2] + nz * 0.45;
+    const sp = new THREE.SpotLight('#eef1f6', 60, 16, 1.05, 0.7, 1.4); sp.castShadow = false;
+    sp.position.set(lx, ly, lz); sp.target.position.set(w.c[0] + nx * 0.05, w.c[1] - w.h * 0.2, w.c[2] + nz * 0.05);
+    group.add(sp, sp.target);
+    const fx = new THREE.Mesh(track(boxG(lx - 0.18, lx + 0.18, ly - 0.05, ly + 0.12, lz - 0.18, lz + 0.18)), dark); group.add(fx);   // (the buckets are merged already: its own mesh)
+    const face = new THREE.Mesh(track(new THREE.PlaneGeometry(0.28, 0.06)), glowM(1.4)); face.rotation.x = -Math.PI / 2; face.position.set(lx, ly - 0.06, lz); group.add(face);
+  }
   scene.add(group);
 
   // ── walls for the can ──

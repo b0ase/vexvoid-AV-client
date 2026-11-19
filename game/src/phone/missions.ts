@@ -101,10 +101,10 @@ export const MISSIONS: Mission[] = [
     ],
     done: [['dez', "that's the feeling"], ['dez', 'rest up. more walls than nights']] },
   { id: 'heaven', title: 'HEAVEN', from: 'nix', summary: 'Nix: get up high and put a throw-up on a heaven the whole street sees.', after: ['lose-them'], delay: 8,
-    intro: [['nix', 'ready for a heaven?'], ['nix', "roof over the shops on the N road. the corner block's side wall is bare from there up. the whole road sees it"], ['nix', "drainpipe off the back lane gets you up. or the scaffold over the canal, top lift"]],
+    intro: [['nix', 'ready for a heaven?'], ['nix', "roof over the shops on the N road. the corner block's side wall is bare from there up. the whole road sees it"], ['nix', "drainpipe off the back lane gets you up. or either scaffold, top lift: the yard, the canal"]],
     objectives: [
-      { type: 'reach', places: ['n-road-heaven', 'canal-heaven'], r: 7, text: 'GET UP TO A HEAVEN: THE N ROAD ROOF OR THE TOP OF SCAFFOLD 2', hint: [['dez', 'W at a drainpipe to climb. space at a ledge to get up it. nothing over two metres']] },
-      { type: 'paint', walls: ['heaven-nw1-e', 'heaven-c3-n'], kind: 'throw-up', text: 'PUT A THROW-UP ON IT', hint: [['dez', "up there you're slow getting down. paint quick, keep an eye on the street"]] },
+      { type: 'reach', places: ['n-road-heaven', 'yard-heaven', 'canal-heaven'], r: 7, text: 'GET UP TO A HEAVEN: THE N ROAD ROOF, OR THE TOP OF A SCAFFOLD', hint: [['dez', 'W at a drainpipe to climb. space at a ledge to get up it. nothing over two metres']] },
+      { type: 'paint', walls: ['heaven-nw1-e', 'heaven-ne8-w', 'heaven-c3-n'], kind: 'throw-up', text: 'PUT A THROW-UP ON IT', hint: [['dez', "up there you're slow getting down. paint quick, keep an eye on the street"]] },
     ],
     done: [['nix', "that's a heaven. the whole road sees it on the way to work"], ['dez', 'worth more than a wall full of tags. and they never buff up there']] },
 ];

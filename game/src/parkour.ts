@@ -416,17 +416,20 @@ export function makeParkour(o: { world: World; plan: Plan; writer: Writer; me: B
       mode = 'hard'; phase = 'down'; t = 0; counts.landings.hard++; mv.speed = 0; me.crouch = false;
       wr.land(1); o.onLand?.('hard', drop); return true;
     }
-    if (mv.speed > 2.2) { mode = 'roll'; phase = 'roll'; t = 0; lD = 0.8; lSpeed = Math.max(3.4, Math.min(6, mv.speed)); counts.landings.roll++; wr.play('Roll', 0.05, true); o.onLand?.('roll', drop); return true; }
+    if (mv.speed > 2.2) { mode = 'roll'; phase = 'roll'; t = 0; lD = 0.66; lSpeed = Math.max(3.4, Math.min(6, mv.speed)); counts.landings.roll++; o.onLand?.('roll', drop); return true; }
     mode = 'heavy'; phase = 'land'; t = 0; counts.landings.heavy++; mv.speed = 0; wr.land(0.8); o.onLand?.('heavy', drop); return true;
   };
   const tickLand = (dt: number) => {
     t += dt;
     if (mode === 'roll') {
       // the roll carries you on: the speed you came in with, easing to a jog
+      // (the library's Roll is a dive roll: its dive is skipped, the roll starts where the shoulder meets the ground, 0.4 s
+      // in, and runs to where he is back on his feet, 1.05 s)
       const u = Math.min(1, t / lD); mv.speed = lerp(lSpeed, 3.4, u);
+      rig({ clip: 'Roll', at: 0.4 + 0.65 * u, fade: 0.06, free: true });
       const x0 = me.x, z0 = me.z; me.x += Math.sin(me.heading) * mv.speed * dt; me.z += Math.cos(me.heading) * mv.speed * dt;
       W.pushOut(me, BODY_R, me.gy); if (Number.isNaN(W.groundAt(me.x, me.z, me.gy))) { me.x = x0; me.z = z0; }
-      if (u >= 1) { mode = 'none'; phase = ''; }
+      if (u >= 1) { mode = 'none'; phase = ''; wr.rig(null); }
       return;
     }
     if (mode === 'heavy') {

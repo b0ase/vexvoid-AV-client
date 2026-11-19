@@ -502,9 +502,11 @@ export function makePlan(): Plan {
   P('n-road', 'N ROAD', -20, -71, 0, -Math.PI / 2, 'the N road, the car\'s loop');
   P('phone-shop', 'PHONE KIOSK', 1.4, 42.3, 0, 0, 'the phone kiosk on the S road: a new burner when the canal has killed yours');
   P('n-road-heaven', 'N ROAD HEAVEN', -42.6, -66, 10, Math.PI / 2, 'up on the roof over the N road shops (nw2), under the tall side wall of the corner block: a heaven');
+  P('yard-heaven', 'YARD HEAVEN', 49.2, -20, 8.09, -Math.PI / 2, 'the top lift of scaffold 1 on the goods yard: the parapet of ne8, seen right across the yard');
   P('canal-heaven', 'CANAL HEAVEN', -9, 9.2, 10.09, Math.PI, 'the top lift of scaffold 2, over the south wharf: the top of the block, seen across the canal');
   const heavens: Heaven[] = [
     { id: 'n-road-heaven', name: 'N ROAD HEAVEN', wall: 'heaven-nw1-e', x: -42.6, z: -66, y: 10, worth: 3, about: 'the corner block\'s tall side wall, over the roof of the N road shops (nw2); up a drainpipe from the back lane' },
+    { id: 'yard-heaven', name: 'YARD HEAVEN', wall: 'heaven-ne8-w', x: 49.2, z: -20, y: 8.09, worth: 3, about: 'the parapet of the block over the goods yard (ne8), from scaffold 1\'s top lift; the whole yard sees it' },
     { id: 'canal-heaven', name: 'CANAL HEAVEN', wall: 'heaven-c3-n', x: -9, z: 9.2, y: 10.09, worth: 3, about: 'the top of the block over the south wharf, from scaffold 2\'s top lift; seen right across the canal' },
   ];
 
@@ -574,6 +576,7 @@ export function makePlan(): Plan {
   // the heavens: the corner block's side wall above the N road shops' roof, and the top of c3 above scaffold 2's top lift
   walls.push({ id: 'heaven-nw1-e', w: 7.6, h: 4.6, c: [-44, 10 + 2.3, -66], n: [1, 0] });
   walls.push({ id: 'heaven-c3-n', w: 15, h: 2.85, c: [-9, 10.09 + 1.425, 10], n: [0, -1] });
+  walls.push({ id: 'heaven-ne8-w', w: 16, h: 0.98, c: [50, 9 + 0.49, -20], n: [-1, 0] });   // (the parapet band over ne8-w's own panel, which ends at 9)
   // gates take paint too (the steel ones)
   for (const g of gates) if (g.kind === 'steel') {
     // only the shut part (an open leaf is swung back out of the way)
