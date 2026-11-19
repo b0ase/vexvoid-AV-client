@@ -906,16 +906,24 @@ export function buildDistrict({ renderer, scene, high, look }: { renderer: THREE
     refl.rotation.x = -Math.PI / 2; refl.updateMatrixWorld(true); reflInv.copy(refl.matrixWorld).invert();
     wu.tReflect.value = refl.getRenderTarget().texture; wu.uReflOn.value = 1;
   }
-  // ── the heavens: a security light over each, washing down the wall, so a piece up there reads from the street ──
-  for (const h of P.heavens) {
-    const w = P.walls.find((q) => q.id === h.wall); if (!w) continue;
-    const top = w.c[1] + w.h / 2, nx = w.n[0], nz = w.n[1];
-    const lx = w.c[0] + nx * 0.45, ly = top + 0.55, lz = w.c[2] + nz * 0.45;
-    const sp = new THREE.SpotLight('#eef1f6', 60, 16, 1.05, 0.7, 1.4); sp.castShadow = false;
-    sp.position.set(lx, ly, lz); sp.target.position.set(w.c[0] + nx * 0.05, w.c[1] - w.h * 0.2, w.c[2] + nz * 0.05);
-    group.add(sp, sp.target);
-    const fx = new THREE.Mesh(track(boxG(lx - 0.18, lx + 0.18, ly - 0.05, ly + 0.12, lz - 0.18, lz + 0.18)), dark); group.add(fx);   // (the buckets are merged already: its own mesh)
-    const face = new THREE.Mesh(track(new THREE.PlaneGeometry(0.28, 0.06)), glowM(1.4)); face.rotation.x = -Math.PI / 2; face.position.set(lx, ly - 0.06, lz); group.add(face);
+  // ── the heavens: a security light over each, washing down the wall, so a piece up there reads from the street. Not a
+  // real light (three more lights in every shader cost ~15% fps): the fixture glows and an additive wash lies on the wall ──
+  {
+    const c = document.createElement('canvas'); c.width = 128; c.height = 128; const g = c.getContext('2d')!;
+    const gr = g.createRadialGradient(64, 8, 4, 64, 30, 120); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,0.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+    const washT = track(texOf(c, true, false));
+    const washM = track(new THREE.MeshBasicMaterial({ map: washT, transparent: true, opacity: 0.32, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    for (const h of P.heavens) {
+      const w = P.walls.find((q) => q.id === h.wall); if (!w) continue;
+      const top = w.c[1] + w.h / 2, nx = w.n[0], nz = w.n[1];
+      const lx = w.c[0] + nx * 0.45, ly = top + 0.55, lz = w.c[2] + nz * 0.45;
+      const fx = new THREE.Mesh(track(boxG(lx - 0.18, lx + 0.18, ly - 0.05, ly + 0.12, lz - 0.18, lz + 0.18)), dark); group.add(fx);   // (the buckets are merged already: its own mesh)
+      const face = new THREE.Mesh(track(new THREE.PlaneGeometry(0.28, 0.06)), glowM(1.6)); face.rotation.x = -Math.PI / 2; face.position.set(lx, ly - 0.06, lz); group.add(face);
+      const ww = Math.min(w.w, 9), wh = Math.min(top + 0.6 - (w.c[1] - w.h / 2 - 1.2), 5.5);
+      const wash = new THREE.Mesh(track(new THREE.PlaneGeometry(ww, wh)), washM); wash.userData.noAO = true;
+      wash.position.set(w.c[0] + nx * 0.04, top + 0.6 - wh / 2, w.c[2] + nz * 0.04); wash.rotation.y = Math.atan2(nx, nz); group.add(wash);
+    }
   }
   scene.add(group);
 
