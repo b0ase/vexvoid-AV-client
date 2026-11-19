@@ -30,7 +30,7 @@ export type Writer = {
   twist: (a: number) => void;
   /** The head on the body, for tests: drift (m) of the head bone from its rest place in the chest's frame, the neck's
    *  and head's turn from rest (rad), and how much the head-to-neck distance has changed (m). */
-  head: (o?: { steady?: boolean; silhouette?: boolean; square?: boolean }) => { drift: number; neck: number; head: number; gap: number; hood: number; worst: string; pts: number; wob: number; sil?: Silhouette };
+  head: (o?: { steady?: boolean; silhouette?: boolean; square?: boolean; pass2?: boolean }) => { drift: number; neck: number; head: number; gap: number; hood: number; worst: string; pts: number; wob: number; sil?: Silhouette };
   /** A landing: the body gives a little (k 0..1, how hard). */
   land: (k: number) => void;
   /** Hold still (painting): the standing clips stop breathing and swaying, so a raised can stays where it is aimed. */
@@ -563,7 +563,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
     qU.setFromUnitVectors(cU, UP); const a = 2 * Math.acos(Math.min(1, Math.abs(qU.w))); if (a < 1e-3) return;
     qI.identity().slerp(qU, Math.min(1, max / a) * w); spin(rHand, qI);
   };
-  let readyW = 0, foldW = 0;
+  let readyW = 0, foldW = 0, pass2 = false, sinceAim = 1;
   const fT = new THREE.Vector3(), fP = new THREE.Vector3();
   // the spray arm: the hand turns so the can is upright with its nozzle at the wall, the wrist goes where that puts the
   // nozzle at the can's distance (kept outside the trunk), and of all the elbows that reach it the one that keeps the
@@ -598,8 +598,17 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
   // nozzle at the can's distance (kept outside the trunk), and of all the elbows that reach it the one that keeps the
   // arm out of the body and the wrist straightest (eased, so it never jumps)
   // where the wrist goes for a nozzle at N pointing at the wall point: the hand upright, the can its distance off
+  // the can upright while it points at the spot (pass 3, owner: held upright like a writer holds it): out of reach the
+  // nozzle sits back from the wall and pointing straight at the spot tipped the can 25-50 degrees; it tips at most
+  // MAX_PITCH (the paint goes where the reticle is either way)
+  const MAX_PITCH = 0.31, lkT = new THREE.Vector3();
+  const lookCan = (from: THREE.Vector3) => {
+    lkT.subVectors(aimAt, from); const hz = Math.hypot(lkT.x, lkT.z), lim = Math.tan(MAX_PITCH) * hz;
+    if (Math.abs(lkT.y) > lim) lkT.y = Math.sign(lkT.y) * lim;
+    return gQ.setFromRotationMatrix(gM.lookAt(lkT.add(from), from, UP));
+  };
   const wristFor = (N: THREE.Vector3) => {
-    gQ.setFromRotationMatrix(gM.lookAt(aimAt, N, UP)); gH.copy(gQ).multiply(gripInv);
+    gQ.setFromRotationMatrix(gM.lookAt(aimAt, N, UP));   // (the reach is planned with the can pointing right at the spot, as in pass 2; the hand's last turn tips it less) gH.copy(gQ).multiply(gripInv);
     wristT.copy(N).sub(tv2.copy(nozLocal).applyQuaternion(gQ));
     if (gripPos) wristT.sub(tv2.copy(gripPos).multiplyScalar(kS).applyQuaternion(gH));
     for (let i = 0; i < 2; i++) { const d = body.depth(wristT); const pen = d.pen + R_HAND + CLEAR; if (pen > 0) wristT.addScaledVector(d.dir, pen); }   // the fist never in the trunk
@@ -795,7 +804,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       shoulderDrop[i] = ex; if (ex < 0.002) return;
       // the chest's up in the world, and the arm joint lowered along it by the excess (skeleton units to world: kS)
       spine2.getWorldQuaternion(qb); sqU.copy(f.up).applyQuaternion(qb);
-      f.sh.getWorldPosition(sqS); sqT.copy(sqA).addScaledVector(sqU, -ex * kS * 0.95);
+      f.sh.getWorldPosition(sqS); sqT.copy(sqA).addScaledVector(sqU, -ex * kS * 0.75 * (1 - aimW));   // (not while the arm reaches for a wall: painting keeps pass 2's reach)
       turn(f.sh, sqA.sub(sqS).normalize(), sqT.sub(sqS).normalize(), 1);
     });
   };
@@ -909,6 +918,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
     head: (o) => {
       if (o && o.steady != null) STEADY.on = !!o.steady;
       if (o && o.square != null) squareOn = !!o.square;   // (tests: the clips' shrug as it was, for a before/after)
+      if (o && o.pass2 != null) { pass2 = !!o.pass2; squareOn = !pass2; LOCK.on = !pass2; }   // (tests: every pass 3 layer off: shrug, carry, upright can, folded arms, foot lock)
       root.updateMatrixWorld(true);
       const hp = headB.getWorldPosition(hdV[0]), np = neckB.getWorldPosition(hdV[1]), rest = spine2.localToWorld(hdV[2].copy(headRest.inChest));
       const ang = (q: THREE.Quaternion) => 2 * Math.acos(Math.min(1, Math.abs(q.w)));
@@ -990,20 +1000,24 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       // The can lies across the fist (pinky to index), so with the arm hanging as the clips have it, it pointed forward
       // flat. Standing, the forearm comes up and forward (the can at the ready, the index finger resting on its top);
       // moving, the wrist turns the can toward upright as far as a wrist goes.
-      const idleNow = !aimOn && !steadyOn && (locoOn ? locoS < 0.7 : /^(Idle_Loop|Crouch_Idle_Loop)$/.test(curName));
+      sinceAim = aimOn || steadyOn ? 0 : sinceAim + dt;   // (the can just off a wall is not yet carried: the reach blends out first)
+      const idleNow = !pass2 && sinceAim > 0.6 && (locoOn ? locoS < 0.7 : /^(Idle_Loop|Crouch_Idle_Loop)$/.test(curName));
       readyW += ((carryOn && idleNow ? 1 : 0) - readyW) * Math.min(1, dt * 5);
       // FOLDED ARMS (pass 3, owner: they hovered in front of the chest; the longer arms reach past where the clip folds
       // them): each forearm laid across the chest, the right one tucked under the left, the elbows by the sides
-      foldW += ((!aimOn && !locoOn && curName === 'Idle_FoldArms_Loop' ? 1 : 0) - foldW) * Math.min(1, dt * 4);
+      foldW += ((!pass2 && !aimOn && !locoOn && curName === 'Idle_FoldArms_Loop' ? 1 : 0) - foldW) * Math.min(1, dt * 4);
       if (readyW * (1 - foldW) > 0.01) {   // the wrist below the shoulder and in front of it: the elbow bent about 100 degrees, by the side
         const ck = locoOn ? crouchW : /Crouch/.test(curName) ? 1 : 0;   // crouched, the can comes forward of the knee
-        rArm.getWorldPosition(fT); fT.addScaledVector(chestDir(1, 0, 0, fP), -0.1 - 0.03 * ck).addScaledVector(chestDir(0, 1, 0, fP), -0.37 + 0.05 * ck).addScaledVector(chestDir(0, 0, 1, fP), 0.28 + 0.1 * ck);
-        armTo(sideArms[1], fT, chestDir(-0.45, -0.35, -0.8, fP), readyW * (1 - foldW) * (1 - aimW));
+        // (in a level frame: the chest's heading and the world's up, so a crouch's forward lean doesn't point the forearm down)
+        rArm.getWorldPosition(fT); fT.addScaledVector(chestDir(1, 0, 0, fP).setY(0).normalize(), -0.14 - 0.02 * ck).addScaledVector(UP, -0.37 + 0.09 * ck).addScaledVector(chestDir(0, 0, 1, fP).setY(0).normalize(), 0.31 + 0.08 * ck);
+        const lvL = chestDir(1, 0, 0, aT).setY(0).normalize(), lvF = chestDir(0, 0, 1, fP).setY(0).normalize();   // (the elbow back, down and out, level too)
+        fP.multiplyScalar(-0.8).addScaledVector(lvL, -0.45).addScaledVector(UP, -0.35).normalize();
+        armTo(sideArms[1], fT, fP, readyW * (1 - foldW) * (1 - aimW));
         if (armsFix) pushOut(sideArms[1], false, 4);   // the fist and the can clear of the hip
       }
       if (foldW > 0.01) {
         // (left, up, forward from the chest joint, metres): the elbow by the ribs, the wrist across at the other side
-        for (const [sa, e, w] of [[sideArms[0], [0.285, -0.05, 0.18], [-0.06, 0.0, 0.29]], [sideArms[1], [-0.285, -0.08, 0.15], [0.0, -0.04, 0.215]]] as const) {
+        for (const [sa, e, w] of [[sideArms[0], [0.285, -0.05, 0.18], [-0.06, 0.0, 0.29]], [sideArms[1], [-0.285, -0.08, 0.16], [0.0, -0.04, 0.24]]] as const) {
           chestPt(e[0], e[1], e[2], fP); chestPt(w[0], w[1], w[2], fT); sa.arm.getWorldPosition(aT);
           armTo(sa, fT, fP.sub(aT.add(fT).multiplyScalar(0.5)).normalize(), foldW);
           // the upper arm out of the ribs, then the forearm laid back across to its wrist (pushing the whole arm out
@@ -1011,14 +1025,14 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
           if (armsFix) { pushOut(sa, true, 3); sa.fore.getWorldPosition(iB); sa.hand.getWorldPosition(iC); turn(sa.fore, aT.subVectors(iC, iB).normalize(), fP.subVectors(fT, iB).normalize(), foldW); pushOut(sa, false, 3); }
         }
       }
-      if (carryW > 0.5 && aimW < 0.99) canUp((1 - aimW) * carryW, 0.5 + 0.2 * Math.max(readyW, foldW));
+      if (!pass2 && carryW > 0.5 && aimW < 0.99) canUp((1 - aimW) * carryW, 0.5 + 0.3 * Math.max(readyW, foldW));
       if (aimW > 0.01) {
         ik(aimW, dt);
         // whatever the reach could not avoid, the arm is pushed out of the trunk like a clip's arm; then the hand turns
         // back so the can points at the spot from where it is
         if (armsFix) {
           pushOut(sideArms[1], true, 10);
-          if (gripPos) { rHand.getWorldPosition(tv2); rHand.getWorldQuaternion(qb); tv3.copy(gripPos).multiplyScalar(kS).applyQuaternion(qb).add(tv2); gQ.setFromRotationMatrix(gM.lookAt(aimAt, tv3, UP)); gH.copy(gQ).multiply(gripInv); rHand.parent!.getWorldQuaternion(qp); qb.copy(qp).invert().multiply(gH); rHand.quaternion.slerp(qb, aimW); rHand.updateMatrixWorld(true); }
+          if (gripPos) { rHand.getWorldPosition(tv2); rHand.getWorldQuaternion(qb); tv3.copy(gripPos).multiplyScalar(kS).applyQuaternion(qb).add(tv2); lookCan(tv3); gH.copy(gQ).multiply(gripInv); rHand.parent!.getWorldQuaternion(qp); qb.copy(qp).invert().multiply(gH); rHand.quaternion.slerp(qb, aimW); rHand.updateMatrixWorld(true); }
         }
       } else { swivel = NaN; reachTw = 0; reachPull = 0; reachSw = 0; ikBest = null; }
       // the fingers: relaxed; the right hand closed round its can; the index finger up on the actuator while the can is

@@ -307,7 +307,7 @@ HEM = zP - 0.02    # the jacket's hem: a waist-length shell, short enough that a
 # (pass 3: square shoulders. Pass 2's jacket narrowed in a dome from the armpits to the neck, so the shoulders sloped
 #  away under the hood. Now the shoulder line runs out level to the deltoids and the trapezius slopes in to the neck.)
 TZ = [HEM, HEM + 0.05, HEM + 0.11, zP + 0.26, zS - 0.13, zS - 0.02, zS + 0.03, zS + 0.055, zS + 0.075, zN + 0.0]
-t_a = curve(TZ, [0.166, 0.167, 0.172, 0.168, 0.178, 0.188, 0.19, 0.167, 0.124, 0.074])     # half width (pass 2: lean, not puffy)
+t_a = curve(TZ, [0.166, 0.167, 0.172, 0.168, 0.173, 0.184, 0.19, 0.167, 0.124, 0.074])     # half width (pass 2: lean, not puffy)
 t_f = curve(TZ, [0.104, 0.105, 0.11, 0.106, 0.116, 0.112, 0.1, 0.09, 0.08, 0.068])     # depth to the front
 t_b = curve(TZ, [0.096, 0.098, 0.104, 0.102, 0.11, 0.11, 0.104, 0.096, 0.086, 0.074])     # depth to the back
 t_y = curve(TZ, [J['Hips'][1] - 0.005, J['Hips'][1] - 0.005, J['Hips'][1] - 0.01, J['Spine1'][1], J['Spine2'][1] + 0.02, J['Spine2'][1] + 0.035, J['LeftArm'][1] - 0.02, J['LeftArm'][1] - 0.021, J['Head'][1] - 0.015, J['Head'][1] - 0.012])
