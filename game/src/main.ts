@@ -18,9 +18,12 @@
  * The SKETCHBOOK (./sketchbook.ts): B opens a panel of sketches (tags, throw-ups, pieces); pick one, aim at a wall and
  * click (or G) and the writer puts it up stroke by stroke ("blast"), at 1x 2x 4x, sized to fit; moving stops it, Z takes
  * it back in one go. N (or SAVE WALL) keeps what is on the wall being painted as a new sketch.
- * Vex's PHONE (./phone/: camera.ts, gallery.ts, photos.ts; the hub to come): Q (or the dock's PHOTO tile) takes a clean picture, no HUD, at up to 3840 px wide,
- * kept as a PNG (this browser, the desktop's VexVoid Photos folder, the player's account); L (or GALLERY) shows them all.
- * O is photo mode: time stops, the HUD goes, WASD / the arrows / a drag orbit the camera and the wheel zooms; Q shoots.
+ * Vex's PHONE (./phone/): E (or the dock's PHONE tile) gets it out: CAMERA, PHOTOS, MESSAGES, MAP, MUSIC, WALLET
+ * (phone.ts). The game runs on behind it; the writer stands still. Contacts message him and MISSIONS arrive in MESSAGES
+ * (missions.ts: data, judged here from the game's own events). Q (or the PHOTO tile) takes a clean picture, no HUD, at
+ * up to 3840 px wide, kept as a PNG (this browser, the desktop's VexVoid Photos folder, the player's account); L (or
+ * GALLERY) opens the phone on the photos. O is photo mode: time stops, the HUD goes, WASD / the arrows / a drag orbit the
+ * camera and the wheel zooms; Q shoots. The MINI-MAP (./minimap.ts) top left: local, turning with the writer; K hides it.
  * Built by scripts/build-game.sh into vx/game/vexvoid-game.js (window.VXGAME).
  */
 import * as THREE from 'three';
@@ -42,6 +45,9 @@ import { makeLoading } from './loading';
 import { localPhotos, merged, type Photo, type PhotoStore, type PhotoCloud } from './phone/photos';
 import { makeGallery, type GalleryState } from './phone/gallery';
 import { makeCamera, type PhotoTaken } from './phone/camera';
+import { makePhone, type AppId, type PhoneState } from './phone/phone';
+import { makeMissions, localProgress, MISSIONS, type ProgressStore, type MissionInfo, type Marker, type Msg, type Framed } from './phone/missions';
+import { makeMinimap, type MinimapState } from './minimap';
 import { makeBook, slotsOf, sketchOf, fit, drawSketch, secsOf, cleanName, type Sketch, type SketchKind, type SketchStore, type BookState } from './sketchbook';
 
 export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) => void; onHud?: (s: string) => void; onRec?: () => void;
@@ -56,7 +62,9 @@ export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) =
   /** Where the player's photos are kept (default: this browser). */
   photos?: PhotoStore;
   /** The player's account, beside this browser (the web game signed in): photos go to both, the gallery lists both. */
-  photoCloud?: PhotoCloud };
+  photoCloud?: PhotoCloud;
+  /** Where the story's progress is kept (messages, missions, places on the map; default: this browser / the app's user data). */
+  progress?: ProgressStore };
 export type { PhotoTaken };
 export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?: number) => string; inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string; at?: number | null; view?: { yaw: number; pitch: number; dist: number; bone?: string; h?: number; fov?: number } | null }) => void; where: () => { x: number; z: number; y: number; yaw: number; heading: number; anim: string; speed: number; tip: [number, number, number] | null };
   /** Call the law on the writer now: the patrol car pulls up nearest them and two officers give chase (testing an escape). */
@@ -84,6 +92,17 @@ export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?:
   deletePhoto: (id: string) => Promise<boolean>;
   /** The gallery panel (L): open or close it, view one photo big (view: an id; null back to the grid). */
   gallery: (o?: { open?: boolean; view?: string | null }) => GalleryState;
+  /** Vex's phone (E): out or away, an app (home camera gallery messages map music wallet), a contact's thread. */
+  phone: (o?: { open?: boolean; app?: AppId; thread?: string | null }) => PhoneState;
+  /** The messages: every thread (contact, unread, the last message); with contact, that thread in full (read: mark it read). */
+  messages: (o?: { contact?: string; read?: boolean }) => { unread: number; contacts: { id: string; name: string; unread: number; last: Msg }[]; thread?: Msg[] };
+  /** The missions: each one's state and objectives, the one in play, where the markers are, the places on the map.
+   *  reset: start the story again (the paint stays on the walls). */
+  missions: (o?: { reset?: boolean }) => { ready: boolean; list: MissionInfo[]; current: { mission: string; title: string; text: string; type: string; marker: Marker | null } | null; markers: Marker[]; known: string[] };
+  /** The mini-map (K): on or off; where it is, its radius and turn. */
+  minimap: (o?: { on?: boolean }) => MinimapState;
+  /** The phone's MAP as a picture: the whole district north up, painted walls filled, places known, markers, the writer. */
+  phoneMap: (width?: number) => string;
   /** Photo mode (O): time stops, the HUD goes, the camera orbits and zooms for framing; Q shoots. */
   photoMode: (on?: boolean) => { on: boolean };
   /** The torch (T): on/off; a lit torch is seen from further by the law. */
@@ -253,7 +272,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const REACH = 2.4;
   const camO = { yaw: home.yaw, pitch: 0.12, dist: 3.4 };
   const keys = new Set<string>(); let shiftNow = false;
-  const MOVE = ['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Shift', ' ', 'c', 'f', 'm', 'p', 't', 'r', '1', '2', '3', '4', '5', '6', '7', 'z', 'x', 'h', 'Tab', 'Escape', 'b', 'g', 'v', 'n', '[', ']', '-', '=', '+', 'Enter', 'q', 'l', 'o'];
+  const MOVE = ['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Shift', ' ', 'c', 'f', 'm', 'p', 't', 'r', '1', '2', '3', '4', '5', '6', '7', 'z', 'x', 'h', 'Tab', 'Escape', 'b', 'g', 'v', 'n', '[', ']', '-', '=', '+', 'Enter', 'q', 'l', 'o', 'e', 'k'];
   // painting: F at a wall squares up to it; the mouse aims, holding it sprays; the wheel sets the can's distance
   type W = (typeof city.walls)[number];
   const can: Can = { colour: COLOURS[0], cap: 2, dist: 0.2, pressure: 1, buff: false };
@@ -288,6 +307,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const hudText = () => {
     if (photoMode) return 'PHOTO MODE · Q SHOOT · DRAG OR WASD ORBIT · WHEEL ZOOM · O DONE';
     if (gallery.isOpen()) return 'PHOTOS · ARROWS PICK · ENTER VIEW · S SAVE · DEL DELETE · L CLOSE';
+    if (phone.isOpen()) return 'PHONE · ARROWS PICK · ENTER OPEN · ESC BACK · 1-6 APPS · Q PHOTO · M MUSIC · E PUT IT AWAY';
     if (flash.until > t) return flash.text;
     const L = law.state(), cells = Math.min(5, Math.ceil(L.heat * 5 - 0.001));
     const what = { off: 'PATROL OFF', calm: L.seen ? 'SEEN' : L.heat >= 0.6 ? 'WANTED' : 'CALM', alerted: 'ALERT', chase: 'CHASE', searching: 'SEARCHING', busted: 'BUSTED' }[L.chase];
@@ -296,7 +316,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     if (bk) return bk + (paint ? `PAINTING ${paint.id.toUpperCase()} · F DONE · ` : 'WASD MOVE · F AT A WALL · ') + lawS;
     return (paint
       ? `PAINTING ${paint.id.toUpperCase()} · ${can.buff ? 'BUFF' : COLOUR_NAMES[colourI]} · ${CAPS[can.cap]} CAP · ${Math.round(can.dist * 100)} CM · Q PHOTO · H HELP · F DONE`
-      : 'WASD MOVE · SHIFT SPRINT · C CROUCH · SPACE JUMP · DRAG LOOK · F AT ANY WALL TO PAINT · B SKETCHBOOK · T TORCH · Q PHOTO · L GALLERY · O PHOTO MODE') + ' · ' + lawS + (opts.onRec ? ' · R RECORD' : '') + (music ? (music.state().on ? ' · M MUSIC OFF' : ' · M MUSIC ON') : '');
+      : 'WASD MOVE · SHIFT SPRINT · C CROUCH · SPACE JUMP · DRAG LOOK · F AT ANY WALL TO PAINT · B SKETCHBOOK · T TORCH · E PHONE · Q PHOTO · L GALLERY · O PHOTO MODE · K MAP') + ' · ' + lawS + (opts.onRec ? ' · R RECORD' : '') + (music ? (music.state().on ? ' · M MUSIC OFF' : ' · M MUSIC ON') : '');
   };
   const hud = () => { const s = hudText(); if (s !== lastHud) { lastHud = s; if (opts.onHud) opts.onHud(s); } };
   const fwd = new THREE.Vector3(0, 0, -1), side = new THREE.Vector3();
@@ -424,11 +444,84 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     return gone ? gone.length : 0;
   };
 
-  // ===== Vex's PHONE (./phone/): the camera and the gallery, each its own module; here only keys, the dock and the API.
-  // Q takes a photo, walking or painting (or busted: that is a picture too); L shows them; O is photo mode
+  // ===== Vex's PHONE (./phone/): the phone and its apps, the missions, the camera and the gallery, each its own module;
+  // here only keys, the dock, the game's events and the API. Q takes a photo, walking or painting (or busted: that is a
+  // picture too); E gets the phone out; L opens it on the photos; O is photo mode
   const photoStore: PhotoStore = opts.photos || (opts.photoCloud ? merged(localPhotos, opts.photoCloud) : localPhotos);
   let photoMode = false;
-  const gallery = makeGallery(host, { store: () => photoStore, focus: () => canvas.focus(), note: (s, secs) => note(s, secs), onChange: () => { const st = gallery.state(); if (st.open && !st.loading) camera.setCount(st.count); hud(); } });
+  const wallInfo = (id: string) => { const w = wallOf.get(id); return w ? { x: w.center.x, y: w.center.y, z: w.center.z, w: w.w, h: w.h, nx: w.normal.x, nz: w.normal.z } : null; };
+  const placeOf = (id: string) => { const p = city.plan.places.find((q) => q.id === id); return p ? { x: p.x, y: p.y, z: p.z, name: p.name } : null; };
+  // what a mission puts on a wall when it starts: the toys' scribbles to buff, your tag crossed out (no undo needed:
+  // they are put up at once, like a play at speed 0)
+  const setupWall = async (name: 'toys' | 'crossed'): Promise<[number, number, number, number] | null> => {
+    await spray.loaded;
+    let seed = name === 'toys' ? 4242 : 1717; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const out: Stroke[] = [];
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    const add = (wall: string, pts: [number, number, number][], c: { colour: string; cap: 1 | 2 | 3; dist?: number }) => { out.push({ wall, cap: c.cap, dist: c.dist ?? 0.2, colour: c.colour, pressure: 1, buff: false, seed: Math.floor(rnd() * 1e9), pts }); for (const [x, y] of pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); } };
+    if (name === 'toys') {
+      // three scrawls low on the shutter east of the record shop: wobbly loops and a squiggle underline (no letters)
+      for (const [cx, cy, w] of [[1.7, 1.0, 1.1], [3.3, 0.75, 0.9], [4.9, 1.1, 1.0]] as const) {
+        const pts: [number, number, number][] = []; let t = 0;
+        for (let i = 0; i <= 26; i++) { const u = i / 26, x = cx - w / 2 + w * u, y = cy + Math.sin(u * Math.PI * 5 + rnd()) * 0.17 + (rnd() - 0.5) * 0.05; pts.push([+x.toFixed(3), +y.toFixed(3), +(t += 0.035).toFixed(3)]); }
+        add('arch16', pts, { colour: rnd() > 0.5 ? '#9a9a9e' : '#f4f4f4', cap: 2 });
+        const ul: [number, number, number][] = []; t = 0; for (let i = 0; i <= 8; i++) ul.push([+(cx - w / 2 + w * 0.9 * i / 8).toFixed(3), +(cy - 0.32 + (rnd() - 0.5) * 0.04).toFixed(3), +(t += 0.04).toFixed(3)]);
+        add('arch16', ul, { colour: '#c9ccd2', cap: 1 });
+      }
+      spray.replay(out);
+      return [x0 - 0.1, y0 - 0.1, x1 + 0.1, y1 + 0.1];
+    }
+    // your tag on the north canal wall, then a fat black line through it
+    const sk = findSketch('tag-v3x'); const w = wallOf.get('canal-n5'); if (!sk || !w) return null;
+    const f = fit(sk, w, { x: 8, y: 1.55 }, 1.1, w.h);
+    spray.replay(sk.strokes.map((k) => ({ ...k, wall: w.id, buff: !!k.buff })), { wall: w.id, at: f.at, scale: f.scale });
+    const [ax, ay] = f.at, bw = f.w, bh = f.h;
+    add(w.id, [[ax - 0.15, ay + bh * 0.2, 0], [ax + bw * 0.5, ay + bh * 0.55, 0.25], [ax + bw + 0.2, ay + bh * 0.85, 0.5]], { colour: '#0c0c0e', cap: 3, dist: 0.25 });
+    add(w.id, [[ax - 0.1, ay + bh * 0.85, 0], [ax + bw + 0.15, ay + bh * 0.15, 0.45]], { colour: '#0c0c0e', cap: 3, dist: 0.25 });
+    spray.replay(out);
+    return [ax, ay, ax + bw, ay + bh];
+  };
+  const missions = makeMissions({
+    me: () => ({ x: me.x, z: me.z, gy: me.gy, crouch: me.crouch, speed: mv.speed }),
+    law: () => law.state(), strokes: (id) => spray.strokes(id), wall: wallInfo, place: placeOf,
+    places: () => city.plan.places, painted: (id) => spray.painted(id), setup: setupWall, ready: spray.loaded,
+  }, opts.progress || localProgress, {
+    onMessage: (m) => { phone.notify(m); hud(); },
+    onChange: () => { phone.refresh(); },
+  });
+  // what a photo sees of a point: in the frame, how far, nothing solid in the way, from in front of the wall
+  const fv = new THREE.Vector3();
+  const framed: Framed = (x, y, z, nx, nz) => {
+    const c = cam.position; fv.set(x, y, z).project(cam);
+    const inFrame = fv.z < 1 && Math.abs(fv.x) < 0.85 && Math.abs(fv.y) < 0.9;
+    const front = (c.x - x) * nx + (c.z - z) * nz > 0.3;
+    const clear = W0.ray(c.x, c.y, c.z, x + nx * 0.3, y, z + nz * 0.3) >= 0.98;
+    return { inFrame, dist: Math.hypot(c.x - x, c.y - y, c.z - z), clear, front };
+  };
+  const nameOf = (id: string) => (id === 'hall-of-fame' ? 'THE HALL OF FAME' : id.startsWith('arch') ? 'THE SHUTTER' : id.toUpperCase().replace(/-/g, ' '));
+  const phone = makePhone(host, {
+    missions, plan: city.plan, walls: city.walls, painted: (id) => spray.painted(id),
+    me: () => ({ x: me.x, z: me.z, gy: me.gy, heading: me.heading }), law: () => law.state(),
+    music: () => (music ? music.state() : null), musicToggle: () => { if (music) music.toggle(); }, musicNext: () => { if (music) music.next(); },   // off stays off: the next track waits
+    shoot: () => snapNow(), photoMode: () => setPhotoMode(true),
+    lastThumb: async () => { try { const l = await photoStore.list(); return l.length ? await photoStore.src(l[0].id) : null; } catch { return null; } },
+    photoSrc: async (id) => { try { return await photoStore.src(id); } catch { return null; } },
+    aim: () => {
+      for (const m of missions.list()) { if (m.status !== 'active') continue; const ms = MISSIONS.find((x) => x.id === m.id)!, o = ms.objectives[m.step]; if (!o || o.type !== 'photo' || !o.walls) continue;
+        const w = wallInfo(o.walls[0]); if (!w) continue; const f = framed(w.x, w.y, w.z, w.nx, w.nz); return { target: nameOf(o.walls[0]), framed: f.inFrame && f.clear && f.front && f.dist <= (o.dist ?? 20) && (!o.painted || spray.painted(o.walls[0])) }; }
+      return null;
+    },
+    sound, avoid: () => { const b = minimap.box(); return b.size ? b.x + b.size : 0; }, focus: () => canvas.focus(),
+    onOpen: (on) => { if (on) { keys.clear(); btn = 0; shiftNow = false; stroke = null; line = null; if (photoMode) setPhotoMode(false); } hud(); },
+  });
+  // the photos live in the phone's PHOTOS app (the gallery lays itself out for the phone's screen)
+  const gallery = makeGallery(phone.slot('gallery'), { store: () => photoStore, focus: () => canvas.focus(), note: (s, secs) => note(s, secs), onChange: () => { const st = gallery.state(); if (st.open && !st.loading) camera.setCount(st.count); if (!st.open) phone.galleryClosed(); hud(); } });
+  phone.bindGallery(gallery);
+  const minimap = makeMinimap(host, {
+    plan: city.plan, walls: city.walls, painted: (id) => spray.painted(id),
+    me: () => ({ x: me.x, z: me.z, heading: me.heading, speed: mv.speed, painting: !!paint }),
+    law: () => law.state(), markers: () => missions.markers(), objective: () => missions.current(),
+  });
   const camera = makeCamera({
     host, renderer: r, composer: comp, store: photoStore,
     render: () => { city.beforeRender(r, scene, cam); comp.render(0); },
@@ -437,27 +530,45 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     note: (s, secs) => note(s, secs), pulse: () => hudUi.pulse('photo'),
     onSaved: () => { gallery.added(); hud(); },
   });
-  const takePhoto = (o: { width?: number } = {}) => camera.take(o);
+  // a photo: judged for the missions at the shutter (what is in frame now), sent in their thread once it is kept
+  const takePhoto = (o: { width?: number } = {}) => { const job = missions.photo(framed), p = camera.take(o); p.then((x) => job.sent(x.id), () => job.sent(null)); return p; };
   const snapNow = () => { void takePhoto().catch(() => { /* said on screen */ }); };
   const openGallery = (on: boolean, id?: string | null) => {
-    if (on) { keys.clear(); btn = 0; shiftNow = false; if (photoMode) setPhotoMode(false); }
-    gallery.open(on, id); hud();
+    if (on) {
+      if (photoMode) setPhotoMode(false);
+      phone.open('gallery', { direct: !phone.isOpen() });
+      if (id) void gallery.refresh().then(() => gallery.view(id));
+    } else if (gallery.isOpen()) gallery.open(false);
+    hud();
+  };
+  // E: the phone out (on the thread of a message just in, if its banner shows), or away
+  const togglePhone = () => {
+    if (phone.isOpen()) { phone.close(); return; }
+    if (bust) return;
+    const b = phone.state().banner; if (b) phone.open('messages', { thread: b, direct: true }); else phone.open('home');
   };
   const setPhotoMode = (on: boolean) => {
     if (on === photoMode) return;
     if (on) { if (paint) togglePaint(); if (gallery.isOpen()) gallery.open(false); keys.clear(); btn = 0; }
     photoMode = on;
-    for (const e of [hudUi.el, tip, book.el]) e.style.visibility = on ? 'hidden' : '';
+    for (const e of [hudUi.el, tip, book.el, phone.banner]) e.style.visibility = on ? 'hidden' : '';
     camera.modeHint(on, t);
     if (!on) { camO.dist = Math.max(1.2, Math.min(7, camO.dist)); camO.pitch = Math.max(-0.35, Math.min(0.75, camO.pitch)); note('PHOTO MODE OFF', 1.4); }
     hud();
   };
   const onKey = (e: KeyboardEvent, down: boolean) => {
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-    // the gallery has the keys while it is open: arrows pick, Enter views, Delete deletes, S saves, C copies, L / Esc close
-    if (gallery.isOpen() && !e.metaKey && !e.ctrlKey && (MOVE.includes(k) || ['Delete', 'Backspace', 'Home', 'End', 'y'].includes(k))) {
+    // the phone has the keys while it is out: arrows pick, Enter opens, Esc goes back, E puts it away (the gallery in
+    // it: arrows pick, Enter views, Delete deletes, S saves, C copies, L / Esc close); Q still shoots, M the music
+    if (phone.isOpen() && !e.metaKey && !e.ctrlKey) {
+      if (['Shift', 'Alt', 'Meta', 'Control', 'CapsLock'].includes(k)) return;
       e.preventDefault(); e.stopPropagation();
-      if (down && !e.repeat && k === 'q') snapNow(); else if (down && k !== 'Shift') gallery.key(k);
+      if (!down) return;
+      if (!e.repeat && k === 'q') { snapNow(); return; }
+      if (!e.repeat && k === 'r' && opts.onRec) { opts.onRec(); return; }
+      if (!e.repeat && k === 'm' && music) { const s = music.toggle(); note(s.on ? `♪ MUSIC ON · ${s.title.toUpperCase()}` : 'MUSIC OFF · [M] TURNS IT BACK ON', 2.5); phone.refresh(); return; }
+      if (e.repeat && (k === 'e' || k === 'Escape' || k === 'l')) return;
+      phone.key(k); hud();
       return;
     }
     if (!MOVE.includes(k)) return;
@@ -465,7 +576,9 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     e.preventDefault(); e.stopPropagation();
     if (down && !e.repeat && k === 'r') { if (opts.onRec) opts.onRec(); return; } // recording belongs to whoever mounted the game
     if (down && !e.repeat && k === 'q') { snapNow(); return; }   // a photo: walking, painting, even being nicked
+    if (down && !e.repeat && k === 'k' && !photoMode) { const on = minimap.toggle(); note(on ? 'MINI-MAP ON · [K] HIDES IT' : 'MINI-MAP OFF · [K] BRINGS IT BACK', 1.8); return; }
     if (bust) return; // nothing to do while you are being nicked
+    if (down && !e.repeat && k === 'e') { togglePhone(); return; }
     if (down && !e.repeat && k === 'l') { openGallery(true); return; }
     if (down && !e.repeat && k === 'o') { setPhotoMode(!photoMode); return; }
     // photo mode: time stands still; WASD and the arrows orbit the camera (the frame reads them), Esc leaves
@@ -512,6 +625,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     book: () => { book.setOpen(!book.state.open); if (book.state.open) { disarmed = false; note(paint ? 'PICK A SKETCH · CLICK THE WALL TO BLAST' : 'PICK A SKETCH · WALK UP TO A WALL'); } },
     help: () => { if (paint) { help = !help; hud(); } },
     torch: () => setTorch(!torch.on),
+    phone: () => togglePhone(),
     photo: () => snapNow(),
     gallery: () => openGallery(!gallery.isOpen()),
     focus: () => canvas.focus(),
@@ -560,9 +674,10 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const ro = new ResizeObserver(() => {
     ({ w, h } = size());
     r.setSize(w, h, false); comp.setSize(w, h); city.resize(w, h);
-    cam.aspect = w / h; cam.updateProjectionMatrix(); hudUi.resize(w, h);
+    cam.aspect = w / h; cam.updateProjectionMatrix(); hudUi.resize(w, h); phone.resize(w, h); minimap.resize(w, h);
   });
   ro.observe(host);
+  phone.resize(w, h); minimap.resize(w, h);
 
   const clock = new THREE.Clock();
   let raf = 0, stopped = false, lastSpray = '';
@@ -572,6 +687,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const camPos = new THREE.Vector3(home.x + Math.sin(home.yaw) * 3.4, home.y + 2, home.z + Math.cos(home.yaw) * 3.4), camLook = new THREE.Vector3(), scr = new THREE.Vector3();
   let landT = 0, forceAnim = '', idleT = 0, camH = 1.45, shotView: { yaw: number; pitch: number; dist: number; bone?: string; h?: number; fov?: number } | null = null, fov0 = 0;
   const lookTo = new THREE.Vector3(), tipV = new THREE.Vector3(), focusV = new THREE.Vector3(), headV = new THREE.Vector3();
+  let storyMs = 0;
   const doorAt = () => city.plan.doors.find((d) => me.x > d.x0 - 0.3 && me.x < d.x1 + 0.3 && me.z > d.z0 - 0.3 && me.z < d.z1 + 0.3 && Math.abs(me.gy) < 0.5) || null;
   cam.position.copy(camPos);
   const frame = () => {
@@ -584,7 +700,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       if (oy || op) lookBy(oy * 1.5 * rdt, op * 0.9 * rdt);
       camera.tick(t);
     }
-    const still = !!bust || photoMode || gallery.isOpen();
+    const still = !!bust || photoMode || phone.isOpen();   // the phone out: the writer stands and looks at it
     const ax = still ? 0 : (keys.has('d') || (!paint && rightK) ? 1 : 0) - (keys.has('a') || (!paint && left) ? 1 : 0);
     const az = still ? 0 : (keys.has('w') || (!paint && upK) ? 1 : 0) - (keys.has('s') || (!paint && downK) ? 1 : 0);
     const sprint = keys.has('Shift') && !me.crouch && !paint;
@@ -743,7 +859,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       prompt(t < tipHold ? tipNote : nw ? (sk ? `[F] THEN CLICK THE WALL TO BLAST ${sk.name}` : '[F] PAINT THIS WALL') : sk ? 'WALK UP TO A WALL TO BLAST ' + sk.name : '');
     }
     writer.steady(!!paint && mv.speed < 0.05);
-    hudUi.dock({ walk: !paint && !bust && !photoMode && !gallery.isOpen(), photos: camera.count(), gallery: gallery.isOpen(), on: !!paint && !bust && !gallery.isOpen(), cap: can.cap, colour: colourI, colours: COLOURS, names: COLOUR_NAMES, dist: can.dist, line: cm(footprint(can).width), buff: !!can.buff, undo: paint ? spray.undoable(runOf(paint.spot).ids) : 0, book: !!book.state.open, help, torch: torch.on });
+    hudUi.dock({ walk: !paint && !bust && !photoMode && !phone.isOpen(), photos: camera.count(), gallery: gallery.isOpen(), phone: phone.isOpen(), unread: missions.unread(), on: !!paint && !bust && !phone.isOpen(), cap: can.cap, colour: colourI, colours: COLOURS, names: COLOUR_NAMES, dist: can.dist, line: cm(footprint(can).width), buff: !!can.buff, undo: paint ? spray.undoable(runOf(paint.spot).ids) : 0, book: !!book.state.open, help, torch: torch.on });
     // the line under the picture sits above the dock, and in the middle of what the sketchbook panel leaves free
     tip.style.bottom = paint ? `${Math.round(16 + 124 * hudScale(w, h))}px` : '9%';
     tip.style.left = book.state.open ? 'calc((100% - 296px) / 2)' : '50%'; tip.style.maxWidth = book.state.open ? 'calc(100% - 330px)' : 'calc(100% - 32px)';
@@ -751,8 +867,9 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     law.pushOut(me, 0.35);
     const ev = photoMode ? '' : law.update(dt, t, { x: me.x, z: me.z, y: me.y, gy: me.gy, crouch: me.crouch, painting: !!paint, spraying: sprayingNow, torch: torch.on, vx: paint ? 0 : Math.sin(me.heading) * mv.speed, vz: paint ? 0 : Math.cos(me.heading) * mv.speed });
     if (ev && opts.onEvent) try { opts.onEvent(ev); } catch { /* the host's business */ }
+    if (ev) missions.event(ev);
     if (ev === 'busted') {
-      if (gallery.isOpen()) gallery.open(false);
+      if (phone.isOpen()) phone.close();
       // a sketch half put up stays on the wall (owner, 16 Nov), undoable as one step; hand painting is still buffed
       const blastWall = auto && auto.group[0] === 'p' ? auto.list[Math.min(auto.i, auto.list.length - 1)].wall : '';
       bust = { t: 0, spot: blastWall && blastWall === lastSpray ? '' : lastSpray, kept: blastWall };
@@ -854,6 +971,17 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     city.beforeRender(r, scene, cam);
     grade.tick(t);
     comp.render(dt);
+    // the phone's lens copies the frame just drawn; the story moves on (messages arrive, objectives are judged); the
+    // mini-map turns with the writer, out of the way while the phone is out or in photo mode
+    phone.tick(t, canvas);
+    // (the story runs on real seconds, not the frame's capped step: a slow machine still gets its messages on time;
+    // photo mode stands still)
+    { const nowMs = performance.now(), real = Math.min(1, (nowMs - (storyMs || nowMs)) / 1000); storyMs = nowMs; missions.tick(photoMode ? 0 : bust && bust.t < 1.4 ? real * 0.3 : real); }
+    // (and out of the way of the help card, and of the sketchbook panel where the view is too narrow for both)
+    { const hs = hudScale(w, h), mapB = 16 + Math.round(150 * hs) + 8;
+      minimap.hide(photoMode || phone.isOpen() || (!!paint && (help || h - (16 + 124 * hs) - 40 < mapB)) || (book.state.open && w - 290 < mapB)); }
+    minimap.update(rdt, t);
+    { const b = minimap.box(); camera.toastAt(b.size ? b.x + b.size + 10 : 16, 16); }
     hud();
   };
   const play = (strokes: Stroke[], o: { wall?: string; at?: [number, number]; scale?: number; speed?: number } = {}) => new Promise<boolean>((res, rej) => {
@@ -959,6 +1087,22 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       return gallery.state();
     },
     photoMode: (on) => { if (on != null) setPhotoMode(!!on); return { on: photoMode }; },
+    phone: (o = {}) => {
+      if (o.open === false) phone.close();
+      else if (o.open || o.app || o.thread !== undefined) {
+        const app: AppId = o.app || (o.thread ? 'messages' : phone.isOpen() ? phone.app() : 'home');
+        if (app === 'gallery') openGallery(true); else phone.open(app, o.thread !== undefined ? { thread: o.thread } : {});
+      }
+      return phone.state();
+    },
+    messages: (o = {}) => {
+      const ts = missions.threads(), out: ReturnType<Game['messages']> = { unread: missions.unread(), contacts: ts.map((t) => ({ id: t.id, name: t.name, unread: t.unread, last: t.last })) };
+      if (o.contact) { const t = ts.find((x) => x.id === o.contact); out.thread = t ? t.msgs.slice() : []; if (o.read) missions.read(o.contact); }
+      return out;
+    },
+    missions: (o = {}) => { if (o.reset) missions.reset(); return { ready: missions.ready(), list: missions.list(), current: missions.current(), markers: missions.markers(), known: missions.known() }; },
+    minimap: (o = {}) => { if (o.on != null) minimap.set(!!o.on); return minimap.state(); },
+    phoneMap: (width) => phone.mapPng(width),
     music: (o = {}) => { if (!music) return null; if (o.on != null) music.set(!!o.on); if (o.next) music.next(); return music.state(); },
     audio: () => { const b = sound(); return b ? { ctx: b.ctx, node: b.out } : null; },
     goto: (x, z, yaw, pitch, y) => { if (paint) togglePaint();   // painting holds the writer at the wall: put the can down first
@@ -972,7 +1116,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       stopped = true; cancelAnimationFrame(raf); ro.disconnect();
       canvas.removeEventListener('keydown', kd); canvas.removeEventListener('keyup', ku); window.removeEventListener('blur', letGo); document.removeEventListener('visibilitychange', onVis);
       scene.remove(torchL, torchL.target, beam); beam.geometry.dispose(); (beam.material as THREE.Material).dispose(); music?.stop(); hissOn(false); law.dispose(); book.dispose(); if (bus) void bus.ctx.close(); spray.dispose(); writer.dispose(); city.dispose(); look.dispose(); comp.dispose(); r.dispose(); canvas.remove(); tip.remove(); hudUi.dispose();
-      gallery.dispose(); camera.dispose();
+      gallery.dispose(); camera.dispose(); phone.dispose(); minimap.dispose();
       for (const o of [reticle, dot, preview, ghost, ghostFrame]) { o.geometry.dispose(); (o.material as THREE.Material).dispose(); }
       const gm = (ghost.material as THREE.MeshBasicMaterial).map; if (gm) gm.dispose();
     },

@@ -45,7 +45,7 @@ export function makeCamera(o: Opts) {
   // the shutter: a quick white flash over the view (never in the picture: the picture is taken first)
   const flash = document.createElement('div'); flash.dataset.vxHud = 'flash';
   flash.style.cssText = 'position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:6';
-  // the photo just kept, small, top left for a moment
+  // the photo just kept, small, top left for a moment (beside the mini-map when it shows: toastAt moves it)
   const toast = document.createElement('div'); toast.dataset.vxHud = 'photo-toast';
   toast.style.cssText = `position:absolute;left:16px;top:16px;width:clamp(120px,15vw,184px);padding:5px 5px 7px;background:rgba(8,8,10,.72);border:1px solid rgba(255,255,255,.28);border-radius:8px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#fff;font:700 9.5px/1.2 ${UI};letter-spacing:.2em;pointer-events:none;z-index:3;opacity:0;transform:translateY(-6px);transition:opacity .25s ease,transform .25s ease;box-shadow:0 10px 30px rgba(0,0,0,.45);box-sizing:border-box;overflow:hidden`;
   toast.innerHTML = '<img alt="" style="display:block;width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:4px;background:#000"><div style="margin-top:7px;display:flex;justify-content:space-between;gap:6px;white-space:nowrap"><span style="overflow:hidden;text-overflow:ellipsis">PHOTO SAVED</span><span style="opacity:.6;flex:none">L GALLERY</span></div>';
@@ -107,6 +107,8 @@ export function makeCamera(o: Opts) {
     /** How many photos the player has (for the dock's badge). */
     count: () => n,
     setCount: (v: number) => { n = Math.max(0, v); },
+    /** Where the photo just kept shows (CSS px from the view's top left): beside whatever holds the corner. */
+    toastAt: (left: number, top: number) => { const l = Math.round(left) + 'px', t = Math.round(top) + 'px'; if (toast.style.left !== l) toast.style.left = l; if (toast.style.top !== t) toast.style.top = t; },
     /** Photo mode's line on or off; tick(t) fades it after a moment. */
     modeHint: (on: boolean, t = 0) => { hint.style.display = on ? 'flex' : 'none'; hint.style.opacity = '1'; hintT = t + 3.5; },
     tick: (t: number) => { if (hint.style.display !== 'none' && t > hintT && hint.style.opacity !== '0.35') hint.style.opacity = '0.35'; },

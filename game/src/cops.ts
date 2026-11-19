@@ -23,7 +23,9 @@ export type Suspect = { x: number; z: number; y: number; gy?: number; crouch: bo
 export type LawEvent = '' | 'alert' | 'busted' | 'escaped';
 export type LawState = {
   on: boolean; heat: number; chase: Chase; seen: boolean;
-  car: { x: number; z: number; heading: number; onStreet: boolean; speed: number };
+  car: { x: number; z: number; heading: number; onStreet: boolean; speed: number;
+    /** The searchlight on the ground: from the lamp (x0 z0) to where it points (x1 z1), lit while the car is out. */
+    search: { x0: number; z0: number; x1: number; z1: number; on: boolean } };
   cops: { x: number; z: number; anim: string; out: boolean; doing: string }[];
 };
 export type Law = {
@@ -122,6 +124,7 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
   let meY = 0;   // the writer's ground level, for the officers' map
   let sweep = 0;
   const aimS = new THREE.Vector3();
+  const beamAt = { x0: 0, z0: 0, x1: 0, z1: 0 };   // the searchlight's lamp and aim, flat (for the mini-map)
 
   // ── geometry helpers ──
   const free = (x: number, z: number, r: number, y = 0) => world.free(x, z, r, y) && !Number.isNaN(world.groundAt(x, z, y)) && !inCar(x, z, r);
@@ -268,6 +271,7 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
       aimS.set(mount.x + Math.sin(a) * 24, 1.2, mount.z + Math.cos(a) * 24);
     }
     car.search.target.position.copy(aimS); car.search.target.updateMatrixWorld();
+    beamAt.x0 = mount.x; beamAt.z0 = mount.z; beamAt.x1 = aimS.x; beamAt.z1 = aimS.z;
     car.search.intensity = carS.onStreet ? 650 : 0; // bright enough to pick the writer out, not so bright that fresh white paint whites out the screen
 
     // ── who sees the writer ──
@@ -367,7 +371,8 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
     update,
     state: () => ({
       on, heat: +heat.toFixed(3), chase: on ? chase : 'off', seen,
-      car: { x: +carS.x.toFixed(2), z: +carS.z.toFixed(2), heading: +carS.h.toFixed(2), onStreet: carS.onStreet, speed: +carS.speed.toFixed(2) },
+      car: { x: +carS.x.toFixed(2), z: +carS.z.toFixed(2), heading: +carS.h.toFixed(2), onStreet: carS.onStreet, speed: +carS.speed.toFixed(2),
+        search: { x0: +beamAt.x0.toFixed(2), z0: +beamAt.z0.toFixed(2), x1: +beamAt.x1.toFixed(2), z1: +beamAt.z1.toFixed(2), on: carS.onStreet && carS.x < 88.5 } },
       cops: cops.map((cp) => ({ x: +cp.x.toFixed(2), z: +cp.z.toFixed(2), anim: cp.out ? cp.w.playing() : '', out: cp.out, doing: cp.doing })),
     }),
     setOn: (v) => {
