@@ -14,6 +14,11 @@
  * Progress is kept as one small JSON object (this browser's localStorage by default, which in the desktop client is the
  * app's own user data). A host can pass its own ProgressStore (the web game's account, later).
  *
+ * THE PHONE CAN DIE (the canal, GAME-DESIGN.md 4): `phone.dead` in the saved state (absent in older saves: alive).
+ * While it is dead nothing arrives: lines wait in the queue, missions still move on (a place reached, a wall painted)
+ * and their messages wait too; a photo objective waits for a camera. A new burner (the phone kiosk) brings it all in.
+ * `phone.case`: a waterproof case (a later unlock) and the canal does not kill it.
+ *
  *   const ms = makeMissions(env, store, { onMessage, onChange }); ms.tick(dt); ms.event('escaped'); ms.photo(framed)
  */
 import { footprint, type Stroke } from '../spray';
@@ -32,8 +37,8 @@ export type Objective = {
   type: 'reach' | 'paint' | 'buff' | 'photo' | 'escape' | 'hide';
   /** What it says on the phone and under the mini-map (short, upper case). */
   text: string;
-  /** reach: a named place, or a point [x, y, z]; r metres. */
-  place?: string; at?: [number, number, number]; r?: number;
+  /** reach: a named place (or any of `places`), or a point [x, y, z]; r metres. */
+  place?: string; places?: string[]; at?: [number, number, number]; r?: number;
   /** paint / buff / photo: the wall (any one of these). */
   walls?: string[];
   /** paint: at least this (a tag, a throw-up, a piece: by size and strokes). */
@@ -95,6 +100,13 @@ export const MISSIONS: Mission[] = [
       { type: 'hide', secs: 5, text: 'LIE LOW: CROUCH AND KEEP STILL OUT OF SIGHT', hint: [['dez', 'now get low. C to crouch. stay still till it goes quiet']] },
     ],
     done: [['dez', "that's the feeling"], ['dez', 'rest up. more walls than nights']] },
+  { id: 'heaven', title: 'HEAVEN', from: 'nix', summary: 'Nix: get up high and put a throw-up on a heaven the whole street sees.', after: ['lose-them'], delay: 8,
+    intro: [['nix', 'ready for a heaven?'], ['nix', "roof over the shops on the N road. the corner block's side wall is bare from there up. the whole road sees it"], ['nix', "drainpipe off the back lane gets you up. or the scaffold over the canal, top lift"]],
+    objectives: [
+      { type: 'reach', places: ['n-road-heaven', 'canal-heaven'], r: 7, text: 'GET UP TO A HEAVEN: THE N ROAD ROOF OR THE TOP OF SCAFFOLD 2', hint: [['dez', 'W at a drainpipe to climb. space at a ledge to get up it. nothing over two metres']] },
+      { type: 'paint', walls: ['heaven-nw1-e', 'heaven-c3-n'], kind: 'throw-up', text: 'PUT A THROW-UP ON IT', hint: [['dez', "up there you're slow getting down. paint quick, keep an eye on the street"]] },
+    ],
+    done: [['nix', "that's a heaven. the whole road sees it on the way to work"], ['dez', 'worth more than a wall full of tags. and they never buff up there']] },
 ];
 
 export type Msg = { id: number; from: string; text?: string; photo?: string; t: number; mission?: string };
@@ -102,7 +114,10 @@ export type MissionInfo = { id: string; title: string; from: string; summary: st
   objectives: { type: Objective['type']; text: string; done: boolean; current: boolean }[] };
 export type Marker = { x: number; y: number; z: number; mission: string; title: string; text: string; type: Objective['type'] };
 type MState = { status: MissionInfo['status']; step: number; wait: number; region?: [number, number, number, number] | null };
-export type Saved = { v: 1; missions: Record<string, MState>; msgs: Msg[]; unread: Record<string, number>; known: string[]; queue: { from: string; text: string; mission: string; wait: number }[]; seq: number };
+export type Saved = { v: 1; missions: Record<string, MState>; msgs: Msg[]; unread: Record<string, number>; known: string[]; queue: { from: string; text: string; mission: string; wait: number }[]; seq: number;
+  /** The phone itself (absent: a working phone, as every save before the canal could kill it). */
+  phone?: PhoneSave };
+export type PhoneSave = { dead: boolean; case?: boolean; since?: number; drowned?: number; replaced?: number };
 export type ProgressStore = { load: () => Promise<Saved | null>; save: (s: Saved) => Promise<void> };
 
 const KEY = 'vx-game-phone';
@@ -160,7 +175,7 @@ export function makeMissions(env: Env, store: ProgressStore = localProgress, cb:
   // the objective now in play: its tip arrives, its places go on the map, what is on the wall now is the baseline
   const begin = (m: Mission, quiet = false) => {
     const s = st(m.id), o = m.objectives[s.step]; if (!o) return;
-    if (o.place) know(o.place);
+    if (o.place) know(o.place); for (const id of o.places || []) know(id);
     for (const w of o.walls || []) { const p = nearestPlace(w); if (p) know(p); }
     baseline(m);
     if (!quiet && o.hint) say(o.hint, m.id, s.step === 0 ? GAP : 1.2);
@@ -212,8 +227,9 @@ export function makeMissions(env: Env, store: ProgressStore = localProgress, cb:
   const judge = (m: Mission): boolean => {
     const s = st(m.id), o = m.objectives[s.step]; if (!o) return false;
     if (o.type === 'reach') {
-      const p = o.place ? env.place(o.place) : o.at ? { x: o.at[0], y: o.at[1], z: o.at[2] } : null; if (!p) return false;
-      const me = env.me(); return Math.hypot(me.x - p.x, me.z - p.z) < (o.r ?? 8) && Math.abs(me.gy - p.y) < 2.2;
+      const me = env.me();
+      const pts = [...(o.places || []).map((id) => env.place(id)), o.place ? env.place(o.place) : o.at ? { x: o.at[0], y: o.at[1], z: o.at[2] } : null].filter(Boolean) as { x: number; y: number; z: number }[];
+      return pts.some((p) => Math.hypot(me.x - p.x, me.z - p.z) < (o.r ?? 8) && Math.abs(me.gy - p.y) < 2.2);
     }
     if (o.type === 'paint') {
       const ss = freshStrokes(m, o).filter((k) => !k.buff && k.pts.length); const need = KIND_MIN[o.kind || 'any'];
@@ -250,8 +266,8 @@ export function makeMissions(env: Env, store: ProgressStore = localProgress, cb:
     tick: (dt: number) => {
       if (!ready) return;
       clock += dt;
-      // lines arriving, one after another
-      if (S.queue.length) { S.queue[0].wait -= dt; if (S.queue[0].wait <= 0) { const q = S.queue.shift()!; deliver({ from: q.from, text: q.text, mission: q.mission }); changed(); } }
+      // lines arriving, one after another (none while the phone is dead: they wait for a new one)
+      if (S.queue.length && !(S.phone && S.phone.dead)) { S.queue[0].wait -= dt; if (S.queue[0].wait <= 0) { const q = S.queue.shift()!; deliver({ from: q.from, text: q.text, mission: q.mission }); changed(); } }
       for (const m of MISSIONS) {
         const s = st(m.id);
         if (s.status === 'locked' && m.after.every((a) => st(a).status === 'done')) { s.status = 'waiting'; s.wait = m.delay; changed(); }
@@ -298,7 +314,7 @@ export function makeMissions(env: Env, store: ProgressStore = localProgress, cb:
       for (const m of MISSIONS) {
         const s = st(m.id), o = m.objectives[s.step]; if (s.status !== 'active' || !o) continue;
         let p: { x: number; y: number; z: number } | null = null;
-        if (o.type === 'reach') p = o.place ? env.place(o.place) : o.at ? { x: o.at[0], y: o.at[1], z: o.at[2] } : null;
+        if (o.type === 'reach') { const id = o.place || (o.places && o.places[0]); p = id ? env.place(id) : o.at ? { x: o.at[0], y: o.at[1], z: o.at[2] } : null; }
         else if (o.walls && o.walls.length) { const w = env.wall(o.walls[0]); if (w) p = { x: w.x + w.nx * 1.2, y: w.y - w.h / 2, z: w.z + w.nz * 1.2 }; }
         if (p) out.push({ x: p.x, y: p.y, z: p.z, mission: m.id, title: m.title, text: o.text, type: o.type });
       }
@@ -317,6 +333,22 @@ export function makeMissions(env: Env, store: ProgressStore = localProgress, cb:
     /** Start the story again (messages, missions, places); the paint stays on the walls. */
     reset: () => { S = fresh(); run.clear(); clock = 0; changed(); },
     ready: () => ready,
+    /** The phone: dead (the canal), the waterproof case, how many have drowned. */
+    phone: (): PhoneSave & { held: number } => ({ dead: !!S.phone?.dead, case: !!S.phone?.case, since: S.phone?.since, drowned: S.phone?.drowned || 0, replaced: S.phone?.replaced || 0, held: S.queue.length }),
+    /** In the canal: the phone dies (false: the case saved it, or it was dead already). */
+    drown: () => {
+      if (S.phone?.case) return false; if (S.phone?.dead) return false;
+      S.phone = { ...(S.phone || {}), dead: true, since: Date.now(), drowned: (S.phone?.drowned || 0) + 1 }; changed(); return true;
+    },
+    /** A new burner: the phone works again, and what waited arrives (the first line straight away). */
+    newPhone: () => {
+      if (!S.phone?.dead) return false;
+      S.phone = { ...S.phone, dead: false, since: undefined, replaced: (S.phone.replaced || 0) + 1 };
+      if (S.queue.length) S.queue[0].wait = Math.min(S.queue[0].wait, 0.8);
+      changed(); return true;
+    },
+    /** The waterproof case (a later unlock; for now an agent or a test can give it). */
+    setCase: (on: boolean) => { S.phone = { ...(S.phone || { dead: false }), case: !!on }; changed(); },
     mission: (id: string) => byId.get(id) || null,
     state: () => S,
   };

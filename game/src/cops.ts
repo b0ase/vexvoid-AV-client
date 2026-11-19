@@ -6,6 +6,8 @@
  * lanes the car cannot follow are how you get away. Seen painting, or seen with the heat up, and it stops: siren, strobes, and two
  * officers get out and run you down. Break their line of sight and get far enough away for a few seconds and they lose
  * you; they search where they last saw you, then give up and walk back (ESCAPED). If one gets within a metre: BUSTED.
+ * PARKOUR / WATER: nobody climbs after the writer or swims after them (Suspect.out): seen up a wall, on a roof or in
+ * the canal, they come to the foot of it and search there, longer than usual, then give up.
  *
  *   const law = await makeLaw({ scene, high, base, world, nav, route, sound })
  *   const ev = law.update(dt, t, { x, z, y, crouch, painting, spraying })   // '' | 'alert' | 'busted' | 'escaped'
@@ -19,7 +21,10 @@ import type { World, makeNav } from './world';
 import { loadWriter, type Writer } from './writer';
 
 export type Chase = 'off' | 'calm' | 'alerted' | 'chase' | 'searching' | 'busted';
-export type Suspect = { x: number; z: number; y: number; gy?: number; crouch: boolean; painting: boolean; spraying: boolean; torch?: boolean; vx?: number; vz?: number };
+export type Suspect = { x: number; z: number; y: number; gy?: number; crouch: boolean; painting: boolean; spraying: boolean; torch?: boolean; vx?: number; vz?: number;
+  /** Out of reach (up a wall, on a roof, a fire escape or a scaffold, in the canal): nobody follows. They search the
+   *  ground below, here, and give up after a while; seen up there is not the same as caught. */
+  out?: { x: number; z: number; y: number } | null };
 export type LawEvent = '' | 'alert' | 'busted' | 'escaped';
 export type LawState = {
   on: boolean; heat: number; chase: Chase; seen: boolean;
@@ -118,7 +123,7 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
     cops.push({ w, helmet, head, x: 0, z: 0, y: 0, h: 0, out: false, doing: 'in', wind: 0, tired: 0, side: i ? 1 : -1, goal: new THREE.Vector2(), look: 0, door: i ? 1 : -1, v: 0, path: [], pi: 0, pathFor: new THREE.Vector3(1e9, 0, 0), replan: 0 });
   }
 
-  let on = true, heat = 0, chase: Chase = 'calm', seen = false, seenT = 0, lostT = 0, searchT = 0, alertT = 0;
+  let on = true, heat = 0, chase: Chase = 'calm', seen = false, seenT = 0, lostT = 0, searchT = 0, alertT = 0, outSearch = false;
   const lastSeen = new THREE.Vector2();
   const carS = { s: 0, speed: 0, onStreet: false, gap: 6, x: start.x, z: start.z, h: start.h };
   let meY = 0;   // the writer's ground level, for the officers' map
@@ -236,7 +241,7 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
   };
 
   const update = (dt: number, t: number, me: Suspect): LawEvent => {
-    let ev: LawEvent = ''; meY = me.gy ?? 0;
+    let ev: LawEvent = ''; meY = me.out ? me.out.y : (me.gy ?? 0);
     // ── the car: drive the loop, brake for anyone in the lane, stop when alerted ──
     if (!on) { carS.onStreet = false; }
     else if (!carS.onStreet && chase === 'calm') {
@@ -306,14 +311,16 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
       if (alertT > 0.9 && carS.speed < 0.5) { spawn(); chase = 'chase'; lostT = 0; }
     }
     if (chase === 'chase' || chase === 'searching') {
-      if (seen) { lastSeen.set(me.x, me.z); lostT = 0; if (chase === 'searching') { chase = 'chase'; for (const cp of cops) cp.doing = 'run'; } }
-      else lostT += dt;
+      const out = me.out || null;
+      if (seen && !out) { lastSeen.set(me.x, me.z); lostT = 0; if (chase === 'searching') { chase = 'chase'; for (const cp of cops) cp.doing = 'run'; } }
+      else { lostT += dt; if (out) lastSeen.set(out.x, out.z); }
       const near = Math.min(...cops.map((cp) => Math.hypot(cp.x - me.x, cp.z - me.z)));
-      if (chase === 'chase' && lostT > LOSE && near > 9) {
-        chase = 'searching'; searchT = 0;
+      if (chase === 'chase' && lostT > LOSE && (near > 9 || out)) {
+        chase = 'searching'; searchT = 0; outSearch = !!out;
         cops.forEach((cp, i) => { cp.doing = 'search'; cp.goal.set(lastSeen.x + (i ? 1.6 : -1.6), lastSeen.y + (i ? -1 : 1)); cp.look = 0; });
       }
-      if (chase === 'searching' && (searchT += dt) > SEARCH) { chase = 'calm'; heat = 0.3; ev = 'escaped'; for (const cp of cops) cp.doing = 'return'; }
+      // (out of reach they wait below twice as long: come down too soon and they are there)
+      if (chase === 'searching' && (searchT += dt) > SEARCH * (outSearch ? 2 : 1)) { chase = 'calm'; heat = 0.3; ev = 'escaped'; for (const cp of cops) cp.doing = 'return'; }
     }
     // officers: run at the writer, search, or walk back to the car and get in
     for (const cp of cops) {
@@ -321,13 +328,13 @@ export async function makeLaw(o: { scene: THREE.Scene; high: boolean; base: stri
       if (cp.doing === 'run') {
         // they can't sprint for ever: a few seconds at a jog to get their wind back
         cp.wind += dt; if (cp.tired > 0) cp.tired -= dt; else if (cp.wind > WIND) { cp.tired = REST; cp.wind = 0; }
-        let tx = seen ? me.x : lastSeen.x, tz = seen ? me.z : lastSeen.y;
+        let tx = seen && !me.out ? me.x : lastSeen.x, tz = seen && !me.out ? me.z : lastSeen.y;
         // the second officer heads where the writer is going (up to 0.7 s ahead), to cut them off at a corner
         if (seen && cp === cops[1]) { const lead = Math.min(0.7, Math.hypot(me.x - cp.x, me.z - cp.z) / RUN_SPEED * 0.5); tx += (me.vx || 0) * lead; tz += (me.vz || 0) * lead; }
         const want = cp.tired > 0 ? JOG_SPEED : RUN_SPEED; cp.v += Math.max(-COP_ACCEL * dt, Math.min(COP_ACCEL * dt, want - cp.v));
         const moved = steer(cp, tx, tz, cp.v, dt);
         cp.w.play(moved ? (cp.tired > 0 ? 'Jog_Fwd_Loop' : 'Sprint_Loop') : 'Idle_Loop', 0.2);
-        if (Math.hypot(cp.x - me.x, cp.z - me.z) < BUST_R && me.y < 0.6 && Math.abs(cp.y - meY) < 0.6 && chase === 'chase') {
+        if (!me.out && Math.hypot(cp.x - me.x, cp.z - me.z) < BUST_R && me.y < 0.6 && Math.abs(cp.y - meY) < 1.4 && chase === 'chase') {   // (up on a skip or a car roof they still pull you down)
           chase = 'busted'; ev = 'busted'; cp.doing = 'bust';
           cp.h = Math.atan2(me.x - cp.x, me.z - cp.z); cp.w.play('Punch_Jab', 0.1, true);
           for (const o2 of cops) if (o2 !== cp) { o2.doing = 'bust'; o2.w.play('Idle_Loop', 0.3); }

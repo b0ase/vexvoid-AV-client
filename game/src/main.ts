@@ -24,6 +24,12 @@
  * up to 3840 px wide, kept as a PNG (this browser, the desktop's VexVoid Photos folder, the player's account); L (or
  * GALLERY) opens the phone on the photos. O is photo mode: time stops, the HUD goes, WASD / the arrows / a drag orbit the
  * camera and the wheel zooms; Q shoots. The MINI-MAP (./minimap.ts) top left: local, turning with the writer; K hides it.
+ * PARKOUR (./parkour.ts): running at something low vaults it; Space at a ledge up to 2.25 m grabs it and mantles up;
+ * W at a drainpipe or a ladder climbs it (W S, Space jumps off, C lets go; C at the top of one climbs down); roofs, fire
+ * escapes, scaffold lifts and the warehouse mezzanine are walkable; big drops roll or land hard. WATER: into the canal
+ * (a jump, a fall, the water steps) and Vex swims (out at the steps or a canal ladder), comes out soaked (./wet.ts:
+ * darker cloth, drips, wet footprints, slower, no painting until his hands dry) and the phone is dead until a new
+ * burner from the PHONE KIOSK on the S road (missions wait; the save remembers). The patrol never follows up or in.
  * Built by scripts/build-game.sh into vx/game/vexvoid-game.js (window.VXGAME).
  */
 import * as THREE from 'three';
@@ -49,6 +55,9 @@ import { makePhone, type AppId, type PhoneState } from './phone/phone';
 import { makeMissions, localProgress, MISSIONS, type ProgressStore, type MissionInfo, type Marker, type Msg, type Framed } from './phone/missions';
 import { makeMinimap, type MinimapState } from './minimap';
 import { makeBook, slotsOf, sketchOf, fit, drawSketch, secsOf, cleanName, type Sketch, type SketchKind, type SketchStore, type BookState } from './sketchbook';
+import { makeParkour, type PkState, type Input as PkInput } from './parkour';
+import { makeWet } from './wet';
+import { CLIMBABLE, WATER_Y } from './plan';
 
 export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) => void; onHud?: (s: string) => void; onRec?: () => void;
   /** Where the walls' paint is kept (default: this browser). */
@@ -66,7 +75,7 @@ export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) =
   /** Where the story's progress is kept (messages, missions, places on the map; default: this browser / the app's user data). */
   progress?: ProgressStore };
 export type { PhotoTaken };
-export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?: number) => string; inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string; at?: number | null; view?: { yaw: number; pitch: number; dist: number; bone?: string; h?: number; fov?: number } | null }) => void; where: () => { x: number; z: number; y: number; yaw: number; heading: number; anim: string; speed: number; tip: [number, number, number] | null };
+export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?: number) => string; inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string; at?: number | null; view?: { yaw: number; pitch: number; dist: number; bone?: string; h?: number; fov?: number } | null; fill?: number }) => void; where: () => { x: number; z: number; y: number; yaw: number; heading: number; anim: string; speed: number; tip: [number, number, number] | null };
   /** Call the law on the writer now: the patrol car pulls up nearest them and two officers give chase (testing an escape). */
   alarm: () => void;
   /** The district's named places (the studio is home; the shops; the tunnel, the rail, the warehouse, the scaffolds...). */
@@ -155,7 +164,17 @@ export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?:
   /** The can in the writer's hand; give fields to change them. */
   can: (o?: Partial<Can>) => Can;
   /** What the paint costs in memory: walls with paint, tiles alive, MB of canvas. */
-  paintStats: () => { walls: number; painted: number; tiles: number; mb: number; resting: number; undo: number; undoTiles: number; drips: number }; flush: () => Promise<void>; goto: (x: number, z: number, yaw?: number, pitch?: number, y?: number) => void; law: () => LawState; cops: (on: boolean) => void; audio: () => { ctx: AudioContext; node: AudioNode } | null };
+  paintStats: () => { walls: number; painted: number; tiles: number; mb: number; resting: number; undo: number; undoTiles: number; drips: number }; flush: () => Promise<void>;
+  /** PARKOUR: what the writer is doing (none vault mantle climb swim roll heavy hard), the route, out of the patrol's
+   *  reach or not, what the prompt offers here; counts. climb: put the writer on a route (its id) at its foot or at y;
+   *  swim: into the water here; reset: stop whatever it is. cam: where the camera is and whether it is inside anything. */
+  parkour: (o?: { climb?: string; y?: number; swim?: boolean; reset?: boolean }) => PkState & { cam: { x: number; y: number; z: number; inside: boolean }; x: number; z: number; gy: number; heading: number };
+  /** The ways up (drainpipes, fire escapes, ladders, scaffold ladders, canal ladders) and the heavens; near: within this many metres. */
+  climbables: (o?: { near?: number }) => { routes: { id: string; kind: string; name: string; x: number; z: number; y0: number; y1: number; top: { x: number; z: number; y: number } | null; bld: string; dist: number }[]; heavens: { id: string; name: string; wall: string; x: number; z: number; y: number; worth: number; painted: boolean; about: string }[] };
+  /** WATER: how wet (0..1), swimming, whether the hands are dry enough to paint, the drips and marks showing, and the
+   *  phone (dead, the case, messages held). wet sets it; drown kills the phone as the canal would; newPhone is the kiosk's
+   *  burner; case gives or takes the waterproof case. */
+  water: (o?: { wet?: number; drown?: boolean; newPhone?: boolean; case?: boolean }) => { wet: number; swimming: boolean; canPaint: boolean; drying: number; drips: number; marks: number; phone: { dead: boolean; case: boolean; held: number; drowned: number; replaced: number } }; goto: (x: number, z: number, yaw?: number, pitch?: number, y?: number) => void; law: () => LawState; cops: (on: boolean) => void; audio: () => { ctx: AudioContext; node: AudioNode } | null };
 
 export type SketchInfo = { id: string; name: string; kind: SketchKind; w: number; h: number; strokes: number; secs: number; mine: boolean; about?: string };
 const infoOf = (s: Sketch): SketchInfo => ({ id: s.id, name: s.name, kind: s.kind, w: s.w, h: s.h, strokes: s.strokes.length, secs: Math.round(secsOf(s)), mine: !!s.mine, about: s.about });
@@ -231,6 +250,8 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     const mesh = new THREE.Mesh(g, m); mesh.frustumCulled = false; mesh.userData.noAO = true; mesh.renderOrder = 5; mesh.visible = false; scene.add(mesh); return mesh;
   })();
   const torchDir = new THREE.Vector3(), torchP = new THREE.Vector3(), DOWN = new THREE.Vector3(0, -1, 0);
+  // (for pictures only, off in play: a soft light at the camera, so a move can be seen in a dark corner; inspect({ fill }))
+  const fillL = new THREE.PointLight('#ffffff', 0, 14, 1.6); fillL.visible = false; scene.add(fillL);
   const setTorch = (on: boolean) => { torch.on = on; note(on ? 'TORCH ON · THEY SEE YOU FROM FURTHER' : 'TORCH OFF', 1.8); hud(); };
 
   const size = () => { const b = host.getBoundingClientRect(); return { w: Math.max(2, Math.round(b.width)), h: Math.max(2, Math.round(b.height)) }; };
@@ -271,7 +292,26 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   // how far along the wall either side of the writer the can reaches; further, A D step along (no stepping by itself)
   const REACH = 2.4;
   const camO = { yaw: home.yaw, pitch: 0.12, dist: 3.4 };
+  // PARKOUR and the WATER (./parkour.ts, ./wet.ts): the actions that take the body over (vault, mantle, climb, swim,
+  // a hard landing), how wet Vex is (1 out of the canal, drying over about two minutes, faster by a warm lamp)
+  let canWanted = true, wet = 0;
+  const DRY_SECS = 110, WET_PAINT = 0.3, WET_SLOW = 0.22;
+  const wetFx = makeWet(scene);
+  const pk = makeParkour({ world: W0, plan: city.plan, writer, me, mv, carry: (on) => writer.carry(on && canWanted),
+    onSplash: (x, z) => { wetFx.splash(x, WATER_Y, z, 1); enterWater(); },
+    onLand: (kind) => { if (kind === 'hard') note('HARD LANDING · WINDED A FEW SECONDS', 2.6); } });
+  // warm places dry you faster: a lamp, a bulb or a work light close by, or home (the studio)
+  const warm = city.plan.lamps.filter((l) => l.kind === 'warm' || l.kind === 'bulb' || l.kind === 'tube' || l.kind === 'wall');
+  const dryRate = () => { let k = 1; for (const l of warm) if (Math.hypot(l.x - me.x, l.z - me.z) < 4.5 && Math.abs(l.y - me.gy) < 5) { k = 2.5; break; } if (Math.hypot(me.x - home.x, me.z - home.z) < 9 && city.ceilingAt(me.x, me.z, me.gy + 1) < Infinity) k = 3; return k; };
+  const dripFrom = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+  const prints: { x: number; y: number; z: number; h: number }[] = []; let walked = 0, footSide = 0;
   const keys = new Set<string>(); let shiftNow = false;
+  // what the parkour reads of the keys: W S A D (or the arrows) as up/down/left/right, the stick relative to the camera
+  (globalThis as { __vxPk?: unknown }).__vxPk = pk;   // (tests: the parkour's own debug())
+  const pkIn = (still = false): PkInput => {
+    const L = keys.has('a') || keys.has('ArrowLeft'), R = keys.has('d') || keys.has('ArrowRight'), U = keys.has('w') || keys.has('ArrowUp'), D = keys.has('s') || keys.has('ArrowDown');
+    return still ? { up: false, down: false, left: false, right: false, ax: 0, az: 0, sprint: false, camYaw: camO.yaw } : { up: U, down: D, left: L, right: R, ax: (R ? 1 : 0) - (L ? 1 : 0), az: (U ? 1 : 0) - (D ? 1 : 0), sprint: keys.has('Shift'), camYaw: camO.yaw };
+  };
   const MOVE = ['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Shift', ' ', 'c', 'f', 'm', 'p', 't', 'r', '1', '2', '3', '4', '5', '6', '7', 'z', 'x', 'h', 'Tab', 'Escape', 'b', 'g', 'v', 'n', '[', ']', '-', '=', '+', 'Enter', 'q', 'l', 'o', 'e', 'k'];
   // painting: F at a wall squares up to it; the mouse aims, holding it sprays; the wheel sets the can's distance
   type W = (typeof city.walls)[number];
@@ -310,13 +350,14 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     if (phone.isOpen()) return 'PHONE · ARROWS PICK · ENTER OPEN · ESC BACK · 1-6 APPS · Q PHOTO · M MUSIC · E PUT IT AWAY';
     if (flash.until > t) return flash.text;
     const L = law.state(), cells = Math.min(5, Math.ceil(L.heat * 5 - 0.001));
+    const cond = (wet > 0.02 ? `SOAKED ${Math.round(wet * 100)}% · ` : '') + (phoneDead() ? 'PHONE DEAD · KIOSK ON THE S ROAD · ' : '') + (pk.winded() > 0 ? 'WINDED · ' : '');
     const what = { off: 'PATROL OFF', calm: L.seen ? 'SEEN' : L.heat >= 0.6 ? 'WANTED' : 'CALM', alerted: 'ALERT', chase: 'CHASE', searching: 'SEARCHING', busted: 'BUSTED' }[L.chase];
     const lawS = L.on ? `HEAT ${'▮'.repeat(cells)}${'▯'.repeat(5 - cells)} ${what} · P PATROL OFF` : 'PATROL OFF · P PATROL ON';
     const bk = book.state.open ? (() => { const s = book.pick(); return `SKETCHBOOK · ${s ? s.name + ' ' + s.kind.toUpperCase() : 'PICK ONE'} · ${book.state.speed}× · SIZE ${Math.round(book.state.size * 100)}% · B CLOSE · `; })() : '';
     if (bk) return bk + (paint ? `PAINTING ${paint.id.toUpperCase()} · F DONE · ` : 'WASD MOVE · F AT A WALL · ') + lawS;
     return (paint
       ? `PAINTING ${paint.id.toUpperCase()} · ${can.buff ? 'BUFF' : COLOUR_NAMES[colourI]} · ${CAPS[can.cap]} CAP · ${Math.round(can.dist * 100)} CM · Q PHOTO · H HELP · F DONE`
-      : 'WASD MOVE · SHIFT SPRINT · C CROUCH · SPACE JUMP · DRAG LOOK · F AT ANY WALL TO PAINT · B SKETCHBOOK · T TORCH · E PHONE · Q PHOTO · L GALLERY · O PHOTO MODE · K MAP') + ' · ' + lawS + (opts.onRec ? ' · R RECORD' : '') + (music ? (music.state().on ? ' · M MUSIC OFF' : ' · M MUSIC ON') : '');
+      : cond + 'WASD MOVE · SHIFT SPRINT · C CROUCH · SPACE JUMP / GRAB · W CLIMB · DRAG LOOK · F AT ANY WALL TO PAINT · B SKETCHBOOK · T TORCH · E PHONE' + (phoneDead() ? '' : ' · Q PHOTO · L GALLERY · O PHOTO MODE · K MAP')) + ' · ' + lawS + (opts.onRec ? ' · R RECORD' : '') + (music ? (music.state().on ? ' · M MUSIC OFF' : ' · M MUSIC ON') : '');
   };
   const hud = () => { const s = hudText(); if (s !== lastHud) { lastHud = s; if (opts.onHud) opts.onHud(s); } };
   const fwd = new THREE.Vector3(0, 0, -1), side = new THREE.Vector3();
@@ -348,6 +389,8 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const squareUp = (w: W) => { paint = { id: w.id, spot: w }; camO.yaw = Math.atan2(w.normal.x, w.normal.z); camO.pitch = 0.1; camO.dist = 2.6; };
   const togglePaint = () => {
     if (paint) { paint = null; btn = 0; stroke = null; line = null; spray.end(); stopAuto(false); me.crouch = false; hud(); return; }
+    if (pk.busy() || me.airborne) { note(pk.mode() === 'swim' ? 'NOT IN THE WATER' : 'GET YOUR FEET DOWN FIRST', 1.6); return; }
+    if (wet > WET_PAINT) { say2(`HANDS TOO WET TO PAINT · DRYING ${Math.round((1 - wet) * 100)}%`, 2.5); note('HANDS TOO WET · FIND SOMEWHERE WARM OR WAIT', 2.5); return; }
     const w = nearestWall(); if (!w) { say2('NO WALL WITHIN REACH', 2.5); note('WALK UP TO A WALL · THEN F', 2.5); return; }
     me.crouch = false; squareUp(w.spot);
     hud();
@@ -531,9 +574,25 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     onSaved: () => { gallery.added(); hud(); },
   });
   // a photo: judged for the missions at the shutter (what is in frame now), sent in their thread once it is kept
-  const takePhoto = (o: { width?: number } = {}) => { const job = missions.photo(framed), p = camera.take(o); p.then((x) => job.sent(x.id), () => job.sent(null)); return p; };
-  const snapNow = () => { void takePhoto().catch(() => { /* said on screen */ }); };
+  // THE PHONE DIES IN THE CANAL (GAME-DESIGN.md 4): no camera, photos, messages, map or music until a new burner from
+  // the PHONE KIOSK on the S road. The missions keep going and their messages wait (missions.ts); the save remembers.
+  const DEAD_SAY = "THE PHONE'S DEAD · A NEW BURNER AT THE PHONE KIOSK, S ROAD";
+  const phoneDead = () => missions.phone().dead;
+  const enterWater = () => {
+    wet = 1;
+    if (paint) togglePaint();
+    if (missions.drown()) { phone.close(); syncPhone(); note("SPLASH · THE PHONE'S DEAD · NEW BURNER AT THE PHONE KIOSK, S ROAD", 4.5); }
+    else note(missions.phone().case ? 'SPLASH · THE CASE KEPT THE PHONE DRY' : 'SPLASH', 2);
+  };
+  const syncPhone = () => { const d = phoneDead(); if (d !== phone.isDead()) { phone.setDead(d); music?.hold(d); hud(); } };
+  const newBurner = () => { if (!missions.newPhone()) return false; syncPhone(); note('NEW BURNER · SAME NUMBER · YOUR MESSAGES ARE COMING IN', 3.5); return true; };
+  const takePhoto = (o: { width?: number } = {}) => {
+    if (phoneDead()) return Promise.reject(new Error("the phone is dead (the canal): get a new burner at the phone kiosk on the S road"));
+    const job = missions.photo(framed), p = camera.take(o); p.then((x) => job.sent(x.id), () => job.sent(null)); return p;
+  };
+  const snapNow = () => { if (phoneDead()) { note(DEAD_SAY, 2.6); return; } void takePhoto().catch(() => { /* said on screen */ }); };
   const openGallery = (on: boolean, id?: string | null) => {
+    if (on && phoneDead()) { note(DEAD_SAY, 2.6); return; }
     if (on) {
       if (photoMode) setPhotoMode(false);
       phone.open('gallery', { direct: !phone.isOpen() });
@@ -545,10 +604,13 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const togglePhone = () => {
     if (phone.isOpen()) { phone.close(); return; }
     if (bust) return;
+    // at the kiosk with a dead one: a new burner
+    { const d = doorAt(); if (d && d.id === 'phone-shop' && phoneDead()) { newBurner(); return; } }
     const b = phone.state().banner; if (b) phone.open('messages', { thread: b, direct: true }); else phone.open('home');
   };
   const setPhotoMode = (on: boolean) => {
     if (on === photoMode) return;
+    if (on && phoneDead()) { note(DEAD_SAY, 2.6); return; }
     if (on) { if (paint) togglePaint(); if (gallery.isOpen()) gallery.open(false); keys.clear(); btn = 0; }
     photoMode = on;
     for (const e of [hudUi.el, tip, book.el, phone.banner]) e.style.visibility = on ? 'hidden' : '';
@@ -608,9 +670,13 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     if (down && !e.repeat && paint && k === 'x') { can.buff = !can.buff; if (can.buff) note('BUFF CAN · TAKES PAINT OFF'); hud(); }
     if (down && paint && k === 'z' && !auto) undo();
     if (down && !e.repeat && paint && k === 'h') { help = !help; hud(); }
-    if (down && !e.repeat && k === 'c' && !paint) me.crouch = !me.crouch;
-    // a jump: a moment's gather (the body dips), then up
-    if (down && !e.repeat && k === ' ' && !me.airborne && !mv.takeoff) { mv.takeoff = GAIT.gather; me.crouch = false; writer.land(0.25); writer.play('Jump_Start', 0.06, true); }
+    // C: crouch; on a wall it lets go, at the top of a drainpipe or a ladder it climbs down
+    if (down && !e.repeat && k === 'c' && !paint) { if (!pk.down()) { if (!pk.busy()) me.crouch = !me.crouch; } }
+    // Space: a ledge in front is grabbed (a mantle), something low with a drop behind is gone over, a drop ladder
+    // overhead is jumped for, a wall being climbed is jumped off; otherwise a jump: a moment's gather, then up
+    if (down && !e.repeat && k === ' ' && !paint) {
+      if (!pk.jump(pkIn())) { if (!me.airborne && !mv.takeoff && !pk.busy()) { mv.takeoff = GAIT.gather; me.crouch = false; writer.land(0.25); writer.play('Jump_Start', 0.06, true); } }
+    }
     if (down) keys.add(k); else keys.delete(k);
     if (k === 'Shift') shiftNow = down;
   };
@@ -686,7 +752,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   let bust: { t: number; spot: string; kept: string } | null = null;
   const camPos = new THREE.Vector3(home.x + Math.sin(home.yaw) * 3.4, home.y + 2, home.z + Math.cos(home.yaw) * 3.4), camLook = new THREE.Vector3(), scr = new THREE.Vector3();
   let landT = 0, forceAnim = '', idleT = 0, camH = 1.45, shotView: { yaw: number; pitch: number; dist: number; bone?: string; h?: number; fov?: number } | null = null, fov0 = 0;
-  const lookTo = new THREE.Vector3(), tipV = new THREE.Vector3(), focusV = new THREE.Vector3(), headV = new THREE.Vector3();
+  const lookTo = new THREE.Vector3(), tipV = new THREE.Vector3(), focusV = new THREE.Vector3(), headV = new THREE.Vector3(), swimAt = new THREE.Vector3(), fillOff = new THREE.Vector3();
   let storyMs = 0;
   const doorAt = () => city.plan.doors.find((d) => me.x > d.x0 - 0.3 && me.x < d.x1 + 0.3 && me.z > d.z0 - 0.3 && me.z < d.z1 + 0.3 && Math.abs(me.gy) < 0.5) || null;
   cam.position.copy(camPos);
@@ -703,12 +769,19 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     const still = !!bust || photoMode || phone.isOpen();   // the phone out: the writer stands and looks at it
     const ax = still ? 0 : (keys.has('d') || (!paint && rightK) ? 1 : 0) - (keys.has('a') || (!paint && left) ? 1 : 0);
     const az = still ? 0 : (keys.has('w') || (!paint && upK) ? 1 : 0) - (keys.has('s') || (!paint && downK) ? 1 : 0);
-    const sprint = keys.has('Shift') && !me.crouch && !paint;
+    const sprint = keys.has('Shift') && !me.crouch && !paint && pk.winded() <= 0;   // (winded after a hard landing: no sprint)
     // movement is relative to where the camera looks
     fwd.set(-Math.sin(camO.yaw), 0, -Math.cos(camO.yaw)); side.set(Math.cos(camO.yaw), 0, -Math.sin(camO.yaw));
-    if (mv.takeoff > 0 && (mv.takeoff -= dt) <= 0) { mv.takeoff = 0; me.vy = 4.6; me.airborne = true; }
-    if (!paint) {
-      const top = me.crouch ? GAIT.crouch : sprint ? GAIT.sprint : GAIT.jog, air = me.airborne ? GAIT.air : 1;
+    if (mv.takeoff > 0 && (mv.takeoff -= dt) <= 0) { mv.takeoff = 0; me.vy = 4.6; me.airborne = true; pk.takeoff(true); }
+    // PARKOUR: an action that has the body runs it (vault, mantle, climb, swim, a landing); W into a route at its foot
+    // (or at a canal ladder, swimming) gets on it
+    const busy0 = pk.busy();
+    if (!paint && !still && (keys.has('w') || upK) && (!me.airborne || pk.mode() === 'swim')) pk.grab();
+    if (pk.busy()) pk.tick(dt, pkIn(still));
+    pk.tickNote(dt);
+    if (!paint && !busy0 && !pk.busy()) {
+      // soaked he is slower; winded after a hard landing too
+      const top = (me.crouch ? GAIT.crouch : sprint ? GAIT.sprint : GAIT.jog) * (1 - WET_SLOW * wet) * pk.speedK(), air = me.airborne ? GAIT.air : 1;
       let target = 0, step = 0;
       if (ax || az) {
         const dx = fwd.x * az + side.x * ax, dz = fwd.z * az + side.z * ax;
@@ -722,13 +795,14 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       me.heading += step; mv.yawRate += ((dt > 0 ? step / dt : 0) - mv.yawRate) * Math.min(1, dt * 20);
       const was = mv.speed, acc = target > mv.speed ? (sprint ? GAIT.sprintAccel : GAIT.accel) : GAIT.decel + GAIT.decelPer * mv.speed;
       mv.speed += Math.max(-acc * dt * air, Math.min(acc * dt * air, target - mv.speed));
-      if (mv.speed > 0.001) {
+      // running at something low: over it (the vault takes the body from here)
+      if (mv.speed > 0.001 && !pk.tryVault()) {
         const x0 = me.x, z0 = me.z, feet = me.gy + me.y;
         me.x += Math.sin(me.heading) * mv.speed * dt; me.z += Math.cos(me.heading) * mv.speed * dt;
         // push out of walls, piers and props at the writer's height (a body 0.35 m round)
         W0.pushOut(me, 0.35, feet);
         // nothing to stand on here at this level (a step too high, the edge of the water): slide along, or stay
-        if (Number.isNaN(W0.groundAt(me.x, me.z, feet))) {
+        if (Number.isNaN(W0.groundAt(me.x, me.z, feet)) && !(me.airborne && pk.waterAt(me.x, me.z))) {   // (in the air over the canal: on into it)
           if (!Number.isNaN(W0.groundAt(me.x, z0, feet))) me.z = z0; else if (!Number.isNaN(W0.groundAt(x0, me.z, feet))) me.x = x0; else { me.x = x0; me.z = z0; }
         }
         // running into something: the legs slow to what the body really does, rather than running on the spot
@@ -738,7 +812,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       const accel = dt > 0 ? (mv.speed - was) / dt : 0;
       mv.roll += (Math.max(-0.16, Math.min(0.16, -0.02 * mv.yawRate * mv.speed)) - mv.roll) * Math.min(1, dt * 10);
       mv.pitch += (Math.max(-0.06, Math.min(0.1, accel * 0.004 + (mv.speed / GAIT.sprint) * 0.05)) - mv.pitch) * Math.min(1, dt * 9);
-    } else { mv.yawRate = 0; mv.roll *= Math.max(0, 1 - dt * 6); mv.pitch *= Math.max(0, 1 - dt * 6); }   // painting: the side step sets the speed
+    } else if (paint) { mv.yawRate = 0; mv.roll *= Math.max(0, 1 - dt * 6); mv.pitch *= Math.max(0, 1 - dt * 6); }   // painting: the side step sets the speed
     const moving = mv.speed > 0.15;
     sprayingNow = false;
     if (paint) {
@@ -855,8 +929,11 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       hissOn(sprayingNow, 0.55 + 0.45 * vol);
     } else {
       reticle.visible = dot.visible = preview.visible = ghost.visible = false; hissOn(false); writer.aim(null); follow = 0; aimAt = null; plan = null; hudUi.near('');
-      const nw = !bust && nearestWall(2.5), sk = book.state.open ? book.pick() : null;
-      prompt(t < tipHold ? tipNote : nw ? (sk ? `[F] THEN CLICK THE WALL TO BLAST ${sk.name}` : '[F] PAINT THIS WALL') : sk ? 'WALK UP TO A WALL TO BLAST ' + sk.name : '');
+      // PARKOUR first (a climb, a ledge, the water), then the wall; soaked hands say so
+      const pkSay = bust || photoMode ? '' : pk.look(pkIn());
+      const nw = !bust && !pk.busy() && !me.airborne && nearestWall(2.5), sk = book.state.open ? book.pick() : null;
+      const wallSay = nw ? (wet > WET_PAINT ? `HANDS TOO WET TO PAINT · DRYING ${Math.round((1 - wet) * 100)}%` : sk ? `[F] THEN CLICK THE WALL TO BLAST ${sk.name}` : '[F] PAINT THIS WALL') : sk ? 'WALK UP TO A WALL TO BLAST ' + sk.name : '';
+      prompt(t < tipHold ? tipNote : pkSay && wallSay && nw ? `${pkSay} · ${wallSay}` : pkSay || wallSay);
     }
     writer.steady(!!paint && mv.speed < 0.05);
     hudUi.dock({ walk: !paint && !bust && !photoMode && !phone.isOpen(), photos: camera.count(), gallery: gallery.isOpen(), phone: phone.isOpen(), unread: missions.unread(), on: !!paint && !bust && !phone.isOpen(), cap: can.cap, colour: colourI, colours: COLOURS, names: COLOUR_NAMES, dist: can.dist, line: cm(footprint(can).width), buff: !!can.buff, undo: paint ? spray.undoable(runOf(paint.spot).ids) : 0, book: !!book.state.open, help, torch: torch.on });
@@ -864,8 +941,18 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     tip.style.bottom = paint ? `${Math.round(16 + 124 * hudScale(w, h))}px` : '9%';
     tip.style.left = book.state.open ? 'calc((100% - 296px) / 2)' : '50%'; tip.style.maxWidth = book.state.open ? 'calc(100% - 330px)' : 'calc(100% - 32px)';
     spray.update(dt, me, auto ? auto.speed : 1);   // a blast at 2x/4x runs the paint's wet clock at its own speed
+    // WET: soaked through in the water; out of it drying (faster somewhere warm); the cloth, the drips, the prints
+    if (pk.mode() === 'swim') wet = 1; else if (wet > 0) wet = Math.max(0, wet - dt * dryRate() / DRY_SECS);
+    writer.wet(wet);
+    prints.length = 0;
+    if (wet > 0.12 && !pk.busy() && !me.airborne && mv.speed > 0.3) { walked += mv.speed * dt; if (walked > 0.72) { walked = 0; footSide ^= 1; const fp = writer.bonePos(footSide ? 'RightFoot' : 'LeftFoot', dripFrom[4]); if (fp) prints.push({ x: fp.x, y: me.gy, z: fp.z, h: me.heading }); } }
+    if (wet > 0.04) { writer.bonePos('LeftHand', dripFrom[0]); writer.bonePos('RightHand', dripFrom[1]); writer.bonePos('Hips', dripFrom[2]); dripFrom[2].y -= 0.3; writer.bonePos('Head', dripFrom[3]); dripFrom[3].y += 0.06; }
+    wetFx.update(dt, { wet, from: dripFrom.slice(0, 4), feet: prints, standing: mv.speed < 0.2 && !pk.busy() && !me.airborne, ground: (x, z, y) => W0.groundAt(x, z, y), swimming: pk.mode() === 'swim', at: swimAt.set(me.x, 0, me.z), water: WATER_Y });
+    syncPhone();
     law.pushOut(me, 0.35);
-    const ev = photoMode ? '' : law.update(dt, t, { x: me.x, z: me.z, y: me.y, gy: me.gy, crouch: me.crouch, painting: !!paint, spraying: sprayingNow, torch: torch.on, vx: paint ? 0 : Math.sin(me.heading) * mv.speed, vz: paint ? 0 : Math.cos(me.heading) * mv.speed });
+    // (up a wall, on a roof, in the canal: out of their reach, they search below; low on a route they can still pull you off)
+    const out = pk.out(), lowRoute = pk.mode() === 'climb' && !out ? pk.route() : null;
+    const ev = photoMode ? '' : law.update(dt, t, { x: me.x, z: me.z, y: lowRoute ? 0 : me.y, gy: lowRoute ? lowRoute.y0 : me.gy, crouch: me.crouch, painting: !!paint, spraying: sprayingNow, torch: torch.on, vx: paint || pk.busy() ? 0 : Math.sin(me.heading) * mv.speed, vz: paint || pk.busy() ? 0 : Math.cos(me.heading) * mv.speed, out });
     if (ev && opts.onEvent) try { opts.onEvent(ev); } catch { /* the host's business */ }
     if (ev) missions.event(ev);
     if (ev === 'busted') {
@@ -874,7 +961,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       const blastWall = auto && auto.group[0] === 'p' ? auto.list[Math.min(auto.i, auto.list.length - 1)].wall : '';
       bust = { t: 0, spot: blastWall && blastWall === lastSpray ? '' : lastSpray, kept: blastWall };
       if (paint) togglePaint();
-      btn = 0; me.crouch = false; keys.clear(); mv.speed = 0; mv.yawRate = 0;
+      btn = 0; me.crouch = false; keys.clear(); mv.speed = 0; mv.yawRate = 0; pk.reset();
       writer.play('Hit_Knockback', 0.08, true);
       const c = law.nearest(); if (c) camO.yaw = Math.atan2(me.x - c.x, me.z - c.z) + 1.1;
     }
@@ -894,17 +981,28 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     }
     if (bust) { /* the knockback clip plays out */ }
     else if (paint && !me.airborne) writer.loco(mv.speed, me.crouch);
+    else if (pk.busy()) { /* the parkour poses the body (writer.rig, or the roll clip) */ }
+    else if (me.airborne && pk.air()) { /* a jump came up under a ledge: caught it */ }
     else if (me.airborne) {
       // exact under constant gravity, so a jump peaks at the same 0.81 m at 25 fps as at 60 (Euler lost ~9 cm at
       // 25 fps and the 0.72 m loading dock became unjumpable)
       me.y += me.vy * dt - 6.5 * dt * dt; me.vy -= 13 * dt;
       // over a ledge or a dock while high enough: the ground under the writer is up there now
       { const feet = me.gy + me.y, g = W0.groundAt(me.x, me.z, feet); if (!Number.isNaN(g) && Math.abs(g - me.gy) > 0.01) { me.y = feet - g; me.gy = g; } }
-      if (me.y <= 0) {
-        // the landing: the harder it is, the more the body gives and the more speed it costs
+      // over the canal there is nothing to land on: down into the water
+      if (pk.waterAt(me.x, me.z) && Number.isNaN(W0.groundAt(me.x, me.z, me.gy + me.y))) {
+        const feet = me.gy + me.y; if (me.gy > WATER_Y - 3) { me.gy = WATER_Y - 3; me.y = feet - me.gy; }
+        if (feet <= WATER_Y + 0.12) pk.splash();
+      }
+      if (pk.busy()) { /* in the water now */ }
+      else if (me.y <= 0) {
+        // the landing: the harder it is, the more the body gives and the more speed it costs; from high up a roll,
+        // a heavy landing or a hard one (parkour.ts)
         const k = Math.min(1, Math.max(0, -me.vy / 7)); me.y = 0; me.vy = 0; me.airborne = false;
-        writer.land(0.3 + 0.5 * k); mv.speed *= 1 - 0.12 * k;
-        if (mv.speed > 1.5) landT = 0; else { writer.play('Jump_Land', 0.05, true); landT = 0.14; }
+        if (!pk.land()) {
+          writer.land(0.3 + 0.5 * k); mv.speed *= 1 - 0.12 * k;
+          if (mv.speed > 1.5) landT = 0; else { writer.play('Jump_Land', 0.05, true); landT = 0.14; }
+        }
       } else if (me.vy < 2.5) writer.play('Jump_Loop', 0.15);
     } else if (mv.takeoff > 0) { /* gathering for the jump */ }
     else if (landT > 0) landT -= dt;
@@ -918,16 +1016,18 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     }
     writer.lean(mv.roll, mv.pitch); writer.twist(paint ? mv.offset : 0);
     // the ground under the writer: up a kerb or a step is a quick step, not a pop; off an edge, they fall
-    {
+    if (!pk.busy()) {
       const g = W0.groundAt(me.x, me.z, me.gy + me.y);
       if (!Number.isNaN(g)) {
-        if (!me.airborne && g < me.gy - STEP) { me.airborne = true; me.y = me.gy - g; me.vy = 0; me.gy = g; mv.takeoff = 0; }
+        if (!me.airborne && g < me.gy - STEP) { pk.takeoff(false); me.airborne = true; me.y = me.gy - g; me.vy = 0; me.gy = g; mv.takeoff = 0; }
         else if (!me.airborne) me.gy += (g - me.gy) * Math.min(1, dt * 16);
       }
+      // down the water steps into deep water: swimming
+      if (!me.airborne && pk.inOpen(me.x, me.z) && me.gy < WATER_Y - 0.85) pk.wade();
     }
-    const py = me.gy + me.y;
-    writer.grounded(!me.airborne);
-    writer.root.position.set(me.x, py, me.z);
+    const py = me.gy + me.y, sr = pk.swimRoot();
+    writer.grounded(!me.airborne && !pk.busy());
+    if (sr) writer.root.position.set(sr.x, sr.y, sr.z); else writer.root.position.set(me.x, py, me.z);
     writer.root.rotation.y = me.heading;
     writer.update(dt);
     rim.position.set(me.x + Math.sin(camO.yaw) * 1.8 + Math.cos(camO.yaw) * 0.9, py + 2.4, me.z + Math.cos(camO.yaw) * 1.8 - Math.sin(camO.yaw) * 0.9);
@@ -940,8 +1040,10 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     // at a wall a metre away the full beam burns a white hole: painting, it dims to a work light
     torchL.intensity = (paint ? 14 : 650) * torch.w;
     beam.visible = torch.w > 0.02; if (beam.visible) { beam.position.copy(torchP); beam.quaternion.setFromUnitVectors(DOWN, torchDir); (beam.material as THREE.ShaderMaterial).uniforms.uW.value = torch.w * (paint ? 0.3 : 1); }
-    // the camera: behind, above, over the right shoulder, kept inside the street
-    camH += ((me.crouch && !paint ? 1.05 : 1.45) - camH) * Math.min(1, dt * 10);
+    // the camera: behind, above, over the right shoulder, kept inside the street; on a wall it swings round behind the
+    // climber (unless the player is dragging it), a little higher to see up the route
+    if (pk.mode() === 'climb' && !drag) { const rt = pk.route(); if (rt && rt.n) { const want = Math.atan2(rt.n[0], rt.n[1]); camO.yaw += Math.atan2(Math.sin(want - camO.yaw), Math.cos(want - camO.yaw)) * Math.min(1, dt * 2.5); camO.pitch += (0.05 - camO.pitch) * Math.min(1, dt * 2); } }
+    camH += ((me.crouch && !paint ? 1.05 : pk.mode() === 'swim' ? 1.25 : 1.45) - camH) * Math.min(1, dt * 10);
     const tgtY = py + camH;
     const cx = me.x + Math.sin(camO.yaw) * Math.cos(camO.pitch) * camO.dist + Math.cos(camO.yaw) * 0.55;
     const cz = me.z + Math.cos(camO.yaw) * Math.cos(camO.pitch) * camO.dist - Math.sin(camO.yaw) * 0.55;
@@ -965,9 +1067,10 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       cam.position.set(f.x + Math.sin(a) * Math.cos(v.pitch) * v.dist, f.y + Math.sin(v.pitch) * v.dist, f.z + Math.cos(a) * Math.cos(v.pitch) * v.dist); cam.lookAt(f);
       if (!fov0) fov0 = cam.fov; const fv = v.fov || fov0; if (cam.fov !== fv) { cam.fov = fv; cam.updateProjectionMatrix(); }
     } else if (fov0 && cam.fov !== fov0) { cam.fov = fov0; cam.updateProjectionMatrix(); fov0 = 0; }
+    if (fillL.visible) fillL.position.copy(cam.position).add(fillOff.set(0, 0.6, 0));
     focusV.set(me.x, me.gy + me.y, me.z); city.update(dt, t, cam, focusV);
     // a shop door: the trigger is marked on the ground (phase 3 opens the shops)
-    if (!paint && !bust) { const d = doorAt(); if (d && t >= tipHold) prompt(`${d.name} · OPENS SOON`); }
+    if (!paint && !bust) { const d = doorAt(); if (d && t >= tipHold) prompt(d.id === 'phone-shop' ? (phoneDead() ? '[E] A NEW BURNER · ON THE HOUSE' : 'PHONE KIOSK · YOURS STILL WORKS') : `${d.name} · OPENS SOON`); }
     city.beforeRender(r, scene, cam);
     grade.tick(t);
     comp.render(dt);
@@ -979,7 +1082,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     { const nowMs = performance.now(), real = Math.min(1, (nowMs - (storyMs || nowMs)) / 1000); storyMs = nowMs; missions.tick(photoMode ? 0 : bust && bust.t < 1.4 ? real * 0.3 : real); }
     // (and out of the way of the help card, and of the sketchbook panel where the view is too narrow for both)
     { const hs = hudScale(w, h), mapB = 16 + Math.round(150 * hs) + 8;
-      minimap.hide(photoMode || phone.isOpen() || (!!paint && (help || h - (16 + 124 * hs) - 40 < mapB)) || (book.state.open && w - 290 < mapB)); }
+      minimap.hide(photoMode || phone.isOpen() || phoneDead() || (!!paint && (help || h - (16 + 124 * hs) - 40 < mapB)) || (book.state.open && w - 290 < mapB)); }
     minimap.update(rdt, t);
     { const b = minimap.box(); camera.toastAt(b.size ? b.x + b.size + 10 : 16, 16); }
     hud();
@@ -1028,6 +1131,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       if (o.yaw != null) camO.yaw = o.yaw; if (o.pitch != null) camO.pitch = o.pitch; if (o.dist != null) camO.dist = o.dist;
       if (o.heading != null) me.heading = o.heading; if (o.anim !== undefined) forceAnim = o.anim || '';
       if (o.at !== undefined) writer.freeze(o.at); if (o.view !== undefined) shotView = o.view;
+      if (o.fill !== undefined) { fillL.intensity = Math.max(0, +o.fill || 0); fillL.visible = fillL.intensity > 0; }   // (pictures: a soft light from the camera)
     },
     /** Paint a stroke on a wall: points (u, v) 0..1 across and up it. */
     paint: (id, pts, o = {}) => { stroke = null; spray.path(id, pts, { colour: o.colour || COLOURS[0], cap: o.cap || 2, dist: o.dist ?? 0.2, pressure: o.pressure ?? 1, buff: !!o.buff }); },
@@ -1039,7 +1143,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     head: (o) => writer.head(o),
     arms: () => writer.arms(),
     fixArms: (on) => writer.fixArms(on),
-    carry: (on) => writer.carry(on),
+    carry: (on) => { canWanted = on; writer.carry(on && !(pk.mode() === 'climb' || pk.mode() === 'swim' || (pk.mode() === 'mantle'))); },
     far: (side) => writer.far(side),
     ik: () => writer.ik(),
     bones: (names) => Object.fromEntries(names.map((n) => { const p = writer.bonePos(n, new THREE.Vector3()); return [n, p ? [p.x, p.y, p.z] as [number, number, number] : null]; })),
@@ -1102,11 +1206,31 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     },
     missions: (o = {}) => { if (o.reset) missions.reset(); return { ready: missions.ready(), list: missions.list(), current: missions.current(), markers: missions.markers(), known: missions.known() }; },
     minimap: (o = {}) => { if (o.on != null) minimap.set(!!o.on); return minimap.state(); },
+    parkour: (o = {}) => {
+      if (o.reset) pk.reset();
+      if (o.climb) { if (paint) togglePaint(); if (!pk.climb(o.climb, o.y)) throw new Error('no climbable route ' + o.climb + ' (climbables lists them)'); }
+      if (o.swim) { if (paint) togglePaint(); const z = Math.max(city.plan.canal.open.z0 + 1, Math.min(city.plan.canal.open.z1 - 1, me.z)); me.z = z; me.gy = WATER_Y; me.y = 0; me.airborne = false; pk.swim(); }
+      const c = cam.position, inside = W0.boxes.some((b) => c.x > b.x0 && c.x < b.x1 && c.z > b.z0 && c.z < b.z1 && c.y > (b.y0 ?? -1e9) && c.y < (b.y1 ?? 1e9));
+      return { ...pk.state(), cam: { x: +c.x.toFixed(2), y: +c.y.toFixed(2), z: +c.z.toFixed(2), inside }, x: +me.x.toFixed(2), z: +me.z.toFixed(2), gy: +me.gy.toFixed(2), heading: +me.heading.toFixed(3) };
+    },
+    climbables: (o = {}) => ({
+      routes: city.plan.climbs.filter((c) => CLIMBABLE.includes(c.kind) && c.n).map((c) => ({ id: c.id || '', kind: c.kind, name: c.name || c.kind, x: +c.x.toFixed(2), z: +c.z.toFixed(2), y0: +c.y0.toFixed(2), y1: +c.y1.toFixed(2), top: c.top ? { x: +c.top.x.toFixed(2), z: +c.top.z.toFixed(2), y: +c.top.y.toFixed(2) } : null, bld: c.bld || '', dist: +Math.hypot(c.x - me.x, c.z - me.z).toFixed(1) }))
+        .filter((r) => o.near == null || r.dist <= o.near).sort((a, b) => a.dist - b.dist),
+      heavens: city.plan.heavens.map((h) => ({ ...h, painted: spray.painted(h.wall) })),
+    }),
+    water: (o = {}) => {
+      if (o.wet != null) wet = Math.max(0, Math.min(1, +o.wet));
+      if (o.case != null) missions.setCase(!!o.case);
+      if (o.drown) { if (missions.drown()) { phone.close(); syncPhone(); } }
+      if (o.newPhone) newBurner();
+      const ph = missions.phone(), st = wetFx.stats();
+      return { wet: +wet.toFixed(3), swimming: pk.mode() === 'swim', canPaint: wet <= WET_PAINT, drying: +(dryRate() / DRY_SECS).toFixed(4), drips: st.drops, marks: st.marks, phone: { dead: ph.dead, case: !!ph.case, held: ph.held, drowned: ph.drowned || 0, replaced: ph.replaced || 0 } };
+    },
     phoneMap: (width) => phone.mapPng(width),
     music: (o = {}) => { if (!music) return null; if (o.on != null) music.set(!!o.on); if (o.next) music.next(); return music.state(); },
     audio: () => { const b = sound(); return b ? { ctx: b.ctx, node: b.out } : null; },
     goto: (x, z, yaw, pitch, y) => { if (paint) togglePaint();   // painting holds the writer at the wall: put the can down first
-      mv.speed = 0; mv.yawRate = 0; mv.side = 0;
+      pk.reset(); mv.speed = 0; mv.yawRate = 0; mv.side = 0; mv.roll = 0; mv.pitch = 0;
       // the level: the one asked for, else the highest there is here (the bridge, not the towpath under it)
       const g = W0.groundAt(x, z, y ?? 60);
       me.x = x; me.z = z; me.gy = Number.isNaN(g) ? (y ?? 0) : g; me.y = 0; me.vy = 0; me.airborne = false; mv.takeoff = 0;
@@ -1116,7 +1240,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       stopped = true; cancelAnimationFrame(raf); ro.disconnect();
       canvas.removeEventListener('keydown', kd); canvas.removeEventListener('keyup', ku); window.removeEventListener('blur', letGo); document.removeEventListener('visibilitychange', onVis);
       scene.remove(torchL, torchL.target, beam); beam.geometry.dispose(); (beam.material as THREE.Material).dispose(); music?.stop(); hissOn(false); law.dispose(); book.dispose(); if (bus) void bus.ctx.close(); spray.dispose(); writer.dispose(); city.dispose(); look.dispose(); comp.dispose(); r.dispose(); canvas.remove(); tip.remove(); hudUi.dispose();
-      gallery.dispose(); camera.dispose(); phone.dispose(); minimap.dispose();
+      gallery.dispose(); camera.dispose(); phone.dispose(); minimap.dispose(); wetFx.dispose();
       for (const o of [reticle, dot, preview, ghost, ghostFrame]) { o.geometry.dispose(); (o.material as THREE.Material).dispose(); }
       const gm = (ghost.material as THREE.MeshBasicMaterial).map; if (gm) gm.dispose();
     },

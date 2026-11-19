@@ -12,6 +12,9 @@
  * stays quiet). Keys while it is out: arrows pick, Enter opens, Esc goes back, 1-6 open an app from home, E puts it
  * away, Q still shoots, L the photos, M the music.
  *
+ * DEAD (the canal, GAME-DESIGN.md 4): setDead(true) and the screen is black glass with the crack run right across it and
+ * the water under it: no apps, no messages, no map, no camera, no music. E puts it away. A new burner brings it back.
+ *
  *   const ph = makePhone(host, deps); ph.open('messages', { thread: 'dez' }); ph.key('ArrowDown'); ph.tick(t, canvas)
  */
 import { kc } from '../hud';
@@ -46,7 +49,7 @@ export type PhoneDeps = {
   focus: () => void;
   onOpen: (open: boolean) => void;
 };
-export type PhoneState = { open: boolean; app: AppId; thread: string | null; sel: number; unread: number; land: boolean; w: number; h: number; banner: string; apps: string[] };
+export type PhoneState = { open: boolean; app: AppId; thread: string | null; sel: number; unread: number; land: boolean; w: number; h: number; banner: string; apps: string[]; dead: boolean };
 
 const UI = '"SF Pro Text",-apple-system,system-ui,"Helvetica Neue",Arial,sans-serif', MONO = 'ui-monospace,Menlo,monospace';
 const CSS = `
@@ -58,6 +61,12 @@ const CSS = `
 @keyframes vxpup{from{transform:translateY(40px) scale(.97);opacity:0}to{transform:none;opacity:1}}
 .vxp-wear{position:absolute;inset:0;pointer-events:none;z-index:3}
 .vxp-scr{position:absolute;overflow:hidden;background:#000}
+.vxp-dead{position:absolute;inset:0;z-index:6;display:none;background:radial-gradient(ellipse at 62% 38%,#0d0e10,#000 70%)}
+.vxp.dead .vxp-dead{display:block}
+.vxp.dead .vxp-app,.vxp.dead .vxp-sb,.vxp.dead .vxp-hi{display:none!important}
+.vxp-dead svg{position:absolute;inset:0;width:100%;height:100%}
+.vxp-dead i{position:absolute;left:0;right:0;height:2px;background:rgba(255,255,255,.16);top:31%;animation:vxpflk 2.6s steps(1) infinite}
+@keyframes vxpflk{0%,88%{opacity:0}89%{opacity:1}91%{opacity:.2}93%{opacity:.8}95%,100%{opacity:0}}
 .vxp-sb{position:absolute;left:0;right:0;top:0;height:34px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;font:700 12px/1 ${UI};letter-spacing:.04em;z-index:2;pointer-events:none}
 .vxp-sb .isl{position:absolute;left:50%;top:9px;width:86px;height:22px;margin-left:-43px;border-radius:12px;background:#000;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
 .vxp-sb .isl::after{content:"";position:absolute;right:10px;top:7px;width:8px;height:8px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#2a2a30,#050506)}
@@ -281,7 +290,25 @@ export function makePhone(host: HTMLElement, d: PhoneDeps) {
   const apps: Record<AppId, HTMLDivElement> = {} as Record<AppId, HTMLDivElement>;
   for (const id of ['home', ...APPS.map((a) => a.id)] as AppId[]) { const a = document.createElement('div'); a.className = 'vxp-app'; a.dataset.app = id; scr.appendChild(a); apps[id] = a; }
   const hi = document.createElement('div'); hi.className = 'vxp-hi'; hi.dataset.a = 'home'; hi.title = 'Home (Esc)'; scr.appendChild(hi);
+  const deadEl = document.createElement('div'); deadEl.className = 'vxp-dead'; deadEl.dataset.vxPhone = 'dead'; deadEl.innerHTML = '<svg></svg><i></i>'; scr.appendChild(deadEl);
   ph.append(scr, wear); root.appendChild(ph); host.appendChild(root);
+  let dead = false;
+  // the dead screen: a crack web from where it hit, water bled in under the glass, nothing lit
+  const drawDead = (W: number, H: number) => {
+    const sv = deadEl.querySelector('svg')!; sv.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    let seed = 7; const R = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const cx = W * 0.62, cy = H * 0.36, paths: string[] = [];
+    for (let k = 0; k < 13; k++) {
+      let a = (k / 13) * Math.PI * 2 + R() * 0.4, x = cx, y = cy, d = `M${x.toFixed(1)} ${y.toFixed(1)}`;
+      const len = Math.max(W, H) * (0.35 + R() * 0.7);
+      for (let s = 0; s < 7; s++) { a += (R() - 0.5) * 0.5; x += Math.cos(a) * len / 7; y += Math.sin(a) * len / 7; d += ` L${x.toFixed(1)} ${y.toFixed(1)}`; }
+      paths.push(d);
+    }
+    const rings = [0.06, 0.12, 0.2].map((r) => { let d = ''; for (let k = 0; k <= 13; k++) { const a = (k / 13) * Math.PI * 2, rr = Math.min(W, H) * r * (0.8 + R() * 0.4); d += `${k ? 'L' : 'M'}${(cx + Math.cos(a) * rr).toFixed(1)} ${(cy + Math.sin(a) * rr).toFixed(1)} `; } return d; });
+    sv.innerHTML = `<defs><radialGradient id="vxpwet" cx="30%" cy="78%" r="60%"><stop offset="0" stop-color="#2a2d33" stop-opacity=".55"/><stop offset=".6" stop-color="#15171a" stop-opacity=".35"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient></defs>`
+      + `<ellipse cx="${W * 0.3}" cy="${H * 0.8}" rx="${W * 0.55}" ry="${H * 0.3}" fill="url(#vxpwet)"/>`
+      + `<g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round"><path d="${paths.join(' ')}" stroke-opacity=".34" stroke-width="1"/><path d="${rings.join(' ')}" stroke-opacity=".22" stroke-width=".8"/><circle cx="${cx}" cy="${cy}" r="5" stroke-opacity=".5" stroke-width="1.2"/></g>`;
+  };
   const banner = document.createElement('div'); banner.className = 'vxp-bn'; banner.dataset.vxHud = 'banner'; host.appendChild(banner);
   const header = (title: string, right = '') => `<div class="vxp-hd"><button class="vxp-bk" data-a="back" title="Back (Esc)">‹</button><b>${title}</b><span class="r">${right}</span></div>`;
 
@@ -322,6 +349,7 @@ export function makePhone(host: HTMLElement, d: PhoneDeps) {
     const base = land ? -Math.PI * 0.75 : Math.PI * 0.75;
     wear.innerHTML = `<g fill="none" stroke="#fff" stroke-linecap="round"><path d="${[ray(base - 0.5, 70, 0.15), ray(base - 0.05, 120, -0.12), ray(base + 0.42, 58, 0.2), ray(base + 0.9, 34, -0.1), ray(base - 1.0, 40, 0.08)].join(' ')}" stroke-opacity=".2" stroke-width=".8"/><circle cx="${cx}" cy="${cy}" r="3.2" stroke-opacity=".28" stroke-width=".8"/><path d="M${cx - 9} ${cy + 3} Q${cx - 4} ${cy - 6} ${cx + 5} ${cy - 7}" stroke-opacity=".14" stroke-width=".6"/></g><g fill="none" stroke="#fff" stroke-linecap="round" stroke-opacity=".22"><path d="M${R * 0.7} ${H - 2.5} L${R * 0.7 + 18} ${H - 2.2}" stroke-width="1.4"/><path d="M2.2 ${H * 0.62} L2.6 ${H * 0.62 + 11}" stroke-width="1.1"/><path d="M${W - 2.4} ${H * 0.3} L${W - 2.2} ${H * 0.3 + 7}" stroke-width="1"/></g>`;
     gridCols = land ? 3 : 3;
+    drawDead(PW - 2 * bz, PH - 2 * bz);
     if (isOpen) refresh();
   };
   let gridCols = 3;
@@ -518,7 +546,7 @@ export function makePhone(host: HTMLElement, d: PhoneDeps) {
     banner.style.left = x + 'px'; banner.style.width = Math.max(180, ww) + 'px';
   };
   const notify = (m: Msg) => {
-    if (m.from === 'me') return;
+    if (m.from === 'me' || dead) return;
     // the phone already out: no banner over it, the buzz and the badge say it
     if (isOpen) { buzz(d.sound()); refresh(); return; }
     banner.innerHTML = `${avatar(m.from)}<div class="t"><b>${esc(CONTACTS[m.from]?.name || m.from.toUpperCase())}</b><span>${esc(m.text || 'Photo')}</span></div>${kc('E')}`;
@@ -564,6 +592,7 @@ export function makePhone(host: HTMLElement, d: PhoneDeps) {
   const key = (k: string) => {
     if (!isOpen) return false;
     if (k === 'e') { close(); return true; }
+    if (dead) { if (k === 'Escape' || k === 'Backspace') close(); return true; }   // a dead phone does nothing
     if (k === 'l') { if (app === 'gallery') close(); else { direct = false; show('gallery'); } return true; }
     if (app === 'gallery' && gallery) {
       if (k === 'Escape') { gallery.key('Escape'); if (!gallery.isOpen() && isOpen && app === 'gallery') { if (direct) close(); else show('home'); } return true; }
@@ -603,7 +632,10 @@ export function makePhone(host: HTMLElement, d: PhoneDeps) {
       if (t - lastSlow > 0.5) { lastSlow = t; (scr.querySelector('.vxp-sb .tm') as HTMLElement).textContent = hm(Date.now()); if (app === 'music') renderMusic(); if (app === 'home') renderHome(); if (app === 'map') renderObjs(); }
     },
     resize: (w: number, h: number) => { layout(w, h); if (banner.classList.contains('on')) placeBanner(); },
-    state: (): PhoneState => ({ open: isOpen, app, thread, sel, unread: d.missions.unread(), land, w: PW, h: PH, banner: banner.classList.contains('on') ? bannerFor : '', apps: APPS.map((a) => a.id) }),
+    state: (): PhoneState => ({ open: isOpen, app, thread, sel, unread: d.missions.unread(), land, w: PW, h: PH, banner: banner.classList.contains('on') ? bannerFor : '', apps: APPS.map((a) => a.id), dead }),
+    /** The canal killed it (true), or a new burner (false). */
+    setDead: (on: boolean) => { if (dead === on) return; dead = on; root.classList.toggle('dead', on); if (on) { hideBanner(); if (gallery && gallery.isOpen()) gallery.open(false); app = 'home'; for (const k of Object.keys(apps) as AppId[]) apps[k].classList.toggle('on', k === 'home'); } else if (isOpen) show('home'); },
+    isDead: () => dead,
     /** The phone's map as a picture (the whole district, north up, markers, you): a PNG data URL. */
     mapPng: (width = 1200) => { const B = d.plan.bounds, h = Math.round(width * (B.z1 - B.z0) / (B.x1 - B.x0)), c = document.createElement('canvas'); drawMap(performance.now() / 1000, c, { width, height: h }); return c.toDataURL('image/png'); },
     dispose: () => { clearTimeout(bannerT); root.remove(); banner.remove(); },
