@@ -98,9 +98,12 @@ export function piece3(id, name, parts, o = {}) {
 
   // ---- the fill: two coats, each part's edge cut in ----
   out.fill = [
-    ...solid(F, Uf, { cap: 3, dist: 0.09, colour: C.fill }, { inset: 0.05, ang: 0.08, speed: 1.8 }),
-    ...fillPass(F, Uf, { cap: 3, dist: 0.1, colour: C.fill }, { gap: 0.065, inset: 0.05, ang: 1.3, speed: 2.0 }),
-    ...parts.flatMap((p) => edgePass(F, p.f, 0.02, { cap: 2, dist: 0.07, colour: C.fill }, { speed: 1.3, corner: 0.7 })),
+    // light coats (a fill that pools runs: the paint must stay under the drip point even when it has no time to set)
+    ...solid(F, Uf, { cap: 3, dist: o.fillDist ?? 0.13, colour: C.fill, pressure: 0.8 }, { inset: 0.05, ang: 0.08, speed: 2.0, k: 0.9 }),
+    ...fillPass(F, Uf, { cap: 3, dist: 0.14, colour: C.fill, pressure: 0.4 }, { gap: 0.07, inset: 0.05, ang: 1.3, speed: 2.4 }),
+    // each part's edge cut in, only where that part shows (a ring under a part in front would show through it)
+    ...parts.flatMap((p, i) => contours(F, p.f, -0.022, 0.002).flatMap((lp) => runsWhere(resample(lp.concat([lp[0]]), 0.008), (x, y) => topAt(x, y) === i, 0.05))
+      .map((r) => stroke(r, { cap: 2, dist: 0.08, colour: C.fill, pressure: 0.5 }, { speed: 1.5, corner: 0.7, step: 0.01 }))),
   ]
   // ---- fades, letter by letter: light down from the top, mid up from the bottom, in three passes each so they blend ----
   out.fade = []
@@ -114,9 +117,9 @@ export function piece3(id, name, parts, o = {}) {
   // ---- the 3D: side faces mid, faces turned down dark; each misted dark away from the letter ----
   const farOf = (x, y) => -at(F, Uf, x - d3[0], y - d3[1])   // > 0: the point d3 back is still inside the letter
   out.block = [
-    ...concentric(F, sideF, { cap: 2, dist: 0.08, colour: C.mid }, { speed: 1.5 }),
+    ...concentric(F, sideF, { cap: 2, dist: 0.1, colour: C.mid, pressure: 0.85 }, { speed: 1.7 }),
     ...edgePass(F, sideF, 0.008, { cap: 1, dist: 0.06, colour: C.mid }, { speed: 1.2, min: 0.03 }),
-    ...concentric(F, downF, { cap: 2, dist: 0.08, colour: C.dark }, { speed: 1.5 }),
+    ...concentric(F, downF, { cap: 2, dist: 0.1, colour: C.dark, pressure: 0.85 }, { speed: 1.7 }),
     ...edgePass(F, downF, 0.008, { cap: 1, dist: 0.06, colour: C.dark }, { speed: 1.2, min: 0.03 }),
     // the shaded end of the side faces: a dark mist where the face runs away from the letter
     // the shade: a soft dark mist over the far side of the 3D (it falls on the cloud too: the piece's cast shadow)
@@ -133,7 +136,7 @@ export function piece3(id, name, parts, o = {}) {
   const shF = sdf(F, shM)
   // concentric passes (each cell painted once: a dense hatch here pools and runs)
   out.overlap = []
-  for (let lv = 0.006; lv < 0.2; lv += 0.012) { const ls = lines(F, shF, { cap: 1, dist: 0.06, colour: C.dark }, { level: -lv, speed: 1.3, min: 0.015 }); if (!ls.length) break; out.overlap.push(...ls) }
+  for (let lv = 0.007; lv < 0.2; lv += 0.016) { const ls = lines(F, shF, { cap: 1, dist: 0.09, colour: C.dark, pressure: 0.8 }, { level: -lv, speed: 1.5, min: 0.015 }); if (!ls.length) break; out.overlap.push(...ls) }
 
   // ---- detail inside the faces (wild): splits along the bars, in the dark ----
   out.detail = []
@@ -142,7 +145,7 @@ export function piece3(id, name, parts, o = {}) {
   // ---- the keyline: a light band right round letters + 3D ----
   out.key = []
   if (key > 0) {
-    const kc = { cap: 2, dist: Math.max(0.05, Math.min(0.12, key * 1.8)), colour: C.light }
+    const kc = { cap: 2, dist: Math.max(0.05, Math.min(0.12, key * 1.8)), colour: C.light, pressure: 0.75 }
     out.key.push(...lines(F, Sf, kc, { level: key * 0.35, speed: 0.9, min: 0.04 }))
     out.key.push(...lines(F, Sf, kc, { level: key * 0.65, speed: 0.9, min: 0.04 }))
   }

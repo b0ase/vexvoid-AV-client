@@ -26,6 +26,8 @@ const prof = (f, hard) => {
 }
 
 /** Paints a sketch. px: pixels per metre (the game paints at 200). Returns { w, h, rgba: Float32Array premultiplied }. */
+// o.dry: seconds for wet paint to set (DRY, as the game at 1x); Infinity = no drying between strokes, as a blast at
+// 2x / 4x or at once gets in the game (its paint clock does not run with the playback)
 export function paint(sk, o = {}) {
   const PX = o.px || 200, k = PX / 200, W = Math.ceil(sk.w * PX), H = Math.ceil(sk.h * PX)
   const buf = new Float32Array(W * H * 4), wcols = Math.ceil(W / (CELL * k)), wet = new Float32Array(wcols * Math.ceil(H / (CELL * k)) + 1), wetAt = new Float32Array(wet.length)
@@ -64,7 +66,7 @@ export function paint(sk, o = {}) {
     }
     const wetter = (x, y, add, T) => {
       if (s.buff || x < 0 || y < 0 || x >= W || y >= H) return 0
-      const i = Math.floor(y / (CELL * k)) * wcols + Math.floor(x / (CELL * k)), w = wet[i] * Math.exp(-Math.max(0, T - wetAt[i]) / DRY) + add
+      const i = Math.floor(y / (CELL * k)) * wcols + Math.floor(x / (CELL * k)), w = wet[i] * Math.exp(-Math.max(0, T - wetAt[i]) / (o.dry ?? DRY)) + add
       wetAt[i] = Math.max(T, wetAt[i]); wet[i] = w
       for (let q = 0; wet[i] >= 1 && q < 3 && drips.length < 4000; q++) { wet[i] -= 0.55; drip(x, y) }
       return Math.min(1, w)

@@ -221,7 +221,7 @@ const top = (laid) => Math.max(...laid.strokes.flatMap((s) => s.pts.map((p) => p
 // pass 3: the four word tags are handstyles (hands.mjs); the brush hand and the V mark stay
 export const TAGS = [
   { id: 'tag-vexvoid', make: () => handTag('tag-vexvoid', 'VEXVOID', H.VEXVOID, { h: 0.5, colour: WHITE, cap: 1, dist: 0.16, about: 'VexVoid hand: hooked entry, V on into a looped E, the X falls to a descender, the D carried on into an underline that kicks up' }) },
-  { id: 'tag-vexvoid-brush', make: () => brushTag('tag-vexvoid-brush', 'VEXVOID BRUSH', 'VEXVOID', { h: 0.75, bounce: [0, -0.02, 0.03, 0, -0.03, 0.02, 0.02], splat: 8, drips: 6, about: 'brush hand: heavy angular VEXVOID, strokes pressed on and flicked off to points' }) },
+  { id: 'tag-vexvoid-brush', make: () => handTag('tag-vexvoid-brush', 'VEXVOID FAT', { ...H.VEXVOID, s: H.VEXVOID.s.map((st) => ({ ...st, p: st.p.map(([x, y]) => [x, y, 1]) })) }, { h: 0.72, slant: 0.14, colour: WHITE, cap: 2, dist: 0.07, speed: 2.0, drips: 1, about: 'fat-cap VEXVOID: the VexVoid hand cut sharp at every turn, with a fat cap close in' }) },
   { id: 'tag-v3x', make: () => handTag('tag-v3x', 'V3X', H.V3X, { h: 0.5, colour: WHITE, cap: 1, dist: 0.16, about: 'V3X hand: the V runs straight on into a sharp 3, the X kicks out low, a crown of three thorns' }) },
   { id: 'tag-void', make: () => handTag('tag-void', 'VOID', H.VOIDW, { h: 0.52, colour: WHITE, cap: 1, dist: 0.16, about: 'VOID hand: V into O into I in one pull, the D swung on into an underline that flicks up' }) },
   { id: 'tag-npg', make: () => handTag('tag-npg', 'NPG', H.NPG, { h: 0.44, colour: CHROME, cap: 1, dist: 0.16, about: 'NPG hand: N straight on into P, a spiked G, an arrow under it' }) },

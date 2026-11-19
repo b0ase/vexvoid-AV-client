@@ -34,7 +34,7 @@ export const WILD = {
   // X: the heavy bar falls left to right and kicks on; the light one crosses over it and grows into an arrow up and out
   X: () => ({ w: 0.82, parts: [
     P(bar([[0.02, 1.02], [0.8, -0.04], [0.98, -0.14]], W * 1.04, { a: TOP, b: S([1, 0.2]) }), 0, { cuts: [notch([0.68, 0.32], [-1, 0.3], 0.14, 0.05)] }),
-    P(bar([[0.06, -0.04], [0.8, 1.1]], W * 0.88, { a: BOT, b: A({ len: 0.36, wide: 0.6 }) }), 1),
+    P(curveBar([[0.06, -0.04], [0.5, 0.42], [0.62, 0.86], [0.86, 1.12]], W * 0.88, { a: BOT, b: A({ len: 0.36, wide: 0.6 }) }), 1),
   ] }),
   // the second V: the right arm the heavy one, laid over; a bit broken off the left arm's top
   V2: () => ({ w: 0.82, parts: [
@@ -45,6 +45,8 @@ export const WILD = {
   // O: a cut ring, split at the top left, its lower right corner run out as a short kick
   O: () => { const o = [[0.2, 0], [0.62, 0], [0.76, 0.14], [0.76, 0.8], [0.56, 1], [0.12, 1], [0, 0.88], [0, 0.2]]; return { w: 0.76, parts: [
     P([o], 0, { cuts: [inset(o, W), notch([-0.04, 0.68], [1, -0.4], 0.3, 0.05)] }),
+    P(bar([[0.6, 0.86], [0.7, 1.14]], W * 0.8, { b: S([1, 0.15]) }), -0.5),
+    P(curveBar([[0.24, 0.08], [0.02, -0.06], [-0.3, -0.12]], [W * 0.75, W * 0.55, 0.02], { b: { point: 0.06 } }), -12),
   ] } },
   // I: a stem, its top broken off as a bit; a blade swept back off its foot (under the O)
   I: () => ({ w: W * 1.1, parts: [
@@ -56,6 +58,7 @@ export const WILD = {
   D: () => { const o = [[0, 0], [0.48, 0], [0.8, 0.34], [0.8, 0.66], [0.5, 1], [0, 1]]; return { w: 0.82, parts: [
     P([o], 0, { cuts: [inset(o, W), notch([-0.04, 0.3], [1, -0.3], 0.16, 0.05)] }),
     P(bar([[0.62, 0.5], [1.0, 0.5]], WH, { b: A({ len: 0.44, wide: 0.68 }) }), 1),
+    P(curveBar([[0.5, 0.1], [0.82, 0.02], [1.12, -0.2]], [W * 0.8, W * 0.6, 0.02], { b: { point: 0.06 } }), -1),
   ] } },
   3: () => ({ w: 0.76, parts: [
     P(bar([[0.0, 1 - W / 2], [0.54, 1 - W / 2], [0.7, 0.86]], WH, { a: SIDE }), 1),

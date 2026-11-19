@@ -62,16 +62,17 @@ function paintThrow(id, name, F, L, o) {
     const sh = F.mask(), di = Math.round(o.shadow[0] * F.res), dj = Math.round(o.shadow[1] * F.res)
     for (let j = 0; j < F.ny; j++) for (let i = 0; i < F.nx; i++) { const si = i - di, sj = j - dj; if (si >= 0 && sj >= 0 && si < F.nx && sj < F.ny && U[sj * F.nx + si] && !U[j * F.nx + i]) sh[j * F.nx + i] = 1 }
     const sf = sdf(F, sh)
-    out.push(...concentric(F, sf, { cap: 2, dist: 0.08, colour: C.shadow }, { speed: 1.8 }))
+    out.push(...concentric(F, sf, { cap: 2, dist: 0.1, colour: C.shadow, pressure: 0.85 }, { speed: 1.9 }))
   }
   // the fill: fast diagonal zig-zags of a fat cap (they show), then the edge run round close in
-  const fp = footprint({ cap: 3, dist: 0.11 })
-  out.push(...fillPass(F, Uf, { cap: 3, dist: 0.11, colour: C.fill }, { gap: fp.width * fp.hard * 0.8, inset: 0.05, ang: -0.75, speed: 2.8 }))
-  out.push(...L.flatMap((l) => edgePass(F, l.f, 0.028, { cap: 2, dist: 0.08, colour: C.fill }, { speed: 1.9, corner: 0.5 })))
+  // (light enough that it does not pool and run even with no time to set between strokes)
+  const fp = footprint({ cap: 3, dist: 0.13 })
+  out.push(...fillPass(F, Uf, { cap: 3, dist: 0.13, colour: C.fill, pressure: 0.85 }, { gap: fp.width * fp.hard * 0.85, inset: 0.05, ang: -0.75, speed: 2.8 }))
+  out.push(...L.flatMap((l) => edgePass(F, l.f, 0.028, { cap: 2, dist: 0.09, colour: C.fill, pressure: 0.6 }, { speed: 1.9, corner: 0.5 })))
   // a second tone low in the fill, quick (optional)
   if (o.low) { const y0 = Math.min(...L.map((l) => l.y0)), keep = (x, y) => y < y0 + h * 0.3 + jitter(0.02); out.push(...fillPass(F, Uf, { cap: 3, dist: 0.22, colour: o.low, pressure: 0.45 }, { gap: 0.05, inset: 0.04, ang: 0, speed: 2.4, keep })) }
   // the keyline: a light band right round the silhouette, before the outline cuts its inside edge
-  if (o.key) { const kc = { cap: 2, dist: 0.06, colour: C.key }; for (const lv of [0.25, 0.6, 0.9]) out.push(...lines(F, Uf, kc, { level: o.key * lv, speed: 1.4, min: 0.04 })) }
+  if (o.key) { const kc = { cap: 2, dist: 0.07, colour: C.key, pressure: 0.75 }; for (const lv of [0.3, 0.75]) out.push(...lines(F, Uf, kc, { level: o.key * lv, speed: 1.4, min: 0.04 })) }
   // the outline: one cap, one distance, even all round; each letter goes under the ones in front
   const lc = { cap: o.lineCap ?? 2, dist: o.lineDist ?? 0.05, colour: C.line }
   for (const l of L) for (const lp of contours(F, l.f, 0.004, 0.0015)) {
