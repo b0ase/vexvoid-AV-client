@@ -510,7 +510,8 @@ uu = np.broadcast_to(u_h[:, None], Ph.shape[:2]); pp = np.broadcast_to(psi[None]
 # toward its edge; where it lands it gathers in soft folds that run down from the neck
 def drape(P, w, off):
     """Points P (n, 3) pulled toward the jacket's surface by w (0..1), to `off` outside it, and never inside it."""
-    z, ph, rho = polar(P); want = torso_r(z, ph) + off; r2 = rho + (want - rho) * w; r2 = np.maximum(r2, torso_r(z, ph) + 0.004)
+    z, ph, rho = polar(P); want = torso_r(z, ph) + off; r2 = rho + (want - rho) * w
+    r2 = np.where((w > 0) & (z < zN), np.maximum(r2, torso_r(z, ph) + 0.004), r2)   # (only where it lies on the body: above the collar the crown is left alone)
     Q = P.copy(); Q[:, 0] = CX + np.sin(ph) * r2; Q[:, 1] = t_y(z) - np.cos(ph) * r2
     for pts, nn in STRAPS:   # over a strap: lifted clear of it, eased off at its edges
         d = Q[:, None] - pts[None]; k = np.argmin((d ** 2).sum(-1), 1); dd = Q - pts[k]; n_ = nn[k]
