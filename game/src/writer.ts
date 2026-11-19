@@ -801,10 +801,10 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
   };
   let baseY = char.position.y;
   const iU = new THREE.Vector3(), qF = new THREE.Quaternion();
-  const legIK = (lg: { up: THREE.Bone; knee: THREE.Bone; foot: THREE.Bone }, lift: number) => {
+  const legIK = (lg: { up: THREE.Bone; knee: THREE.Bone; foot: THREE.Bone }, lift: number, dx = 0, dz = 0) => {
     lg.foot.getWorldQuaternion(qF);
     lg.up.getWorldPosition(iA); lg.knee.getWorldPosition(iB); lg.foot.getWorldPosition(iC);
-    iT.copy(iC); iT.y += lift;
+    iT.copy(iC); iT.y += lift; iT.x += dx; iT.z += dz;
     const l1 = iA.distanceTo(iB), l2 = iB.distanceTo(iC);
     iU.copy(iT).sub(iA); const d = Math.max(0.05, Math.min(iU.length(), (l1 + l2) * 0.999)); iU.normalize();
     const cosA = Math.max(-1, Math.min(1, (l1 * l1 + d * d - l2 * l2) / (2 * l1 * d))), sinA = Math.sqrt(1 - cosA * cosA);
@@ -817,6 +817,36 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
     // the foot keeps the way it was pointing
     lg.foot.parent!.getWorldQuaternion(qp); lg.foot.quaternion.copy(qp.invert().multiply(qF)); lg.foot.updateMatrixWorld(true);
   };
+  // FOOT LOCK (pass 3: the planted foot slid 1.4-1.7 m/s at a sprint). A sole point that touches the ground is pinned
+  // there; while any pinned point is still down, the leg reaches (IK) so they stay where they landed. Points that lift
+  // (the heel as the foot rolls) let go and points that come down (the ball, the toe) pin where they land, so the lock
+  // follows the heel-to-toe roll. Off the ground the correction eases away through the swing.
+  const LOCK = { on: true, max: 0.22, down: 0.03 };   // (down: a point is pinned from 3 cm above the ground, so it comes straight down onto its spot)
+  const locks = [0, 1].map(() => ({ on: false, anc: [] as (THREE.Vector3 | null)[], off: new THREE.Vector3(), d: new THREE.Vector3() }));
+  const footLock = (dt: number) => {
+    const live = LOCK.on && !!ground && onGround && locoOn && locoS > 0.25;
+    for (const side of [0, 1]) {
+      const L = locks[side], S = soles[side]; let n = 0, down = 0; L.d.set(0, 0, 0);
+      const isDown = (q: SP) => q.w.y - ground!(q.w.x, q.w.z) <= LOCK.down;
+      // first the correction that keeps the points already pinned where they are, then the points just come down are
+      // pinned where that correction puts them (pinning them with last frame's correction dragged the foot next frame)
+      if (live) for (let i = 0; i < S.length; i++) {
+        const q = S[i]; if (!isDown(q)) { L.anc[i] = null; continue; }
+        down++; if (!L.on || !L.anc[i]) continue;
+        L.d.x += L.anc[i]!.x - q.w.x; L.d.z += L.anc[i]!.z - q.w.z; n++;
+      }
+      if (!live || !down) { L.on = false; L.anc.length = 0; L.off.multiplyScalar(Math.exp(-dt * 18)); }
+      else {
+        if (n) L.off.set(L.d.x / n, 0, L.d.z / n);
+        for (let i = 0; i < S.length; i++) if (isDown(S[i]) && (!L.on || !L.anc[i])) { L.anc[i] = S[i].w.clone().add(L.off); L.anc[i]!.y = 0; }
+        L.on = true;
+        if (L.off.length() > LOCK.max) { L.on = false; L.anc.length = 0; L.off.setLength(LOCK.max); }   // too far to hold: let go
+      }
+      if (L.off.lengthSq() > 1e-8) { legIK(legs[side], 0, L.off.x, L.off.z); soleNow(); }
+      lockInfo[side] = [L.on ? 1 : 0, +L.off.length().toFixed(3), down, n];
+    }
+  };
+  const lockInfo: number[][] = [[], []];
   const lowest = (side: number) => { let lo = Infinity, x = 0, z = 0; for (const q of soles[side]) if (q.w.y < lo) { lo = q.w.y; x = q.w.x; z = q.w.z; } return { y: lo, x, z }; };
   const fitFeet = (dt: number) => {
     char.position.y = baseY;   // measured from the pose as animated, so the offset is absolute
@@ -905,7 +935,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       return out;
     },
     arms: () => { root.updateMatrixWorld(true); return body.measure(); },
-    ik: () => ikInfo,
+    ik: () => ({ ...ikInfo, lock: lockInfo as unknown as number }),
     far: (side) => { root.updateMatrixWorld(true); const r = body.far(side); r.info += ` | bind hits ${bones.filter((b) => vx.bind?.[b.name]).length}/${bones.length} e.g. ${bones[9]?.name} keys ${Object.keys(vx.bind || {}).slice(8, 10)}`; return r; },
     freeze: (t) => { frozen = t; },
     bonePos: (name, out) => { const b = bones.find((x) => x.name.replace(/^mixamorig:?/, '') === name); return b ? b.getWorldPosition(out) : null; },
@@ -951,7 +981,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       }
       steadyHead(dt);
       squareShoulders();
-      if (ground) { if (feetOn) fitFeet(dt); else soleNow(); measure(dt); }
+      if (ground) { if (feetOn) { fitFeet(dt); footLock(dt); } else soleNow(); measure(dt); }
       aimW += ((aimOn ? aimTo : 0) - aimW) * Math.min(1, dt * 9);
       carryW += ((carryOn ? 1 : 0) - carryW) * Math.min(1, dt * 10);
       // the arms out of the trunk as the clip has them (both), then the spray arm reaches for the wall over that
