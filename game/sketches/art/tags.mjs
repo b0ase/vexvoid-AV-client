@@ -8,6 +8,8 @@ import { WHITE, BLACK, CHROME, rand, jitter, stroke, dot } from './can.mjs'
 import { sketch, drips, prepare, fillPass, edgePass, bottoms, scatter } from './paint.mjs'
 import { at, resample } from './raster.mjs'
 import { vmarkStrokes } from './vmark.mjs'
+import * as H from './hands.mjs'
+import { handTag } from './hands.mjs'
 
 // Catmull-Rom through control points
 const smooth = (p, n = 6) => {
@@ -216,29 +218,12 @@ function tag(id, name, text, hand, o) {
 const right = (laid) => Math.max(...laid.strokes.flatMap((s) => s.pts.map((p) => p[0])))
 const top = (laid) => Math.max(...laid.strokes.flatMap((s) => s.pts.map((p) => p[1])))
 
+// pass 3: the four word tags are handstyles (hands.mjs); the brush hand and the V mark stay
 export const TAGS = [
-  { id: 'tag-vexvoid', make: () => tag('tag-vexvoid', 'VEXVOID', 'VEXVOID', DRIP, {
-    h: 0.5, lean: 0.16, gap: 0.13, cap: 2, dist: 0.065, speed: 2.1, hold0: 0.1, bounce: [0, 0.03, -0.02, 0.02, 0, 0.04, 0], about: 'drip hand: quick tall VEXVOID, drips',
-    extra: (laid, can) => {
-      // the paint pooled at the bottoms runs: drips off some of the letters' feet
-      const runs = laid.foot.filter(() => rand() < 0.6).map(([x, y]) => [x + jitter(0.01), y + 0.01, 0.08 + rand() * 0.32])
-      return drips(runs, { cap: 1, dist: 0.05, colour: can.colour }, { speed: 0.9, hold: 0.1, up: 0.0 })
-    } }) },
-  { id: 'tag-vexvoid-brush', make: () => brushTag('tag-vexvoid-brush', 'VEXVOID BRUSH', 'VEXVOID', { h: 0.75, bounce: [0, -0.02, 0.03, 0, -0.03, 0.02, 0.02], about: 'brush hand: heavy angular VEXVOID, strokes pressed on and flicked off to points, drips and splatter' }) },
-  { id: 'tag-v3x', make: () => penTag('tag-v3x', 'V3X', V3X, {
-    h: 0.5, lean: 0.22, nib: 1.05, W: 0.075, w0: 0.016, speed: 2.6, about: 'blade hand: sharp V3X, the V flicked in under a crown, the X carried on into an underline, sparks',
-    extra: (T) => {
-      const W = { cap: 1, dist: 0.06, colour: CHROME }, spark = (x, y, k) => [stroke([[x, y - k], [x, y + k]], W, { speed: 1.2 }), stroke([[x - k * 0.7, y], [x + k * 0.7, y]], W, { speed: 1.2 }), dot(x, y, W, 0.08)]
-      const [a, b] = T([1.86, 1.0]), [c, d] = T([0.36, 1.5])
-      return [...spark(a, b, 0.06), ...spark(c, d, 0.04)]
-    } }) },
-  { id: 'tag-void', make: () => penTag('tag-void', 'VOID', VOIDW, {
-    h: 0.52, lean: 0.24, nib: 0.62, W: 0.07, w0: 0.016, speed: 2.4, about: 'round hand: VOID in one flowing pull, a halo over the I, an underline that flicks up',
-    extra: (T, can) => {
-      const halo = Array.from({ length: 29 }, (_, i) => { const a = -0.5 + i / 28 * Math.PI * 2.15; return T([0.86 + Math.cos(a) * 0.17, 1.24 + Math.sin(a) * 0.06]) })
-      return [stroke(halo, can, { speed: 1.6, hold0: 0.04 }), dot(...T([0.86, 1.24]), can, 0.1)]
-    } }) },
-  { id: 'tag-npg', make: () => penTag('tag-npg', 'NPG', NPGW, {
-    h: 0.44, lean: 0.3, nib: 0.45, W: 0.07, w0: 0.016, colour: CHROME, speed: 2.4, about: 'chisel hand: chrome NPG, N into P, a spiked G, an arrow under it' }) },
+  { id: 'tag-vexvoid', make: () => handTag('tag-vexvoid', 'VEXVOID', H.VEXVOID, { h: 0.5, colour: WHITE, cap: 1, dist: 0.16, about: 'VexVoid hand: hooked entry, V on into a looped E, the X falls to a descender, the D carried on into an underline that kicks up' }) },
+  { id: 'tag-vexvoid-brush', make: () => brushTag('tag-vexvoid-brush', 'VEXVOID BRUSH', 'VEXVOID', { h: 0.75, bounce: [0, -0.02, 0.03, 0, -0.03, 0.02, 0.02], splat: 8, drips: 6, about: 'brush hand: heavy angular VEXVOID, strokes pressed on and flicked off to points' }) },
+  { id: 'tag-v3x', make: () => handTag('tag-v3x', 'V3X', H.V3X, { h: 0.5, colour: WHITE, cap: 1, dist: 0.16, about: 'V3X hand: the V runs straight on into a sharp 3, the X kicks out low, a crown of three thorns' }) },
+  { id: 'tag-void', make: () => handTag('tag-void', 'VOID', H.VOIDW, { h: 0.52, colour: WHITE, cap: 1, dist: 0.16, about: 'VOID hand: V into O into I in one pull, the D swung on into an underline that flicks up' }) },
+  { id: 'tag-npg', make: () => handTag('tag-npg', 'NPG', H.NPG, { h: 0.44, colour: CHROME, cap: 1, dist: 0.16, about: 'NPG hand: N straight on into P, a spiked G, an arrow under it' }) },
   { id: 'tag-vmark', make: () => sketch('tag-vmark', 'V MARK', 'tag', vmarkStrokes(0, 0, 0.5, { colour: WHITE, dist: 0.06 }), 'the V mark: a blade V with a crown, filled quick') },
 ]
