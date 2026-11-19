@@ -243,7 +243,7 @@ MIR = np.array([BI[b.replace('Left', '@').replace('Right', 'Left').replace('@', 
 MESHES = {}; PIECES = []
 class Mesh:
     def __init__(s, name): s.name = name; s.V = []; s.W = []; s.F = []; s.M = []; s.UV = []; s.UP = []; s.PID = []; s.n = 0; MESHES[name] = s
-MATS = ['Hoodie', 'Trousers', 'Gloves', 'Shoes', 'Sole', 'Void', 'Trim', 'Mask', 'Pack', 'Can', 'Cap', 'Reflect', 'Detail', 'Cotton']
+MATS = ['Hoodie', 'Trousers', 'Gloves', 'Shoes', 'Sole', 'Void', 'Trim', 'Mask', 'Pack', 'Can', 'Cap', 'Reflect', 'Detail', 'Cotton', 'Lace']
 def grid(mesh, P, mat, W, closed=True, cap0=False, cap1=False, out=None, mirror=False, name='', paint=None, texel=1.0):
     """Add a grid of points P (rings, around, 3) to a mesh as quads. W: weights (rings*around, bones). closed: the rings
     join up. cap0/cap1: close the first/last ring with a fan. mirror: add the right-hand twin too. paint: how the atlas
@@ -320,15 +320,16 @@ def torso_surface(z, th):
 NT = 64; th_t = np.arange(NT) / NT * 2 * math.pi
 z_t = np.concatenate([np.linspace(TZ[0], TZ[2], 7)[:-1], np.linspace(TZ[2], TZ[5], 22)[:-1], np.linspace(TZ[5], TZ[9], 15)])
 _THF = np.linspace(0, 2 * math.pi, 361)
-def torso_r(z, phi):
-    """How far the jacket's surface is from the trunk's middle line (CX, t_y(z)) at heights z, toward polar angles phi
-    (0 = straight ahead, a quarter turn = his left). For laying the hood and the sleeves' seams on it."""
+def surf_r(surface, cy, z, phi):
+    """How far a body surface (surface(z, th) -> points) is from its middle line (CX, cy(z)) at heights z, toward polar
+    angles phi (0 = straight ahead, a quarter turn = his left). For laying the hood on the jacket, and the seams."""
     z = np.atleast_1d(np.asarray(z, float)); phi = np.atleast_1d(np.asarray(phi, float))
-    S = torso_surface(z[:, None], _THF[None]); dx = S[..., 0] - CX; dy = -(S[..., 1] - t_y(z)[:, None])
+    S = surface(z[:, None], _THF[None]); dx = S[..., 0] - CX; dy = -(S[..., 1] - cy(z)[:, None])
     ps = np.unwrap(np.arctan2(dx, dy), axis=1); rs = np.hypot(dx, dy); out = np.empty(len(z))
     for i in range(len(z)):
         p = (phi[i] - ps[i, 0]) % (2 * math.pi) + ps[i, 0]; out[i] = np.interp(p, ps[i], rs[i])
     return out
+def torso_r(z, phi): return surf_r(torso_surface, t_y, z, phi)
 def polar(P):
     """Each point's height, polar angle round the trunk's middle line and distance from it."""
     P = np.asarray(P, float).reshape(-1, 3); dx = P[:, 0] - CX; dy = -(P[:, 1] - t_y(P[:, 2]))
@@ -726,6 +727,27 @@ patch(body, Pl, Nl, rs(0.085, 0.125), cl(0.9, 2.25), 0.019, 'Trousers', Wl, 'car
 patch(body, Pl, Nl, rs(sK - 0.075, sK + 0.085), cl(-0.9, 0.9), 0.005, 'Trousers', Wl, 'knee', mirror=True)   # the shaped knee panel
 patch(body, Pl, Nl, rs(CUFF - 0.004, CUFF + 0.046), np.arange(NL + 1), 0.004, 'Trim', Wl, 'ankle-cuff', mirror=True)
 
+# ── welded seams (pass 3, owner: the sleeves and legs overlapped the jacket at the seams). Where a sleeve leaves the
+# jacket and a leg leaves the seat, a piped seam runs round the join, so two pieces meeting read as sewn together.
+def exit_loop(P, inside, W):
+    """Down each column of a grid (rings from the body end along a limb), where it first comes out of the body: a closed
+    loop of points, with the limb's weights there."""
+    R, N = P.shape[:2]; ins = inside(P.reshape(-1, 3)).reshape(R, N); Wg = W.reshape(R, N, NB); pts = []; ws = []
+    for j in range(N):
+        col = ins[:, j]; k = next((i for i in range(1, R) if col[i] < 0), R - 1); a, b = col[k - 1], col[k]
+        f = float(np.clip(a / (a - b) if a != b else 0.0, 0, 1)); pts.append(P[k - 1, j] + (P[k, j] - P[k - 1, j]) * f); ws.append(Wg[k - 1, j] * (1 - f) + Wg[k, j] * f)
+    pts = np.array(pts + pts[:1]); ws = np.array(ws + ws[:1]); return pts, ws
+def piping(mesh, pts, ws, r, mat, name):
+    up = unit(pts - pts[:-1].mean(0)); box_tube(mesh, pts, r, r, 6, up, mat, ws.repeat(6, 0), pw=2.0, name=name, mirror=True)
+def in_torso(X): z, ph, rho = polar(X); return torso_r(z, ph) - rho
+pts_, ws_ = exit_loop(Ps, in_torso, sleeve_w(Ps)); piping(body, pts_, ws_, 0.0042, 'Detail', 'armhole')
+seat_surface = lambda z, th: np.stack(np.broadcast_arrays(CX + s_a(z) * sup(np.sin(th), 2.3), J['Hips'][1] - np.where(np.cos(th) > 0, s_f(z), s_b(z)) * sup(np.cos(th), 2.3), z), -1)
+def in_seat(X):
+    z = X[:, 2]; dx = X[:, 0] - CX; dy = -(X[:, 1] - J['Hips'][1]); ph = np.arctan2(dx, dy); rho = np.hypot(dx, dy)   # (round the hips' line)
+    r = surf_r(seat_surface, lambda zz: np.full_like(zz, J['Hips'][1]), np.clip(z, SZ[0], SZ[-1]), ph)
+    return np.where((z > SZ[0]) & (z < SZ[-1]), r - rho, -1.0)
+pts_, ws_ = exit_loop(Pl, in_seat, leg_w(Pl)); piping(body, pts_, ws_, 0.004, 'Trousers', 'leg-seam')
+
 # ───────────────────────────── trainers: high-tops with a thick midsole ─────────────────────────────
 AX, AY, AZ = J['LeftFoot']                                     # the ankle; the shoe lies along -y from heel to toe
 SQ = [-0.078, -0.07, -0.05, -0.02, 0.02, 0.06, 0.1, 0.14, 0.18, 0.203, 0.212]
@@ -761,7 +783,7 @@ for sgn in (1, -1): patch(body, Pu, Nu, rq(0.0, 0.13), np.sort(sgn * ch(0.35, 1.
 patch(body, Pu, Nu, rq(-0.02, 0.12), ch(-0.3, 0.3), 0.009, 'Shoes', Wu, 'tongue', mirror=True)                          # the padded tongue
 for q0 in np.linspace(0.01, 0.115, 6):                                                                                  # laces across it
     r0 = int(np.argmin(np.abs(q_s - q0))); cols = ch(-0.75, 0.75) % NSH; line = Pu[r0, cols] + Nu[r0, cols] * 0.012
-    box_tube(body, line, 0.004, 0.003, 6, Nu[r0, cols], 'Detail', Wu.reshape(len(q_s), NSH, NB)[r0, cols].mean(0)[None].repeat(len(cols) * 6, 0), name='lace', mirror=True)
+    box_tube(body, line, 0.004, 0.003, 6, Nu[r0, cols], 'Lace', Wu.reshape(len(q_s), NSH, NB)[r0, cols].mean(0)[None].repeat(len(cols) * 6, 0), name='lace', mirror=True)
 
 # ───────────────────────────── the backpack, its straps, and the cans ─────────────────────────────
 pack = Mesh('SM_Char_Writer_Pack')
@@ -776,6 +798,15 @@ grid(pack, Pk, 'Pack', Wk, cap0=True, cap1=True, name='pack'); Nk = grid_normals
 rk = lambda a, b: np.where((z_k >= a) & (z_k <= b))[0]; ck = lambda a, b: np.arange(int(round(a / (2 * math.pi) * NK)), int(round(b / (2 * math.pi) * NK)) + 1)
 patch(pack, Pk, Nk, rk(zS + PACK_DZ - 0.33, zS + PACK_DZ - 0.17), ck(math.pi - 0.95, math.pi + 0.95), 0.022, 'Pack', Wk, 'pack-pocket', edge=0.0)       # the front pocket
 patch(pack, Pk, Nk, rk(zS + PACK_DZ - 0.12, zS + PACK_DZ - 0.085), ck(math.pi - 1.2, math.pi + 1.2), 0.004, 'Reflect', Wk, 'pack-tape')                  # reflective tape: the mark you see from behind
+# webbing (pass 3): rows of daisy-chain loops across the back of the pack, and a compression strap down each side
+for zz in (zS + PACK_DZ - 0.06, zS + PACK_DZ - 0.15, zS + PACK_DZ - 0.24):
+    r0 = int(np.argmin(np.abs(z_k - zz))); cols = ck(math.pi - 0.75, math.pi + 0.75) % NK; line = Pk[r0, cols] + Nk[r0, cols] * 0.004
+    box_tube(pack, resample(line, 24), 0.0125, 0.0018, 6, Nk[r0, cols].mean(0), 'Detail', Wk.reshape(len(z_k), NK, NB)[r0, cols].mean(0)[None].repeat(24 * 6, 0), name='webbing')
+    for c0 in np.linspace(cols[0] + 1, cols[-1] - 1, 6).astype(int) % NK:   # bar tacks: the loops stand off between them
+        p0 = Pk[r0, c0] + Nk[r0, c0] * 0.0065; box_tube(pack, np.array([p0 + [0, 0, 0.011], p0 - [0, 0, 0.011]]), 0.004, 0.002, 6, Nk[r0, c0], 'Trim', Wk.reshape(len(z_k), NK, NB)[r0, c0][None].repeat(12, 0), name='tack')
+for sgn in (1, -1):
+    c0 = int(round((math.pi / 2 + (0 if sgn > 0 else math.pi)) / (2 * math.pi) * NK)) % NK; rows = rk(zS + PACK_DZ - 0.33, zS + PACK_DZ - 0.02)
+    line = Pk[rows, c0] + Nk[rows, c0] * 0.004; box_tube(pack, resample(line, 12), 0.011, 0.0018, 6, Nk[rows, c0].mean(0), 'Detail', Wk.reshape(len(z_k), NK, NB)[rows, c0].mean(0)[None].repeat(12 * 6, 0), name='side-strap')
 # two spare cans, each standing in an elastic mesh pocket on a side of the pack (they sit in it: the pocket wraps the
 # lower half of the can and its band grips it), leaning out a touch so the caps clear the arms
 Wpk = spine_w(np.array([[CX, 0, J['Spine2'][2] + 0.03]]))
@@ -857,6 +888,21 @@ def vnoise(Q, scale, seed=0):
 def crinkle(Q, amp):
     """Many small sharp creases (nylon that has been worn): valleys along the zero lines of two noises."""
     return -amp * ((1 - np.abs(vnoise(Q, 0.035, 1.7))) ** 6 + 0.6 * (1 - np.abs(vnoise(Q, 0.014, 5.3))) ** 6)
+# seams (pass 3): where the panels of each garment are sewn, a flat-felled seam (a raised fold of cloth) with a double
+# row of stitches beside it: (columns round the piece as a fraction, rows along it as heights for the jacket)
+SEAMS = {'jacket': dict(u=(0.25, 0.75), z=(zS + 0.045,)), 'sleeve': dict(u=(0.75, 0.5)), 'leg': dict(u=(0.25, 0.75)), 'seat': dict(u=(0.0, 0.5))}
+def seam_marks(pc, w, h):
+    """For a piece's patch of the atlas (h x w px): (darkening in the seam's crease, stitch dots, raised seam height)."""
+    sd = SEAMS.get(pc['name']); U, Vv = np.meshgrid(np.linspace(0, 1, w), np.linspace(0, 1, h)); crease_ = np.zeros((h, w)); dots = np.zeros((h, w)); ridge = np.zeros((h, w))
+    if not sd or not pc['closed']: return crease_, dots, ridge
+    def add(d, along):   # d: distance from the seam line in px; along: px along it (for the dashes)
+        nonlocal crease_, dots, ridge
+        crease_ = np.maximum(crease_, np.exp(-(d / 1.1) ** 2)); ridge = np.maximum(ridge, np.exp(-((d - 2.5) / 2.2) ** 2))
+        dash = (np.floor(along / 2.6) % 2 == 0).astype(float); dots = np.maximum(dots, dash * (np.exp(-((d - 4.5) / 0.7) ** 2) + np.exp(-((d - 7.0) / 0.7) ** 2)))
+    for u0 in sd.get('u', ()): add(np.abs(((U - u0 + 0.5) % 1) - 0.5) * w, Vv * h)
+    for z0 in sd.get('z', ()):
+        v0 = np.interp(z0, z_t, np.linspace(0, 1, len(z_t))); add(np.abs(Vv - v0) * h, U * w)
+    return crease_, dots, ridge
 FOLDP = {'sleeve': s_s, 'leg': s_l, 'jacket': z_t, 'seat': z_p, 'hood': u_hx}
 NIMG = np.zeros((ATLAS, ATLAS, 3)); NIMG[..., 2] = 1.0
 def fold_height(pc, w, h):
@@ -902,6 +948,7 @@ def fold_height(pc, w, h):
             H += 0.0018 * bump(zH - 0.03, 0.05, sp) * crease(th * 9 + 3 * wob) + crinkle(Q, 0.0003)
     elif pc['mat'] in ('Hoodie', 'Pack', 'Trousers', 'Cotton'): H += crinkle(Q, 0.0004)
     elif pc['mat'] == 'Gloves': H += crinkle(Q, 0.00025)
+    cr_, dt_, rg_ = seam_marks(pc, w, h); H += 0.0007 * rg_ - 0.0004 * cr_ - 0.00025 * dt_
     if not pc['closed']:   # a sewn panel: its edge stands up
         U, Vv = np.meshgrid(np.linspace(0, 1, w), np.linspace(0, 1, h)); e = np.minimum(np.minimum(U, 1 - U) * w, np.minimum(Vv, 1 - Vv) * h)
         H += 0.0009 * sstep(0.0, 3.5, e)
@@ -922,6 +969,9 @@ for pc, x, y, w, h in RECTS:
         if min(w, h) > 24: A *= 1 + 0.22 * ((e > 4) & (e < 6)) * ((np.floor((U * w + Vv * h) / 4) % 2) == 0)
     elif pc['name'] in ('jacket', 'sleeve', 'leg', 'hood'):
         A *= 0.8 + 0.2 * sstep(0.5, 2.5, px)                                    # the seam the tube closes on
+    if pc['closed']: cr_, dt_, rg_ = seam_marks(pc, w, h); A *= (1 - 0.35 * cr_) * (1 + 0.3 * dt_)   # sewn seams: a dark crease, light stitches
+    if pc['name'] == 'midsole': A *= 0.86 + 0.14 * (np.cos(Vv * h * 0.9) > 0.3)                       # the rubber's moulded ribs
+    if pc['name'] in ('pack', 'pack-pocket'): A *= 0.9 + 0.1 * stretch(_rng.random((max(2, h // 3), max(2, w // 3))), w, h)   # nylon scuffed in places
     if pc['name'] == 'leg': A *= 1 - 0.3 * sstep(0.72, 1.0, Vv) * (0.6 + 0.4 * np.sin(U * 40) ** 2)   # street grime up from the cuffs
     if pc['name'] in ('midsole', 'upper'): A *= 0.82 + 0.18 * stretch(_rng.random((12, 24)), w, h)   # scuffs
     A *= 0.94 + 0.06 * stretch(_rng.random((max(2, h // 6), max(2, w // 6))), w, h)                   # nothing is one flat value
@@ -938,7 +988,7 @@ def mat(name, rgb, rough):
     M = bpy.data.materials.new(name); M.use_nodes = True; b = M.node_tree.nodes.get('Principled BSDF')
     b.inputs['Base Color'].default_value = (*rgb, 1); b.inputs['Roughness'].default_value = rough; return M
 LOOKS = {'Hoodie': (0.035, 0.6), 'Trousers': (0.07, 0.8), 'Gloves': (0.03, 0.6), 'Shoes': (0.7, 0.5), 'Sole': (0.8, 0.6), 'Void': (0.0, 1.0), 'Trim': (0.02, 0.8),
-         'Mask': (0.01, 0.9), 'Pack': (0.03, 0.5), 'Can': (0.6, 0.3), 'Cap': (0.85, 0.5), 'Reflect': (0.8, 0.3), 'Detail': (0.012, 0.45), 'Cotton': (0.16, 0.95)}
+         'Mask': (0.01, 0.9), 'Pack': (0.03, 0.5), 'Can': (0.6, 0.3), 'Cap': (0.85, 0.5), 'Reflect': (0.8, 0.3), 'Detail': (0.012, 0.45), 'Cotton': (0.16, 0.95), 'Lace': (0.75, 0.8)}
 BM = {n: mat(n, (LOOKS[n][0],) * 3, LOOKS[n][1]) for n in MATS}
 # the atlas goes out inside the .glb as each material's base colour texture, on the second UV set
 ATLAS_IMG = bpy.data.images.new('writer-atlas', ATLAS, ATLAS); _px = np.ones((ATLAS * ATLAS, 4), np.float32); _px[:, :3] = IMG.ravel()[:, None]; ATLAS_IMG.pixels.foreach_set(_px.ravel())

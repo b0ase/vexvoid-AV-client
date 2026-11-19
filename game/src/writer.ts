@@ -116,26 +116,32 @@ function weave(kind: Weave, per: number) {
 
 // the game's own materials for the model's named slots
 const LOOK: Record<string, () => THREE.Material> = {
-  // cotton and canvas: a soft sheen at grazing angles, the thing that makes cloth read as cloth
-  // the jacket is a technical shell: a tight ripstop with a sheen, so the street's rim lights draw its folds
-  Hoodie: () => new THREE.MeshPhysicalMaterial({ color: '#4a4b51', roughness: 0.6, metalness: 0, sheen: 0.9, sheenRoughness: 0.45, sheenColor: new THREE.Color('#a4a5ad'), normalScale: new THREE.Vector2(0.45, 0.45), ...weave('ripstop', 44) }),
-  // the hoodie under the shell (pass 3): its hood is up and out over the jacket. Matte heather cotton, a lighter grey
-  // than the black shell, so the hood reads as its own garment and the shoulders as the jacket's
-  Cotton: () => new THREE.MeshPhysicalMaterial({ color: '#8d8e93', roughness: 0.93, metalness: 0, sheen: 0.6, sheenRoughness: 0.8, sheenColor: new THREE.Color('#6c6d72'), normalScale: new THREE.Vector2(0.6, 0.6), ...weave('knit', 80) }),
-  Trousers: () => new THREE.MeshPhysicalMaterial({ color: '#5d5e64', roughness: 0.84, metalness: 0, sheen: 0.5, sheenRoughness: 0.65, sheenColor: new THREE.Color('#84848a'), normalScale: new THREE.Vector2(0.5, 0.5), ...weave('twill', 30) }),
-  Gloves: () => new THREE.MeshStandardMaterial({ color: '#34353a', roughness: 0.55, metalness: 0, normalScale: new THREE.Vector2(0.4, 0.4), ...weave('knit', 70) }),
-  Trim: () => new THREE.MeshStandardMaterial({ color: '#2a2b30', roughness: 0.9, metalness: 0, normalScale: new THREE.Vector2(0.8, 0.8), ...weave('knit', 60) }),
-  Shoes: () => new THREE.MeshStandardMaterial({ color: '#dcdcdf', roughness: 0.5, metalness: 0, emissive: '#141414' }),
-  Sole: () => new THREE.MeshStandardMaterial({ color: '#f1f1f1', roughness: 0.55, metalness: 0, emissive: '#1c1c1c' }),
+  // (pass 3, owner: "a real modern-AAA graffiti writer, not a grey clay figure"): each garment its own fabric and its
+  // own value in the black and white, so they separate: a black nylon shell with a slight sheen, the grey cotton hood of
+  // the hoodie under it, charcoal cargo twill, worn white trainers on grey rubber, a black pack with webbing.
+  // the jacket is a technical shell: a tight ripstop with a sheen, so the street's rim lights draw its folds and seams
+  Hoodie: () => new THREE.MeshPhysicalMaterial({ color: '#2a2b30', roughness: 0.46, metalness: 0, sheen: 0.7, sheenRoughness: 0.35, sheenColor: new THREE.Color('#8e9098'), normalScale: new THREE.Vector2(0.45, 0.45), ...weave('ripstop', 44) }),
+  // the hoodie under the shell: its hood is up and out over the jacket. Matte heather cotton, a lighter grey than the
+  // shell, so the hood reads as its own garment and the shoulders as the jacket's
+  Cotton: () => new THREE.MeshPhysicalMaterial({ color: '#7c7d82', roughness: 0.95, metalness: 0, sheen: 0.5, sheenRoughness: 0.85, sheenColor: new THREE.Color('#6c6d72'), normalScale: new THREE.Vector2(0.6, 0.6), ...weave('knit', 80) }),
+  // cargo twill: dead matte, darker than the hood, lighter than the shell
+  Trousers: () => new THREE.MeshPhysicalMaterial({ color: '#45464b', roughness: 0.88, metalness: 0, sheen: 0.4, sheenRoughness: 0.7, sheenColor: new THREE.Color('#77787e'), normalScale: new THREE.Vector2(0.5, 0.5), ...weave('twill', 30) }),
+  Gloves: () => new THREE.MeshStandardMaterial({ color: '#2d2e32', roughness: 0.6, metalness: 0, normalScale: new THREE.Vector2(0.4, 0.4), ...weave('knit', 70) }),
+  Trim: () => new THREE.MeshStandardMaterial({ color: '#202125', roughness: 0.92, metalness: 0, normalScale: new THREE.Vector2(0.8, 0.8), ...weave('knit', 60) }),
+  // worn trainers: an off-white upper gone matte with wear, grey rubber under it, white laces
+  Shoes: () => new THREE.MeshStandardMaterial({ color: '#cfcfd1', roughness: 0.66, metalness: 0, emissive: '#0d0d0d', normalScale: new THREE.Vector2(0.5, 0.5) }),
+  Sole: () => new THREE.MeshStandardMaterial({ color: '#b9b9bb', roughness: 0.82, metalness: 0, emissive: '#101010' }),
+  Lace: () => new THREE.MeshStandardMaterial({ color: '#e6e6e6', roughness: 0.85, metalness: 0, ...weave('twill', 400) }),
   Void: () => new THREE.MeshBasicMaterial({ color: '#000000' }),
   // the bandana is near-black: inside the hood there is only darkness (no faces, not even the suggestion of one)
   Mask: () => new THREE.MeshPhysicalMaterial({ color: '#0b0b0d', roughness: 0.95, metalness: 0, sheen: 0.25, sheenRoughness: 0.8, sheenColor: new THREE.Color('#2a2a2e') }),
-  Pack: () => new THREE.MeshStandardMaterial({ color: '#36373c', roughness: 0.5, metalness: 0.05, normalScale: new THREE.Vector2(0.45, 0.45), ...weave('ripstop', 24) }), // nylon, a little sheen
+  Pack: () => new THREE.MeshStandardMaterial({ color: '#1d1e22', roughness: 0.55, metalness: 0.05, normalScale: new THREE.Vector2(0.45, 0.45), ...weave('ripstop', 24) }), // nylon, a little sheen
   Can: () => new THREE.MeshStandardMaterial({ color: '#b8b8bc', roughness: 0.35, metalness: 0.8 }),
   Cap: () => new THREE.MeshStandardMaterial({ color: '#f2f2f2', roughness: 0.5, metalness: 0 }),
-  // reflective tape (the pack, the heels): it throws back whatever light finds it; and the dark hardware: zips, buckles, rubber
+  // reflective tape (the pack, the heels): it throws back whatever light finds it; and the dark hardware: zips, buckles,
+  // webbing, rubber
   Reflect: () => new THREE.MeshStandardMaterial({ color: '#e6e7ea', roughness: 0.32, metalness: 0.35, emissive: '#2c2c2e' }),
-  Detail: () => new THREE.MeshStandardMaterial({ color: '#17181b', roughness: 0.42, metalness: 0.15 }),
+  Detail: () => new THREE.MeshStandardMaterial({ color: '#141518', roughness: 0.5, metalness: 0.12 }),
 };
 
 // each file is fetched and parsed once (the cops are the same model on the same skeleton)
@@ -221,7 +227,7 @@ export async function loadWriter(url: string, shadow: boolean, modelUrl?: string
       if (src.normalMap && std.isMeshStandardMaterial) {
         const weave = std.normalMap; std.normalMap = src.normalMap; std.normalScale.copy(src.normalScale);
         const ph = mat as THREE.MeshPhysicalMaterial;
-        if (weave && ph.isMeshPhysicalMaterial && src.name === 'Hoodie') { ph.clearcoat = 0.16; ph.clearcoatRoughness = 0.5; ph.clearcoatNormalMap = weave; ph.clearcoatNormalScale.set(0.7, 0.7); }
+        if (weave && ph.isMeshPhysicalMaterial && src.name === 'Hoodie') { ph.clearcoat = 0.3; ph.clearcoatRoughness = 0.42; ph.clearcoatNormalMap = weave; ph.clearcoatNormalScale.set(0.7, 0.7); }
         std.needsUpdate = true;
       }
       const m = new THREE.SkinnedMesh(geo, mat); m.name = sm.name; m.userData.slot = src.name;
