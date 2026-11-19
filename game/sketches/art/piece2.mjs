@@ -114,6 +114,20 @@ export function piece3(id, name, parts, o = {}) {
   fadeTop.forEach((t, n) => out.fade.push(...fillPass(F, Uf, { cap: 3, dist: 0.24, colour: C.light, pressure: 0.32 }, { gap: 0.05, inset: 0.035, ang: 0.0, speed: 2.1, keep: (x, y) => vOf(x, y) > t + jitter(0.025) })))
   fadeLow.forEach((t, n) => out.fade.push(...fillPass(F, Uf, { cap: 3, dist: 0.24, colour: C.mid, pressure: 0.3 }, { gap: 0.05, inset: 0.035, ang: 0.0, speed: 2.1, keep: (x, y) => vOf(x, y) < t + jitter(0.025) })))
 
+  // ---- a fill effect (optional): bubbles rising in the lower half of the faces, each with a glint ----
+  out.fx = []
+  if (o.bubbles) {
+    const placed = []
+    for (let n = 0, tries = 0; n < o.bubbles && tries < o.bubbles * 60; tries++) {
+      const x = box.x0 + rand() * (box.x1 - box.x0), y = box.y0 + rand() * (box.y1 - box.y0), v = vOf(x, y), r = (0.028 + 0.05 * Math.pow(rand(), 1.6) * (1 - v)) * k
+      if (v > 0.55 || at(F, Uf, x, y) > -(r + 0.035 * k) || placed.some(([a, b, rr]) => Math.hypot(a - x, b - y) < r + rr + 0.03 * k)) continue
+      const i = topAt(x, y); if (i < 0 || at(F, parts[i].f, x, y) > -(r + 0.03 * k)) continue
+      placed.push([x, y, r]); n++
+      out.fx.push(dot(x, y, r > 0.034 ? { cap: 3, dist: 0.05, colour: C.mid } : { cap: 2, dist: Math.max(0.05, Math.min(0.2, r * 2.4)), colour: C.mid }, 0.3))
+      out.fx.push(dot(x - r * 0.35, y + r * 0.35, { cap: 1, dist: 0.05, colour: C.light }, 0.04))
+    }
+  }
+
   // ---- the 3D: side faces mid, faces turned down dark; each misted dark away from the letter ----
   const farOf = (x, y) => -at(F, Uf, x - d3[0], y - d3[1])   // > 0: the point d3 back is still inside the letter
   out.block = [
@@ -223,7 +237,7 @@ export function piece3(id, name, parts, o = {}) {
   if (o.mark !== false) out.tag.push(...vmarkStrokes(bx.x1 + 0.1 * k, bx.y0 - 0.18 * k, 0.2 * k, { colour: C.light }))
   if (o.dedication !== false) out.tag.push(...smallTag(o.dedication || 'NPG', bx.x0 + 0.05 * k, bx.y0 - 0.26 * k, 0.13 * k, { cap: 1, dist: 0.05, colour: C.light }))
 
-  const order = ['cloud', 'block', 'fill', 'fade', 'overlap', 'detail', 'key', 'outline', 'shine', 'drips', 'tag']
+  const order = ['cloud', 'block', 'fill', 'fade', 'fx', 'overlap', 'detail', 'key', 'outline', 'shine', 'drips', 'tag']
   if (o.log) console.log('   ' + order.map((n) => `${n} ${(out[n] || []).length}`).join('  '))
   return sketch(id, name, 'piece', order.filter((n) => !o.only || o.only.includes(n)).flatMap((n) => out[n] || []), o.about)
 }
@@ -236,11 +250,11 @@ export const PIECES3 = [
   { id: 'piece-vexvoid', make: () => piece3('piece-vexvoid', 'VEXVOID', layWord(VXV, WILD, { h: 1.0, slant: 0.16, kern: [0, 0.0, -0.1, -0.1, -0.08, -0.04, -0.04], lift: [-0.06, 0.03, -0.03, 0.03, 0, 0.04, -0.02], scale: [1.14, 1, 1, 1, 1, 1, 1.06] }),
     { capH: 1, log: true, glints: [[0, 0.18, 0.92], [4, 0.2, 0.9]], about: 'wildstyle VEXVOID: interlocked parts, arrows grown out of the letters, chrome fade, 3D, keyline, cloud' }) },
   { id: 'piece-vexvoid-semi', make: () => piece3('piece-vexvoid-semi', 'VEXVOID SEMI', layWord(VXV, SEMI, { h: 1.0, kern: [0, -0.12, -0.1, -0.08, -0.07, -0.05, -0.05], lift: [-0.08, 0.02, -0.02, 0.02, 0, 0.03, -0.01], scale: [1.14, 1, 1, 1, 1, 1, 1.06] }),
-    { capH: 1, log: true, glints: [[0, 0.18, 0.92], [4, 0.2, 0.9]], about: 'semi-wild VEXVOID: straight letters with arrows, kicks and cuts grown out of them' }) },
+    { capH: 1, log: true, bubbles: 26, glints: [[0, 0.18, 0.92], [4, 0.2, 0.9]], about: 'semi-wild VEXVOID: straight letters with arrows, kicks and cuts grown out of them' }) },
   { id: 'piece-vexvoid-straight', make: () => piece3('piece-vexvoid-straight', 'VEXVOID STRAIGHT', layWord(['V', 'E', 'X', 'V', 'O', 'I', 'D'], STRAIGHT, { h: 1.0, kern: [0, -0.1, -0.08, -0.08, -0.07, -0.05, -0.05], lift: [-0.08, 0.02, -0.02, 0.02, 0, 0.03, -0.01], scale: [1.14, 1, 1, 1, 1, 1, 1.06] }),
     { capH: 1, log: true, glints: [[0, 0.18, 0.95], [5, 0.3, 0.98]], about: 'straight letters: readable block VEXVOID, chrome fade, 3D, keyline, cloud' }) },
   { id: 'piece-v3x', make: () => piece3('piece-v3x', 'V3X', layWord(['V', '3', 'X'], STRAIGHT, { h: 1.15, slant: 0.1, kern: [0, -0.06, -0.06], lift: [0, 0.02, -0.02], scale: [1.1, 1, 1.05] }),
     { capH: 1.15, log: true, depth: [0.12, -0.16], colours: { fill: WHITE, light: CHROME }, fadeTop: [], glints: [[0, 0.16, 0.94]], about: '3D blockbuster V3X: heavy square letters, a deep two-tone 3D, white face' }) },
   { id: 'piece-void', make: () => piece3('piece-void', 'VOID', layWord(['V', 'O', 'I', 'D'], SEMI, { h: 1.05, kern: [0, -0.08, -0.04, -0.04], lift: [-0.04, 0, 0.03, -0.01], scale: [1.1, 1, 1, 1.06] }),
-    { capH: 1.05, log: true, glints: [[0, 0.18, 0.92]], about: 'semi-wild VOID: chrome fade, 3D, keyline, cloud' }) },
+    { capH: 1.05, log: true, bubbles: 16, glints: [[0, 0.18, 0.92]], about: 'semi-wild VOID: chrome fade, 3D, keyline, cloud' }) },
 ]

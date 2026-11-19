@@ -54,7 +54,7 @@ export function handStroke(P, can, { speed = 2.2, hold0 = 0.06, flick = 0.06, co
  * colour, cap, dist, speed, drips (how many of the feet run), extra(T, can).
  */
 export function handTag(id, name, word, o) {
-  const h = o.h, k = o.slant ?? 0.2, T = ([u, v]) => [(u + v * k) * h, v * h]
+  const h = o.h, k = o.slant ?? 0.2, sx = o.sx ?? 1, T = ([u, v]) => [(u * sx + v * k) * h, v * h]   // sx < 1: a compressed, taller-looking hand
   const can = { cap: o.cap ?? 1, dist: o.dist ?? 0.06, colour: o.colour }
   const out = []
   for (const st of word.s) out.push(...handStroke(path(st.p).map(T), { ...can, ...(st.can || {}) }, { speed: (o.speed ?? 2.4) * (st.speed ?? 1), hold0: st.hold0 ?? 0.07, flick: (st.flick ?? 0.12) * h, corner: o.corner ?? 0.75 }))
