@@ -687,6 +687,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const camPos = new THREE.Vector3(home.x + Math.sin(home.yaw) * 3.4, home.y + 2, home.z + Math.cos(home.yaw) * 3.4), camLook = new THREE.Vector3(), scr = new THREE.Vector3();
   let landT = 0, forceAnim = '', idleT = 0, camH = 1.45, shotView: { yaw: number; pitch: number; dist: number; bone?: string; h?: number; fov?: number } | null = null, fov0 = 0;
   const lookTo = new THREE.Vector3(), tipV = new THREE.Vector3(), focusV = new THREE.Vector3(), headV = new THREE.Vector3();
+  let storyMs = 0;
   const doorAt = () => city.plan.doors.find((d) => me.x > d.x0 - 0.3 && me.x < d.x1 + 0.3 && me.z > d.z0 - 0.3 && me.z < d.z1 + 0.3 && Math.abs(me.gy) < 0.5) || null;
   cam.position.copy(camPos);
   const frame = () => {
@@ -973,7 +974,9 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     // the phone's lens copies the frame just drawn; the story moves on (messages arrive, objectives are judged); the
     // mini-map turns with the writer, out of the way while the phone is out or in photo mode
     phone.tick(t, canvas);
-    missions.tick(dt);
+    // (the story runs on real seconds, not the frame's capped step: a slow machine still gets its messages on time;
+    // photo mode stands still)
+    { const nowMs = performance.now(), real = Math.min(1, (nowMs - (storyMs || nowMs)) / 1000); storyMs = nowMs; missions.tick(photoMode ? 0 : bust && bust.t < 1.4 ? real * 0.3 : real); }
     // (and out of the way of the help card, and of the sketchbook panel where the view is too narrow for both)
     { const hs = hudScale(w, h), mapB = 16 + Math.round(150 * hs) + 8;
       minimap.hide(photoMode || phone.isOpen() || (!!paint && (help || h - (16 + 124 * hs) - 40 < mapB)) || (book.state.open && w - 290 < mapB)); }

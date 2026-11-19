@@ -207,6 +207,7 @@ const CSS = `
 .vxp-ph.land .vxp-who{display:none}
 .vxp-ph.land .vxp-card{margin:4px 8px 14px;padding:7px 10px;gap:4px}
 .vxp-ph.land .vxp-cam{margin-top:-24px}
+.vxp-ph.land .vxp-cbk{top:30px}
 .vxp-ph.land .vxp-home{flex-direction:row;align-items:stretch;padding:16px 20px 16px 22px;gap:18px}
 .vxp-ph.land .vxp-hl{flex:0 0 38%;display:flex;flex-direction:column;justify-content:center;gap:14px;min-width:0}
 .vxp-ph.land .vxp-clk{align-items:flex-start;padding:0}
@@ -411,7 +412,9 @@ export function makePhone(host: HTMLElement, d: PhoneDeps) {
     const known = new Set(d.missions.known());
     g.font = `700 ${10 / k}px ${UI}`; g.textAlign = 'center'; g.textBaseline = 'middle';
     { const C = d.plan.canal, s = 'CANAL'; g.font = `800 ${9 / k}px ${UI}`; g.fillStyle = 'rgba(255,255,255,.55)'; g.save(); g.translate(B.x0 + 14, (C.z0 + C.z1) / 2); g.fillText(s.split('').join(' '), 0, 0); g.restore(); g.font = `700 ${10 / k}px ${UI}`; }
-    for (const p of d.plan.places) { if (!known.has(p.id)) continue; const s = p.name.toUpperCase(); g.lineWidth = 3 / k; g.strokeStyle = 'rgba(0,0,0,.85)'; g.strokeText(s, p.x, p.z - 6 / k); g.fillStyle = 'rgba(255,255,255,.88)'; g.fillText(s, p.x, p.z - 6 / k); g.fillStyle = '#fff'; g.beginPath(); g.arc(p.x, p.z, 2 / k, 0, Math.PI * 2); g.fill(); }
+    const taken: number[][] = [];   // (labels that would sit on one already drawn are left off)
+    for (const p of d.plan.places) { if (!known.has(p.id)) continue; const s = p.name.toUpperCase(), tw = g.measureText(s).width / 2 + 4 / k, th = 8 / k;
+      if (taken.some(([x, z, w]) => Math.abs(x - p.x) < w + tw && Math.abs(z - p.z) < th * 2)) continue; taken.push([p.x, p.z, tw]); g.lineWidth = 3 / k; g.strokeStyle = 'rgba(0,0,0,.85)'; g.strokeText(s, p.x, p.z - 6 / k); g.fillStyle = 'rgba(255,255,255,.88)'; g.fillText(s, p.x, p.z - 6 / k); g.fillStyle = '#fff'; g.beginPath(); g.arc(p.x, p.z, 2 / k, 0, Math.PI * 2); g.fill(); }
     for (const m of d.missions.markers()) drawMarker(g, m.x, m.z, k, t, 7);
     drawYou(g, me.x, me.z, me.heading, k, 9);
   };
@@ -516,7 +519,8 @@ export function makePhone(host: HTMLElement, d: PhoneDeps) {
   };
   const notify = (m: Msg) => {
     if (m.from === 'me') return;
-    if (isOpen && app === 'messages' && (thread === m.from)) { refresh(); return; }
+    // the phone already out: no banner over it, the buzz and the badge say it
+    if (isOpen) { buzz(d.sound()); refresh(); return; }
     banner.innerHTML = `${avatar(m.from)}<div class="t"><b>${esc(CONTACTS[m.from]?.name || m.from.toUpperCase())}</b><span>${esc(m.text || 'Photo')}</span></div>${kc('E')}`;
     bannerFor = m.from; placeBanner(); banner.classList.add('on');
     clearTimeout(bannerT); bannerT = window.setTimeout(hideBanner, 4800);
