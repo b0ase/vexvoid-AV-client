@@ -371,7 +371,7 @@ export function makeMissions(env: Env, store: ProgressStore = localProgress, cb:
      *  replaces what it added before). Its missions wait their turn in the story, or start(id) brings one in now. */
     addPack: (pack: Pack) => { const r = installPack(MISSIONS, pack, CONTACTS); byId = new Map(MISSIONS.map((m) => [m.id, m])); if (ready) for (const id of r.added) if (st(id).status === 'active') begin(byId.get(id)!, true); changed(); return r; },
     /** Take a pack's missions out of this game (never a starter). Their progress stays in the save. */
-    removePack: (id: string) => { const n = removePack(MISSIONS, id); for (const k of [...run.keys()]) if (MISSIONS.every((m) => m.id !== k)) run.delete(k); byId = new Map(MISSIONS.map((m) => [m.id, m])); changed(); return n; },
+    removePack: (id: string) => { const n = removePack(MISSIONS, id); for (const k of [...run.keys()]) if (MISSIONS.every((m) => m.id !== k)) run.delete(k); byId = new Map(MISSIONS.map((m) => [m.id, m])); S.queue = S.queue.filter((q) => !q.mission || byId.has(q.mission)); changed(); return n; },
     /** Bring a mission in now, whatever comes before it (for building and checking packs): it arrives as it would. */
     start: (id: string) => { const m = byId.get(id); if (!m) return false; const s = st(id); s.status = 'waiting'; s.wait = 0.2; s.step = 0; run.delete(id); changed(); return true; },
   };
