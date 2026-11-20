@@ -9635,7 +9635,13 @@ Reply with only the JSON array in one \`\`\`json code block.`;
         const sub = document.querySelector('.v3xv0id-subtitle'); if (sub) sub.textContent = 'STUDIO';
         const brand = document.querySelector('.v3xv0id-brand'); // back to the site
         if (brand) { brand.title = 'vexvoid.com'; brand.style.cursor = 'pointer'; brand.addEventListener('click', () => { (window.top || window).location.href = '/'; }); }
-        document.querySelector('[data-tab="layers"]').click();
+        // The site page that frames the studio says where to start (?tab=edit from vexvoid.com/studio/edit) and hears every
+        // tab change, so its address bar always names the open tool. Web tabs only; anything else starts on the mixing desk.
+        const webTab = t => t && document.querySelector(`.tab-button[data-tab="${String(t).replace(/[^a-z0-9-]/gi, '')}"]:not([data-desktop])`);
+        if (window.parent !== window) document.querySelectorAll('.tab-button').forEach(b => b.addEventListener('click', () => {
+          try { window.parent.postMessage({ vxStudio: 'tab', tab: b.getAttribute('data-tab') }, location.origin); } catch (e) {}
+        }));
+        (webTab(new URLSearchParams(location.search).get('tab')) || document.querySelector('[data-tab="layers"]')).click();
       }
 
       console.log('🎛️ All V3XV0ID Tab Content Systems initialized');
