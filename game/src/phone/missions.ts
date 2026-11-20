@@ -333,6 +333,8 @@ export function makeMissions(env: Env, store: ProgressStore = localProgress, cb:
     /** Start the story again (messages, missions, places); the paint stays on the walls. */
     reset: () => { S = fresh(); run.clear(); clock = 0; changed(); },
     ready: () => ready,
+    /** A story not begun: no message yet and nothing done (a stranger's first visit; main.ts starts the first night). */
+    fresh: () => ready && S.msgs.length === 0 && S.queue.length === 0 && Object.values(S.missions).every((m) => m.status !== 'done' && m.status !== 'active'),
     /** The phone: dead (the canal), the waterproof case, how many have drowned. */
     phone: (): PhoneSave & { held: number } => ({ dead: !!S.phone?.dead, case: !!S.phone?.case, since: S.phone?.since, drowned: S.phone?.drowned || 0, replaced: S.phone?.replaced || 0, held: S.queue.length }),
     /** In the canal: the phone dies (false: the case saved it, or it was dead already). */

@@ -25,7 +25,9 @@ const UI = '"SF Pro Text",-apple-system,system-ui,"Helvetica Neue",Arial,sans-se
 type Me = { x: number; z: number; heading: number; speed: number; painting: boolean };
 export type MinimapState = { on: boolean; shown: boolean; radius: number; rotation: number; heading: number; size: number; x: number; y: number; opacity: number; car: boolean; markers: number; edge: number; objective: string };
 
-export function makeMinimap(host: HTMLElement, o: { plan: Plan; walls: Wall[]; painted: (id: string) => boolean; me: () => Me; law: () => LawState; markers: () => Marker[]; objective: () => { title: string; text: string; marker: Marker | null } | null }) {
+export function makeMinimap(host: HTMLElement, o: { plan: Plan; walls: Wall[]; painted: (id: string) => boolean; me: () => Me; law: () => LawState; markers: () => Marker[]; objective: () => { title: string; text: string; marker: Marker | null } | null;
+  /** The way to the objective along the streets (world x, z from the writer), and its length: drawn as a line. */
+  route?: () => { pts: { x: number; z: number }[]; length: number } | null }) {
   const el = document.createElement('div'); el.dataset.vxHud = 'minimap';
   el.style.cssText = 'position:absolute;left:16px;top:16px;pointer-events:none;z-index:2;transition:opacity .35s ease';
   const cv = document.createElement('canvas'); cv.style.cssText = 'display:block;border-radius:50%';
@@ -57,6 +59,13 @@ export function makeMinimap(host: HTMLElement, o: { plan: Plan; walls: Wall[]; p
     // the law only when it is near (inside the map, with a margin for the beam)
     const c = L.car, near = L.on && c.onStreet && Math.hypot(c.x - me.x, c.z - me.z) < radius + 8;
     if (L.on) drawLaw(g, { ...L, car: { ...c, onStreet: near }, cops: L.cops.filter((cp) => Math.hypot(cp.x - me.x, cp.z - me.z) < radius) }, mo);
+    // the route to the objective: a white line with a dark edge, so it reads over streets and roofs alike
+    const rt = o.route && !me.painting ? o.route() : null;
+    if (rt && rt.pts.length > 1) {
+      g.lineJoin = 'round'; g.lineCap = 'round'; g.beginPath(); g.moveTo(me.x, me.z); for (const p of rt.pts.slice(1)) g.lineTo(p.x, p.z);
+      g.strokeStyle = 'rgba(0,0,0,.7)'; g.lineWidth = 6 / k; g.stroke();
+      g.strokeStyle = 'rgba(255,255,255,.95)'; g.lineWidth = 2.6 / k; g.stroke();
+    }
     g.restore();
     // markers: inside, a diamond; outside, a pointer on the rim
     const ms = o.markers(); let edge = 0;
@@ -94,7 +103,7 @@ export function makeMinimap(host: HTMLElement, o: { plan: Plan; walls: Wall[]; p
       // the objective in play, and how far
       // (painting: the map fades back and the objective line goes; the dock and its tip line need the room)
       const ob = me.painting ? null : o.objective(); let s = '';
-      if (ob) { const mk = ob.marker, d = mk ? Math.hypot(mk.x - me.x, mk.z - me.z) : -1; s = `${ob.text}${d >= 0 ? ` · ${d < 1000 ? Math.round(d) + ' M' : (d / 1000).toFixed(1) + ' KM'}` : ''}`; }
+      if (ob) { const mk = ob.marker, rt = o.route ? o.route() : null, d = rt && rt.pts.length > 1 ? rt.length : mk ? Math.hypot(mk.x - me.x, mk.z - me.z) : -1; s = `${ob.text}${d >= 0 ? ` · ${d < 1000 ? Math.round(d) + ' M' : (d / 1000).toFixed(1) + ' KM'}` : ''}`; }
       if (s !== lastLine) { lastLine = s; line.style.display = s ? 'flex' : 'none'; line.innerHTML = s ? '<span style="flex:none;width:7px;height:7px;transform:rotate(45deg);background:#fff;border:1px solid #000;margin-right:2px"></span><span></span>' : ''; if (s) (line.lastChild as HTMLElement).textContent = s; }
     },
     toggle: () => { on = !on; keep(on); show(); lastDraw = -1; return on; },

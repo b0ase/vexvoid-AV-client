@@ -91,6 +91,9 @@ export const ROAD_Y = -0.14, TOW_Y = -3, WATER_Y = -3.55, DECK_Y = 1.6, DOCK_Y =
 /** The viaduct's arches spring 1.6 m up and are round (radius half the bay). */
 export const SPRING = 1.6;
 
+/** A stranger's first night starts here (main.ts): outside the studio door, facing the studio's own wall (studio-s2). */
+export const FIRST_NIGHT = { x: -17.1, z: -33.9, heading: Math.PI, yaw: 0 };
+
 export function makePlan(): Plan {
   const bounds: Rect = { x0: -96, x1: 96, z0: -112, z1: 64 };
   const blds: Bld[] = [], boxes: Box[] = [], surfs: Surf[] = [], holes: Rect[] = [], gates: Gate[] = [], lamps: Lamp[] = [];

@@ -57,7 +57,7 @@ import { makeMinimap, type MinimapState } from './minimap';
 import { makeBook, slotsOf, sketchOf, fit, drawSketch, secsOf, cleanName, type Sketch, type SketchKind, type SketchStore, type BookState } from './sketchbook';
 import { makeParkour, type PkState, type Input as PkInput } from './parkour';
 import { makeWet } from './wet';
-import { CLIMBABLE, WATER_Y } from './plan';
+import { CLIMBABLE, WATER_Y, FIRST_NIGHT } from './plan';
 
 export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) => void; onHud?: (s: string) => void; onRec?: () => void;
   /** Where the walls' paint is kept (default: this browser). */
@@ -75,7 +75,13 @@ export type MountOpts = { base: string; high?: boolean; onStatus?: (s: string) =
   /** Where the story's progress is kept (messages, missions, places on the map; default: this browser / the app's user data). */
   progress?: ProgressStore };
 export type { PhotoTaken };
-export type Game = { canvas: HTMLCanvasElement; stop: () => void; snap: (width?: number) => string; inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string; at?: number | null; view?: { yaw: number; pitch: number; dist: number; bone?: string; h?: number; fov?: number } | null; fill?: number }) => void; where: () => { x: number; z: number; y: number; yaw: number; heading: number; anim: string; speed: number; tip: [number, number, number] | null };
+export type Game = { canvas: HTMLCanvasElement;
+  /** The way to the objective in play along the streets (what the mini-map draws): its points (x, z) and length (m). */
+  route: () => { to: { x: number; z: number; text: string } | null; pts: [number, number][]; length: number };
+  /** The FIRST NIGHT (a stranger's first two minutes): start it here (outside the studio door, the coach line on) or
+   *  stop it; its stage (tag, go), the coach line showing and the moment card (a title across the picture). */
+  firstNight: (o?: { start?: boolean; stop?: boolean }) => { on: boolean; stage: string; painted: boolean; tip: string; card: string; cards: number };
+  stop: () => void; snap: (width?: number) => string; inspect: (o: { yaw?: number; pitch?: number; dist?: number; heading?: number; anim?: string; at?: number | null; view?: { yaw: number; pitch: number; dist: number; bone?: string; h?: number; fov?: number } | null; fill?: number }) => void; where: () => { x: number; z: number; y: number; yaw: number; heading: number; anim: string; speed: number; tip: [number, number, number] | null };
   /** Call the law on the writer now: the patrol car pulls up nearest them and two officers give chase (testing an escape). */
   alarm: () => void;
   /** The district's named places (the studio is home; the shops; the tunnel, the rail, the warehouse, the scaffolds...). */
@@ -204,6 +210,17 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   tip.style.cssText = 'position:absolute;left:50%;bottom:9%;transform:translateX(-50%);display:none;align-items:center;gap:8px;padding:8px 14px;background:rgba(8,8,10,.66);border:1px solid rgba(255,255,255,.22);border-radius:10px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#fff;font:700 11.5px/1 "SF Pro Text",-apple-system,system-ui,"Helvetica Neue",Arial,sans-serif;letter-spacing:.2em;text-transform:uppercase;white-space:nowrap;max-width:calc(100% - 32px);overflow:hidden;text-overflow:ellipsis;pointer-events:none;z-index:2';
   if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
   host.appendChild(tip);
+  // A MOMENT: a title across the picture for a beat (a mission done, the first tag up). Words, not numbers (no XP).
+  const card = document.createElement('div'); card.dataset.vxHud = 'card';
+  card.style.cssText = 'position:absolute;left:50%;top:24%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:10px;pointer-events:none;z-index:3;opacity:0;transition:opacity .45s ease,transform .6s cubic-bezier(.2,.8,.2,1);color:#fff;text-align:center;text-shadow:0 2px 24px rgba(0,0,0,.85)';
+  card.innerHTML = '<div style="font:900 italic clamp(34px,6.2vw,76px)/.92 \'SF Pro Display\',-apple-system,system-ui,\'Helvetica Neue\',Arial,sans-serif;letter-spacing:-.01em;text-transform:uppercase"></div><div style="width:44px;height:2px;background:#fff;opacity:.85"></div><div style="font:700 11px/1.4 \'SF Pro Text\',-apple-system,system-ui,\'Helvetica Neue\',Arial,sans-serif;letter-spacing:.32em;text-transform:uppercase;opacity:.86;max-width:min(560px,86vw)"></div>';
+  host.appendChild(card);
+  let cardTm = 0, cardN = 0;
+  const moment = (title: string, sub = '', secs = 2.8) => {
+    (card.children[0] as HTMLElement).textContent = title; (card.children[2] as HTMLElement).textContent = sub; (card.children[1] as HTMLElement).style.display = sub ? '' : 'none';
+    cardN++; card.style.opacity = '1'; card.style.transform = 'translate(-50%,-50%) scale(1)';
+    clearTimeout(cardTm); cardTm = window.setTimeout(() => { card.style.opacity = '0'; card.style.transform = 'translate(-50%,-56%) scale(.98)'; }, secs * 1000);
+  };
   let tipNow = '', sprayed = false, follow = 0, tipHold = 0, tipNote = '';
   // the line under the picture: square brackets are keys ("[F] PAINT THIS WALL" shows F on a keycap)
   const prompt = (s: string) => { if (s !== tipNow) { tipNow = s; tip.innerHTML = keyed(s); tip.style.display = s ? 'flex' : 'none'; } };
@@ -318,6 +335,11 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const can: Can = { colour: COLOURS[0], cap: 2, dist: 0.2, pressure: 1, buff: false };
   const CAPS = ['', 'SKINNY', 'MEDIUM', 'FAT'];
   let paint: { id: string; spot: W } | null = null, colourI = 0, btn = 0, help = false, sprayingNow = false;
+  // FIRST NIGHT (docs/FIRST-2-MIN.md): a stranger's first two minutes. A story not begun starts outside the studio door
+  // facing its own wall, and a coach line teaches in context, one thing at a time: put your name up (F, the mouse, F),
+  // read Dez's text (E), follow the line on the map (Shift to sprint). It stands aside for any other prompt and ends once
+  // the first job is under way. null: not a first night (a returning player, or the coach is done).
+  let intro: { stage: 'tag' | 'go'; t0: number; x: number; z: number; moved: number; press0: number; painted: boolean } | null = null;
   let down: THREE.Vector2 | null = null;   // where the button went down: a stroke or a line starts there, not where the mouse is a frame later
   // a stroke by hand: the can's point on the wall, eased after the mouse so the line comes out steady
   let stroke: { key: string; t0: number; x: number; y: number } | null = null;
@@ -357,7 +379,8 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     if (bk) return bk + (paint ? `PAINTING ${paint.id.toUpperCase()} · F DONE · ` : 'WASD MOVE · F AT A WALL · ') + lawS;
     return (paint
       ? `PAINTING ${paint.id.toUpperCase()} · ${can.buff ? 'BUFF' : COLOUR_NAMES[colourI]} · ${CAPS[can.cap]} CAP · ${Math.round(can.dist * 100)} CM · Q PHOTO · H HELP · F DONE`
-      : cond + 'WASD MOVE · SHIFT SPRINT · C CROUCH · SPACE JUMP / GRAB · W CLIMB · DRAG LOOK · F AT ANY WALL TO PAINT · B SKETCHBOOK · T TORCH · E PHONE' + (phoneDead() ? '' : ' · Q PHOTO · L GALLERY · O PHOTO MODE · K MAP')) + ' · ' + lawS + (opts.onRec ? ' · R RECORD' : '') + (music ? (music.state().on ? ' · M MUSIC OFF' : ' · M MUSIC ON') : '');
+      // (walking: the few keys that matter now; the rest are taught where they are needed, and the dock shows E Q L)
+      : cond + 'WASD MOVE · DRAG LOOK · SHIFT SPRINT · SPACE JUMP · C CROUCH · F PAINT A WALL · B SKETCHBOOK' + (phoneDead() ? '' : ' · E PHONE')) + ' · ' + lawS + (music && !music.state().on ? ' · M MUSIC ON' : '');
   };
   const hud = () => { const s = hudText(); if (s !== lastHud) { lastHud = s; if (opts.onHud) opts.onHud(s); } };
   const fwd = new THREE.Vector3(0, 0, -1), side = new THREE.Vector3();
@@ -388,11 +411,14 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   const stopAuto = (ok: boolean) => { const a = auto; if (!a) return; auto = null; spray.end(); if (blasting) disarmed = true; if (!ok && blasting) note(`STOPPED ${blasting} · Z TAKES IT BACK`, 2.5); blasting = ''; a.done(ok); };
   const squareUp = (w: W) => { paint = { id: w.id, spot: w }; camO.yaw = Math.atan2(w.normal.x, w.normal.z); camO.pitch = 0.1; camO.dist = 2.6; };
   const togglePaint = () => {
-    if (paint) { paint = null; btn = 0; stroke = null; line = null; spray.end(); stopAuto(false); me.crouch = false; hud(); return; }
+    if (paint) {
+      if (intro && intro.stage === 'tag' && pressN > intro.press0) { intro.stage = 'go'; intro.t0 = t; intro.painted = true; const c = missions.current(); moment('UP', c ? 'NOW THE STREET · ' + c.text : 'NOW THE STREET'); }
+      paint = null; btn = 0; stroke = null; line = null; spray.end(); stopAuto(false); me.crouch = false; hud(); return;
+    }
     if (pk.busy() || me.airborne) { note(pk.mode() === 'swim' ? 'NOT IN THE WATER' : 'GET YOUR FEET DOWN FIRST', 1.6); return; }
     if (wet > WET_PAINT) { say2(`HANDS TOO WET TO PAINT · DRYING ${Math.round((1 - wet) * 100)}%`, 2.5); note('HANDS TOO WET · FIND SOMEWHERE WARM OR WAIT', 2.5); return; }
     const w = nearestWall(); if (!w) { say2('NO WALL WITHIN REACH', 2.5); note('WALK UP TO A WALL · THEN F', 2.5); return; }
-    me.crouch = false; squareUp(w.spot);
+    me.crouch = false; squareUp(w.spot); if (intro) intro.press0 = pressN;
     hud();
   };
   // the hiss of the can (made from noise, so nothing to download)
@@ -524,13 +550,17 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     spray.replay(out);
     return [ax, ay, ax + bw, ay + bh];
   };
+  // (the route to the objective: see THE ROUTE below)
+  let routeP: { x: number; z: number }[] | null = null, routeLen = 0, routeT = -9, routeKey = '';
   const missions = makeMissions({
     me: () => ({ x: me.x, z: me.z, gy: me.gy, crouch: me.crouch, speed: mv.speed }),
     law: () => law.state(), strokes: (id) => spray.strokes(id), wall: wallInfo, place: placeOf,
     places: () => city.plan.places, painted: (id) => spray.painted(id), setup: setupWall, ready: spray.loaded,
   }, opts.progress || localProgress, {
     onMessage: (m) => { phone.notify(m); hud(); },
-    onChange: () => { phone.refresh(); },
+    onChange: () => { phone.refresh(); routeT = -9; },
+    // a job done: its title across the picture for a beat, and who it was for (the reply comes in on the phone)
+    onDone: (m) => moment(m.title, 'DONE · ' + (m.from === 'mo' ? 'MO · VOID RECORDS' : m.from.toUpperCase()) + ' IS TEXTING'),
   });
   // what a photo sees of a point: in the frame, how far, nothing solid in the way, from in front of the wall
   const fv = new THREE.Vector3();
@@ -560,11 +590,46 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   // the photos live in the phone's PHOTOS app (the gallery lays itself out for the phone's screen)
   const gallery = makeGallery(phone.slot('gallery'), { store: () => photoStore, focus: () => canvas.focus(), note: (s, secs) => note(s, secs), onChange: () => { const st = gallery.state(); if (st.open && !st.loading) camera.setCount(st.count); if (!st.open) phone.galleryClosed(); hud(); } });
   phone.bindGallery(gallery);
+  // THE ROUTE: the way to the objective in play along the streets (the officers' A* over the district's walkable grid),
+  // drawn on the mini-map as a line; its length is the distance the objective line gives. Worked out again every second
+  // or so and whenever the objective changes; none while painting or when the way is not on foot (a heaven, up a pipe)
+  const updRoute = (force = false) => {
+    const c = missions.current(), mk = c && c.marker;
+    if (!mk || paint || pk.busy()) { if (!mk) { routeP = null; routeKey = ''; } return; }
+    const key = `${mk.x.toFixed(1)},${mk.z.toFixed(1)}`;
+    if (!force && key === routeKey && t - routeT < 1.1) return;
+    routeT = t; routeKey = key;
+    const r = city.nav().path(me.x, me.z, me.gy, mk.x, mk.z, mk.y, 60000);
+    if (!r || !r.reached || r.pts.length < 2) { routeP = null; routeLen = 0; return; }
+    // every few cells and every turn (the grid's steps are half a metre)
+    const pts = r.pts, out: { x: number; z: number }[] = [{ x: me.x, z: me.z }];
+    for (let i = 1; i < pts.length - 1; i++) { const a = pts[i - 1], b = pts[i], c2 = pts[i + 1]; if (i % 6 === 0 || Math.abs((b.x - a.x) * (c2.z - b.z) - (b.z - a.z) * (c2.x - b.x)) > 1e-3) out.push({ x: b.x, z: b.z }); }
+    out.push({ x: pts[pts.length - 1].x, z: pts[pts.length - 1].z });
+    routeLen = 0; for (let i = 1; i < out.length; i++) routeLen += Math.hypot(out[i].x - out[i - 1].x, out[i].z - out[i - 1].z);
+    routeP = out;
+  };
   const minimap = makeMinimap(host, {
     plan: city.plan, walls: city.walls, painted: (id) => spray.painted(id),
     me: () => ({ x: me.x, z: me.z, heading: me.heading, speed: mv.speed, painting: !!paint }),
     law: () => law.state(), markers: () => missions.markers(), objective: () => missions.current(),
+    route: () => (routeP ? { pts: routeP, length: routeLen } : null),
   });
+  // the FIRST NIGHT's coach line (see `intro`): what to do next, one thing at a time; '' when there is nothing to add
+  const coach = (atWall: boolean) => {
+    if (!intro) return '';
+    intro.moved = Math.max(intro.moved, Math.hypot(me.x - intro.x, me.z - intro.z));
+    if (intro.stage === 'tag') {
+      // walked off without painting: the street it is (a tag can wait)
+      if (intro.moved > 9 || t - intro.t0 > 45) { intro.stage = 'go'; intro.t0 = t; }
+      else return atWall ? '[F] PUT YOUR NAME ON THE WALL' : t - intro.t0 < 12 ? '[W] [A] [S] [D] MOVE · DRAG TO LOOK · [F] AT A WALL TO PAINT' : '';
+    }
+    const c = missions.current();
+    // the first job under way (the record shop reached), or a while gone by: the coach is done
+    if ((c && c.mission !== 'get-up') || (c && c.type !== 'reach') || t - intro.t0 > 60) { intro = null; return ''; }
+    if (phone.isOpen()) return '';
+    if (missions.unread() > 0) return '[E] READ YOUR MESSAGES';
+    return c ? (mv.speed > 5.2 ? 'FOLLOW THE LINE ON THE MAP' : 'FOLLOW THE LINE ON THE MAP · HOLD [SHIFT] TO SPRINT') : '';
+  };
   const camera = makeCamera({
     host, renderer: r, composer: comp, store: photoStore,
     render: () => { city.beforeRender(r, scene, cam); comp.render(0); },
@@ -706,7 +771,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
   window.addEventListener('blur', letGo);
   const onVis = () => { if (document.visibilityState !== 'visible') letGo(); };
   document.addEventListener('visibilitychange', onVis);
-  let drag: { x: number; y: number } | null = null;
+  let drag: { x: number; y: number } | null = null, dragT = -9;
   const aim = (e: PointerEvent) => { shiftNow = e.shiftKey; const b = canvas.getBoundingClientRect(); mouse.set(((e.clientX - b.left) / b.width) * 2 - 1, -((e.clientY - b.top) / b.height) * 2 + 1); };
   canvas.addEventListener('pointerdown', (e) => {
     canvas.focus(); aim(e); canvas.setPointerCapture(e.pointerId);
@@ -726,7 +791,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     aim(e);
     if (!drag) return;
     lookBy(-(e.clientX - drag.x) * 0.0045, (e.clientY - drag.y) * 0.003);
-    drag = { x: e.clientX, y: e.clientY };
+    drag = { x: e.clientX, y: e.clientY }; dragT = t;
   });
   const endDrag = (e: PointerEvent) => {
     aim(e);
@@ -911,7 +976,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       // low on the wall the writer gets down to it, and stands again for the rest; never while the button is held
       if (P && !me.airborne && !pressing && !sprayingNow) { if (P.y < feet + 0.8) me.crouch = true; else if (P.y > feet + 1.15) me.crouch = false; }
       follow = P && auto && auto.group[0] === 'p' ? (P.x - me.x) * n.z - (P.z - me.z) * n.x : 0;
-      prompt(t < tipHold ? tipNote : auto ? (blasting ? `BLASTING ${blasting} · [A] [D] TO STOP` : '') : armed && !h ? 'POINT AT THE WALL TO PLACE IT' : !h ? 'POINT AT THE WALL' : '');
+      prompt(t < tipHold ? tipNote : auto ? (blasting ? `BLASTING ${blasting} · [A] [D] TO STOP` : '') : armed && !h ? 'POINT AT THE WALL TO PLACE IT' : !h ? 'POINT AT THE WALL' : intro && intro.stage === 'tag' ? (!sprayed || pressN === intro.press0 ? 'HOLD [LMB] AND MOVE THE MOUSE TO SPRAY' : pressing ? '' : pressN - intro.press0 < 3 ? 'KEEP GOING · A TAG IS A FEW STROKES' : "THAT'S YOUR NAME UP · [F] WHEN YOU'RE DONE") : '');
       // by the reticle: a keycap and a verb, only when there is something to do
       const sep = '<span class="sep"></span>';
       const near = auto || !h ? '' : armed ? `${kc('LMB')}BLAST ${armed.name}${plan && plan.fitted ? ' · SIZED TO FIT' : ''}` : line ? `${kc('SHIFT')}STRAIGHT LINE · LET GO TO SPRAY` : tooHigh ? 'TOO HIGH · AIM LOWER' : tooFar ? `${kc('A')}${kc('D')}STEP ALONG` : !sprayed ? `${kc('LMB')}SPRAY${sep}${kc('RMB')}LIGHT${sep}${kc('F')}DONE${sep}TOOLS: CLICK THE DOCK` : shiftNow && !pressing ? `${kc('LMB')}DRAG A STRAIGHT LINE` : '';
@@ -933,7 +998,8 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       const pkSay = bust || photoMode ? '' : pk.look(pkIn());
       const nw = !bust && !pk.busy() && !me.airborne && nearestWall(2.5), sk = book.state.open ? book.pick() : null;
       const wallSay = nw ? (wet > WET_PAINT ? `HANDS TOO WET TO PAINT · DRYING ${Math.round((1 - wet) * 100)}%` : sk ? `[F] THEN CLICK THE WALL TO BLAST ${sk.name}` : '[F] PAINT THIS WALL') : sk ? 'WALK UP TO A WALL TO BLAST ' + sk.name : '';
-      prompt(t < tipHold ? tipNote : pkSay && wallSay && nw ? `${pkSay} · ${wallSay}` : pkSay || wallSay);
+      const coachSay = !bust && !photoMode ? coach(!!nw) : '';
+      prompt(t < tipHold ? tipNote : pkSay && wallSay && nw ? `${pkSay} · ${wallSay}` : (intro && intro.stage === 'tag' && nw && !pkSay && !sk && wet <= WET_PAINT ? coachSay : pkSay || wallSay || coachSay));
     }
     writer.steady(!!paint && mv.speed < 0.05);
     hudUi.dock({ walk: !paint && !bust && !photoMode && !phone.isOpen(), photos: camera.count(), gallery: gallery.isOpen(), phone: phone.isOpen(), unread: missions.unread(), on: !!paint && !bust && !phone.isOpen(), cap: can.cap, colour: colourI, colours: COLOURS, names: COLOUR_NAMES, dist: can.dist, line: cm(footprint(can).width), buff: !!can.buff, undo: paint ? spray.undoable(runOf(paint.spot).ids) : 0, book: !!book.state.open, help, torch: torch.on });
@@ -1042,6 +1108,12 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     beam.visible = torch.w > 0.02; if (beam.visible) { beam.position.copy(torchP); beam.quaternion.setFromUnitVectors(DOWN, torchDir); (beam.material as THREE.ShaderMaterial).uniforms.uW.value = torch.w * (paint ? 0.3 : 1); }
     // the camera: behind, above, over the right shoulder, kept inside the street; on a wall it swings round behind the
     // climber (unless the player is dragging it), a little higher to see up the route
+    // the camera drifts round behind a writer on the move, unless the player turned it in the last moment: the keys
+    // alone steer (A or D curves the run), as in any street game; a big reversal (running at the camera) is left alone
+    if (!paint && !photoMode && !bust && !drag && !shotView && !pk.busy() && mv.speed > 1.2 && t - dragT > 1.2) {
+      let d = me.heading + Math.PI - camO.yaw; d = Math.atan2(Math.sin(d), Math.cos(d));
+      if (Math.abs(d) < 2.3) camO.yaw += d * Math.min(1, dt * 1.7 * Math.min(1, mv.speed / GAIT.jog));
+    }
     if (pk.mode() === 'climb' && !drag) { const rt = pk.route(); if (rt && rt.n) { const want = Math.atan2(rt.n[0], rt.n[1]); camO.yaw += Math.atan2(Math.sin(want - camO.yaw), Math.cos(want - camO.yaw)) * Math.min(1, dt * 2.5); camO.pitch += (0.05 - camO.pitch) * Math.min(1, dt * 2); } }
     camH += ((me.crouch && !paint ? 1.05 : pk.mode() === 'swim' ? 1.25 : 1.45) - camH) * Math.min(1, dt * 10);
     const tgtY = py + camH;
@@ -1084,7 +1156,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     // (and out of the way of the help card, and of the sketchbook panel where the view is too narrow for both)
     { const hs = hudScale(w, h), mapB = 16 + Math.round(150 * hs) + 8;
       minimap.hide(photoMode || phone.isOpen() || phoneDead() || (!!paint && (help || h - (16 + 124 * hs) - 40 < mapB)) || (book.state.open && w - 290 < mapB)); }
-    minimap.update(rdt, t);
+    updRoute(); minimap.update(rdt, t);
     { const b = minimap.box(); camera.toastAt(b.size ? b.x + b.size + 10 : 16, 16); }
     hud();
   };
@@ -1105,12 +1177,27 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
 
   say(''); hud();
   frame();
+  // FIRST NIGHT: the story's progress has loaded (a moment; never more than 2.5 s under the loading screen). Not begun:
+  // start outside the studio door, facing its own wall under the door lamp, with the coach line (see `intro`)
+  for (let i = 0; i < 50 && !missions.ready(); i++) await new Promise((r) => setTimeout(r, 50));
+  if (missions.fresh() && !paint && Math.hypot(me.x - home.x, me.z - home.z) < 0.5) {
+    Object.assign(me, { x: FIRST_NIGHT.x, z: FIRST_NIGHT.z, heading: FIRST_NIGHT.heading, vy: 0, y: 0, gy: 0 }); mv.speed = 0;
+    Object.assign(camO, { yaw: FIRST_NIGHT.yaw, pitch: 0.16, dist: 3.1 });
+    intro = { stage: 'tag', t0: t, x: me.x, z: me.z, moved: 0, press0: pressN, painted: false };
+  }
+  updRoute(true);   // (builds the walking grid now, under the loading screen, not in the first seconds of play)
   requestAnimationFrame(() => loading.done());   // the first frame is up: fade into the game
   // the soundtrack starts with the game (owner: music on by default); a held-back AudioContext starts on the first key
-  if (opts.music !== false) music = makeMusic({ bus: sound, tracks: opts.music || undefined, onTrack: (tr) => note(`♪ ${tr.title.toUpperCase()} · [M] MUSIC`, 3.5) });
+  if (opts.music !== false) music = makeMusic({ bus: sound, tracks: opts.music || undefined, onTrack: (tr) => { if (!intro) note(`♪ ${tr.title.toUpperCase()} · [M] MUSIC`, 3.5); } });   // (the first night's coach has the line)
 
   const api: Game = {
     canvas,
+    route: () => { updRoute(true); const c = missions.current(); return { to: c && c.marker ? { x: c.marker.x, z: c.marker.z, text: c.text } : null, pts: routeP ? routeP.map((p) => [+p.x.toFixed(2), +p.z.toFixed(2)] as [number, number]) : [], length: +routeLen.toFixed(1) }; },
+    firstNight: (o = {}) => {
+      if (o.start) { Object.assign(me, { x: FIRST_NIGHT.x, z: FIRST_NIGHT.z, heading: FIRST_NIGHT.heading, vy: 0, y: 0, gy: 0, airborne: false }); mv.speed = 0; Object.assign(camO, { yaw: FIRST_NIGHT.yaw, pitch: 0.16, dist: 3.1 }); intro = { stage: 'tag', t0: t, x: me.x, z: me.z, moved: 0, press0: pressN, painted: false }; }
+      if (o.stop) intro = null;
+      return { on: !!intro, stage: intro ? intro.stage : '', painted: !!(intro && intro.painted), tip: tipNow, card: +card.style.opacity > 0.5 ? (card.textContent || '') : '', cards: cardN };
+    },
     where: () => { const p = writer.tip(tipV); return { x: me.x, z: me.z, y: me.gy + me.y, yaw: camO.yaw, heading: me.heading, anim: writer.playing(), speed: mv.speed, tip: p ? [p.x, p.y, p.z] as [number, number, number] : null }; },
     alarm: () => law.alarm({ x: me.x, z: me.z, gy: me.gy }),
     places: () => city.plan.places.map((p) => ({ ...p })),

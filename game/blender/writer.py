@@ -365,7 +365,9 @@ NS = 28; th_s = np.arange(NS) / NS * 2 * math.pi
 # (pass 3: the cap is a set-in sleeve's, rounding over the deltoid and gone into the body: pass 2's ran on up the line of
 #  the arm toward the neck, which made one long slope from the hood down the arm)
 s_s = np.concatenate([np.linspace(-0.08, 0.0, 6)[:-1], np.linspace(0.0, sW - 0.075, 38)[:-1], np.linspace(sW - 0.075, sW - 0.01, 7)])
-r_sleeve = curve([-0.08, -0.055, -0.025, 0.05, sE - 0.03, sE + 0.06, sW - 0.1, sW - 0.075, sW - 0.055, sW - 0.01], [0.01, 0.036, 0.058, 0.064, 0.056, 0.054, 0.05, 0.047, 0.041, 0.039])
+# (pass 5: the sleeves read inflated, a padded tube twice the arm. A shell sleeve is cut close: about 10% slimmer down the
+#  arm, the cap unchanged so the shoulder seam still meets the body, the cuff band and its tab following)
+r_sleeve = curve([-0.08, -0.055, -0.025, 0.05, sE - 0.03, sE + 0.06, sW - 0.1, sW - 0.075, sW - 0.055, sW - 0.01], [0.01, 0.036, 0.057, 0.058, 0.0505, 0.0485, 0.0455, 0.0435, 0.038, 0.036])
 Ps, Cs, Ts, EFs, EOs = tube(arm_path, s_s, r_sleeve(s_s) * 0.95, r_sleeve(s_s), th_s)
 def sleeve_folds(P):
     n = grid_normals(P, True); s = np.broadcast_to(s_s[:, None], P.shape[:2]); th = np.broadcast_to(th_s[None], P.shape[:2])
@@ -391,7 +393,7 @@ def sleeve_w(P):
     return weights(LeftShoulder=(1 - arm) * 0.6, Spine2=(1 - arm) * 0.4, LeftArm=arm * (1 - fore), LeftForeArm=arm * fore)
 grid(body, Ps, 'Hoodie', sleeve_w(Ps), mirror=True, cap0=True, name='sleeve')
 # the cuff: an elastic band with its own thickness, turned in at the end
-s_c = np.array([sW - 0.065, sW - 0.058, sW - 0.03, sW - 0.006, sW - 0.002, sW - 0.006]); r_c = np.array([0.039, 0.045, 0.045, 0.044, 0.04, 0.033])
+s_c = np.array([sW - 0.065, sW - 0.058, sW - 0.03, sW - 0.006, sW - 0.002, sW - 0.006]); r_c = np.array([0.036, 0.0415, 0.0415, 0.0405, 0.037, 0.0305])
 Pc = tube(arm_path, s_c, r_c * 0.95, r_c, th_s)[0]
 grid(body, Pc, 'Trim', weights(LeftForeArm=np.ones(Pc.shape[0] * Pc.shape[1])), mirror=True, name='cuff')
 
@@ -462,11 +464,11 @@ def one(bone, P): return weights(**{bone: np.ones(P.shape[0] * P.shape[1])})
 # wrist (a strap with a hook-and-loop end), so the cuff reads as a cuff and not as the sleeve stopping
 def _ring(s0, rr0, ths):
     P_ = tube(arm_path, np.array([s0]), np.array([rr0 * 0.95]), np.array([rr0]), ths)[0][0]; return P_, unit(P_ - arm_path(np.array([s0]))[0])
-_wr, _wn = _ring(sW - 0.061, 0.0462, th_s); _wr = np.concatenate([_wr, _wr[:1]]); _wn = np.concatenate([_wn, _wn[:1]])
+_wr, _wn = _ring(sW - 0.061, 0.0426, th_s); _wr = np.concatenate([_wr, _wr[:1]]); _wn = np.concatenate([_wn, _wn[:1]])
 box_tube(body, _wr, 0.0022, 0.0016, 6, _wn, 'Detail', weights(LeftForeArm=np.ones(len(_wr) * 6)), pw=4.0, name='cuff-weld', mirror=True)
-_tr, _tn = _ring(sW - 0.034, 0.0478, np.linspace(math.pi / 2 - 0.75, math.pi / 2 + 0.5, 14))
+_tr, _tn = _ring(sW - 0.034, 0.0441, np.linspace(math.pi / 2 - 0.75, math.pi / 2 + 0.5, 14))
 box_tube(body, _tr, 0.0105, 0.0022, 6, _tn, 'Detail', weights(LeftForeArm=np.ones(len(_tr) * 6)), pw=4.0, name='cuff-tab', mirror=True)
-_ax = unit(arm_path(np.array([sW - 0.02]))[0] - arm_path(np.array([sW - 0.05]))[0]); _te, _tne = _ring(sW - 0.034, 0.0498, np.array([math.pi / 2 + 0.4]))
+_ax = unit(arm_path(np.array([sW - 0.02]))[0] - arm_path(np.array([sW - 0.05]))[0]); _te, _tne = _ring(sW - 0.034, 0.0461, np.array([math.pi / 2 + 0.4]))
 box_tube(body, np.array([_te[0] - _ax * 0.0085, _te[0] + _ax * 0.0085]), 0.0085, 0.0022, 6, _tne[0], 'Trim', weights(LeftForeArm=np.ones(12)), pw=5.0, name='cuff-tab-end', mirror=True)
 
 # ───────────────────────────── jacket details ─────────────────────────────
@@ -598,14 +600,19 @@ under[:, 0] = CX + np.sin(pl) * rr_; under[:, 1] = t_y(zl) - np.cos(pl) * rr_; u
 roll = (last + under) / 2 + (last - Ph[-2]) * 0.2
 Ph = np.concatenate([Ph, roll[None], under[None]]); u_h2 = np.concatenate([u_h, [1.0, 1.0]])
 # the opening's edge: the cloth turns in over a drawcord channel, then the lining runs back inside
+# (pass 5: the turn was a hard step with the lining in the hood's own grey, so the bottom corners of the opening caught
+#  the light as two pale points, like teeth. Now a rounder roll, and the lining is dark: inside the hood, only shadow)
 c0 = Ph[0].mean(0)
-lip = c0 + (Ph[0] - c0) * 0.93 + np.array([0, -0.01, 0]); inner = c0 + (Ph[0] - c0) * 0.87 + np.array([0, 0.004, 0]); deep = c0 + (Ph[0] - c0) * 0.9 + np.array([0, 0.05, 0])
+lip = c0 + (Ph[0] - c0) * 0.95 + np.array([0, -0.006, 0]); inner = c0 + (Ph[0] - c0) * 0.91 + np.array([0, 0.006, 0]); deep = c0 + (Ph[0] - c0) * 0.93 + np.array([0, 0.045, 0])
 Ph = np.concatenate([deep[None], inner[None], lip[None], Ph]); u_hx = np.concatenate([[0, 0, 0], u_h2])
 # weights: the head carries the hood round the skull, the neck the nape, the body (chest and shoulders) the cowl
 _u = np.broadcast_to(u_hx[:, None], Ph.shape[:2]).ravel(); cw = sstep(0.72, 0.93, _u); hw = (1 - sstep(0.45, 0.8, _u)) * (1 - cw)
 Wsp = spine_w(Ph.reshape(-1, 3)) * cw[:, None]; Wh = weights(Head=hw, Neck=(1 - hw) * (1 - cw)); Wh = Wh * (1 - cw)[:, None] + Wsp; Wh /= Wh.sum(1, keepdims=True)
-grid(hood, Ph, 'Cotton', Wh, name='hood')
-patch(hood, Ph, grid_normals(Ph, True), np.arange(3, 8), np.arange(NH + 1), 0.004, 'Cotton', Wh, 'hood-hem')   # the bound edge
+grid(hood, Ph[2:], 'Cotton', Wh[2 * NH:], name='hood')
+grid(hood, Ph[:3], 'Mask', Wh[:3 * NH], name='hood-lining')   # (pass 5) the lining inside the opening: as dark as the mask
+# the bound edge round the brow and the sides only (pass 5: carried on under the chin it stood proud of the collar in two
+# pale hooks); thinner, so it reads as a binding and not a tube
+patch(hood, Ph, grid_normals(Ph, True), np.arange(3, 7), np.arange(-NH // 3, NH // 3 + 1), 0.0028, 'Cotton', Wh, 'hood-hem')
 # inside: a head with nothing on it, and a mask and gaiter over where a face would be. Only darkness.
 def ellipsoid(c, r, nu=20, nv=12, v0=-1.0, v1=1.0, u0=0.0, u1=2 * math.pi):
     v = np.linspace(v0, v1, nv) * math.pi / 2; u = np.linspace(u0, u1, nu, endpoint=(u1 - u0) < 2 * math.pi - 1e-6)
@@ -622,7 +629,7 @@ grid(body, Pn, 'Mask', weights(Head=sstep(HZ - 0.02, HZ + 0.05, zz), Spine2=1 - 
 strings = Mesh('SM_Char_Writer_String')
 for sgn in (1, -1):
     top_ = np.array([CX + sgn * 0.046, HY - 0.162, HZ + 0.03]); pts = [top_, top_ + np.array([sgn * 0.004, -0.012, -0.05]), top_ + np.array([sgn * 0.012, -0.004, -0.12]), top_ + np.array([sgn * 0.016, 0.0, -0.2])]
-    Pd = sweep(resample(pts, 10), 0.0035, 0.0035, 6, (1, 0, 0)); grid(strings, Pd, 'Detail', spine_w(Pd.reshape(-1, 3)), cap1=True, name='cord')
+    Pd = sweep(resample(pts, 10), 0.0035, 0.0035, 6, (1, 0, 0)); grid(strings, Pd, 'Trim', spine_w(Pd.reshape(-1, 3)), cap1=True, name='cord')   # (pass 5: braided cord, matte: in Detail's sheen a floodlight drew it as two white hooks at the collar)
     Pd = sweep(resample([pts[3] + np.array([0, 0, 0.012]), pts[3] + np.array([0, 0, -0.018])], 3), 0.007, 0.007, 8, (1, 0, 0)); grid(strings, Pd, 'Detail', spine_w(Pd.reshape(-1, 3)), cap0=True, cap1=True, name='toggle')
 
 # ── the spray can: one shape for the cans on the pack, the can in the hand and the grip the fingers close round.
@@ -969,7 +976,7 @@ def seam_marks(pc, w, h):
     for z0 in sd.get('z', ()):
         v0 = np.interp(z0, z_t, np.linspace(0, 1, len(z_t))); add(np.abs(Vv - v0) * h, U * w)
     return crease_, dots, ridge
-FOLDP = {'sleeve': s_s, 'leg': s_l, 'jacket': z_t, 'seat': z_p, 'hood': u_hx}
+FOLDP = {'sleeve': s_s, 'leg': s_l, 'jacket': z_t, 'seat': z_p, 'hood': u_hx[2:]}   # (pass 5: the hood piece starts at the lip; the lining is its own)
 NIMG = np.zeros((ATLAS, ATLAS, 3)); NIMG[..., 2] = 1.0
 def fold_height(pc, w, h):
     """The fold relief (m) over a piece's patch of the atlas, h x w pixels; and metres per pixel across and along."""
