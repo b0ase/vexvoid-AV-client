@@ -7790,8 +7790,14 @@ ${GEN_SYSTEM.split('\n\nReply with')[0]}`;
               await pic(`${m.id} ${o.type}: ${o.text} (${id || 'x ' + o.at[0] + ' z ' + o.at[2]})`);
             } else if (o.walls && o.walls.length) {
               const w = walls.find(x => x.id === o.walls[0]); if (!w) continue;
-              const d = Math.max(6, Math.min(14, w.w * 0.7));
-              g.goto(w.x + w.nx * d, w.z + w.nz * d, Math.atan2(w.nx, w.nz), 0.1);
+              // step back from the wall, but stay on its ground (not up on the roof of whatever is behind) with room for
+              // the camera behind the writer (backed into a wall, the view is the back of his head)
+              const foot = w.y - w.h / 2; let d = 0;
+              for (const k of [Math.min(14, w.w * 0.7), 10, 8, 6, 4.5, 3]) {
+                if (k < 3) continue; g.goto(w.x + w.nx * k, w.z + w.nz * k, Math.atan2(w.nx, w.nz), 0.1); await new Promise(r => setTimeout(r, 400));
+                const me = g.where(), c = g.parkour().cam; if (Math.abs(me.y - foot) < 1.2 && Math.hypot(c.x - me.x, c.z - me.z) > 3) { d = k; break; }
+              }
+              if (!d) { d = 2.5; g.goto(w.x + w.nx * d, w.z + w.nz * d, Math.atan2(w.nx, w.nz), 0.1); }
               await pic(`${m.id} ${o.type}: ${o.text} (wall ${w.id}, ${w.w.toFixed(1)} x ${w.h.toFixed(1)} m, from ${d.toFixed(0)} m)`);
             }
           }
