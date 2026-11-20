@@ -621,7 +621,7 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
     if (intro.stage === 'tag') {
       // walked off without painting: the street it is (a tag can wait)
       if (intro.moved > 9 || t - intro.t0 > 45) { intro.stage = 'go'; intro.t0 = t; }
-      else return atWall ? '[F] PUT YOUR NAME ON THE WALL' : t - intro.t0 < 12 ? '[W] [A] [S] [D] MOVE · DRAG TO LOOK · [F] AT A WALL TO PAINT' : '';
+      else return atWall ? '[F] PUT YOUR NAME ON THE WALL' : t - intro.t0 < 12 ? '[W] [A] [S] [D] MOVE · DRAG TO LOOK' : '';
     }
     const c = missions.current();
     // the first job under way (the record shop reached), or a while gone by: the coach is done
