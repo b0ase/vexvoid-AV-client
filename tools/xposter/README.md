@@ -132,7 +132,7 @@ Two slots a day is about **60 posts a month**.
 | `images.json` | the picture allowlist (sha256 and a description of each) |
 | `seed/` | the Mac queue (x-03 to x-10, x-L2), plus `history.jsonl`: x-L1, x-01 and x-02, already posted by the Mac, kept so the repeat and link checks know about them |
 | `install.sh` | the root-side install (run by `setup.sh`) and `--check` (run by `setup.sh --self-test`) |
-| `test-xposter.mjs` | 124 checks against a fake Anthropic API and a fake X API on 127.0.0.1 (the real SDK, the real OAuth signing) |
+| `test-xposter.mjs` | 127 checks against a fake Anthropic API and a fake X API on 127.0.0.1 (the real SDK, the real OAuth signing) |
 
 **Why a timer every 15 minutes instead of cron at 12:00 and 18:00:**
 

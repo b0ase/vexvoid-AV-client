@@ -287,8 +287,19 @@ try {
   ok((fs.statSync(path.join(HOME, 'posts.jsonl')).mode & 0o777) === 0o644, 'posts.jsonl is readable by others (no secrets in it): the owner reads it without sudo')
   // the test knobs only accept a local fake server
   process.env.VEXVOID_X_TEST_X_BASE = 'https://evil.example'
-  let threw = false; try { await X2.tick({ now: T('2026-11-29T18:00:00Z') }) } catch { threw = true }
-  ok(readLog().pop().state === 'error' || threw, 'a test knob pointing anywhere but 127.0.0.1 is refused')
+  reset(); r = await X2.tick({ now: T('2026-11-29T18:00:00Z') })
+  ok(r.action === 'error' && /127\.0\.0\.1/.test(readLog().pop().note) && X.calls.length === 0, 'a test knob pointing anywhere but 127.0.0.1 is refused (logged, nothing sent)')
+  process.env.VEXVOID_X_TEST_X_BASE = `http://127.0.0.1:${xs.address().port}`
+  // dry needs only the Anthropic key; with it missing it stops before any call
+  const envBody = fs.readFileSync(ENVF, 'utf8'); fs.writeFileSync(ENVF, envBody.replace(/^ANTHROPIC_API_KEY=.*$/m, ''))
+  reset(); r = await X2.dry({ now: T('2026-11-29T19:00:00Z') })
+  ok(!r.ok && A.calls.length === 0 && out.some((l) => /no Anthropic key/.test(l)), 'dry without the Anthropic key: says so, no call')
+  fs.writeFileSync(ENVF, envBody.replace(/^VEXVOID_X_API_KEY=.*$/m, ''))
+  reset(); r = await X2.dry({ now: T('2026-11-29T19:05:00Z') })
+  ok(r.ok && A.calls.length === 1 && X.calls.length === 0, 'dry with only the Anthropic key: works (dry never needs the X keys)')
+  reset(); r = await X2.tick({ now: T('2026-11-30T12:00:00Z') })
+  ok(r.action === 'error' && /VEXVOID_X_API_KEY/.test(readLog().pop().note) && A.calls.length + X.calls.length === 0, 'tick with an X key missing: logged, no calls')
+  fs.writeFileSync(ENVF, envBody)
 } finally {
   console.log = log0
   anth.close(); xs.close(); fs.rmSync(H, { recursive: true, force: true })

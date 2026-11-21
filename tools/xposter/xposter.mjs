@@ -56,9 +56,9 @@ export function readKeys(P = paths()) {
   const k = {}
   for (const line of raw.split('\n')) { const m = line.match(/^\s*(?:export\s+)?([A-Z0-9_]+)\s*=\s*["']?([^"'\s]+)["']?\s*$/); if (m) k[m[1]] = m[2] }
   const missing = KEY_NAMES.filter((n) => !k[n])
-  if (missing.length) return { missing, why: 'missing from the key file' }
-  SECRETS = KEY_NAMES.map((n) => k[n])
-  return { x: { apiKey: k.VEXVOID_X_API_KEY, apiSecret: k.VEXVOID_X_API_SECRET, accessToken: k.VEXVOID_X_ACCESS_TOKEN, accessSecret: k.VEXVOID_X_ACCESS_SECRET }, anthropic: k.ANTHROPIC_API_KEY }
+  SECRETS = KEY_NAMES.map((n) => k[n]).filter(Boolean)
+  return { ...(missing.length ? { missing, why: 'missing from the key file' } : {}), anthropic: k.ANTHROPIC_API_KEY,
+    x: { apiKey: k.VEXVOID_X_API_KEY, apiSecret: k.VEXVOID_X_API_SECRET, accessToken: k.VEXVOID_X_ACCESS_TOKEN, accessSecret: k.VEXVOID_X_ACCESS_SECRET } }
 }
 
 /** The allowlist (images.json), and the pictures on disk whose sha256 matches. */
@@ -187,9 +187,9 @@ async function run(P, slot, now, deps) {
   const model_usd = +R.modelCost(R.MODEL, usage).toFixed(5)
   const x_usd = R.isLinkPost(pick) ? R.X_COST.link : R.X_COST.plain
   const rec = { ...base, text: pick.text, image: pick.image || null, alt: pick.alt || '', ...source, tries, tokens: usage, model_usd, x_usd }
-  const x = deps.x || realX(keys.x)
-  let mediaId = null
+  let x, mediaId = null
   try {
+    x = deps.x || realX(keys.x)
     if (pick.image) {
       const img = images.find((i) => i.id === pick.image)
       mediaId = await x.upload(fs.readFileSync(path.join(P.images, img.set, img.file)), img.file, pick.alt)
@@ -226,7 +226,7 @@ export async function dry({ now = Date.now(), deps = {} } = {}) {
     console.log(`\nthe queue has ${q.length}; the next slot posts ${q[0]}:\n  ${s.text.replace(/\n/g, '\n  ')}\n  [${s.image || 'no picture'}]  checks: ${p.length ? p.join('; ') : 'ok'}`)
   }
   let client = deps.anthropic
-  if (!client) { const k = readKeys(P); if (k.missing && k.missing.includes('ANTHROPIC_API_KEY')) { console.log(`\nno Anthropic key (${k.why}): run as vexvoid-x (sudo vexvoid-x dry) after vexvoid-x-keys`); return { ok: false } } client = await anthropicClient(k.anthropic) }
+  if (!client) { const k = readKeys(P); if (!k.anthropic) { console.log(`\nno Anthropic key (${k.why}): run as vexvoid-x (sudo vexvoid-x dry) after vexvoid-x-keys`); return { ok: false } } client = await anthropicClient(k.anthropic) }
   const linkOk = !hist.slice(-(R.LINK_EVERY - 1)).some(R.isLinkPost)
   const w = await write({ client, images, hist, rel: releases(), linkOk, slotLabel: 'a dry run', random: deps.random })
   const cost = R.modelCost(R.MODEL, w.usage)
