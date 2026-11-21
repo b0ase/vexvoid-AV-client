@@ -1,0 +1,12 @@
+{
+ "v": 1,
+ "id": "p-house-canal",
+ "tier": "MISSION",
+ "title": "LOW WATER",
+ "brief": "Nix has spotted a long bare wall down by the canal. Get there, put a throw-up on it, take a straight photo of it, then crouch out of sight until the patrol passes.",
+ "contacts": ["nix"],
+ "places": ["canal"],
+ "credit": { "name": "VEXVOID", "show": true },
+ "revisions": 1,
+ "cost_stop_usd": 6
+}
