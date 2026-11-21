@@ -42,7 +42,7 @@
     "v3xv0id",
     "cloud"
   ],
-  "author": "FRESH",
+  "author": "VexVoid",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
@@ -56,6 +56,7 @@
   "build": {
     "appId": "com.b0ase.v3xv0id-av-client",
     "productName": "V3XV0ID AV Client",
+    "copyright": "Copyright © 2026 VexVoid",
     "directories": {
       "output": "dist"
     },
