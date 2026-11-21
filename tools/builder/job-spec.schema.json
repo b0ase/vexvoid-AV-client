@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vexvoid.com/schemas/job-spec-v1.json",
+  "title": "VexVoid builder JOB SPEC v1",
+  "description": "The fixed-format job the builder works from (Pay to Develop, Phase A). Written by tools/builder/reader.mjs from a buyer's brief; the builder never sees the brief itself. The pack the builder writes is game/content/packs/<id>.json with the pack id <id>.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["v", "id", "tier", "title", "brief", "contacts", "places", "credit", "revisions", "cost_stop_usd"],
+  "properties": {
+    "v": { "const": 1 },
+    "id": {
+      "description": "The job id, which is also the pack id, the pack file name and the branch pack/<id>.",
+      "type": "string",
+      "pattern": "^p-[a-z0-9]+(-[a-z0-9]+)*$",
+      "minLength": 4,
+      "maxLength": 28
+    },
+    "tier": { "enum": ["MISSION", "MISSION_SET"] },
+    "title": {
+      "description": "The mission (or story arc) title: capitals, short, plain text.",
+      "type": "string",
+      "pattern": "^[A-Z0-9][A-Z0-9 '.,!?-]*$",
+      "minLength": 2,
+      "maxLength": 24
+    },
+    "brief": {
+      "description": "What to build, written by the reader in the house voice: plain text, no links, names or brands.",
+      "type": "string",
+      "pattern": "^[\\x20-\\x7E]+$",
+      "minLength": 20,
+      "maxLength": 600
+    },
+    "contacts": {
+      "description": "Who may send the mission's messages (existing contacts only).",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,23}$" }
+    },
+    "places": {
+      "description": "Where it may happen (existing named places only; empty: the builder picks).",
+      "type": "array",
+      "maxItems": 6,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" }
+    },
+    "credit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "show"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._-]*$", "minLength": 1, "maxLength": 32 },
+        "show": { "type": "boolean" }
+      }
+    },
+    "revisions": { "type": "integer", "minimum": 0, "maximum": 2 },
+    "cost_stop_usd": {
+      "description": "The per-job AI cost stop (MISSION $6, MISSION SET $15 by default). At the stop the job pauses; it is never a cap on buyers.",
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 30
+    },
+    "reader": {
+      "description": "Where the spec came from (filled in by reader.mjs).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "model": { "type": "string", "maxLength": 64 },
+        "at": { "type": "string", "maxLength": 40 },
+        "brief_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    }
+  }
+}

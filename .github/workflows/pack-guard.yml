@@ -1,0 +1,76 @@
+# PACK GUARD (Pay to Develop): the builder writes DATA, never CODE.
+# On every pull request from a pack/* branch: fail if any changed file is outside game/content/packs/, then run the
+# static pack checks (scripts/pack-validate.mjs, scripts/test-packs.mjs). Lightweight: no install, no browser.
+# The ruleset on feat/vx-rebuild and main makes "pack-guard" a required status check (tools/builder/README.md).
+# On a pull request from any other branch the job runs and passes at once, so the required check never blocks normal work.
+name: pack-guard
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  pack-guard:
+    name: pack-guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Not a pack branch
+        if: ${{ !startsWith(github.head_ref, 'pack/') }}
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          echo "Not a pack/* branch ($HEAD_REF), nothing to guard."
+
+      - name: Check out (the pull request head, its base for the diff)
+        if: ${{ startsWith(github.head_ref, 'pack/') }}
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Only game/content/packs/ may change
+        if: ${{ startsWith(github.head_ref, 'pack/') }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          C=${RUNNER_TEMP:-/tmp}/pack-guard-changed.txt
+          base=$(git merge-base "$BASE_SHA" "$HEAD_SHA")
+          # every path the PR touches, renames and deletions included (both sides of a rename)
+          git diff --name-status --no-renames "$base" "$HEAD_SHA" > "$C"
+          cat "$C"
+          bad=$(awk '{ print $2 }' "$C" | grep -v -E '^game/content/packs/[A-Za-z0-9._-]+$' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::A pack branch may only change files directly under game/content/packs/. Outside it:"
+            echo "$bad"
+            exit 1
+          fi
+          # a pack PR adds or changes pack JSON and the generated index only, and never deletes a pack
+          odd=$(awk '{ print $2 }' "$C" | grep -v -E '^game/content/packs/(p-[a-z0-9-]+\.json|index\.ts)$' || true)
+          if [ -n "$odd" ]; then echo "::error::Only p-*.json packs and index.ts: $odd"; exit 1; fi
+          if awk '$1 == "D"' "$C" | grep -q .; then echo "::error::A pack PR does not delete files"; exit 1; fi
+          # no symlinks (a link in packs/ could point anywhere)
+          for f in $(awk '$1 != "D" { print $2 }' "$C"); do
+            mode=$(git ls-tree "$HEAD_SHA" -- "$f" | awk '{ print $1 }')
+            if [ "$mode" = "120000" ]; then echo "::error::$f is a symlink"; exit 1; fi
+          done
+          echo "OK: only game/content/packs/ changed"
+
+      - name: Node
+        if: ${{ startsWith(github.head_ref, 'pack/') }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: pack-validate and test-packs
+        if: ${{ startsWith(github.head_ref, 'pack/') }}
+        run: |
+          set -euo pipefail
+          node scripts/pack-index.mjs --check
+          node scripts/pack-validate.mjs
+          node scripts/test-packs.mjs

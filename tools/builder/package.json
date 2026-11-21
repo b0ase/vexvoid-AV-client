@@ -1,0 +1,10 @@
+{
+  "name": "vexvoid-builder-tools",
+  "private": true,
+  "type": "module",
+  "description": "The VexVoid builder's own dependencies (tools/builder): the Anthropic SDK for the reader, Playwright only to fetch chrome-headless-shell. Installed by setup.sh with pnpm --frozen-lockfile; never part of the app.",
+  "dependencies": {
+    "@anthropic-ai/sdk": "1.6.0",
+    "playwright": "1.64.1"
+  }
+}
