@@ -1,0 +1,212 @@
+{
+ "note": "The X autopilot picture allowlist: faceless record art only, black and white, checked by eye one by one on 21 Nov 2026. Banned (a face, a masked face or a figure facing the camera): VexVoid_Jam jam-01, 03, 05, 10, 11, 16, 17, 18. Also left out: jam-07 (a painted face in the wall piece and a figure in the train window), Landscape download-1 (reads as a coin), download-3, -7, -9, -11, -16 (garbled or misspelt letters), download-14 (shows V3X, the token name). twin = a near-identical take: the two count as one picture for the no-repeat rule. Files are fetched from https://www.vexvoid.com/images/<set>/<file> and checked against sha256.",
+ "base": "https://www.vexvoid.com/images",
+ "images": [
+  {
+   "id": "jam-02",
+   "set": "VexVoid_Jam",
+   "file": "jam-02.jpg",
+   "bytes": 78723,
+   "sha256": "95ca2aaa1cfa89e8b59cddfb9d6c8a7e2ddbe7248db6023043ec618509a06a43",
+   "about": "VEXVOID in glowing white drip letters on a wet black brick wall.",
+   "twin": "jam-12"
+  },
+  {
+   "id": "jam-04",
+   "set": "VexVoid_Jam",
+   "file": "jam-04.jpg",
+   "bytes": 66920,
+   "sha256": "abd0ada52bb66b747c0bd8a9527d93c4185d881ccaa1bbf53da57cf16600c400",
+   "about": "A hooded figure seen from behind on a night platform as a train streaks past."
+  },
+  {
+   "id": "jam-06",
+   "set": "VexVoid_Jam",
+   "file": "jam-06.jpg",
+   "bytes": 80104,
+   "sha256": "e296270f873c80f4580db895891db0f1e536677887afb5f8353f66fb21233340",
+   "about": "A huge dripping white V hanging at the end of a dark graffiti tunnel.",
+   "twin": "jam-14"
+  },
+  {
+   "id": "jam-08",
+   "set": "VexVoid_Jam",
+   "file": "jam-08.jpg",
+   "bytes": 76468,
+   "sha256": "63d81081790a847be0ca2057b739536b3a197cd78f2dbd06ad2c7a923edb078f",
+   "about": "A painted locomotive in a rainy night yard, smoke stack behind.",
+   "twin": "jam-21"
+  },
+  {
+   "id": "jam-09",
+   "set": "VexVoid_Jam",
+   "file": "jam-09.jpg",
+   "bytes": 159164,
+   "sha256": "c8b37ffe5fe53f8ecba6ccbc54b388297a1e31dc203e0e9e091e89bacbec4e03",
+   "about": "An empty rail yard at night under floodlights, painted carriages on the far tracks."
+  },
+  {
+   "id": "jam-12",
+   "set": "VexVoid_Jam",
+   "file": "jam-12.jpg",
+   "bytes": 79068,
+   "sha256": "536b17ff8e647db6a2129299148d631f42704a848d92f36747d8ef4fbf9bea65",
+   "about": "VEXVOID in glowing white drip letters on a black wall above wet ground.",
+   "twin": "jam-02"
+  },
+  {
+   "id": "jam-13",
+   "set": "VexVoid_Jam",
+   "file": "jam-13.jpg",
+   "bytes": 110766,
+   "sha256": "0b2ce0194fcc9ad172ec1283a009e3c389e8f9a8493748b429c0be83902bba20",
+   "about": "VEX VOID in cracked white letters on a wet black wall."
+  },
+  {
+   "id": "jam-14",
+   "set": "VexVoid_Jam",
+   "file": "jam-14.jpg",
+   "bytes": 79771,
+   "sha256": "9c1ce8fbea49c69bf0f5666f7e8f578dd2236e811f9a8271764a9d2933c97e8d",
+   "about": "A dripping white V on black at the end of a tunnel.",
+   "twin": "jam-06"
+  },
+  {
+   "id": "jam-15",
+   "set": "VexVoid_Jam",
+   "file": "jam-15.jpg",
+   "bytes": 73234,
+   "sha256": "4afdf6a1e098b8385006aa4932b8cc2f6c3954c0779468a97bc4a78ff0aa5e0a",
+   "about": "VEX in white at the end of a dark corridor between two trains, wet floor shining."
+  },
+  {
+   "id": "jam-19",
+   "set": "VexVoid_Jam",
+   "file": "jam-19.jpg",
+   "bytes": 93735,
+   "sha256": "4a3cbf496203d7d8871d447c8500c5029d2c53066e61858e631eaa3e1ff69df3",
+   "about": "A hooded figure seen from behind on a trackside path: graffiti wall on the left, trains under the lamps on the right."
+  },
+  {
+   "id": "jam-20",
+   "set": "VexVoid_Jam",
+   "file": "jam-20.jpg",
+   "bytes": 125916,
+   "sha256": "6e5c6a8b40aaf5d43facd68885dfeafb6d43b7fa3ad3da431f8446f70179d923",
+   "about": "A long underground tunnel covered in graffiti, lit by work lamps."
+  },
+  {
+   "id": "jam-21",
+   "set": "VexVoid_Jam",
+   "file": "jam-21.jpg",
+   "bytes": 76526,
+   "sha256": "e921e0cd21086a672d9884ae1086b72c650dff55b6908125c0942e9bbe74ecd1",
+   "about": "A painted train in a dark yard at night, in the rain.",
+   "twin": "jam-08"
+  },
+  {
+   "id": "jam-22",
+   "set": "VexVoid_Jam",
+   "file": "jam-22.jpg",
+   "bytes": 104273,
+   "sha256": "372679cd7e90ad989ff00c7abae3b35a617bfb391e8604ca5178328a098e8b99",
+   "about": "A lone hooded figure, small in the frame, crosses a wet graffiti-lined tunnel."
+  },
+  {
+   "id": "land-00",
+   "set": "VexVoid_Landscape",
+   "file": "download.jpg",
+   "bytes": 97710,
+   "sha256": "a14ebace4fb86f775b9fd0b3d5893ac6606ea5dfcae8414b72d971337837174c",
+   "about": "A winged white V emblem on black."
+  },
+  {
+   "id": "land-02",
+   "set": "VexVoid_Landscape",
+   "file": "download-2.jpg",
+   "bytes": 135346,
+   "sha256": "dcf3730c334bf96c90889de40b3b642b5dcb2d9d08c8c4f2808da751f5c91d08",
+   "about": "VEX in distressed white letters, close up on a black wall."
+  },
+  {
+   "id": "land-04",
+   "set": "VexVoid_Landscape",
+   "file": "download-4.jpg",
+   "bytes": 101384,
+   "sha256": "98cb93d51635a30cd8ad790362db00f50d05e615377b37565abfe1c11121e6c9",
+   "about": "A sharp geometric white V mark on a scratched black wall."
+  },
+  {
+   "id": "land-05",
+   "set": "VexVoid_Landscape",
+   "file": "download-5.jpg",
+   "bytes": 115012,
+   "sha256": "64f3901b657e50b31b46789417a4e44d24ea9a30486872c5caaa855b8beca776",
+   "about": "A white V splashed on a black wall, paint spatter, wet floor."
+  },
+  {
+   "id": "land-06",
+   "set": "VexVoid_Landscape",
+   "file": "download-6.jpg",
+   "bytes": 143743,
+   "sha256": "978be4a50f8e05a7e404d9bf50c712b74a4c44967322353e977e8e3f6542cc25",
+   "about": "A glowing V mark at the far end of a ruined, flooded hall with graffiti."
+  },
+  {
+   "id": "land-08",
+   "set": "VexVoid_Landscape",
+   "file": "download-8.jpg",
+   "bytes": 118651,
+   "sha256": "b092e319e1840f0720981b8c4cb29077b6c49b099a582e87f85727a700ed2aef",
+   "about": "VEXVOID sprayed in dripping white letters on a dark wall."
+  },
+  {
+   "id": "land-10",
+   "set": "VexVoid_Landscape",
+   "file": "download-10.jpg",
+   "bytes": 139098,
+   "sha256": "5cf09bce44d73beab972b147d27864d911179a752fe2ab40c99cbb7ef5a796bb",
+   "about": "A giant distressed white V at the end of a graffiti corridor."
+  },
+  {
+   "id": "land-12",
+   "set": "VexVoid_Landscape",
+   "file": "download-12.jpg",
+   "bytes": 137492,
+   "sha256": "266d5dd3325ee43f32f2d432043625e6ed156d4651ea7e52480697039ce72b0f",
+   "about": "VEX in white spray letters on the dark wall of an empty room."
+  },
+  {
+   "id": "land-13",
+   "set": "VexVoid_Landscape",
+   "file": "download-13.jpg",
+   "bytes": 82443,
+   "sha256": "df32e40908a1e872c9cb1d544a092c54e54d8b35f4dc6dd3fabd865667944c17",
+   "about": "VEX in white letters on a black wall, shallow focus."
+  },
+  {
+   "id": "land-15",
+   "set": "VexVoid_Landscape",
+   "file": "download-15.jpg",
+   "bytes": 108013,
+   "sha256": "daeb5194edc12875fec8143e29e430590f233e0de575a34c10e9cdd1e7cdc60a",
+   "about": "VEX in white on a brick wall in a dark warehouse."
+  },
+  {
+   "id": "land-17",
+   "set": "VexVoid_Landscape",
+   "file": "download-17.jpg",
+   "bytes": 116112,
+   "sha256": "834387afe557233dce792fa2b1001953b105abc37282fc89b9fd1585d4deb22b",
+   "about": "A clean white V on a concrete wall above a wet floor."
+  },
+  {
+   "id": "land-18",
+   "set": "VexVoid_Landscape",
+   "file": "download-18.jpg",
+   "bytes": 101827,
+   "sha256": "c47d43a8af308cbfe9ac55f666a16acdbb468f7764bfa1b49fe48dbf3bc2e8c1",
+   "about": "VEX glowing white at the end of a dark, wet corridor."
+  }
+ ]
+}

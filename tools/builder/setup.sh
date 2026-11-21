@@ -17,11 +17,16 @@
 # lets refs/heads/pack/* out, and runs the SELF-TEST: build the game, pack-validate, test-packs, the reader's mock tests,
 # and pack-check on the house pack p-house-sleeve. It prints ALL OK, or what failed.
 #
+# On Linux it also installs the X AUTOPILOT (tools/xposter/README.md): its own user vexvoid-x, a root-owned copy of the
+# code in /opt/vexvoid-x taken from the fetched commit (not the working tree), and a tick every 15 minutes that posts to
+# @v3xvoid at 12:00 and 18:00 London. Its keys are installed separately with vexvoid-x-keys; `user` can't read them.
+#
 #   bash setup.sh                 everything
 #   bash setup.sh --no-install    skip apt, Node, pnpm, Claude Code and the browser (they must be there already)
 #   bash setup.sh --self-test     only the self-test (on an existing setup)
 # Test knobs: VEXVOID_BUILDER_HOME (default ~/vexvoid-builder), VEXVOID_BUILDER_ENV, VEXVOID_REPO_URL, VEXVOID_BUILDER_REF
-# (feat/vx-builder), VEXVOID_NO_RC=1 (leave ~/.profile and ~/.bashrc alone; they are only edited on Linux anyway).
+# (feat/vx-builder), VEXVOID_NO_RC=1 (leave ~/.profile and ~/.bashrc alone; they are only edited on Linux anyway),
+# VEXVOID_NO_XPOSTER=1 (don't install or check the X autopilot).
 set -euo pipefail
 { set +x; } 2>/dev/null
 umask 022
@@ -207,6 +212,19 @@ if [ "${PLAT%%_*}" = linux ] && [ -z "${VEXVOID_NO_RC:-}" ]; then   # the VM onl
   for rc in "$HOME/.profile" "$HOME/.bashrc"; do [ -f "$rc" ] && grep -q '# vexvoid-builder$' "$rc" || echo "$LINE" >> "$rc"; done
   echo "   vexvoid-job, vexvoid-read, anthropic-key, git-credential-vexvoid (PATH added to ~/.profile and ~/.bashrc)"
 else echo "   vexvoid-job, vexvoid-read, anthropic-key, git-credential-vexvoid (shell files not touched)"; fi
+
+# ---------------------------------------------------------------- the X autopilot (tools/xposter/README.md)
+say "the X autopilot (user vexvoid-x, code in /opt/vexvoid-x, a tick every 15 minutes)"
+if [ "${PLAT%%_*}" = linux ] && [ -z "${VEXVOID_NO_XPOSTER:-}" ]; then
+  # from the commit just fetched from GitHub, never the working tree (a builder session can write there): git archive
+  # of that commit, unpacked by root into a fresh folder, then that folder's install.sh runs as root
+  git -C "$REPO" fetch --quiet --no-tags "$URL" "+refs/heads/$REF"
+  XREV=$(git -C "$REPO" rev-parse FETCH_HEAD)
+  XST=$(sudo mktemp -d)
+  GIT_NO_REPLACE_OBJECTS=1 git -C "$REPO" archive --format=tar "$XREV" tools/xposter tools/builder/pnpm-lock.yaml vx/catalogue.json | sudo tar -x -C "$XST" --no-same-owner
+  if ! sudo env VEXVOID_X_REV="$XREV" bash "$XST/tools/xposter/install.sh" "$XST"; then sudo rm -rf "$XST"; die "the X autopilot did not install"; fi
+  sudo rm -rf "$XST"
+else echo "   (Linux only; not installed here)"; fi
 fi
 
 # ---------------------------------------------------------------- the self-test
@@ -231,10 +249,20 @@ echo "-- pack-check on the house pack p-house-sleeve (headless, software WebGL, 
 if PACK_FPS=off PACK_OUT=$T/pack-check bash tools/packs/pack-check.sh game/content/packs/p-house-sleeve.json > "$T/pack-check.log" 2>&1; then
   echo "   ok   pack-check ALL OK (pictures: $T/pack-check/p-house-sleeve-contact-sheet.jpg)"
 else FAILS+=("pack-check (see $T/pack-check.log)"); echo "   FAIL pack-check"; grep -E 'FAIL|timed out|did not' "$T/pack-check.log" | head -n 20; fi
+echo "-- the X autopilot, with a fake Claude and a fake X (no key; nothing is posted)"
+node tools/xposter/test-xposter.mjs > "$T/test-xposter.log" 2>&1 && echo "   ok   $(tail -n 1 "$T/test-xposter.log")" || { FAILS+=("test-xposter (see $T/test-xposter.log)"); echo "   FAIL test-xposter"; grep FAIL "$T/test-xposter.log" | head; }
+if [ "${PLAT%%_*}" = linux ] && [ -z "${VEXVOID_NO_XPOSTER:-}" ]; then
+  echo "-- the X autopilot as installed (user, permissions, schedule, pictures, its own tests)"
+  if bash tools/xposter/install.sh --check > "$T/xposter-check.log" 2>&1; then echo "   ok   installed and locked down"; grep -E '^ +(state|today|next slot|queue|keys|last problem):' "$T/xposter-check.log" || true
+  else FAILS+=("the X autopilot install (see $T/xposter-check.log)"); echo "   FAIL the X autopilot install"; grep -E 'FAIL' "$T/xposter-check.log" | head; fi
+fi
 [ -z "$(git status --porcelain)" ] || echo "   (note: the checkout has local changes: $(git status --porcelain | head -n 3 | tr '\n' ' '))"
 
+# drop sudo's cached password, so nothing started later from this terminal (a builder job) can use it
+[ "${PLAT%%_*}" != linux ] || sudo -k 2>/dev/null || true
 if [ ${#FAILS[@]} -eq 0 ]; then
   printf '\nALL OK\nThe builder is ready. Next: put a job spec in %s/inbox (vexvoid-read makes one from a brief), then run: vexvoid-job\n' "$B"
+  [ "${PLAT%%_*}" != linux ] || [ -n "${VEXVOID_NO_XPOSTER:-}" ] || printf 'The X autopilot: vexvoid-x status (keys: vexvoid-x-keys; stop: sudo touch /home/vexvoid-x/STOP)\n'
   exit 0
 fi
 printf '\nSELF-TEST FAILED (%s):\n' "${#FAILS[@]}"; printf '  %s\n' "${FAILS[@]}"; exit 1

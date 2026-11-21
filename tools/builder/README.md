@@ -37,6 +37,7 @@ bash -c '. ~/.config/vexvoid-builder/env && f=$(mktemp) && curl -fsSL -H @<(prin
 | browser | `pnpm install --frozen-lockfile` in `tools/builder` (Anthropic SDK 1.6.0, Playwright 1.64.1), then `playwright install chromium-headless-shell` plus its system libraries |
 | build tools | three@0.182.0 and @esbuild/linux-x64 (or arm64) 0.27.2 for `scripts/build-game.sh`, each checked against its npm registry integrity hash (three's is also in `vx/lib/three.VERSION.txt`) |
 | commands | `vexvoid-read` (brief to spec), `vexvoid-job` (run the next job), `anthropic-key` (Claude Code's `apiKeyHelper`), added to `PATH` in `~/.profile` |
+| X autopilot | its own user `vexvoid-x`, root-owned code in `/opt/vexvoid-x` (from the fetched commit, not the working tree), a timer, and the commands `vexvoid-x` and `vexvoid-x-keys`. Its keys are installed separately, and `user` can't read them. See `tools/xposter/README.md` |
 
 **The self-test** (`bash ~/vexvoid-builder/repo/tools/builder/setup.sh --self-test` runs it alone):
 
@@ -44,7 +45,11 @@ bash -c '. ~/.config/vexvoid-builder/env && f=$(mktemp) && curl -fsSL -H @<(prin
 2. runs `scripts/pack-validate.mjs`;
 3. runs `scripts/test-packs.mjs`;
 4. runs `tools/builder/test-reader.mjs` (the reader with a mock client, no API call);
-5. runs `tools/packs/pack-check.sh` on the house pack `p-house-sleeve`: headless, software WebGL, `PACK_FPS=off`. It plays the mission to the end, checks the messages and the credit, checks that progress survives a reload, and saves pictures and a clip.
+5. runs `tools/packs/pack-check.sh` on the house pack `p-house-sleeve`: headless, software WebGL, `PACK_FPS=off`. It plays the mission to the end, checks the messages and the credit, checks that progress survives a reload, and saves pictures and a clip;
+6. runs `tools/xposter/test-xposter.mjs` (the X autopilot against a fake Claude and a fake X: nothing is sent);
+7. on the VM, runs `tools/xposter/install.sh --check`. It checks the `vexvoid-x` user, that `user` can't change the code or read the keys, the timer, all 25 pictures, and the installed copy's own tests.
+
+The setup ends with `sudo -k`, which clears sudo's remembered password.
 
 ## 2. Run a job
 
@@ -117,6 +122,7 @@ Notes:
 | file | what |
 |---|---|
 | `setup.sh` | one-command setup and the self-test |
+| `../xposter/` | the X autopilot for @v3xvoid (its own README) |
 | `run-job.sh`, `common.sh`, `report.mjs` | the job runner, its shared helpers, its cost ledger and PR body |
 | `PLAYBOOK.md` | the builder agent's standing instruction (its CLAUDE.md) |
 | `reader.mjs`, `job-spec.schema.json`, `spec.mjs` | brief to spec, the spec format, the spec check |
