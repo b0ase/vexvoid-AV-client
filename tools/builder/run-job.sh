@@ -104,7 +104,7 @@ for n in $(seq 1 "$MAXS"); do
   say "session $n: $MODEL, budget \$$REMAIN (failed checks so far: $FAILS)"
   T0=$(date +%s)
   TO=(); command -v timeout >/dev/null 2>&1 && TO=(timeout --kill-after=30 "${BUILDER_SESSION_SECS:-5400}")   # a stuck session (a bad key retries for ever)
-  ( cd "$WORK" && "${TO[@]}" env -i HOME="$HOME" USER="${USER:-user}" LANG=C.UTF-8 TERM=dumb TMPDIR="$J/tmp" \
+  ( cd "$WORK" && ${TO[@]+"${TO[@]}"} env -i HOME="$HOME" USER="${USER:-user}" LANG=C.UTF-8 TERM=dumb TMPDIR="$J/tmp" \
       PATH="$J/bin:$(dirname "$NODE"):$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin" \
       "$CLAUDE" -p "$MSG" --bare --restricted \
         --tools "Read,Glob,Grep,Write,Edit,Bash" \
@@ -160,7 +160,7 @@ IDX=$J/tmp/previews.index; rm -f "$IDX"
 while read -r f; do sha=$(git -C "$WORK" hash-object -w -- "$f"); GIT_INDEX_FILE=$IDX git -C "$WORK" update-index --add --cacheinfo "100644,$sha,$ID/$(basename "$f")"; done < "$J/pr-pictures.txt"
 TREE=$(GIT_INDEX_FILE=$IDX git -C "$WORK" write-tree)
 PARENT=(); git -C "$R" fetch --quiet origin "+refs/heads/pack/$ID-previews:refs/remotes/origin/pack/$ID-previews" 2>/dev/null && PARENT=(-p "origin/pack/$ID-previews")
-PCOMMIT=$(git -C "$WORK" -c user.name=vexvoid-builder -c user.email=vexvoid-builder@users.noreply.github.com commit-tree "$TREE" "${PARENT[@]}" -m "previews for $ID")
+PCOMMIT=$(git -C "$WORK" -c user.name=vexvoid-builder -c user.email=vexvoid-builder@users.noreply.github.com commit-tree "$TREE" ${PARENT[@]+"${PARENT[@]}"} -m "previews for $ID")
 IMGBASE="https://github.com/$GH_REPO/blob/$PCOMMIT/$ID"
 node "$R/tools/builder/report.mjs" body "$J" "$IMGBASE" > "$J/pr-body.md"
 if [ "$DRY" = 1 ]; then say "DRY: would push pack/$ID and pack/$ID-previews and open a PR into $BASE_BRANCH; body: $J/pr-body.md"; exit 0; fi
