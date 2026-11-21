@@ -1,9 +1,10 @@
 vexvoid-game.js: game/src (TypeScript) bundled by scripts/build-game.sh with esbuild 0.27.2 (darwin-arm64, npm
 integrity checked) and three 0.182.0 (MIT, npm sha512-GbHabT+Irv+ihI1/f5kIIsZ+Ef9Sl5A1Y7imvS5RQjWgtTPfPnZ43JmlYI7NtCRDK9zir20lQpfg8/9Yd02OvQ==).
-sha256 8dc27a04137494b264690c1be56a0428bebded9eb2b5cbe03ccc8ef8a3c81526
+sha256 6db832cbdf03cce1aaa9aabaabfe53e9c73175f71dcc8c110904c568eaf93faf
 The district (game/src/plan.ts, world.ts, district.ts, districtTex.ts) is our own, all surfaces drawn in code. city.ts (forked from
 tokenblaster.lol @88d14f1, ESCAPE FROM TERRORNODE, NPG Ltd) is no longer used by the game; cityAssets.ts/cityShaders.ts still lend it shaders.
 sketches: game/sketches/*.json, our own starter sketches (stroke data, written by game/sketches/make.mjs), bundled in.
+content packs: game/content/packs/*.json, missions as data (Pay to Develop; index by scripts/pack-index.mjs, checked by scripts/pack-validate.mjs), bundled in.
 loading/: the loading screen's clips (ident = the dripping VEXVOID title, hall = the hall of fame under its floodlight; H.264, no sound, with poster frames): loading clips: VexVoid's own (Grok Imagine, made by the owner).
 music: streamed from the VexVoid music bucket (game/src/playlist.ts): VexVoid's own tracks, produced by the owner.
 tex/: Poly Haven concrete_floor_02 and large_floor_tiles_02 (CC0), via tokenblaster.lol public/doubleo/tex.

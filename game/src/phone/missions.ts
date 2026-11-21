@@ -11,6 +11,9 @@
  *   hide    crouched, still and out of sight for a few seconds while the patrol is about (lying low)
  * There are no points and no levels (owner rule): progress is new messages, new contacts and new places on the map.
  *
+ * MISSIONS is the STARTERS with the installed CONTENT PACKS after them (./packs.ts; game/content/packs/*.json, data
+ * only, never engine code). A pack can only add missions; one can also be loaded into a running game (addPack).
+ *
  * Progress is kept as one small JSON object (this browser's localStorage by default, which in the desktop client is the
  * app's own user data). A host can pass its own ProgressStore (the web game's account, later).
  *
@@ -23,6 +26,8 @@
  */
 import { footprint, type Stroke } from '../spray';
 import type { LawState } from '../cops';
+import { mergePacks, installPack, removePack, type Pack } from './packs';
+import PACKS from '../../content/packs/index';
 
 export type SketchKind = 'tag' | 'throw-up' | 'piece';
 /** The people who message Vex. No faces: a mark (their initial) on a black disc. */
@@ -51,11 +56,17 @@ export type Objective = {
   secs?: number;
   /** Sent when this objective comes up (a tip, from the mentor mostly). */
   hint?: Line[];
+  /** paint: a starter sketch that does it, by id (the checks blast it; the tip can name it). */
+  sketch?: string;
 };
 export type Mission = { id: string; title: string; from: string; summary: string; after: string[]; delay: number;
   /** Something put up on a wall when the mission starts (the toys' scribbles, your tag crossed out). */
   setup?: 'toys' | 'crossed';
-  intro: Line[]; objectives: Objective[]; done: Line[] };
+  intro: Line[]; objectives: Objective[]; done: Line[];
+  /** Set by the pack loader (./packs.ts), never in a pack's JSON: the pack it came from, and "built by" on its card. */
+  pack?: string; credit?: string };
+/** The wall each setup puts its paint on (main.ts setupWall): an `over` objective must be on it. */
+export const SETUP_WALLS: Record<NonNullable<Mission['setup']>, string> = { toys: 'arch16', crossed: 'canal-n5' };
 
 // size and strokes that make a tag, a throw-up or a piece (the starters: tags 0.6-2.2 m and 4-15 strokes, throw-ups
 // 2.4-3.2 m and 24-57, pieces 3.9-6.7 m and 179-596, made smaller to fit a wall and the writer's reach)
@@ -63,7 +74,7 @@ const KIND_MIN: Record<SketchKind | 'any', { n: number; ext: number }> = { any: 
 
 /** The starter missions: they teach the game in order (paint, the photo, the buff can and the sketchbook, going over,
  *  the law). Short, real, no cringe; nobody's face. */
-export const MISSIONS: Mission[] = [
+export const STARTERS: Mission[] = [
   { id: 'get-up', title: 'GET UP', from: 'dez', summary: 'Dez wants your name on the shut arch next to the record shop.', after: [], delay: 4,
     intro: [['dez', 'you up?'], ['dez', 'shut arch next to the record shop on the N road. been bare for months'], ['dez', 'go put your name on it. a tag. in and out']],
     objectives: [
@@ -108,10 +119,14 @@ export const MISSIONS: Mission[] = [
     ],
     done: [['nix', "that's a heaven. the whole road sees it on the way to work"], ['dez', 'worth more than a wall full of tags. and they never buff up there']] },
 ];
+/** Every mission: the starters, then the installed packs' (a pack loaded into a running game goes on the end). */
+export const MISSIONS: Mission[] = mergePacks(STARTERS, PACKS as unknown as Pack[], CONTACTS).list;
 
 export type Msg = { id: number; from: string; text?: string; photo?: string; t: number; mission?: string };
 export type MissionInfo = { id: string; title: string; from: string; summary: string; status: 'locked' | 'waiting' | 'active' | 'done'; step: number;
-  objectives: { type: Objective['type']; text: string; done: boolean; current: boolean }[] };
+  objectives: { type: Objective['type']; text: string; done: boolean; current: boolean }[];
+  /** A pack's mission: the pack, and who built it (shown on the card). region: what its setup put up (metres on the wall). */
+  pack?: string; credit?: string; region?: [number, number, number, number] | null };
 export type Marker = { x: number; y: number; z: number; mission: string; title: string; text: string; type: Objective['type'] };
 type MState = { status: MissionInfo['status']; step: number; wait: number; region?: [number, number, number, number] | null };
 export type Saved = { v: 1; missions: Record<string, MState>; msgs: Msg[]; unread: Record<string, number>; known: string[]; queue: { from: string; text: string; mission: string; wait: number }[]; seq: number;
@@ -148,7 +163,7 @@ const GAP = 1.3;   // seconds between lines arriving (they type)
 
 export function makeMissions(env: Env, store: ProgressStore = localProgress, cb: { onMessage?: (m: Msg) => void; onChange?: () => void; onDone?: (m: Mission) => void } = {}) {
   let S: Saved = fresh(), ready = false, saving = false, again = false;
-  const byId = new Map(MISSIONS.map((m) => [m.id, m]));
+  let byId = new Map(MISSIONS.map((m) => [m.id, m]));
   const st = (id: string) => (S.missions[id] ||= { status: 'locked', step: 0, wait: 0 });
   // what is judged now (not kept: a paint objective starts again from what is on the wall when the game opens)
   const run = new Map<string, { base: WeakSet<Stroke>; hid: number; since: number; dirty0: number }>();
@@ -307,7 +322,8 @@ export function makeMissions(env: Env, store: ProgressStore = localProgress, cb:
     read: (contact: string) => { if (S.unread[contact]) { S.unread[contact] = 0; changed(); } },
     unread: () => Object.values(S.unread).reduce((a, b) => a + b, 0),
     list: (): MissionInfo[] => MISSIONS.map((m) => { const s = st(m.id); return { id: m.id, title: m.title, from: m.from, summary: m.summary, status: s.status, step: s.step,
-      objectives: m.objectives.map((o, i) => ({ type: o.type, text: o.text, done: s.status === 'done' || i < s.step, current: s.status === 'active' && i === s.step })) }; }),
+      objectives: m.objectives.map((o, i) => ({ type: o.type, text: o.text, done: s.status === 'done' || i < s.step, current: s.status === 'active' && i === s.step })),
+      ...(m.pack ? { pack: m.pack, credit: m.credit } : {}), ...(s.region ? { region: s.region } : {}) }; }),
     /** Where the objectives in play are (a wall's foot, a place). */
     markers: (): Marker[] => {
       const out: Marker[] = [];
@@ -353,6 +369,13 @@ export function makeMissions(env: Env, store: ProgressStore = localProgress, cb:
     setCase: (on: boolean) => { S.phone = { ...(S.phone || { dead: false }), case: !!on }; changed(); },
     mission: (id: string) => byId.get(id) || null,
     state: () => S,
+    /** A content pack's missions into the game now, until it reloads (./packs.ts: it can only add; loading it again
+     *  replaces what it added before). Its missions wait their turn in the story, or start(id) brings one in now. */
+    addPack: (pack: Pack) => { const r = installPack(MISSIONS, pack, CONTACTS); byId = new Map(MISSIONS.map((m) => [m.id, m])); if (ready) for (const id of r.added) if (st(id).status === 'active') begin(byId.get(id)!, true); changed(); return r; },
+    /** Take a pack's missions out of this game (never a starter). Their progress stays in the save. */
+    removePack: (id: string) => { const n = removePack(MISSIONS, id); for (const k of [...run.keys()]) if (MISSIONS.every((m) => m.id !== k)) run.delete(k); byId = new Map(MISSIONS.map((m) => [m.id, m])); S.queue = S.queue.filter((q) => !q.mission || byId.has(q.mission)); changed(); return n; },
+    /** Bring a mission in now, whatever comes before it (for building and checking packs): it arrives as it would. */
+    start: (id: string) => { const m = byId.get(id); if (!m) return false; const s = st(id); s.status = 'waiting'; s.wait = 0.2; s.step = 0; run.delete(id); changed(); return true; },
   };
   return api;
 }

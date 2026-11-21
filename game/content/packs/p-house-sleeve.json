@@ -1,0 +1,32 @@
+{
+  "v": 1,
+  "id": "p-house-sleeve",
+  "job": "house-sleeve",
+  "credit": { "name": "VEXVOID", "show": true },
+  "missions": [
+    {
+      "id": "p-house-sleeve-cover",
+      "title": "SLEEVE",
+      "from": "mo",
+      "summary": "Mo needs a sleeve for the new Void Records twelve: a piece on a wall in the square, shot for the cover.",
+      "after": [],
+      "delay": 8,
+      "intro": [
+        ["mo", "mo. the new void twelve is pressed"],
+        ["mo", "need a sleeve. not a render. a real wall, shot at night"],
+        ["mo", "the square in the south block. big bare walls and nobody looks till morning"]
+      ],
+      "objectives": [
+        { "type": "reach", "place": "square", "r": 12, "text": "GET TO THE SQUARE IN THE SOUTH BLOCK" },
+        { "type": "paint", "walls": ["s3-n", "c3-s"], "kind": "piece", "sketch": "piece-void", "text": "PUT A PIECE ON A WALL FACING THE SQUARE",
+          "hint": [["dez", "big wall. stand back and check the letters before you fill. B for the sketchbook"]] },
+        { "type": "photo", "walls": ["s3-n", "c3-s"], "painted": true, "dist": 24, "text": "SHOOT IT FOR THE SLEEVE",
+          "hint": [["mo", "straight on. all of it in. no tilt"]] }
+      ],
+      "done": [
+        ["mo", "that's the cover"],
+        ["mo", "first copy is yours. and it's going in the window"]
+      ]
+    }
+  ]
+}

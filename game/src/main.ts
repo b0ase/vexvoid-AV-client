@@ -52,7 +52,8 @@ import { localPhotos, merged, type Photo, type PhotoStore, type PhotoCloud } fro
 import { makeGallery, type GalleryState } from './phone/gallery';
 import { makeCamera, type PhotoTaken } from './phone/camera';
 import { makePhone, type AppId, type PhoneState } from './phone/phone';
-import { makeMissions, localProgress, MISSIONS, type ProgressStore, type MissionInfo, type Marker, type Msg, type Framed } from './phone/missions';
+import { makeMissions, localProgress, MISSIONS, CONTACTS, SETUP_WALLS, type ProgressStore, type MissionInfo, type Marker, type Msg, type Framed } from './phone/missions';
+import type { Pack } from './phone/packs';
 import { makeMinimap, type MinimapState } from './minimap';
 import { makeBook, slotsOf, sketchOf, fit, drawSketch, secsOf, cleanName, type Sketch, type SketchKind, type SketchStore, type BookState } from './sketchbook';
 import { makeParkour, type PkState, type Input as PkInput } from './parkour';
@@ -112,8 +113,13 @@ export type Game = { canvas: HTMLCanvasElement;
   /** The messages: every thread (contact, unread, the last message); with contact, that thread in full (read: mark it read). */
   messages: (o?: { contact?: string; read?: boolean }) => { unread: number; contacts: { id: string; name: string; unread: number; last: Msg }[]; thread?: Msg[] };
   /** The missions: each one's state and objectives, the one in play, where the markers are, the places on the map.
-   *  reset: start the story again (the paint stays on the walls). */
-  missions: (o?: { reset?: boolean }) => { ready: boolean; list: MissionInfo[]; current: { mission: string; title: string; text: string; type: string; marker: Marker | null } | null; markers: Marker[]; known: string[] };
+   *  reset: start the story again (the paint stays on the walls). start: bring that mission in now, whatever comes
+   *  before it (building and checking packs). */
+  missions: (o?: { reset?: boolean; start?: string }) => { ready: boolean; list: MissionInfo[]; current: { mission: string; title: string; text: string; type: string; marker: Marker | null } | null; markers: Marker[]; known: string[] };
+  /** CONTENT PACKS (./phone/packs.ts; game/content/packs): the packs in play, and what a pack may refer to (contacts,
+   *  missions, places, walls, starter sketches, setups, the bounds and the buildings, for the validator). load: a pack's
+   *  missions into this game now, no rebuild (until the game reloads; a pack can only add); unload: take one out again. */
+  packs: (o?: { load?: Pack; unload?: string }) => PacksInfo;
   /** The mini-map (K): on or off; where it is, its radius and turn. */
   minimap: (o?: { on?: boolean }) => MinimapState;
   /** The phone's MAP as a picture: the whole district north up, painted walls filled, places known, markers, the writer. */
@@ -182,6 +188,9 @@ export type Game = { canvas: HTMLCanvasElement;
    *  burner; case gives or takes the waterproof case. */
   water: (o?: { wet?: number; drown?: boolean; newPhone?: boolean; case?: boolean }) => { wet: number; swimming: boolean; canPaint: boolean; drying: number; drips: number; marks: number; phone: { dead: boolean; case: boolean; held: number; drowned: number; replaced: number } }; goto: (x: number, z: number, yaw?: number, pitch?: number, y?: number) => void; law: () => LawState; cops: (on: boolean) => void; audio: () => { ctx: AudioContext; node: AudioNode } | null };
 
+export type PacksInfo = { packs: { id: string; credit?: string; missions: string[] }[]; added?: string[]; skipped?: string[]; removed?: number;
+  refs: { contacts: string[]; missions: string[]; places: { id: string; x: number; y: number; z: number }[]; walls: string[]; sketches: { id: string; kind: SketchKind }[];
+    setups: Record<string, string>; bounds: { x0: number; x1: number; z0: number; z1: number }; blds: { id: string; x0: number; x1: number; z0: number; z1: number; y: number; h: number; open: boolean }[] } };
 export type SketchInfo = { id: string; name: string; kind: SketchKind; w: number; h: number; strokes: number; secs: number; mine: boolean; about?: string };
 const infoOf = (s: Sketch): SketchInfo => ({ id: s.id, name: s.name, kind: s.kind, w: s.w, h: s.h, strokes: s.strokes.length, secs: Math.round(secsOf(s)), mine: !!s.mine, about: s.about });
 
@@ -1292,7 +1301,18 @@ export async function mount(host: HTMLElement, opts: MountOpts): Promise<Game> {
       if (o.contact) { const t = ts.find((x) => x.id === o.contact); out.thread = t ? t.msgs.slice() : []; if (o.read) missions.read(o.contact); }
       return out;
     },
-    missions: (o = {}) => { if (o.reset) missions.reset(); return { ready: missions.ready(), list: missions.list(), current: missions.current(), markers: missions.markers(), known: missions.known() }; },
+    missions: (o = {}) => { if (o.reset) missions.reset(); if (o.start && !missions.start(o.start)) throw new Error('no mission ' + o.start); return { ready: missions.ready(), list: missions.list(), current: missions.current(), markers: missions.markers(), known: missions.known() }; },
+    packs: (o = {}) => {
+      const out: Partial<PacksInfo> = {};
+      if (o.unload) out.removed = missions.removePack(o.unload);
+      if (o.load) { const r = missions.addPack(o.load); out.added = r.added; out.skipped = r.skipped; }
+      const by = new Map<string, { id: string; credit?: string; missions: string[] }>();
+      for (const m of MISSIONS) if (m.pack) { if (!by.has(m.pack)) by.set(m.pack, { id: m.pack, credit: m.credit, missions: [] }); by.get(m.pack)!.missions.push(m.id); }
+      const P = city.plan;
+      return { ...out, packs: [...by.values()], refs: { contacts: Object.keys(CONTACTS), missions: MISSIONS.map((m) => m.id), places: P.places.map((p) => ({ id: p.id, x: p.x, y: p.y, z: p.z })),
+        walls: city.walls.map((w) => w.id), sketches: book.all().filter((k) => !k.mine).map((k) => ({ id: k.id, kind: k.kind })), setups: { ...SETUP_WALLS },
+        bounds: { ...P.bounds }, blds: P.blds.map((b) => ({ id: b.id, x0: b.x0, x1: b.x1, z0: b.z0, z1: b.z1, y: b.y || 0, h: b.h, open: !!b.shell })) } };
+    },
     minimap: (o = {}) => { if (o.on != null) minimap.set(!!o.on); return minimap.state(); },
     parkour: (o = {}) => {
       if (o.reset) pk.reset();

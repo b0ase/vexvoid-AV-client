@@ -136,6 +136,7 @@ const CSS = `
 .vxp-card .ln{display:flex;align-items:center;gap:9px;font-size:11px;font-weight:700;letter-spacing:.08em;line-height:1.3}
 .vxp-card .ln.done{opacity:.45}
 .vxp-card .ln i{font-style:normal;font-size:9px;font-weight:800;letter-spacing:.22em;color:rgba(255,255,255,.6)}
+.vxp-card .ln i.cr{font-size:8px;letter-spacing:.2em;color:rgba(255,255,255,.42)}
 .vxp-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:32px;padding:0 13px;border-radius:10px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.05);color:#fff;font:700 10px/1 ${UI};letter-spacing:.2em;cursor:pointer;white-space:nowrap}
 .vxp-btn:hover{background:#fff;color:#0a0a0b}
 .vxp-btn:hover .vxh-kc{border-color:rgba(0,0,0,.55);color:#0a0a0b}
@@ -406,9 +407,11 @@ export function makePhone(host: HTMLElement, d: PhoneDeps) {
     const me = d.me(), ms = d.missions.list().filter((m) => m.from === thread && m.status !== 'locked' && m.status !== 'waiting');
     const marks = d.missions.markers();
     (th.querySelector('.vxp-card') as HTMLElement).innerHTML = ms.map((m) => {
-      if (m.status === 'done') return `<div class="ln done"><span style="font-size:13px">✓</span><span><i>${esc(m.title)}</i> · DONE</span></div>`;
+      // a pack's mission: who built it (Pay to Develop's credit, opt-in)
+      const by = m.credit ? `<br><i class="cr">BUILT BY ${esc(m.credit)}</i>` : '';
+      if (m.status === 'done') return `<div class="ln done"><span style="font-size:13px">✓</span><span><i>${esc(m.title)}</i> · DONE${by}</span></div>`;
       const o = m.objectives.find((x) => x.current), mk = marks.find((k) => k.mission === m.id);
-      return `<div class="ln"><span class="vxp-dia" style="margin:0"></span><span style="flex:1"><i>${esc(m.title)}</i><br>${esc(o ? o.text : '')}${mk ? ' · ' + dist(Math.hypot(mk.x - me.x, mk.z - me.z)) : ''}</span></div>${mk ? `<div><button class="vxp-btn" data-a="showmap" data-m="${m.id}">SHOW ON MAP ${kc('ENTER')}</button></div>` : ''}`;
+      return `<div class="ln"><span class="vxp-dia" style="margin:0"></span><span style="flex:1"><i>${esc(m.title)}</i><br>${esc(o ? o.text : '')}${mk ? ' · ' + dist(Math.hypot(mk.x - me.x, mk.z - me.z)) : ''}${by}</span></div>${mk ? `<div><button class="vxp-btn" data-a="showmap" data-m="${m.id}">SHOW ON MAP ${kc('ENTER')}</button></div>` : ''}`;
     }).join('');
     d.missions.read(thread);
   };
