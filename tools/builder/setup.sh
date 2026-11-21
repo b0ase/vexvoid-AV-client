@@ -46,6 +46,9 @@ PNPM_SRI_linux_arm64=sha512-JaRd5gNxwdNGBBkrZFt8bknrK4YmHVJBW0JMhUQ0fJ0dEYp6C2GT
 PNPM_SRI_darwin_arm64=sha512-pVbmIIbhixiLvADLu1WA3TaW8FZy/D72R1De27WbbFx8/2mxvnsTyFVm4fO9kjpjMY7RzJd48CiQ96p8fO3ebQ==
 NODE_MIN=24
 
+# never wait on a hidden prompt: a system Node's corepack pnpm shim asks "download pnpm? [Y/n]" on stderr, and
+# `pnpm -v 2>/dev/null` then hangs silently (seen on the Mandala VM, 21 Nov 2026). Version checks also time out.
+export COREPACK_ENABLE_DOWNLOAD_PROMPT=0 COREPACK_ENABLE_STRICT=0
 say() { printf '\n== %s\n' "$*"; }
 die() { printf '\nSETUP FAILED: %s\n' "$*"; exit 1; }
 case "$(uname -s)-$(uname -m)" in
@@ -106,7 +109,7 @@ else die "no Node $NODE_MIN+ (run without --no-install)"; fi
 
 # ---------------------------------------------------------------- pnpm
 say "pnpm $PNPM_V"
-if command -v pnpm >/dev/null 2>&1 && [ "$(pnpm -v 2>/dev/null)" = "$PNPM_V" ]; then echo "   pnpm $(pnpm -v) at $(command -v pnpm)"
+if command -v pnpm >/dev/null 2>&1 && [ "$(timeout 60 pnpm -v </dev/null 2>/dev/null)" = "$PNPM_V" ]; then echo "   pnpm $(pnpm -v) at $(command -v pnpm)"
 elif [ "$INSTALL" = 1 ]; then
   SRIV=PNPM_SRI_$PLAT; npm_fetch "@pnpm/exe.${NPLAT}" "$PNPM_V" "${!SRIV:-}" "$TOOLS/pnpm-$PNPM_V"
   ln -sfn "$TOOLS/pnpm-$PNPM_V/package/pnpm" "$BIN/pnpm"; chmod +x "$TOOLS/pnpm-$PNPM_V/package/pnpm"; hash -r; echo "   pnpm $(pnpm -v)"
