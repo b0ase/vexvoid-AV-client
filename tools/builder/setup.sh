@@ -143,8 +143,8 @@ fi
 git -C "$REPO" config --local --unset-all credential.helper 2>/dev/null || true
 git -C "$REPO" config --local --add credential.helper ""          # drop any helper from the system or global config
 git -C "$REPO" config --local --add credential.helper "$BIN/git-credential-vexvoid"
-git -C "$REPO" config --local user.name vexvoid-builder
-git -C "$REPO" config --local user.email vexvoid-builder@users.noreply.github.com
+git -C "$REPO" config --local user.name v3xv0id-builder
+git -C "$REPO" config --local user.email 359593724+v3xv0id-builder@users.noreply.github.com
 git -C "$REPO" config --local core.hooksPath "$REPO/.git/hooks"
 git -C "$REPO" config --local push.default nothing
 git -C "$REPO" fetch --quiet --prune origin

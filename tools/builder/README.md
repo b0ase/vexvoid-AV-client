@@ -33,7 +33,7 @@ bash -c '. ~/.config/vexvoid-builder/env && f=$(mktemp) && curl -fsSL -H @<(prin
 | Node | the newest LTS (24 or later) from nodejs.org, checked against `SHASUMS256.txt`, in `~/vexvoid-builder/tools/node` |
 | pnpm | 12.16.1, the npm tarball checked against its pinned integrity |
 | Claude Code | the official native installer: `curl -fsSL https://claude.ai/install.sh \| bash -s stable` |
-| repo | clones `b0ase/vexvoid-AV-client` (`feat/vx-builder`) into `~/vexvoid-builder/repo`, through a credential helper (`~/vexvoid-builder/bin/git-credential-vexvoid`) that reads the token from the env file for github.com only. It sets git user `vexvoid-builder` and adds a **pre-push hook that lets only `refs/heads/pack/*` out** (no feat/*, main, tags or deletes) |
+| repo | clones `b0ase/vexvoid-AV-client` (`feat/vx-builder`) into `~/vexvoid-builder/repo`, through a credential helper (`~/vexvoid-builder/bin/git-credential-vexvoid`) that reads the token from the env file for github.com only. It sets git user `v3xv0id-builder` (the machine user, noreply email) and adds a **pre-push hook that lets only `refs/heads/pack/*` out** (no feat/*, main, tags or deletes) |
 | browser | `pnpm install --frozen-lockfile` in `tools/builder` (Anthropic SDK 1.6.0, Playwright 1.64.1), then `playwright install chromium-headless-shell` plus its system libraries |
 | build tools | three@0.182.0 and @esbuild/linux-x64 (or arm64) 0.27.2 for `scripts/build-game.sh`, each checked against its npm registry integrity hash (three's is also in `vx/lib/three.VERSION.txt`) |
 | commands | `vexvoid-read` (brief to spec), `vexvoid-job` (run the next job), `anthropic-key` (Claude Code's `apiKeyHelper`), added to `PATH` in `~/.profile` |
