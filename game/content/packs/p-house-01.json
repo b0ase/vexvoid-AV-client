@@ -1,0 +1,34 @@
+{
+  "v": 1,
+  "id": "p-house-01",
+  "job": "house-01",
+  "credit": { "name": "VEXVOID", "show": true },
+  "missions": [
+    {
+      "id": "p-house-01-dark",
+      "title": "TEN DARK MINUTES",
+      "from": "nix",
+      "summary": "The yard lamps cut out at 3am for ten minutes: get in, throw one up on the last carriage, shoot it and get clear.",
+      "after": [],
+      "delay": 8,
+      "intro": [
+        ["nix", "heard something. the yard lamps cut out at 3am. ten minutes, then they come back"],
+        ["nix", "patrol walks its loop the whole time. so it's quiet and it's quick"],
+        ["nix", "last carriage on the east side. one throw-up, one photo. then go"]
+      ],
+      "objectives": [
+        { "type": "reach", "place": "yard", "r": 12, "text": "SLIP INTO THE YARD",
+          "hint": [["nix", "walk. don't run. running is loud"]] },
+        { "type": "paint", "walls": ["ne7-e"], "kind": "throw-up", "sketch": "throw-void", "text": "PUT A THROW-UP ON THE LAST CARRIAGE",
+          "hint": [["nix", "fill it fast. the lamps won't stay off"]] },
+        { "type": "photo", "walls": ["ne7-e"], "painted": true, "dist": 16, "text": "GET A PHOTO OF IT" },
+        { "type": "escape", "text": "GET CLEAR BEFORE THE PATROL COMES ROUND",
+          "hint": [["nix", "they're close. keep low and go"]] }
+      ],
+      "done": [
+        ["nix", "lamps are back on. you're not in them"],
+        ["nix", "good. nobody heard a thing"]
+      ]
+    }
+  ]
+}
