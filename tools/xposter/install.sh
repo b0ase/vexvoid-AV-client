@@ -48,7 +48,8 @@ if [ "${1:-}" = --check ]; then
   if [ -d /run/systemd/system ]; then c 'systemctl is-enabled --quiet vexvoid-x.timer && systemctl is-active --quiet vexvoid-x.timer' "the timer is enabled and active"
   else c '[ -f /etc/cron.d/vexvoid-x ] && [ "$(stat -c %U /etc/cron.d/vexvoid-x)" = root ]' "the cron entry is in place"; fi
   c '$NODE $OPT/xposter.mjs status > /tmp/vexvoid-x-status.$$ 2>&1 && grep -q "pictures:  25 of 25" /tmp/vexvoid-x-status.$$' "all 25 pictures on disk and checked"
-  c '$NODE $OPT/test-xposter.mjs > /tmp/vexvoid-x-test.$$ 2>&1' "the installed copy passes its tests (fake Claude, fake X; $(tail -n 1 /tmp/vexvoid-x-test.$$ 2>/dev/null || true))"
+  c '$NODE $OPT/test-xposter.mjs > /tmp/vexvoid-x-test.$$ 2>&1' "the installed copy passes its tests (fake Claude, fake X)"
+  grep FAIL /tmp/vexvoid-x-test.$$ | head -n 5 | sed 's/^/        /' || true
   grep -E '^  (state|today|next slot|queue|keys|last problem):' /tmp/vexvoid-x-status.$$ 2>/dev/null | sed 's/^/   /' || true
   rm -f /tmp/vexvoid-x-status.$$ /tmp/vexvoid-x-test.$$
   [ $F = 0 ] && exit 0 || exit 1
@@ -154,7 +155,7 @@ NEED="VEXVOID_X_API_KEY VEXVOID_X_API_SECRET VEXVOID_X_ACCESS_TOKEN VEXVOID_X_AC
 id -u vexvoid-x >/dev/null 2>&1 || { echo "no vexvoid-x user: run the builder setup first"; exit 1; }
 [ "$(id -u)" = 0 ] || [ "$(id -un)" = vexvoid-x ] || sudo -v   # the password first, so the paste goes to the right prompt
 printf 'Paste the key line (Ctrl+Shift+V), then press Enter. Nothing will show: '
-IFS= read -rs line; echo
+IFS= read -rs line || [ -n "${line:-}" ] || { echo; echo "Nothing pasted. Nothing was written."; exit 1; }; echo
 blk=$(printf '%s' "$line" | tr -d ' \r\n\t' | base64 -d 2>/dev/null) || { echo "That line is not base64. Nothing was written."; exit 1; }
 unset line
 # every line must be NAME=value for one of the five names, each value one word; never print a value

@@ -252,7 +252,7 @@ export function status({ now = Date.now() } = {}) {
   out.push(`  queue:     ${q.length} hand-written post${q.length === 1 ? '' : 's'} waiting${q.length ? ' (next: ' + q[0] + ')' : ''}${held ? `; ${held} held in queue/held (failed the checks)` : ''}`)
   let keys
   try { fs.accessSync(P.env, fs.constants.R_OK); const k = readKeys(P); SECRETS = []; keys = k.missing ? `MISSING ${k.missing.join(', ')}` : 'all 5 present' }
-  catch (e) { keys = e.code === 'ENOENT' ? 'NOT INSTALLED (run vexvoid-x-keys)' : 'present? (only vexvoid-x can read them: sudo vexvoid-x status shows)' }
+  catch (e) { keys = e.code === 'ENOENT' ? 'NOT INSTALLED (run vexvoid-x-keys)' : 'hidden from you, as they should be (sudo vexvoid-x status checks them)' }
   out.push(`  keys:      ${keys}`)
   const { ready, all } = loadImages(P)
   out.push(`  pictures:  ${ready.length} of ${all.length} on disk and checked`)
