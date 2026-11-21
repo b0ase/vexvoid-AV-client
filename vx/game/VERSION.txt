@@ -1,6 +1,6 @@
 vexvoid-game.js: game/src (TypeScript) bundled by scripts/build-game.sh with esbuild 0.27.2 (darwin-arm64, npm
 integrity checked) and three 0.182.0 (MIT, npm sha512-GbHabT+Irv+ihI1/f5kIIsZ+Ef9Sl5A1Y7imvS5RQjWgtTPfPnZ43JmlYI7NtCRDK9zir20lQpfg8/9Yd02OvQ==).
-sha256 6db832cbdf03cce1aaa9aabaabfe53e9c73175f71dcc8c110904c568eaf93faf
+sha256 9e2228e9c0f3ef7f4f4747a05f024ef4f8e55e62ecff7b9b71947fcecc586cea
 The district (game/src/plan.ts, world.ts, district.ts, districtTex.ts) is our own, all surfaces drawn in code. city.ts (forked from
 tokenblaster.lol @88d14f1, ESCAPE FROM TERRORNODE, NPG Ltd) is no longer used by the game; cityAssets.ts/cityShaders.ts still lend it shaders.
 sketches: game/sketches/*.json, our own starter sketches (stroke data, written by game/sketches/make.mjs), bundled in.
