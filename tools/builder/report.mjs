@@ -67,7 +67,7 @@ if (cmd === 'cost') {
   out.push('', '### Play-check (headless, software WebGL; the fps gate runs at review on a real GPU)', '', '```', ...lines.map((l) => l.replace(/`/g, "'")), '```', '')
   if (pics.length) {
     out.push('### Previews', '')
-    for (const p of pics) { const n = path.basename(p); out.push(/\.mp4$/.test(n) ? `- clip: [${n}](${img}/${n})` : `![${n}](${img}/${n}?raw=true)`) }
+    for (const p of pics) { const n = path.basename(p); out.push(/\.(jpg|png)$/.test(n) ? `![${n}](${img}/${n}?raw=true)` : `- ${/\.mp4$/.test(n) ? 'clip' : 'check result'}: [${n}](${img}/${n})`) }
     out.push('')
   }
   const models = Object.entries(L.models).map(([m, t]) => `${m} $${t.usd.toFixed(2)}`).join(', ') || 'none'
