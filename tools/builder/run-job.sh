@@ -17,6 +17,7 @@
 #   BUILDER_DRY=1          do everything except the push and the pull request (a local test)
 #   BUILDER_MAX_SESSIONS=4 agent sessions before the job is left as failed
 #   CLAUDE_BIN=claude      the Claude Code command (tests point it at a stand-in)
+#   BUILDER_SESSION_SECS=5400  wall-clock limit per agent session (needs coreutils timeout, as on the VM)
 # Exit 0: a PR is open (or, dry, ready). 1: failed or refused. 5: paused at the cost stop. 75: another job is running.
 set -euo pipefail
 { set +x; } 2>/dev/null
@@ -60,6 +61,8 @@ git -C "$R" worktree add --quiet -B "pack/$ID" "$WORK" "$BASE"
 # ---- 3. the agent's world: pack-check on its PATH, its settings, its prompt ----
 cat > "$J/bin/pack-check" <<EOF
 #!/usr/bin/env bash
+# the agent's pack-check: this job's pack (or every pack) only, never another path
+for a in "\$@"; do case "\$a" in game/content/packs/p-*.json) case "\$a" in *..*|*/*/*/*/*) echo "pack-check: only game/content/packs/p-<id>.json"; exit 2 ;; esac ;; *) echo "pack-check: only game/content/packs/p-<id>.json"; exit 2 ;; esac; done
 cd "$WORK" && exec env PACKS_REPO="$WORK" PACK_FPS=off PACK_OUT="$J/previews" PACK_LOG="$J/checks.log" bash "$R/tools/packs/pack-check.sh" "\$@"
 EOF
 chmod +x "$J/bin/pack-check"
@@ -100,12 +103,14 @@ for n in $(seq 1 "$MAXS"); do
   if [ "$n" = 1 ]; then RESUME=(--session-id "$SID"); else RESUME=(--resume "$SID"); fi
   say "session $n: $MODEL, budget \$$REMAIN (failed checks so far: $FAILS)"
   T0=$(date +%s)
-  ( cd "$WORK" && env -i HOME="$HOME" USER="${USER:-user}" LANG=C.UTF-8 TERM=dumb TMPDIR="$J/tmp" \
+  TO=(); command -v timeout >/dev/null 2>&1 && TO=(timeout --kill-after=30 "${BUILDER_SESSION_SECS:-5400}")   # a stuck session (a bad key retries for ever)
+  ( cd "$WORK" && "${TO[@]}" env -i HOME="$HOME" USER="${USER:-user}" LANG=C.UTF-8 TERM=dumb TMPDIR="$J/tmp" \
       PATH="$J/bin:$(dirname "$NODE"):$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin" \
       "$CLAUDE" -p "$MSG" --bare --restricted \
         --tools "Read,Glob,Grep,Write,Edit,Bash" \
         --allowedTools "Read" "Glob" "Grep" "Write(./$PACKF)" "Edit(./$PACKF)" \
-          "Bash(node scripts/pack-validate.mjs)" "Bash(node scripts/pack-validate.mjs *)" "Bash(node scripts/pack-index.mjs)" "Bash(pack-check *)" \
+          "Bash(node scripts/pack-validate.mjs)" "Bash(node scripts/pack-validate.mjs --refs)" "Bash(node scripts/pack-validate.mjs $PACKF)" \
+          "Bash(node scripts/pack-index.mjs)" "Bash(pack-check $PACKF)" "Bash(pack-check)" \
         --disallowedTools "WebFetch" "WebSearch" \
         --permission-mode dontAsk --permission-prompts none \
         --settings "$J/claude-settings.json" --strict-mcp-config \

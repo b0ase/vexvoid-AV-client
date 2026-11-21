@@ -22,7 +22,8 @@ jobs:
         if: ${{ !startsWith(github.head_ref, 'pack/') }}
         env:
           HEAD_REF: ${{ github.head_ref }}
-        run: echo "Not a pack/* branch ($HEAD_REF): nothing to guard."
+        run: |
+          echo "Not a pack/* branch ($HEAD_REF), nothing to guard."
 
       - name: Check out (the pull request head, its base for the diff)
         if: ${{ startsWith(github.head_ref, 'pack/') }}
@@ -38,22 +39,23 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
+          C=${RUNNER_TEMP:-/tmp}/pack-guard-changed.txt
           base=$(git merge-base "$BASE_SHA" "$HEAD_SHA")
           # every path the PR touches, renames and deletions included (both sides of a rename)
-          git diff --name-status --no-renames "$base" "$HEAD_SHA" > changed.txt
-          cat changed.txt
-          bad=$(awk '{ print $2 }' changed.txt | grep -v -E '^game/content/packs/[A-Za-z0-9._-]+$' || true)
+          git diff --name-status --no-renames "$base" "$HEAD_SHA" > "$C"
+          cat "$C"
+          bad=$(awk '{ print $2 }' "$C" | grep -v -E '^game/content/packs/[A-Za-z0-9._-]+$' || true)
           if [ -n "$bad" ]; then
             echo "::error::A pack branch may only change files directly under game/content/packs/. Outside it:"
             echo "$bad"
             exit 1
           fi
           # a pack PR adds or changes pack JSON and the generated index only, and never deletes a pack
-          odd=$(awk '{ print $2 }' changed.txt | grep -v -E '^game/content/packs/(p-[a-z0-9-]+\.json|index\.ts)$' || true)
+          odd=$(awk '{ print $2 }' "$C" | grep -v -E '^game/content/packs/(p-[a-z0-9-]+\.json|index\.ts)$' || true)
           if [ -n "$odd" ]; then echo "::error::Only p-*.json packs and index.ts: $odd"; exit 1; fi
-          if awk '$1 == "D"' changed.txt | grep -q .; then echo "::error::A pack PR does not delete files"; exit 1; fi
+          if awk '$1 == "D"' "$C" | grep -q .; then echo "::error::A pack PR does not delete files"; exit 1; fi
           # no symlinks (a link in packs/ could point anywhere)
-          for f in $(awk '$1 != "D" { print $2 }' changed.txt); do
+          for f in $(awk '$1 != "D" { print $2 }' "$C"); do
             mode=$(git ls-tree "$HEAD_SHA" -- "$f" | awk '{ print $1 }')
             if [ "$mode" = "120000" ]; then echo "::error::$f is a symlink"; exit 1; fi
           done

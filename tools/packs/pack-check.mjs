@@ -72,7 +72,8 @@ await open()
 // the guard the desktop copy has (the packs test profile): here, the page must be this run's own 127.0.0.1 server
 if (!String(await T.ev(`location.href`)).startsWith(web.url)) { console.log('FAIL not the check page: refusing to reset the story there'); quit(1) }
 { // the game steps time by at most 50 ms a frame: under ~20 fps it runs slow, so every wait is stretched to match
-  const f = await fpsNow(3000); SLOW = Math.min(14, Math.max(1, 1 / Math.min(1, 0.05 * Math.max(0.5, f))))
+  await fpsNow(2500); const f = await fpsNow(3000); SLOW =   // (the first frames compile shaders: not counted)
+    Math.min(14, Math.max(1, 1 / Math.min(1, 0.05 * Math.max(0.5, f))))
   result.view = `${VW}x${VH}`; result.fpsStart = f; result.slow = +SLOW.toFixed(2)
   console.log(`     (${GL} WebGL, ${VW}x${VH}, ${f} fps: waits x${SLOW.toFixed(1)})`)
 }
@@ -206,10 +207,12 @@ try {
       if (o.type === 'hide') await T.key('c', 'KeyC', 67)
       if (o.type === 'escape') await g(`(g.cops(false), 1)`)
       O.secs = +((Date.now() - t0) / 1000).toFixed(1)
-      if (after) { O.ok = true; ok(true, `${oi + 1}. ${o.type}: ${o.text} (${O.secs} s${O.sketch ? ', blasted ' + O.sketch : ''}${O.framed ? ', framed ' + O.framed : ''})`) } else bad(`objective ${oi + 1} (${o.type}: ${o.text}) did not complete`)
+      if (after) { O.ok = true; ok(true, `${oi + 1}. ${o.type}: ${o.text} (${O.secs} s${O.sketch ? ', blasted ' + O.sketch : ''}${O.framed ? ', framed ' + O.framed : ''})`) }
+      else { bad(`objective ${oi + 1} (${o.type}: ${o.text}) did not complete${O.framed === 'never in frame' ? ' (the lens never said IN FRAME from in front of ' + o.walls.join(' / ') + ')' : ''}`); if (s) await snap(`${mi}-${oi}-${o.type}`); R.stuck = true; break }
       if (o.type === 'photo' && after) save(`${mi}-${oi}-photo`, 'png', await T.ev(`window.vxGameNow.photos().then((l) => window.vxGameNow.photoData(l[0].id))`))
       else if (s) await snap(`${mi}-${oi}-${o.type}`)
     }
+    if (R.stuck) { ok(false, `${m.id}: the rest of it not played (objectives come one at a time)`); continue }
     const fin = await waitFor(m.id + ' done', async () => { const x = await mis(m.id); return x.status === 'done' ? x : null }, 6)
     if (fin) ok(true, `${m.title} done`); else bad('not done after its last objective')
     const lastDone = m.done[m.done.length - 1]
