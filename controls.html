@@ -5178,8 +5178,11 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
 
       // ----- the release carousel -----
       const mc = { sel: 'all', market: null, marketBusy: false };
+      // catalogue images that show a face (masked or in shadow) are never a release cover (house rule: no faces).
+      // Checked by eye across the whole catalogue, 21 Nov 2026; add any new one here.
+      const MC_FACES = ['jam-01', 'jam-03', 'jam-10', 'jam-11', 'jam-17', 'jam-18'].map(n => '/VexVoid_Jam/' + n + '.jpg');
       function mcCover(key) {
-        const imgs = catalogue().images || []; if (!imgs.length) return '';
+        const imgs = (catalogue().images || []).filter(i => !MC_FACES.some(f => i.url.endsWith(f))); if (!imgs.length) return '';
         let h = 0; for (const c of key) h = (h * 31 + c.charCodeAt(0)) >>> 0;
         return imgs[h % imgs.length].url;
       }
