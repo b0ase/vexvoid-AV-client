@@ -1,0 +1,63 @@
+{
+ "pack": "p-house-01",
+ "gl": "swiftshader",
+ "missions": [
+  {
+   "id": "p-house-01-dark",
+   "title": "TEN DARK MINUTES",
+   "objectives": [
+    {
+     "type": "reach",
+     "text": "SLIP INTO THE YARD",
+     "ok": true,
+     "secs": 1.1
+    },
+    {
+     "type": "paint",
+     "text": "PUT A THROW-UP ON THE LAST CARRIAGE",
+     "ok": true,
+     "secs": 4.7,
+     "sketch": "throw-void"
+    },
+    {
+     "type": "photo",
+     "text": "GET A PHOTO OF IT",
+     "ok": true,
+     "secs": 15.6,
+     "framed": "9 m back, tilt 0.12"
+    },
+    {
+     "type": "escape",
+     "text": "GET CLEAR BEFORE THE PATROL COMES ROUND",
+     "ok": true,
+     "secs": 186
+    }
+   ],
+   "ok": true
+  }
+ ],
+ "fps": [],
+ "pictures": [
+  "/home/user/vexvoid-builder/jobs/p-house-01/previews/p-house-01/0-phone-card.png",
+  "/home/user/vexvoid-builder/jobs/p-house-01/previews/p-house-01/0-phone-map.png",
+  "/home/user/vexvoid-builder/jobs/p-house-01/previews/p-house-01/0-0-reach.jpg",
+  "/home/user/vexvoid-builder/jobs/p-house-01/previews/p-house-01/0-1-paint.jpg",
+  "/home/user/vexvoid-builder/jobs/p-house-01/previews/p-house-01/0-2-photo.png",
+  "/home/user/vexvoid-builder/jobs/p-house-01/previews/p-house-01/clip-frame.jpg",
+  "/home/user/vexvoid-builder/jobs/p-house-01/previews/p-house-01/map-overhead.png",
+  "/home/user/vexvoid-builder/jobs/p-house-01/previews/p-house-01/district-yard-street.jpg",
+  "/home/user/vexvoid-builder/jobs/p-house-01/previews/p-house-01/district-yard-wide.jpg",
+  "/home/user/vexvoid-builder/jobs/p-house-01/previews/p-house-01/district-void-street-street.jpg",
+  "/home/user/vexvoid-builder/jobs/p-house-01/previews/p-house-01/district-void-street-wide.jpg"
+ ],
+ "clip": "/home/user/vexvoid-builder/jobs/p-house-01/previews/p-house-01/clip.mp4",
+ "view": "640x400",
+ "fpsStart": 5,
+ "slow": 4,
+ "places": [
+  "yard",
+  "void-street"
+ ],
+ "ok": true,
+ "fails": []
+}
