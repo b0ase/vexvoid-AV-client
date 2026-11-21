@@ -20,7 +20,8 @@
 #   bash setup.sh                 everything
 #   bash setup.sh --no-install    skip apt, Node, pnpm, Claude Code and the browser (they must be there already)
 #   bash setup.sh --self-test     only the self-test (on an existing setup)
-# Test knobs: VEXVOID_BUILDER_HOME (default ~/vexvoid-builder), VEXVOID_REPO_URL, VEXVOID_BUILDER_REF (feat/vx-builder).
+# Test knobs: VEXVOID_BUILDER_HOME (default ~/vexvoid-builder), VEXVOID_BUILDER_ENV, VEXVOID_REPO_URL, VEXVOID_BUILDER_REF
+# (feat/vx-builder), VEXVOID_NO_RC=1 (leave ~/.profile and ~/.bashrc alone; they are only edited on Linux anyway).
 set -euo pipefail
 { set +x; } 2>/dev/null
 umask 022
@@ -163,7 +164,7 @@ chmod 755 "$REPO/.git/hooks/pre-push"; echo "   git user vexvoid-builder; pre-pu
 # ---------------------------------------------------------------- the builder's own deps and the browser
 say "the builder's packages (tools/builder: Anthropic SDK, Playwright) and chrome-headless-shell"
 (cd "$REPO/tools/builder" && pnpm install --ignore-workspace --frozen-lockfile --reporter=silent)
-export PLAYWRIGHT_BROWSERS_PATH=$TOOLS/ms-playwright
+[ "$INSTALL" = 1 ] || [ -d "$TOOLS/ms-playwright" ] && export PLAYWRIGHT_BROWSERS_PATH=$TOOLS/ms-playwright
 if [ "$INSTALL" = 1 ]; then
   (cd "$REPO/tools/builder" && ./node_modules/.bin/playwright install chromium-headless-shell)
   if [ "${PLAT%%_*}" = linux ]; then (cd "$REPO/tools/builder" && sudo env "PATH=$PATH" ./node_modules/.bin/playwright install-deps chromium-headless-shell >/dev/null); fi
@@ -199,12 +200,14 @@ exec node "$REPO/tools/builder/reader.mjs" "\$@"
 EOF
 chmod 755 "$BIN/anthropic-key" "$BIN/vexvoid-job" "$BIN/vexvoid-read"
 LINE="export PATH=\"$BIN:$TOOLS/node/bin:\$HOME/.local/bin:\$PATH\" PLAYWRIGHT_BROWSERS_PATH=\"$TOOLS/ms-playwright\"   # vexvoid-builder"
-for rc in "$HOME/.profile" "$HOME/.bashrc"; do [ -f "$rc" ] && grep -q '# vexvoid-builder$' "$rc" || echo "$LINE" >> "$rc"; done
-echo "   vexvoid-job, vexvoid-read, anthropic-key, git-credential-vexvoid (PATH added to ~/.profile and ~/.bashrc)"
+if [ "${PLAT%%_*}" = linux ] && [ -z "${VEXVOID_NO_RC:-}" ]; then   # the VM only: a Mac running the tests keeps its shell files
+  for rc in "$HOME/.profile" "$HOME/.bashrc"; do [ -f "$rc" ] && grep -q '# vexvoid-builder$' "$rc" || echo "$LINE" >> "$rc"; done
+  echo "   vexvoid-job, vexvoid-read, anthropic-key, git-credential-vexvoid (PATH added to ~/.profile and ~/.bashrc)"
+else echo "   vexvoid-job, vexvoid-read, anthropic-key, git-credential-vexvoid (shell files not touched)"; fi
 fi
 
 # ---------------------------------------------------------------- the self-test
-export PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH:-$TOOLS/ms-playwright}
+[ -d "$TOOLS/ms-playwright" ] && export PLAYWRIGHT_BROWSERS_PATH=$TOOLS/ms-playwright
 say "SELF-TEST in $REPO"
 cd "$REPO"; FAILS=()
 T=$B/selftest; rm -rf "$T"; mkdir -p "$T"
