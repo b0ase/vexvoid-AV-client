@@ -1,6 +1,7 @@
-const { app, BrowserWindow, ipcMain, screen, desktopCapturer, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, desktopCapturer, dialog, shell } = require('electron');
 const path = require('path');
 const remoteMain = require('@electron/remote/main');
+const VIDEOS = require('./vx/music-videos.js');
 
 remoteMain.initialize();
 
@@ -78,6 +79,12 @@ function createControlWindow() {
 
   controlWindow.loadFile(path.join(__dirname, 'controls.html'));
   remoteMain.enable(controlWindow.webContents);
+  // Links out of a YouTube teaser player ("Watch on YouTube", the title) open in the browser, not in a bare app window
+  controlWindow.webContents.setWindowOpenHandler(({ url }) => {
+    let host = ''; try { host = new URL(url).hostname; } catch (e) {}
+    if (/(^|\.)(youtube\.com|youtube-nocookie\.com|youtu\.be)$/.test(host)) { shell.openExternal(url); return { action: 'deny' }; }
+    return { action: 'allow' };
+  });
 
   // Ensure fullscreen after loading
   controlWindow.once('ready-to-show', () => {
@@ -143,8 +150,11 @@ const PAIRING_RELAY = 'relay.bwallet.space';
 app.whenReady().then(() => {
   if (!firstInstance) return;
   const { session } = require('electron');
-  session.defaultSession.webRequest.onBeforeSendHeaders({ urls: ['wss://' + PAIRING_RELAY + '/*'] }, (details, done) => {
-    const headers = details.requestHeaders;
+  // One listener per session (a second call replaces the first), so the YouTube teasers share it: the MUSIC tab's
+  // VIDEOS shelf frames youtube-nocookie from a file:// page, which sends no Referer, and YouTube refuses that
+  // (Error 153). vx/music-videos.js adds the site's address as the Referer on those requests only.
+  session.defaultSession.webRequest.onBeforeSendHeaders({ urls: ['wss://' + PAIRING_RELAY + '/*', ...VIDEOS.EMBED_URLS] }, (details, done) => {
+    const headers = VIDEOS.withReferer(details);
     if (new URL(details.url).hostname === PAIRING_RELAY) {
       for (const k of Object.keys(headers)) if (k.toLowerCase() === 'origin') delete headers[k];
       headers.Origin = APP_ORIGIN; // app identity, see APP_ORIGIN

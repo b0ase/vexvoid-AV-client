@@ -5,6 +5,7 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="./vx/platform.js" data-role="controls"></script>
+  <script src="./vx/music-videos.js"></script>
   <title>V3XV0ID Image Animator - Controls</title>
   <style>
     /* ========== V3XV0ID DESIGN SYSTEM ========== */
@@ -1943,6 +1944,22 @@
     .mc-card:hover .mc-cover{filter:grayscale(.3)}.mc-card.on .mc-cover{border-color:#fff;filter:none}
     .mc-t{margin-top:6px;font-size:10px;letter-spacing:.12em;color:#ddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .mc-s{font-size:8px;letter-spacing:.16em;color:#666;margin-top:2px}
+    /* VIDEOS: the music-video teasers (vx/music-videos.js); the art and a play button until a click loads the player */
+    .mv{margin:14px 0 4px}.mv-h{font-size:10px;letter-spacing:.2em;color:#ddd;margin-bottom:8px}.mv-h .dim{color:#666;margin-left:8px;font-size:8px}
+    .mv-strip{display:flex;gap:12px;overflow-x:auto;padding-bottom:4px}.mv-strip::-webkit-scrollbar{height:3px}.mv-strip::-webkit-scrollbar-thumb{background:#333}
+    .mv-card{flex:none;width:240px;color:#999}
+    .mv-screen{position:relative;width:240px;height:135px;background:#0a0a0a;border:1px solid #1d1d1d;overflow:hidden}
+    .mv-screen iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+    .mv-play{position:absolute;inset:0;width:100%;height:100%;padding:0;border:0;cursor:pointer;background:#0a0a0a center/cover no-repeat;filter:grayscale(1) brightness(.7)}
+    .mv-play:hover{filter:grayscale(1) brightness(.9)}
+    .mv-play::after{content:'';position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-24px 0 0 -24px;border:1px solid #fff;border-radius:50%;background:rgba(0,0,0,.5)}
+    .mv-play::before{content:'';position:absolute;left:50%;top:50%;margin:-8px 0 0 -4px;border-style:solid;border-width:8px 0 8px 13px;border-color:transparent transparent transparent #fff;z-index:1}
+    .mv-card.on .mv-screen{border-color:#fff}
+    #musicTab .music-library-section{min-height:220px} /* the shelf above must not squeeze the track list shut */
+    .mv-k{margin-top:6px;font-size:8px;letter-spacing:.2em;color:#777}
+    .mv-t{margin-top:2px;font-size:11px;letter-spacing:.12em;color:#ddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .mv-row{display:flex;justify-content:space-between;align-items:baseline;margin-top:2px;font-size:8px;letter-spacing:.16em;color:#666}
+    .mv-row button{font:inherit;font-size:8px;letter-spacing:.16em;background:none;border:0;padding:0;color:#888;cursor:pointer}.mv-row button:hover{color:#fff}
     /* VEXVOID preset gallery */
     .pg{display:flex;flex-direction:column;gap:14px;width:100%;height:100%;min-height:0}
     .pg-head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;padding:6px 4px 0}
@@ -2591,6 +2608,9 @@
 
         <!-- Releases: swipe through singles and albums (catalogue, your folders, your wallet, the market), pick one -->
         <div class="mc"><button class="mc-arrow" id="mcPrev" title="Previous">&lsaquo;</button><div class="mc-strip" id="mcStrip"></div><button class="mc-arrow" id="mcNext" title="Next">&rsaquo;</button></div>
+
+        <!-- Videos: the music-video teasers on YouTube (vx/music-videos.js, the same list as vexvoid.com/music). Nothing loads from YouTube until a play click. -->
+        <div class="mv" id="mvShelf"><div class="mv-h">VIDEOS<span class="dim">TEASERS</span></div><div class="mv-strip" id="mvStrip"></div></div>
 
         <!-- Music Library -->
         <div class="music-library-section">
@@ -5185,6 +5205,41 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
         });
         strip.scrollLeft = keep;
       }
+      // ----- the VIDEOS shelf: one teaser plays at a time, in place of its art; the music pauses while it does -----
+      const mv = { on: null };
+      function renderVideoShelf() {
+        const strip = musicEl('mvStrip'); if (!strip || !window.VXVIDEOS) return;
+        strip.innerHTML = '';
+        VXVIDEOS.list.forEach((v, i) => {
+          const card = document.createElement('div'); card.className = 'mv-card' + (mv.on === v.id ? ' on' : ''); card.dataset.video = v.id;
+          card.innerHTML = '<div class="mv-screen"></div><div class="mv-k"></div><div class="mv-t"></div><div class="mv-row"><span></span><button title="Open it on YouTube in the browser">YOUTUBE &#8599;</button></div>';
+          const screen = card.querySelector('.mv-screen');
+          if (mv.on === v.id) {
+            const f = document.createElement('iframe');
+            f.src = VXVIDEOS.embedUrl(v.id); f.title = v.title + ' (teaser) · V3XV0ID';
+            f.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen'; f.allowFullscreen = true; f.referrerPolicy = 'strict-origin-when-cross-origin';
+            screen.appendChild(f);
+          } else {
+            const play = document.createElement('button'); play.className = 'mv-play'; play.title = 'Play the ' + v.title + ' teaser';
+            play.style.backgroundImage = `url("${v.art}")`;
+            play.addEventListener('click', () => playVideoTeaser(i));
+            screen.appendChild(play);
+          }
+          card.querySelector('.mv-k').textContent = v.kind === 'teaser' ? 'TEASER' : 'MUSIC VIDEO';
+          card.querySelector('.mv-t').textContent = v.title.toUpperCase();
+          card.querySelector('.mv-row span').textContent = v.kind === 'teaser' ? 'FULL VIDEO: COMING SOON' : '';
+          card.querySelector('.mv-row button').addEventListener('click', () => VXP.openExternal(VXVIDEOS.watchUrl(v.id)));
+          strip.appendChild(card);
+        });
+      }
+      function videoNow() { const v = mv.on && VXVIDEOS.list.find(x => x.id === mv.on); return { video: v ? v.title : null, id: v ? v.id : null, youtube: v ? VXVIDEOS.watchUrl(v.id) : null }; }
+      function playVideoTeaser(q) {
+        const v = typeof q === 'object' ? q : VXVIDEOS.find(q); if (!v) throw new Error('no video ' + q);
+        if (currentAudio && !currentAudio.paused) currentAudio.pause();
+        mv.on = v.id; renderVideoShelf(); return videoNow();
+      }
+      function stopVideoTeaser() { mv.on = null; renderVideoShelf(); return videoNow(); }
+      renderVideoShelf();
       async function loadMusicMarket() {
         if (mc.marketBusy) return; mc.marketBusy = true;
         musicLibrary.innerHTML = '<div class="wb-note" style="padding:12px">Looking for VexVoid music for sale on the market…</div>';
@@ -5232,6 +5287,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
       function playTrack(id) {
         const track = musicLibraryTracks[id];
         if (!track) return;
+        if (mv.on) stopVideoTeaser(); // a track takes over from a playing teaser
         const a = musicAudio();
         currentTrackIndex = id;
         a.src = track.source === 'local' ? VXP.fileUrl(track.url) : track.url;
@@ -5392,6 +5448,15 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           playTrack(t.id); return musicNow();
         } },
         pause: { doc: 'Pause music', run: () => { if (currentAudio) currentAudio.pause(); return musicNow(); } },
+        videos: { doc: 'List the music-video teasers (the MUSIC tab VIDEOS shelf)', run: () => VXVIDEOS.list.map((v, i) => ({ n: i, title: v.title, kind: v.kind, youtube: VXVIDEOS.watchUrl(v.id), playing: mv.on === v.id })) },
+        video: { args: '{action play|stop, video? (number or title words)}', doc: 'Play a music-video teaser in the MUSIC tab (the music pauses), or stop it', run: a => {
+          if (a.action === 'stop') return stopVideoTeaser();
+          return playVideoTeaser(a.video == null ? 0 : a.video);
+        } },
+        'video-open': { args: '{video (number or title words)}', doc: 'Open a music-video teaser on YouTube in the browser', run: async a => {
+          const v = VXVIDEOS.find(a.video == null ? 0 : a.video); if (!v) throw new Error('no video ' + a.video);
+          await VXP.openExternal(VXVIDEOS.watchUrl(v.id)); return { opened: VXVIDEOS.watchUrl(v.id) };
+        } },
         next: { doc: 'Next track', run: () => { nextTrack(); return musicNow(); } },
         prev: { doc: 'Previous track', run: () => { prevTrack(); return musicNow(); } },
         bpm: { args: '{value}', doc: 'Set the tempo the sketches follow', run: a => { VXGEN.signals.bpm = num(a.value, 40, 220); VXGEN.signals.beat0 = performance.now(); return VXGEN.signals.bpm; } },
@@ -5418,7 +5483,7 @@ Reply with the sketch in one \`\`\`js code block, then one line starting with KN
           crossfader: Number(crossfader.value), deck: activePalette, layers: [...layersA, ...layersB].map(layerInfo),
           sketch: { name: gen.name, seed: gen.seed, knobs: gen.knobs, params: gen.params, evolve: gen.evolve, running: !!gen.inst, sentKey: gen.key },
           tempo: { bpm: VXGEN.signals.bpm, listening: genEl('genAudio').value || 'clock', level: +VXGEN.signals.level.toFixed(2) },
-          music: musicNow(), vx: window.vxState ? window.vxState() : {}
+          music: musicNow(), video: videoNow(), vx: window.vxState ? window.vxState() : {}
         };
       }
       window.vxCommand = async (cmd, args) => {

@@ -11,7 +11,7 @@ function tools({ remote = false } = {}) {
     : { clip: { type: 'string' }, image: { type: 'string' }, path: { type: 'string', description: 'Local file' }, deck };
 
   return [
-    { name: 'mixer_state', description: 'What the mixer is doing now: crossfader, layers on each deck, the running sketch and its knobs, tempo, music, VX engine settings.',
+    { name: 'mixer_state', description: 'What the mixer is doing now: crossfader, layers on each deck, the running sketch and its knobs, tempo, music, the teaser video playing, VX engine settings.',
       inputSchema: { type: 'object', properties: {} }, run: (a, io) => io.cmd('state') },
     { name: 'mixer_snapshot', description: 'A picture of the output window (what the audience sees).',
       inputSchema: { type: 'object', properties: { width: { type: 'number', description: 'Pixel width, default 960' } } },
@@ -44,6 +44,9 @@ function tools({ remote = false } = {}) {
     { name: 'music', description: 'Control the music player: list tracks, play (optionally a track number or title words), pause, next, prev.',
       inputSchema: { type: 'object', properties: { action: { type: 'string', enum: ['list', 'play', 'pause', 'next', 'prev'] }, track: { type: 'string' } }, required: ['action'] },
       run: (a, io) => io.cmd(a.action === 'list' ? 'tracks' : a.action, a.track != null ? { track: a.track } : {}) },
+    { name: 'music_videos', description: 'The V3XV0ID music-video teasers on YouTube (the MUSIC tab VIDEOS shelf, the same list as vexvoid.com/music): list them, play one in the MUSIC tab (by number or title words; the music pauses), or stop it.' + (remote ? '' : ' open shows it on YouTube in the browser.'),
+      inputSchema: { type: 'object', properties: { action: { type: 'string', enum: remote ? ['list', 'play', 'stop'] : ['list', 'play', 'stop', 'open'] }, video: { type: 'string', description: 'Number (from list) or title words, e.g. "shadow steps"' } }, required: ['action'] },
+      run: (a, io) => a.action === 'list' ? io.cmd('videos') : a.action === 'open' && !remote ? io.cmd('video-open', { video: a.video }) : io.cmd('video', { action: a.action === 'stop' ? 'stop' : 'play', video: a.video }) },
     { name: 'store', description: 'The V3XV0ID merch range WE sell (vexvoid.com/store; not the MARKET, where players trade): each item\'s code, name, status (coming soon / concept), USD price once set, and its page. Read only: buying happens on vexvoid.com.',
       inputSchema: { type: 'object', properties: {} }, run: (a, io) => io.cmd('store') },
     { name: 'tempo', description: 'Set the BPM the sketches follow, or choose what they listen to (clock, music, input).',
@@ -62,7 +65,7 @@ function tools({ remote = false } = {}) {
 
 // Commands a remote (claude.ai) session may run in the app; the app checks this list too.
 const REMOTE_COMMANDS = ['state', 'store', 'fade', 'cut', 'sketches', 'sketch', 'cue', 'knobs', 'mutate', 'evolve', 'clips', 'images', 'load', 'layers', 'layer',
-  'remove', 'clear', 'tracks', 'play', 'pause', 'next', 'prev', 'bpm', 'tap', 'audio', 'vx', 'vx-next', 'vx-clean', 'blackout', 'vx-reset', 'snapshot'];
+  'remove', 'clear', 'tracks', 'play', 'pause', 'next', 'prev', 'videos', 'video', 'bpm', 'tap', 'audio', 'vx', 'vx-next', 'vx-clean', 'blackout', 'vx-reset', 'snapshot'];
 
 const INSTRUCTIONS = 'Controls the V3XV0ID VJ mixer live. Check mixer_state first; use mixer_snapshot to see the output. The look is strictly monochrome (white on black). Prefer cueing on the hidden deck and crossfading over changing what is on air abruptly. Locally you also have the VexVoid agent\'s own tools (editor for music videos on the EDIT timeline, text_layer, write_sketch, compose_set, record, skill and more): load the relevant skill first (skill music-video before cutting a video), as VexVoid does.';
 
