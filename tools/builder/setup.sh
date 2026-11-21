@@ -162,7 +162,7 @@ while read -r lref lsha rref rsha; do
 done
 exit 0
 EOF
-chmod 755 "$REPO/.git/hooks/pre-push"; echo "   git user vexvoid-builder; pre-push hook: refs/heads/pack/* only"
+chmod 755 "$REPO/.git/hooks/pre-push"; echo "   git user v3xv0id-builder; pre-push hook: refs/heads/pack/* only"
 
 # ---------------------------------------------------------------- the builder's own deps and the browser
 say "the builder's packages (tools/builder: Anthropic SDK, Playwright) and chrome-headless-shell"
